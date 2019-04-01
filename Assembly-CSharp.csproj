@@ -59,12 +59,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Scripts\GONet\GONet.cs" />
-    <Compile Include="Assets\Scripts\GONet\GONetConnection_ClientToServer.cs" />
-    <Compile Include="Assets\Scripts\GONet\GONetConnection_ServerToClient.cs" />
-    <Compile Include="Assets\Scripts\GONet\GONetServer.cs" />
-    <Compile Include="Assets\Scripts\GONetTestSpawner.cs" />
-    <Compile Include="Assets\Scripts\Simpeesimul.cs" />
+    <Compile Include="Assets\Code\GONet\GONet.cs" />
+    <Compile Include="Assets\Code\GONet\GONetConnection_ClientToServer.cs" />
+    <Compile Include="Assets\Code\GONet\GONetConnection_ServerToClient.cs" />
+    <Compile Include="Assets\Code\GONet\GONetServer.cs" />
+    <Compile Include="Assets\Code\GONetTestSpawner.cs" />
+    <Compile Include="Assets\Code\Simpeesimul.cs" />
     <Reference Include="UnityEditor.StandardEvents">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/UnityEditor.StandardEvents.dll</HintPath>
     </Reference>
