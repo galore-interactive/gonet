@@ -15,7 +15,6 @@ namespace GONet
             this.client = client;
 
             client.OnMessageReceived += OnReceivedFromServer_AnyLittleThingTheProtocolLayerDeemsNecessary;
-            client.OnStateChanged += OnStateChanged;
 
             TransmitCallback = SendToServer_AnyLittleThingTheProtocolLayerDeemsNecessary;
         }
@@ -47,11 +46,6 @@ namespace GONet
         public void Disconnect()
         {
             client.Disconnect();
-        }
-
-        private void OnStateChanged(ClientState state)
-        {
-            UnityEngine.Debug.Log("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
         }
     }
 }

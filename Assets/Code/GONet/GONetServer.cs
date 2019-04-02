@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using NetcodeIO.NET;
+using ReliableNetcode;
 
 namespace GONet
 {
@@ -15,6 +16,8 @@ namespace GONet
 
         public GONetServer(int maxSlots, string address, int port)
         {
+            GONetMain.isServerOverride = true; // wherever the server is running is automatically considered "the" server
+
             MaxSlots = maxSlots;
 
             server = new Server(maxSlots, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
@@ -33,12 +36,24 @@ namespace GONet
             server.Start();
         }
 
+        /// <summary>
+        /// Call this every frame in order to process all network traffic in a timely manner.
+        /// </summary>
         public void Update()
         {
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
                 GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
                 gONetConnection_ServerToClient.Update(); // have to do this in order for anything to really be processed, in or out.
+            }
+        }
+
+        public void SendBytesToAllClients(byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
+        {
+            for (int iConnection = 0; iConnection < numConnections; ++iConnection)
+            {
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
+                gONetConnection_ServerToClient.SendMessage(bytes, bytesUsedCount, qualityOfService);
             }
         }
 

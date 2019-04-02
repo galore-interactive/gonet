@@ -2,17 +2,10 @@
 using NetcodeIO.NET;
 using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
-using System;
-using System.Collections.Generic;
-using System.Net;
 using UnityEngine;
 
 public class Simpeesimul : MonoBehaviour
 {
-    GONetServer server;
-
-    GONetConnection_ClientToServer client;
-
     public bool isServer = true;
 
     public string serverIP = "127.0.0.1";
@@ -22,38 +15,38 @@ public class Simpeesimul : MonoBehaviour
     {
         if (isServer)
         {
-            server = new GONetServer(64, serverIP, serverPort);
-            server.Start();
+            GONetMain.gonetServer = new GONetServer(64, serverIP, serverPort);
+            GONetMain.gonetServer.Start();
         }
         else
         {
-            client = new GONetConnection_ClientToServer(new Client());
-            client.ReceiveCallback = Client_OnMessageReceived;
-            client.Connect(serverIP, serverPort);
+            GONetMain.gonetClient = new GONetClient(new Client());
+            GONetMain.gonetClient.MessageReceived += Client_OnMessageReceived;
+            GONetMain.gonetClient.ConnectToServer(serverIP, serverPort);
         }
     }
 
     int client_messagesReceivedCount = 0;
-    private void Client_OnMessageReceived(byte[] payload, int payloadSize)
+    private void Client_OnMessageReceived(byte[] messageBytes, int bytesUsedCount)
     {
-        using (var testPacketReader = ByteArrayReaderWriter.Get(payload))
+        using (var testPacketReader = ByteArrayReaderWriter.Get(messageBytes))
         {
             uint serverSaysItsSentCount = testPacketReader.ReadUInt32();
-            Debug.Log("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + payloadSize);
+            Debug.Log("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + bytesUsedCount);
         }
     }
 
     public const int SERVER_MAX_CONNECTIONS = 10;
     uint[] server_messagesSentCount = new uint[SERVER_MAX_CONNECTIONS];
 
-    private void Update()
+    private void ______Update()
     {
         if (isServer)
         {
             const int MSG_SIZE = 1024;
             byte[] testPacket = new byte[MSG_SIZE];
 
-            for (int iConnection = 0; iConnection < server.numConnections; ++iConnection)
+            for (int iConnection = 0; iConnection < GONetMain.gonetServer.numConnections; ++iConnection)
             {
                 for (int iMessage = 0; iMessage < 1; ++iMessage)
                 {
@@ -62,27 +55,9 @@ public class Simpeesimul : MonoBehaviour
                         testPacketWriter.Write(++server_messagesSentCount[iConnection]);
                     }
 
-                    server.remoteClients[iConnection].SendMessage(testPacket, MSG_SIZE, QosType.Reliable);
+                    GONetMain.gonetServer.remoteClients[iConnection].SendMessage(testPacket, MSG_SIZE, QosType.Reliable);
                 }
             }
-
-            server.Update(); // have to do this in order for anything to really be processed, in or out.
-        }
-        else
-        {
-            client.Update(); // have to do this in order for anything to really be processed, in or out.
-        }
-    }
-
-    private void OnApplicationQuit()
-    {
-        if (isServer)
-        {
-            server.Stop();
-        }
-        else
-        {
-            client.Disconnect();
         }
     }
 }
