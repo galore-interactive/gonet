@@ -65,7 +65,7 @@ namespace GONet.Utils
                 const string SMALLEST = "Smallest fit not found.  Requested size is: ";
                 const string TOTAL = " total pool count: ";
                 const string CHECKED_OUT = " checked out count: ";
-                UnityEngine.Debug.Log(string.Concat(SMALLEST, currentMinimumSizeToBorrow, TOTAL, poolCapacity, CHECKED_OUT, nextAvailableIndex));
+                GONetLog.Debug(string.Concat(SMALLEST, currentMinimumSizeToBorrow, TOTAL, poolCapacity, CHECKED_OUT, nextAvailableIndex));
 
                 int arraySizeMinimum_original = arraySizeMinimum;
                 int arraySizeMaximum_original = arraySizeMaximum;

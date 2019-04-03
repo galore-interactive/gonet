@@ -175,7 +175,7 @@ namespace GONet
                 }
                 else
                 {
-                    Debug.LogWarning("Trying to dequeue from queued up incoming network data elements and cannot....WHY?");
+                    GONetLog.Warning("Trying to dequeue from queued up incoming network data elements and cannot....WHY?");
                 }
             }
         }
@@ -329,7 +329,7 @@ namespace GONet
 
                 if (onlySendToEndpoint == null)
                 {
-                    Debug.Log("sending changed auto-magical sync values to all connections");
+                    GONetLog.Debug("sending changed auto-magical sync values to all connections");
                     SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
                 }
                 else
@@ -416,7 +416,7 @@ namespace GONet
         {
             int count = changes.Count;
             bitStream_headerAlreadyWritten.WriteUShort((ushort)count);
-            Debug.Log(string.Concat("about to send changes bundle...count: " + count));
+            GONetLog.Debug(string.Concat("about to send changes bundle...count: " + count));
 
             changes.Sort(AutoMagicalSyncChangePriorityComparer.Instance);
 
@@ -433,7 +433,7 @@ namespace GONet
                     string fullUniquePath = HierarchyUtils.GetFullUniquePath(monitoringSupport.gonetParticipant.gameObject);
                     bitStream_headerAlreadyWritten.WriteString(fullUniquePath);
 
-                    Debug.Log("sending full path: " + fullUniquePath);
+                    GONetLog.Debug("sending full path: " + fullUniquePath);
                 }
                 else
                 {
@@ -453,7 +453,7 @@ namespace GONet
                 {
                     bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
 
-                    Debug.Log(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
+                    GONetLog.Debug(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
                 }
             }
         }
@@ -462,7 +462,7 @@ namespace GONet
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
-            Debug.Log(string.Concat("about to read changes bundle...count: " + count));
+            GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
                 bool didSendUnityFullUniquePath_insteadOfGONetId;
@@ -475,7 +475,7 @@ namespace GONet
                     string fullUniquePath;
                     bitStream_headerAlreadyRead.ReadString(out fullUniquePath);
 
-                    Debug.Log("received full path: " + fullUniquePath);
+                    GONetLog.Debug("received full path: " + fullUniquePath);
 
                     GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
                     gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
@@ -485,7 +485,7 @@ namespace GONet
                 {
                     bitStream_headerAlreadyRead.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
 
-                    Debug.Log("did ***not*** receive full path.........process count: " + i + " GONetId: " + GONetId);
+                    GONetLog.Debug("did ***not*** receive full path.........process count: " + i + " GONetId: " + GONetId);
 
                     gonetParticipant = gonetParticipantByGONetIdMap[GONetId];
                 }
@@ -504,7 +504,7 @@ namespace GONet
                     bitStream_headerAlreadyRead.ReadFloat(out lastKnownValue); // TODO FIXME this only works with floats for now
                     // TODO include monitoringSupport.lastKnownValue_previous, which just moght be null and not a float!
 
-                    Debug.Log(string.Concat("just read in auto magic change val.....GONetId: ", GONetId, " indedInList: ", indexInList, " lastKnownValue: ", lastKnownValue));
+                    GONetLog.Debug(string.Concat("just read in auto magic change val.....GONetId: ", GONetId, " indedInList: ", indexInList, " lastKnownValue: ", lastKnownValue));
                 }
                 else if (didSendUnityFullUniquePath_insteadOfGONetId && canASSumeGONetId)
                 { // if in here, we are ASSuming this message here actually represents the assignment of the gonetId for first time
@@ -512,10 +512,10 @@ namespace GONet
 
                     gonetParticipant.GONetId = GONetId;
 
-                    Debug.Log(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
+                    GONetLog.Debug(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
                 }
             }
-            Debug.Log(string.Concat("************done reading changes bundle"));
+            GONetLog.Debug(string.Concat("************done reading changes bundle"));
         }
 
         /// <summary>

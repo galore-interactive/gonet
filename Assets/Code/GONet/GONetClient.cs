@@ -1,4 +1,5 @@
-﻿using NetcodeIO.NET;
+﻿using GONet.Utils;
+using NetcodeIO.NET;
 using ReliableNetcode;
 using System;
 
@@ -44,7 +45,7 @@ namespace GONet
 
         private void OnStateChanged(ClientState state)
         {
-            UnityEngine.Debug.Log("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
+            GONetLog.Debug("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
         }
 
     }

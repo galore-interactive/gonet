@@ -41,12 +41,12 @@ namespace GONet
             {
                 if (NetworkUtils.IsLocalPortListening(port))
                 {
-                    UnityEngine.Debug.LogWarning("Instantiated a server <instance> locally and the port is already occupied!!!  Calling the <instance>.Start() method will likely fail and return false.");
+                    GONetLog.Warning("Instantiated a server <instance> locally and the port is already occupied!!!  Calling the <instance>.Start() method will likely fail and return false.");
                 }
             }
             else
             {
-                UnityEngine.Debug.LogWarning("Instantiated a server <instance> locally and the address is not on this local machine!!!  Calling the <instance>.Start() method will likely fail and return false.");
+                GONetLog.Warning("Instantiated a server <instance> locally and the address is not on this local machine!!!  Calling the <instance>.Start() method will likely fail and return false.");
             }
         }
 
@@ -113,7 +113,7 @@ namespace GONet
         /// </summary>
         private void OnClientDisconnected(RemoteClient client)
         {
-            UnityEngine.Debug.Log("client *DIS*connected"); // TODO remove unity stuffs
+            GONetLog.Debug("client *DIS*connected"); // TODO remove unity stuffs
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace GONet
         /// </summary>
         private void OnClientConnected(RemoteClient client)
         {
-            UnityEngine.Debug.Log("client connected"); // TODO remove unity stuffs
+            GONetLog.Debug("client connected"); // TODO remove unity stuffs
 
             newlyConnectedClients.Enqueue(client);
         }

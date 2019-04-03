@@ -279,7 +279,7 @@ namespace GONet.Utils
                 // allow custom reaction to this grow
                 OnGrowComplete(prevPoolCapacity);
 
-                // UnityEnging.Debug.Log(this.ToString()); // little debuggery for analysis to make sure pools get utilized as expected....this info hopefully provides insight into how best tune/tweak the initial values
+                // UnityEnging.Log.Debug(this.ToString()); // little debuggery for analysis to make sure pools get utilized as expected....this info hopefully provides insight into how best tune/tweak the initial values
             }
         }
 

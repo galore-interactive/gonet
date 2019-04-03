@@ -18,7 +18,7 @@ namespace GONet.Utils
             for (uint i = 0; i < 100; ++i)
             {
                 float unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, i, QUANTIZED_BITS);
-                Debug.Log(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
+                GONetLog.Debug(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
             }
         }
 
@@ -28,16 +28,16 @@ namespace GONet.Utils
             const int ITERATIONS = 100000;
 
             var runtime = CompareWithHalfFloat(false, false, false, true, ITERATIONS); // 6.9ms
-            Debug.Log(string.Concat(ITERATIONS, " iterations of Mathf took \t", runtime.TotalMilliseconds, " milliseconds."));
+            GONetLog.Debug(string.Concat(ITERATIONS, " iterations of Mathf took \t", runtime.TotalMilliseconds, " milliseconds."));
 
             runtime = CompareWithHalfFloat(false, false, true, false, ITERATIONS); // ?ms
-            Debug.Log(string.Concat(ITERATIONS, " iterations of QuantizerFast instance took \t", runtime.TotalMilliseconds, " milliseconds."));
+            GONetLog.Debug(string.Concat(ITERATIONS, " iterations of QuantizerFast instance took \t", runtime.TotalMilliseconds, " milliseconds."));
 
             runtime = CompareWithHalfFloat(false, true, false, false, ITERATIONS); // ?ms
-            Debug.Log(string.Concat(ITERATIONS, " iterations of QuantizerFast took \t", runtime.TotalMilliseconds, " milliseconds."));
+            GONetLog.Debug(string.Concat(ITERATIONS, " iterations of QuantizerFast took \t", runtime.TotalMilliseconds, " milliseconds."));
 
             runtime = CompareWithHalfFloat(true, false, false, false, ITERATIONS); // 12.6ms
-            Debug.Log(string.Concat(ITERATIONS, " iterations of Quantizer took \t", runtime.TotalMilliseconds, " milliseconds."));
+            GONetLog.Debug(string.Concat(ITERATIONS, " iterations of Quantizer took \t", runtime.TotalMilliseconds, " milliseconds."));
         }
 
         TimeSpan CompareWithHalfFloat(bool shouldRunQuantizer, bool shouldRunQuantizerFast, bool shouldRunQuantizerFastInstance, bool shouldRunMathf, int iterations)
@@ -94,8 +94,8 @@ namespace GONet.Utils
                     diff_unhalfied_total += diff_unhalfied;
                 }
 
-                //Debug.Log(string.Concat("original: ", original, " unquantized: ", unquantized, " unhalfied: ", unhalfied));
-                //Debug.Log(string.Concat("WINNER: ", diff_unhalfied < diff_unquantized ? "Mathf.Half" : "Quantizer"));
+                //Log.Debug(string.Concat("original: ", original, " unquantized: ", unquantized, " unhalfied: ", unhalfied));
+                //Log.Debug(string.Concat("WINNER: ", diff_unhalfied < diff_unquantized ? "Mathf.Half" : "Quantizer"));
             }
             DateTime end = HighResolutionTimeUtils.Now;
 
@@ -103,7 +103,7 @@ namespace GONet.Utils
             double diff_unquantizedFastInstance_average = diff_unquantizedFastInstance_total / iterations;
             double diff_unquantized_average = diff_unquantized_total / iterations;
             double diff_unhalfied_average = diff_unhalfied_total / iterations;
-            Debug.Log(string.Concat("After ", iterations, " iterations, \ndiff_unquantized_average: \t\t", diff_unquantized_average, "\ndiff_unquantizedFast_average: \t\t", diff_unquantizedFast_average, "\ndiff_unquantizedFastInstance_average: \t\t", diff_unquantizedFastInstance_average, "\ndiff_unhalfied_average: \t\t", diff_unhalfied_average, "\nOverall WINNER: ", diff_unhalfied_total < diff_unquantized_total ? "Mathf.Half" : "Quantizer"));
+            GONetLog.Debug(string.Concat("After ", iterations, " iterations, \ndiff_unquantized_average: \t\t", diff_unquantized_average, "\ndiff_unquantizedFast_average: \t\t", diff_unquantizedFast_average, "\ndiff_unquantizedFastInstance_average: \t\t", diff_unquantizedFastInstance_average, "\ndiff_unhalfied_average: \t\t", diff_unhalfied_average, "\nOverall WINNER: ", diff_unhalfied_total < diff_unquantized_total ? "Mathf.Half" : "Quantizer"));
 
             return new TimeSpan(end.Ticks - start.Ticks);
         }
@@ -122,13 +122,13 @@ namespace GONet.Utils
             float unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, quantized, QUANTIZED_BITS);
             Assert.GreaterOrEqual(unquantized_calculated, LOWER);
             Assert.LessOrEqual(unquantized_calculated, UPPER);
-            Debug.Log(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
+            GONetLog.Debug(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
 
 
             for (uint i = 0; i < Mathf.Pow(2, QUANTIZED_BITS); ++i)
             {
                 unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, i, QUANTIZED_BITS);
-                Debug.Log(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
+                GONetLog.Debug(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
             }
         }
 
@@ -146,13 +146,13 @@ namespace GONet.Utils
             float unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, quantized, QUANTIZED_BITS);
             Assert.GreaterOrEqual(unquantized_calculated, LOWER);
             Assert.LessOrEqual(unquantized_calculated, UPPER);
-            Debug.Log(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
+            GONetLog.Debug(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
 
 
             for (uint i = 0; i < Mathf.Pow(2, QUANTIZED_BITS); ++i)
             {
                 unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, i, QUANTIZED_BITS);
-                Debug.Log(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
+                GONetLog.Debug(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
             }
         }
 
@@ -171,12 +171,12 @@ namespace GONet.Utils
             float unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, quantized, QUANTIZED_BITS);
             Assert.GreaterOrEqual(unquantized_calculated, LOWER);
             Assert.LessOrEqual(unquantized_calculated, UPPER);
-            Debug.Log(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
+            GONetLog.Debug(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
             
             for (uint i = 0; i < Mathf.Pow(2, QUANTIZED_BITS); ++i)
             {
                 unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, i, QUANTIZED_BITS);
-                Debug.Log(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
+                GONetLog.Debug(string.Concat("quantized: ", i, " unquantized: ", unquantized_calculated));
             }
         }
     }

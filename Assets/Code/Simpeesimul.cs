@@ -1,4 +1,5 @@
 ﻿using GONet;
+using GONet.Utils;
 using NetcodeIO.NET;
 using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
@@ -32,7 +33,7 @@ public class Simpeesimul : MonoBehaviour
         using (var testPacketReader = ByteArrayReaderWriter.Get(messageBytes))
         {
             uint serverSaysItsSentCount = testPacketReader.ReadUInt32();
-            Debug.Log("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + bytesUsedCount);
+            GONetLog.Debug("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + bytesUsedCount);
         }
     }
 

@@ -240,7 +240,7 @@ namespace GONet.Utils
             {
                 const string NOT = "Sibling not found. gameObjectNameOriginal: ";
                 const string IDX = " uniqueSiblingIndex: ";
-                Debug.LogWarning(string.Concat(NOT, gameObjectNameOriginal, IDX, uniqueSiblingIndex));
+                GONetLog.Warning(string.Concat(NOT, gameObjectNameOriginal, IDX, uniqueSiblingIndex));
             }
 
             if (areSiblingsFromPool)
