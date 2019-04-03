@@ -23,10 +23,28 @@ namespace GONet
             0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1,
         };
 
-        public static GONetSessionContext GlobalSessionContext { get; internal set; } // TODO when set, update MySessionContext_Participant
+        private static GONetSessionContext globalSessionContext;
+        public static GONetSessionContext GlobalSessionContext
+        {
+            get { return globalSessionContext; }
+            internal set
+            {
+                globalSessionContext = value;
+                GlobalSessionContext_Participant = (object)globalSessionContext == null ? null : globalSessionContext.gameObject.GetComponent<GONetParticipant>();
+            }
+        }
         public static GONetParticipant GlobalSessionContext_Participant { get; private set; }
 
-        public static GONetSessionContext MySessionContext { get; internal set; } // TODO when set, update MySessionContext_Participant
+        private static GONetSessionContext mySessionContext;
+        public static GONetSessionContext MySessionContext
+        {
+            get { return mySessionContext; }
+            internal set
+            {
+                mySessionContext = value;
+                MySessionContext_Participant = (object)mySessionContext == null ? null : mySessionContext.gameObject.GetComponent<GONetParticipant>();
+            }
+        }
         public static GONetParticipant MySessionContext_Participant { get; private set; }
         public static uint MyAuthorityId => MySessionContext_Participant.OwnerAuthorityId;
 
@@ -449,11 +467,21 @@ namespace GONet
                     bitStream_headerAlreadyWritten.WriteFloat((float)monitoringSupport.lastKnownValue); // TODO FIXME this only works with floats for now
                     // TODO include monitoringSupport.lastKnownValue_previous, which just moght be null and not a float!
                 }
-                else if (monitoringSupport.lastKnownValue is uint && canASSumeGONetId) // TODO we are really going down wrong path here, but this is PoC land...right..its ok
+                else // TODO we are really going down wrong path here with all this if else figuring of what types/fields etc..., but this is PoC land...right..its ok...we'll get code generation in soon-ish
                 {
-                    bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
+                    if (monitoringSupport.lastKnownValue is uint)
+                    {
+                        if (canASSumeGONetId)
+                        {
+                            bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
 
-                    GONetLog.Debug(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
+                            GONetLog.Debug(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
+                        }
+                        else if (monitoringSupport.syncMember.Name == nameof(GONetParticipant.OwnerAuthorityId))
+                        {
+                            bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
+                        }
+                    }
                 }
             }
         }
@@ -465,12 +493,12 @@ namespace GONet
             GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
-                bool didSendUnityFullUniquePath_insteadOfGONetId;
-                bitStream_headerAlreadyRead.ReadBit(out didSendUnityFullUniquePath_insteadOfGONetId);
+                bool didReceiveUnityFullUniquePath_insteadOfGONetId;
+                bitStream_headerAlreadyRead.ReadBit(out didReceiveUnityFullUniquePath_insteadOfGONetId);
 
                 GONetParticipant gonetParticipant = null;
                 uint GONetId = default(uint);
-                if (didSendUnityFullUniquePath_insteadOfGONetId)
+                if (didReceiveUnityFullUniquePath_insteadOfGONetId)
                 {
                     string fullUniquePath;
                     bitStream_headerAlreadyRead.ReadString(out fullUniquePath);
@@ -506,13 +534,23 @@ namespace GONet
 
                     GONetLog.Debug(string.Concat("just read in auto magic change val.....GONetId: ", GONetId, " indedInList: ", indexInList, " lastKnownValue: ", lastKnownValue));
                 }
-                else if (didSendUnityFullUniquePath_insteadOfGONetId && canASSumeGONetId)
-                { // if in here, we are ASSuming this message here actually represents the assignment of the gonetId for first time
-                    bitStream_headerAlreadyRead.ReadUInt(out GONetId);
+                else
+                {
+                    if (didReceiveUnityFullUniquePath_insteadOfGONetId && canASSumeGONetId)
+                    {// if in here, we are ASSuming this message here actually represents the assignment of the gonetId for first time
+                        bitStream_headerAlreadyRead.ReadUInt(out GONetId);
 
-                    gonetParticipant.GONetId = GONetId;
+                        gonetParticipant.GONetId = GONetId;
 
-                    GONetLog.Debug(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
+                        GONetLog.Debug(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
+                    }
+                    else if (monitoringSupport.syncMember.Name == nameof(GONetParticipant.OwnerAuthorityId))
+                    {
+                        uint ownerAuthorityId;
+                        bitStream_headerAlreadyRead.ReadUInt(out ownerAuthorityId);
+
+                        gonetParticipant.OwnerAuthorityId = ownerAuthorityId;
+                    }
                 }
             }
             GONetLog.Debug(string.Concat("************done reading changes bundle"));

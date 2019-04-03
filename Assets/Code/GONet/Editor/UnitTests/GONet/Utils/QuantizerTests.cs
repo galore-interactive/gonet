@@ -161,7 +161,7 @@ namespace GONet.Utils
         public void NegativeToPositiveRange()
         {
             const float LOWER = -0.00037f;
-            const float UPPER =  0.00037f;
+            const float UPPER = 0.00037f;
             const float UNQUANTIZED_ORIGINAL = 0;
             const uint QUANTIZED_BITS = 3;
 
@@ -172,7 +172,7 @@ namespace GONet.Utils
             Assert.GreaterOrEqual(unquantized_calculated, LOWER);
             Assert.LessOrEqual(unquantized_calculated, UPPER);
             GONetLog.Debug(string.Concat("Unquantized..... original: ", UNQUANTIZED_ORIGINAL, " calculated: ", unquantized_calculated));
-            
+
             for (uint i = 0; i < Mathf.Pow(2, QUANTIZED_BITS); ++i)
             {
                 unquantized_calculated = Quantizer.Unquantize(LOWER, UPPER, i, QUANTIZED_BITS);

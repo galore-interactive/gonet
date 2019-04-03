@@ -17,6 +17,11 @@ namespace GONet
 
         #endregion
 
+        private void Awake()
+        {
+            GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
+        }
+
         private void Update()
         {
             GONetMain.Update();

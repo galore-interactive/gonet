@@ -7,6 +7,8 @@ namespace GONet
 {
     public class GONetClient
     {
+        public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;
+
         GONetConnection_ClientToServer connectionToServer;
 
         private Client client;
@@ -35,7 +37,10 @@ namespace GONet
         /// </summary>
         public void Update()
         {
-            connectionToServer.Update();
+            if (ConnectionState == ClientState.Connected)
+            {
+                connectionToServer.Update();
+            }
         }
 
         public void Disconnect()
@@ -45,6 +50,7 @@ namespace GONet
 
         private void OnStateChanged(ClientState state)
         {
+            ConnectionState = state;
             GONetLog.Debug("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
         }
 

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using GONet.Utils;
+using UnityEngine;
 
 namespace GONet
 {
@@ -10,8 +11,12 @@ namespace GONet
     [DisallowMultipleComponent, RequireComponent(typeof(GONetParticipant))]
     public class GONetSessionContext : MonoBehaviour
     {
+        private const string WORKAROUND = "Awake....side effect of getting GONetLog to do static initialization inside the Unity main thread...or else!";
+
         private void Awake()
         {
+            GONetLog.Debug(WORKAROUND);
+
             DontDestroyOnLoad(gameObject);
         }
     }

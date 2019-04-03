@@ -8,7 +8,7 @@ namespace GONet.Utils
     /// <summary>
     /// A nice log4net based logging utility that can/should replace <see cref="UnityEngine.Debug"/> LogXxx methods usage.
     /// Advantages:
-    ///     1. log statements will all have a nice/complete date/time stamp (that includes millisecond and uses GONet's own <see cref="HighResolutionTimeUtils"/>)
+    ///     1. log statements will all have a nice/complete date/time stamp (that includes millisecond and uses GONet's own <see cref="HighResolutionTimeUtils"/>).  This alone might change your life!
     ///     2. log statements will go to the console as usual as well as a gonet.log file in /logs folder
     ///     3. gonet.log file history will be maintained for up to 10 files
     ///     4. you can reconfigure the settings of how the log functions using log4net config stuff (initially configured to be located in configs/log_config.xml)

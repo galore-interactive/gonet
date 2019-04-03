@@ -59,6 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
+    <Compile Include="Assets\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
     <Compile Include="Assets\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
     <Reference Include="UnityEditor.StandardEvents">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/UnityEditor.StandardEvents.dll</HintPath>
@@ -312,6 +313,15 @@
     <Reference Include="ReliableNetcode">
       <HintPath>C:/projects/unity/gonet/Assets/Plugins/ReliableNetcode.dll</HintPath>
     </Reference>
+    <Reference Include="ConsoleE">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/ConsoleE/Editor/ConsoleE.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/log4net.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEditor.Advertisements">
       <HintPath>C:/Users/Shaun Sheppard/AppData/Local/Unity/cache/packages/packages.unity.com/com.unity.ads@2.0.7/Editor/UnityEditor.Advertisements.dll</HintPath>
     </Reference>
@@ -332,12 +342,6 @@
     </Reference>
     <Reference Include="SyntaxTree.VisualStudio.Unity.Bridge">
       <HintPath>C:/Program Files (x86)/Microsoft Visual Studio Tools for Unity/15.0/Editor/SyntaxTree.VisualStudio.Unity.Bridge.dll</HintPath>
-    </Reference>
-    <Reference Include="Common.Logging">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/Common.Logging.dll</HintPath>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/log4net.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib">
       <HintPath>C:/Program Files/Unity2018.1/Editor/Data/MonoBleedingEdge/lib/mono/4.7.1-api/mscorlib.dll</HintPath>
