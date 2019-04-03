@@ -10,9 +10,6 @@ namespace GONet
 
         private Client client;
 
-        public delegate void ServerMessageDelegate(byte[] messageBytes, int bytesUsedCount);
-        public event ServerMessageDelegate MessageReceived;
-
         public GONetClient(Client client)
         {
             this.client = client;
@@ -20,15 +17,6 @@ namespace GONet
             connectionToServer = new GONetConnection_ClientToServer(client);
 
             client.OnStateChanged += OnStateChanged;
-
-            connectionToServer.ReceiveCallback = OnReceiveCallback;
-        }
-
-        private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
-        {
-            GONetMain.ProcessIncomingBytes(connectionToServer, messageBytes, bytesUsedCount);
-
-            MessageReceived?.Invoke(messageBytes, bytesUsedCount);
         }
 
         public void ConnectToServer(string serverIP, int serverPort)
@@ -42,7 +30,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// Call this every frame in order to process all network traffic in a timely manner.
+        /// Call this every frame (from the main Unity thread!) in order to process all network traffic in a timely manner.
         /// </summary>
         public void Update()
         {

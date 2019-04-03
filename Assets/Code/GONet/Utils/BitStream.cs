@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace GONet.Utils
 {
@@ -309,6 +310,23 @@ namespace GONet.Utils
             return ReadBits(out buffer, BitNum.MaxValue) ? buffer : -1;
         }
 
+        static readonly ArrayPool<byte> byteArrayPoolForStrings = new ArrayPool<byte>(100, 1, 100, 1000);
+
+        public void ReadString(out string value)
+        {
+            uint byteCount;
+            ReadUInt(out byteCount);
+            int iByteCount = (int)byteCount;
+            byte[] bytes = byteArrayPoolForStrings.Borrow(iByteCount);
+            for (uint i = 0; i < byteCount; ++i)
+            {
+                byte b = (byte)ReadByte();
+                bytes[i] = b;
+            }
+            value = Encoding.UTF8.GetString(bytes, 0, iByteCount);
+            byteArrayPoolForStrings.Return(bytes);
+        }
+
         #endregion Read Methods
 
         #region Write Methods
@@ -437,6 +455,25 @@ namespace GONet.Utils
         public override void WriteByte(byte value)
         {
             WriteBits(value, BitNum.MaxValue);
+        }
+
+        public void WriteString(string value)
+        {
+            int iByteCount = Encoding.UTF8.GetByteCount(value);
+            uint byteCount = (uint)iByteCount;
+            if (byteCount > uint.MaxValue)
+            {
+                throw new Exception("not bueno..value as bytes > uint.MaxValue");
+            }
+            WriteUInt(byteCount);
+
+            byte[] bytes = byteArrayPoolForStrings.Borrow((int)byteCount);
+            Encoding.UTF8.GetBytes(value, 0, value.Length, bytes, 0);
+            for (int i = 0; i < iByteCount; ++i)
+            {
+                WriteByte(bytes[i]);
+            }
+            byteArrayPoolForStrings.Return(bytes);
         }
 
         /// <summary>

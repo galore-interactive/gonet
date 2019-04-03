@@ -22,14 +22,24 @@ namespace GONet
         /// If the corresponding <see cref="GameObject"/> is included in the/a Unity scene, the owner will be considered the server
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue)]
+        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1)]
         public uint OwnerAuthorityId { get; internal set; } = OwnerAuthorityId_Unset;
 
+        private uint gonetId = GONetId_Unset;
         /// <summary>
         /// Every instance of <see cref="GONetParticipant"/> will be assigned a unique value to this variable.
+        /// IMPORTANT: This is the most important message to process first as data management in GONet relies on it.
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1)]
-        public uint GONetId { get; internal set; } = GONetId_Unset;
+        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue)]
+        public uint GONetId
+        {
+            get { return gonetId; }
+            internal set
+            {
+                gonetId = value;
+                GONetMain.gonetParticipantByGONetIdMap[value] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
+            }
+        }
 
         [GONetAutoMagicalSync]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted

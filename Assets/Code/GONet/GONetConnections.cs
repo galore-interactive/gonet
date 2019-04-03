@@ -1,16 +1,28 @@
-﻿
-using System;
-using System.Net;
+﻿using GONet.Utils;
 using NetcodeIO.NET;
 using ReliableNetcode;
+using System.Net;
 
 namespace GONet
 {
-    public class GONetConnection_ClientToServer : ReliableEndpoint
+    public abstract class GONetConnection : ReliableEndpoint
+    {
+        protected GONetConnection()
+        {
+            ReceiveCallback = OnReceiveCallback;
+        }
+
+        private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
+        {
+            GONetMain.ProcessIncomingBytes(this, messageBytes, bytesUsedCount);
+        }
+    }
+
+    public class GONetConnection_ClientToServer : GONetConnection
     {
         private Client client;
 
-        public GONetConnection_ClientToServer(Client client)
+        public GONetConnection_ClientToServer(Client client) : base()
         {
             this.client = client;
 
@@ -32,7 +44,7 @@ namespace GONet
         public void Connect(string serverIP, int serverPort)
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
-            ulong clientID = (ulong)Guid.NewGuid().ToString().GetHashCode(); // TODO replace with UID.Generate().aslong or something similar
+            ulong clientID = (ulong)GUID.Generate().AsInt64();
             byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { new IPEndPoint(IPAddress.Parse(serverIP), serverPort) },
                 30,
                 5,
@@ -46,6 +58,23 @@ namespace GONet
         public void Disconnect()
         {
             client.Disconnect();
+        }
+    }
+
+    public class GONetConnection_ServerToClient : GONetConnection
+    {
+        private RemoteClient remoteClient;
+
+        public GONetConnection_ServerToClient(RemoteClient remoteClient) : base()
+        {
+            this.remoteClient = remoteClient;
+
+            TransmitCallback = SendToMyClient_AnyLittleThingTheProtocolLayerDeemsNecessary;
+        }
+
+        private void SendToMyClient_AnyLittleThingTheProtocolLayerDeemsNecessary(byte[] payloadBytes, int payloadSize)
+        {
+            remoteClient.SendPayload(payloadBytes, payloadSize);
         }
     }
 }

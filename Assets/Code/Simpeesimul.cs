@@ -8,8 +8,8 @@ public class Simpeesimul : MonoBehaviour
 {
     public bool isServer = true;
 
-    public string serverIP = "127.0.0.1";
-    public int serverPort = 40000;
+    public const string serverIP = "127.0.0.1";
+    public const int serverPort = 40000;
 
     private void Awake()
     {
@@ -21,7 +21,7 @@ public class Simpeesimul : MonoBehaviour
         else
         {
             GONetMain.gonetClient = new GONetClient(new Client());
-            GONetMain.gonetClient.MessageReceived += Client_OnMessageReceived;
+            //GONetMain.gonetClient.MessageReceived += Client_OnMessageReceived; // TODO replace this with an EventBus subscription to a certain message type!
             GONetMain.gonetClient.ConnectToServer(serverIP, serverPort);
         }
     }

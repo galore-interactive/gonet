@@ -2,6 +2,7 @@
 using Microsoft.IO;
 using ReliableNetcode;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,11 +30,29 @@ namespace GONet
         public static GONetParticipant MySessionContext_Participant { get; private set; }
         public static uint MyAuthorityId => MySessionContext_Participant.OwnerAuthorityId;
 
-        internal static bool isServerOverride = false;
+        internal static bool isServerOverride = NetworkUtils.IsIPAddressOnLocalMachine(Simpeesimul.serverIP) && !NetworkUtils.IsLocalPortListening(Simpeesimul.serverPort); // TODO FIXME gotta iron out good startup process..this is quite temporary
         public static bool IsServer => isServerOverride || MySessionContext_Participant?.OwnerAuthorityId == GONetParticipant.OwnerAuthorityId_Server; // TODO cache this since it will not change and too much processing to get now
 
-        internal static GONetServer gonetServer; // TODO FIXME make this private.....temporary for testing, its internal
-        internal static GONetClient gonetClient; // TODO FIXME make this private.....temporary for testing, its internal
+        private static GONetServer _gonetServer; // TODO remove this once we make gonetServer private again!
+        /// <summary>
+        /// TODO FIXME make this private.....its internal temporary for testing
+        /// </summary>
+        internal static GONetServer gonetServer
+        {
+            get { return _gonetServer; }
+            set
+            {
+                _gonetServer = value;
+                _gonetServer.ClientConnected += Server_OnClientConnected_SendClientCurrentState;
+            }
+        }
+
+        /// <summary>
+        /// TODO FIXME make this private.....its internal temporary for testing
+        /// </summary>
+        internal static GONetClient gonetClient;
+
+        internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
 
         static GONetMain()
         {
@@ -63,7 +82,8 @@ namespace GONet
         /// </summary>
         internal static void Update()
         {
-            ProcessAutoMagicalSyncStuffs();
+            ProcessIncomingBytes_QueuedNetworkData();
+            ProcessAutoMagicalSyncStuffs(); // TODO may want to call this at end of frame in same frame as the other MonoBehaviour instances in teh game have run to make changes...send out same frame as opposed to "beginning" of next frame?
 
             if (IsServer)
             {
@@ -90,23 +110,79 @@ namespace GONet
             }
         }
 
+        struct NetworkData
+        {
+            public ReliableEndpoint sourceEndpoint;
+            public byte[] messageBytes;
+            public int bytesUsedCount;
+        }
+
+        static readonly ArrayPool<byte> incomingNetworkDataArrayPool = new ArrayPool<byte>(1000, 10, 1024, 2048);
+        static readonly ConcurrentQueue<NetworkData> incomingNetworkData = new ConcurrentQueue<NetworkData>();
+
+        /// <summary>
+        /// All incoming network bytes need to come here.
+        /// IMPORTANT: the thread on which this processes may likely NOT be the main Unity thread.
+        /// </summary>
         internal static void ProcessIncomingBytes(ReliableEndpoint sourceEndpoint, byte[] messageBytes, int bytesUsedCount)
         {
-            using (var memoryStream = new MemoryStream(messageBytes))
+            NetworkData networkData = new NetworkData()
             {
-                using (var bitStream = new Utils.BitStream(memoryStream)) // NOTE: This implementation does NOT advance memoryStream.Position on bitStream.Read(), hence the manual advances below
-                {
-                    // header...just message type/id
-                    uint messageID;
-                    bitStream.ReadUInt(out messageID);
+                sourceEndpoint = sourceEndpoint,
+                messageBytes = incomingNetworkDataArrayPool.Borrow(bytesUsedCount),
+                bytesUsedCount = bytesUsedCount
+            };
 
-                    Type messageType = messageTypeByMessageIDMap[messageID];
-                    if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
+            Buffer.BlockCopy(messageBytes, 0, networkData.messageBytes, 0, bytesUsedCount);
+
+            incomingNetworkData.Enqueue(networkData);
+        }
+
+        #endregion
+
+        #region private methods
+
+        /// <summary>
+        /// Call this from the main Unity thread!
+        /// </summary>
+        private static void ProcessIncomingBytes_QueuedNetworkData()
+        {
+            NetworkData tmp;
+            int count = incomingNetworkData.Count;
+            for (int i = 0; i < count && !incomingNetworkData.IsEmpty; ++i)
+            {
+                if (incomingNetworkData.TryDequeue(out tmp))
+                {
+                    using (var memoryStream = new MemoryStream(tmp.messageBytes))
                     {
-                        DeserializeBody_ChangesBundle(bitStream);
-                    } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
+                        using (var bitStream = new Utils.BitStream(memoryStream))
+                        {
+                            // header...just message type/id
+                            uint messageID;
+                            bitStream.ReadUInt(out messageID);
+
+                            Type messageType = messageTypeByMessageIDMap[messageID];
+                            if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
+                            {
+                                DeserializeBody_ChangesBundle(bitStream);
+                            } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
+                        }
+                    }
+
+                    // TODO this should only deserialize the message....and then send over to an EventBus where subscribers to that event/message from the bus can process accordingly
+
+                    incomingNetworkDataArrayPool.Return(tmp.messageBytes);
+                }
+                else
+                {
+                    Debug.LogWarning("Trying to dequeue from queued up incoming network data elements and cannot....WHY?");
                 }
             }
+        }
+
+        private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient gonetConnection_ServerToClient)
+        {
+            ProcessAutoMagicalSyncStuffs(true, gonetConnection_ServerToClient);
         }
 
         #endregion
@@ -114,12 +190,12 @@ namespace GONet
         #region what once was GONetAutoMagicalSyncManager
 
         static uint lastAssignedGONetId = GONetParticipant.GONetId_Unset;
-        static readonly Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>> autoSyncMemberDataByGONetParticipant = new Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>>(1000);
+        static readonly Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>> autoSyncMemberDataByGONetParticipantMap = new Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>>(1000);
 
-        class AutoMagicalSync_ValueMonitoringSupport
+        internal class AutoMagicalSync_ValueMonitoringSupport
         {
             /// <summary>
-            /// NOTE: The list this is an index for is a list value inside <see cref="autoSyncMemberDataByGONetParticipant"/>.
+            /// NOTE: The list this is an index for is a list value inside <see cref="autoSyncMemberDataByGONetParticipantMap"/>.
             /// IMPORTANT: The list it indexes therein MUST be predictably ordered on all sides of the networking fence in order for this to be useful!
             /// </summary>
             internal uint indexInList;
@@ -130,7 +206,7 @@ namespace GONet
             internal object lastKnownValue;
             internal object lastKnownValue_previous;
 
-            internal bool HasValueChangedSinceLastSync;
+            internal bool hasValueChangedSinceLastSync;
 
             internal void UpdateLastKnownValue() // TODO FIXME need to use some code generation up in this piece for increased runtime/execution performance instead of reflection herein
             {
@@ -139,7 +215,7 @@ namespace GONet
                                     ? ((PropertyInfo)syncMember).GetValue(syncMemberOwner)
                                     : ((FieldInfo)syncMember).GetValue(syncMemberOwner); // ASSuming field here since only field and property allowed
 
-                HasValueChangedSinceLastSync = !Equals(lastKnownValue, lastKnownValue_previous); // NOTE: using != must be somehow not comparing values and instead comparing memory addresses because of object declaration even though if they are floats they have same value
+                hasValueChangedSinceLastSync = !Equals(lastKnownValue, lastKnownValue_previous); // NOTE: using != must be somehow not comparing values and instead comparing memory addresses because of object declaration even though if they are floats they have same value
             }
         }
 
@@ -148,7 +224,7 @@ namespace GONet
         /// </summary>
         internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         {
-            {
+            { // auto-magical sync related housekeeping
                 MonoBehaviour[] monoBehaviours = gonetParticipant.gameObject.GetComponents<MonoBehaviour>();
                 List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = new List<AutoMagicalSync_ValueMonitoringSupport>(25);
                 int length = monoBehaviours.Length;
@@ -168,7 +244,7 @@ namespace GONet
 
                         AutoMagicalSync_ValueMonitoringSupport monitoringSupport = new AutoMagicalSync_ValueMonitoringSupport();
 
-                        monitoringSupport.indexInList = (uint)iSyncMember;
+                        monitoringSupport.indexInList = (uint)monitoringSupports.Count; // since this Count is being checked prior to adding monitoring to that list, the Count now will end up being the index in that list after the Add
                         monitoringSupport.gonetParticipant = gonetParticipant;
                         monitoringSupport.syncMemberOwner = monoBehaviour;
                         monitoringSupport.syncMember = syncMember;
@@ -182,7 +258,7 @@ namespace GONet
 
                 if (monitoringSupports.Count > 0)
                 {
-                    autoSyncMemberDataByGONetParticipant[gonetParticipant] = monitoringSupports;
+                    autoSyncMemberDataByGONetParticipantMap[gonetParticipant] = monitoringSupports;
                 }
             }
 
@@ -206,34 +282,60 @@ namespace GONet
             }
         }
 
-        static readonly List<AutoMagicalSync_ValueMonitoringSupport> valueChangesSinceLastSync = new List<AutoMagicalSync_ValueMonitoringSupport>(1000);
-        static void ProcessAutoMagicalSyncStuffs()
+        /// <summary>
+        /// Just a helper data structure just for use in <see cref="ProcessAutoMagicalSyncStuffs(bool, ReliableEndpoint)"/>
+        /// </summary>
+        static readonly List<AutoMagicalSync_ValueMonitoringSupport> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport>(1000);
+        /// <summary>
+        /// Determines what has changed since last call (and stores it in <see cref="syncValuesToSend"/>)
+        /// and then, depending on the value of <paramref name="isProcessingAllStateRegardlessOfChange"/>, 
+        /// 
+        /// either (if true) sends all current values...
+        /// or (if false) sends only the changed things...
+        /// 
+        /// ...to all remote connections (or just to <paramref name="onlySendToEndpoint"/> if not null)
+        /// </summary>
+        static void ProcessAutoMagicalSyncStuffs(bool isProcessingAllStateRegardlessOfChange = false, ReliableEndpoint onlySendToEndpoint = null)
         {
-            valueChangesSinceLastSync.Clear();
+            syncValuesToSend.Clear();
 
-            var enumerator = autoSyncMemberDataByGONetParticipant.GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = enumerator.Current.Value;
-                int length = monitoringSupports.Count;
-                for (int i = 0; i < length; ++i)
+            { // TODO: PERF: look into putting this in another thread...perhaps checking on a frequency....I "believe" MemberInfo.GetValue(obj) is thread safe since it is only a read
+                var enumerator = autoSyncMemberDataByGONetParticipantMap.GetEnumerator();
+                while (enumerator.MoveNext())
                 {
-                    AutoMagicalSync_ValueMonitoringSupport monitoringSupport = monitoringSupports[i];
-                    monitoringSupport.UpdateLastKnownValue();
-                    if (monitoringSupport.HasValueChangedSinceLastSync)
+                    List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = enumerator.Current.Value;
+                    int length = monitoringSupports.Count;
+                    for (int i = 0; i < length; ++i)
                     {
-                        valueChangesSinceLastSync.Add(monitoringSupport);
-                        monitoringSupport.HasValueChangedSinceLastSync = false;
+                        AutoMagicalSync_ValueMonitoringSupport monitoringSupport = monitoringSupports[i];
+                        monitoringSupport.UpdateLastKnownValue();
+                        if (isProcessingAllStateRegardlessOfChange || monitoringSupport.hasValueChangedSinceLastSync)
+                        {
+                            syncValuesToSend.Add(monitoringSupport);
+
+                            if (!isProcessingAllStateRegardlessOfChange)
+                            {
+                                monitoringSupport.hasValueChangedSinceLastSync = false;
+                            }
+                        }
                     }
                 }
             }
 
-            if (valueChangesSinceLastSync.Count > 0)
+            if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                byte[] changesSerialized = SerializeChangesBundle(valueChangesSinceLastSync, out bytesUsedCount);
+                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount);
 
-                SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
+                if (onlySendToEndpoint == null)
+                {
+                    Debug.Log("sending changed auto-magical sync values to all connections");
+                    SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
+                }
+                else
+                {
+                    onlySendToEndpoint.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
+                }
 
                 valueChangeSerializationArrayPool.Return(changesSerialized);
             }
@@ -251,7 +353,7 @@ namespace GONet
             try
             {
                 foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
-                        .Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(Message)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+                        .Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
                 {
                     foreach (var type in types)
                     {
@@ -267,20 +369,11 @@ namespace GONet
             }
         }
 
-        abstract class Message
-        {
-        }
-
-        class AutoMagicalSync_ValueChangesMessage : Message
-        {
-            List<AutoMagicalSync_ValueMonitoringSupport> changes;
-        }
-
         /// <summary>
         /// PRE: <paramref name="changes"/> size is greater than 0
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <see cref="valueChangeSerializationArrayPool"/>!
         /// </summary>
-        private static byte[] SerializeChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport> changes, out int bytesUsedCount)
+        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport> changes, out int bytesUsedCount)
         {
             using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
             {
@@ -291,7 +384,7 @@ namespace GONet
                         bitStream.WriteUInt(messageID);
                     }
 
-                    SerializeChangesBundle_AppendStream(changes, bitStream); // body
+                    SerializeBody_ChangesBundle(changes, bitStream); // body
 
                     bitStream.WriteCurrentPartialByte();
 
@@ -304,33 +397,63 @@ namespace GONet
             }
         }
 
-        private static void SerializeChangesBundle_AppendStream(List<AutoMagicalSync_ValueMonitoringSupport> changes, Utils.BitStream bitStream)
+        class AutoMagicalSyncChangePriorityComparer : IComparer<AutoMagicalSync_ValueMonitoringSupport>
+        {
+            internal static readonly AutoMagicalSyncChangePriorityComparer Instance = new AutoMagicalSyncChangePriorityComparer();
+
+            private AutoMagicalSyncChangePriorityComparer() { }
+
+            public int Compare(AutoMagicalSync_ValueMonitoringSupport x, AutoMagicalSync_ValueMonitoringSupport y)
+            {
+                int xPriority = x.syncAttribute.ProcessingPriority_GONetInternalOverride != 0 ? x.syncAttribute.ProcessingPriority_GONetInternalOverride : x.syncAttribute.ProcessingPriority;
+                int yPriority = y.syncAttribute.ProcessingPriority_GONetInternalOverride != 0 ? y.syncAttribute.ProcessingPriority_GONetInternalOverride : y.syncAttribute.ProcessingPriority;
+
+                return yPriority.CompareTo(xPriority); // descending...highest priority first!
+            }
+        }
+
+        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport> changes, Utils.BitStream bitStream_headerAlreadyWritten)
         {
             int count = changes.Count;
-            bitStream.WriteUShort((ushort)count);
+            bitStream_headerAlreadyWritten.WriteUShort((ushort)count);
+            Debug.Log(string.Concat("about to send changes bundle...count: " + count));
+
+            changes.Sort(AutoMagicalSyncChangePriorityComparer.Instance);
+
             for (int i = 0; i < count; ++i)
             {
                 AutoMagicalSync_ValueMonitoringSupport monitoringSupport = changes[i];
 
-                bool shouldSendUnityUniquePathId = false; // TODO this should be true when this change represents the assignment of the GONetId since the other side will not have it yet and cannot use it to look anything up
-                bitStream.WriteBit(shouldSendUnityUniquePathId);
-                if (shouldSendUnityUniquePathId)
+                bool canASSumeGONetId = monitoringSupport.syncMember.Name == nameof(GONetParticipant.GONetId);
+
+                bool shouldSendUnityFullUniquePath_insteadOfGONetId = canASSumeGONetId;
+                bitStream_headerAlreadyWritten.WriteBit(shouldSendUnityFullUniquePath_insteadOfGONetId);
+                if (shouldSendUnityFullUniquePath_insteadOfGONetId)
                 {
-                    // TODO FIXME make/manage/use the full unique path hash code hash table lookup dudio (this should be added to during OnEnable_
+                    string fullUniquePath = HierarchyUtils.GetFullUniquePath(monitoringSupport.gonetParticipant.gameObject);
+                    bitStream_headerAlreadyWritten.WriteString(fullUniquePath);
+
+                    Debug.Log("sending full path: " + fullUniquePath);
                 }
                 else
                 {
-                    bitStream.WriteUInt(monitoringSupport.gonetParticipant.GONetId); // should we order change list by this id ascending and just put diff from last value?
+                    bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.gonetParticipant.GONetId); // should we order change list by this id ascending and just put diff from last value?
                 }
 
-                bitStream.WriteUInt(monitoringSupport.indexInList);
+                bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.indexInList);
 
                 bool isFloatValue = monitoringSupport.lastKnownValue is float;
-                bitStream.WriteBit(isFloatValue);
+                bitStream_headerAlreadyWritten.WriteBit(isFloatValue);
                 if (isFloatValue)
                 {
-                    bitStream.WriteFloat((float)monitoringSupport.lastKnownValue); // TODO FIXME this only works with floats for now
+                    bitStream_headerAlreadyWritten.WriteFloat((float)monitoringSupport.lastKnownValue); // TODO FIXME this only works with floats for now
                     // TODO include monitoringSupport.lastKnownValue_previous, which just moght be null and not a float!
+                }
+                else if (monitoringSupport.lastKnownValue is uint && canASSumeGONetId) // TODO we are really going down wrong path here, but this is PoC land...right..its ok
+                {
+                    bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
+
+                    Debug.Log(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
                 }
             }
         }
@@ -339,23 +462,39 @@ namespace GONet
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
+            Debug.Log(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
-                bool shouldSendUnityUniquePathId;
-                bitStream_headerAlreadyRead.ReadBit(out shouldSendUnityUniquePathId);
+                bool didSendUnityFullUniquePath_insteadOfGONetId;
+                bitStream_headerAlreadyRead.ReadBit(out didSendUnityFullUniquePath_insteadOfGONetId);
 
+                GONetParticipant gonetParticipant = null;
                 uint GONetId = default(uint);
-                if (shouldSendUnityUniquePathId)
+                if (didSendUnityFullUniquePath_insteadOfGONetId)
                 {
-                    // TODO FIXME make/manage/use the full unique path hash code hash table lookup dudio (this should be added to during OnEnable_
+                    string fullUniquePath;
+                    bitStream_headerAlreadyRead.ReadString(out fullUniquePath);
+
+                    Debug.Log("received full path: " + fullUniquePath);
+
+                    GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
+                    gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+                    // NOTE: cannot do the following as we are ASSuming this message here actually represents the assignment of the gonetId for first time: GONetId = gonetParticipant.GONetId;
                 }
                 else
                 {
                     bitStream_headerAlreadyRead.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
+
+                    Debug.Log("did ***not*** receive full path.........process count: " + i + " GONetId: " + GONetId);
+
+                    gonetParticipant = gonetParticipantByGONetIdMap[GONetId];
                 }
 
                 uint indexInList;
                 bitStream_headerAlreadyRead.ReadUInt(out indexInList);
+
+                AutoMagicalSync_ValueMonitoringSupport monitoringSupport = autoSyncMemberDataByGONetParticipantMap[gonetParticipant][(int)indexInList];
+                bool canASSumeGONetId = monitoringSupport.syncMember.Name == nameof(GONetParticipant.GONetId);
 
                 bool isFloatValue;
                 bitStream_headerAlreadyRead.ReadBit(out isFloatValue);
@@ -367,7 +506,16 @@ namespace GONet
 
                     Debug.Log(string.Concat("just read in auto magic change val.....GONetId: ", GONetId, " indedInList: ", indexInList, " lastKnownValue: ", lastKnownValue));
                 }
+                else if (didSendUnityFullUniquePath_insteadOfGONetId && canASSumeGONetId)
+                { // if in here, we are ASSuming this message here actually represents the assignment of the gonetId for first time
+                    bitStream_headerAlreadyRead.ReadUInt(out GONetId);
+
+                    gonetParticipant.GONetId = GONetId;
+
+                    Debug.Log(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
+                }
             }
+            Debug.Log(string.Concat("************done reading changes bundle"));
         }
 
         /// <summary>
@@ -375,7 +523,7 @@ namespace GONet
         /// </summary>
         internal static void OnDisable_StopMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         {
-            autoSyncMemberDataByGONetParticipant.Remove(gonetParticipant);
+            autoSyncMemberDataByGONetParticipantMap.Remove(gonetParticipant);
 
             // do we need to send event to disable this thing?
         }

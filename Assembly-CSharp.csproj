@@ -62,8 +62,8 @@
     <Compile Include="Assets\Code\GONet\GONet.cs" />
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\Code\GONet\GONetClient.cs" />
-    <Compile Include="Assets\Code\GONet\GONetConnection_ClientToServer.cs" />
-    <Compile Include="Assets\Code\GONet\GONetConnection_ServerToClient.cs" />
+    <Compile Include="Assets\Code\GONet\GONetConnections.cs" />
+    <Compile Include="Assets\Code\GONet\GONetEvents.cs" />
     <Compile Include="Assets\Code\GONet\GONetGlobal.cs" />
     <Compile Include="Assets\Code\GONet\GONetParticipant.cs" />
     <Compile Include="Assets\Code\GONet\GONetServer.cs" />
@@ -76,7 +76,9 @@
     <Compile Include="Assets\Code\GONet\Utils\DateTimeUtils.cs" />
     <Compile Include="Assets\Code\GONet\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\Code\GONet\Utils\GUID.cs" />
+    <Compile Include="Assets\Code\GONet\Utils\HierarchyUtils.cs" />
     <Compile Include="Assets\Code\GONet\Utils\HighResolutionTimeUtils.cs" />
+    <Compile Include="Assets\Code\GONet\Utils\NetworkUtils.cs" />
     <Compile Include="Assets\Code\GONet\Utils\ObjectPool.cs" />
     <Compile Include="Assets\Code\GONet\Utils\Quantizer.cs" />
     <Compile Include="Assets\Code\GONet\Utils\StringUtils.cs" />
