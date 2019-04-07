@@ -97,7 +97,63 @@ namespace GONet.Generation
 
         internal override void SerializeAll(Utils.BitStream bitStream_appendTo)
         {
-            throw new NotImplementedException();
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+			{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {
+				if (singleMember_memberTypeFullName == typeof(bool).FullName)
+                {
+#>
+				bitStream_appendTo.WriteBit(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName
+				 || singleMember_memberTypeFullName == typeof(int).FullName
+				 || singleMember_memberTypeFullName == typeof(long).FullName
+				 || singleMember_memberTypeFullName == typeof(ushort).FullName
+				 || singleMember_memberTypeFullName == typeof(uint).FullName
+				 || singleMember_memberTypeFullName == typeof(float).FullName
+				 || singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+#>
+				byte[] bytes = BitConverter.GetBytes(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				int count = bytes.Length;
+				for (int i = 0; i < count; ++i)
+				{
+					bitStream_appendTo.WriteByte(bytes[i]);
+				}
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName
+				      || singleMember_memberTypeFullName == typeof(sbyte).FullName)
+				{
+#>
+				bitStream_appendTo.WriteByte(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+#>
+                bitStream_appendTo.WriteString(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+			}#>
+			}
+<#		}
+	}
+#>
         }
 
         internal override void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex)
