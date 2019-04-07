@@ -399,12 +399,6 @@ namespace GONet.Generation
 
         public bool Equals(GONetParticipant_ComponentsWithAutoSyncMembers x, GONetParticipant_ComponentsWithAutoSyncMembers y)
         {
-            bool linqsAnswer = Enumerable.SequenceEqual(x.ComponentMemberNames_By_ComponentTypeFullName, y.ComponentMemberNames_By_ComponentTypeFullName);
-            return linqsAnswer;
-            
-            // TODO see if linqsAnswer matches below:
-
-            /*
             bool areInitiallyEqual =
                 x != null && y != null &&
                 x.ComponentMemberNames_By_ComponentTypeFullName != null && y.ComponentMemberNames_By_ComponentTypeFullName != null &&
@@ -414,20 +408,18 @@ namespace GONet.Generation
                 int componentCount = x.ComponentMemberNames_By_ComponentTypeFullName.Length;
                 for (int iComponent = 0; iComponent < componentCount; ++iComponent)
                 {
-                    Tuple<string, string[]> xTuple = x.ComponentMemberNames_By_ComponentTypeFullName[iComponent];
-                    string xComponentTypeFullName = xTuple.Item1;
-                    int xCount = xTuple.Item2.Length;
+                    GONetParticipant_ComponentsWithAutoSyncMembers_Single xSingle = x.ComponentMemberNames_By_ComponentTypeFullName[iComponent];
+                    int xCount = xSingle.autoSyncMembers.Length;
 
-                    Tuple<string, string[]> yTuple = y.ComponentMemberNames_By_ComponentTypeFullName[iComponent];
-                    string yComponentTypeFullName = yTuple.Item1;
-                    int yCount = yTuple.Item2.Length;
+                    GONetParticipant_ComponentsWithAutoSyncMembers_Single ySingle = y.ComponentMemberNames_By_ComponentTypeFullName[iComponent];
+                    int yCount = ySingle.autoSyncMembers.Length;
 
-                    if (xComponentTypeFullName == yComponentTypeFullName && xCount == yCount)
+                    if (xSingle.componentTypeAssemblyQualifiedName == ySingle.componentTypeAssemblyQualifiedName && xCount == yCount)
                     {
                         for (int iMember = 0; iMember < xCount; ++iMember)
                         {
-                            string xMemberName = xTuple.Item2[iMember];
-                            string yMemberName = yTuple.Item2[iMember];
+                            string xMemberName = xSingle.autoSyncMembers[iMember].memberName;
+                            string yMemberName = ySingle.autoSyncMembers[iMember].memberName;
                             if (xMemberName != yMemberName)
                             {
                                 return false;
@@ -443,7 +435,6 @@ namespace GONet.Generation
                 }
             }
             return false;
-            */
         }
 
         public int GetHashCode(GONetParticipant_ComponentsWithAutoSyncMembers obj)
