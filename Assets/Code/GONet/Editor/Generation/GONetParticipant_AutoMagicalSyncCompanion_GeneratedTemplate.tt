@@ -119,12 +119,45 @@ namespace GONet.Generation
 				bitStream_appendTo.WriteBit(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
+				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				{
+#>
+				bitStream_appendTo.WriteFloat(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+#>
+				bitStream_appendTo.WriteLong(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
+				{
+#>
+				bitStream_appendTo.WriteUInt(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+#>
+                bitStream_appendTo.WriteString(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
+#>
+				bitStream_appendTo.WriteByte(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+#>
+				bitStream_appendTo.WriteUShort(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
 				 || singleMember_memberTypeFullName == typeof(int).FullName
-				 || singleMember_memberTypeFullName == typeof(long).FullName
-				 || singleMember_memberTypeFullName == typeof(ushort).FullName
-				 || singleMember_memberTypeFullName == typeof(uint).FullName
-				 || singleMember_memberTypeFullName == typeof(float).FullName
+				 || singleMember_memberTypeFullName == typeof(sbyte).FullName
 				 || singleMember_memberTypeFullName == typeof(double).FullName)
 				{
 #>
@@ -134,19 +167,6 @@ namespace GONet.Generation
 				{
 					bitStream_appendTo.WriteByte(bytes[i]);
 				}
-<#
-				}
-				else if (singleMember_memberTypeFullName == typeof(byte).FullName
-				      || singleMember_memberTypeFullName == typeof(sbyte).FullName)
-				{
-#>
-				bitStream_appendTo.WriteByte(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-				else if (singleMember_memberTypeFullName == typeof(string).FullName)
-                {
-#>
-                bitStream_appendTo.WriteString(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
 			}#>
@@ -166,7 +186,150 @@ namespace GONet.Generation
         /// </summary>
         internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom)
         {
-            throw new NotImplementedException();
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+			{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {
+				if (singleMember_memberTypeFullName == typeof(bool).FullName)
+                {
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadBit(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				bool value;
+                bitStream_readFrom.ReadBit(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				{
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadFloat(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				float value;
+                bitStream_readFrom.ReadFloat(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadLong(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				long value;
+                bitStream_readFrom.ReadLong(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
+				{
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadUInt(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				uint value;
+                bitStream_readFrom.ReadUInt(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadString(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				string value;
+                bitStream_readFrom.ReadString(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
+#>
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = (byte)bitStream_readFrom.ReadByte();
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+#>
+<#					if (singleMember.isField) {#>
+                bitStream_readFrom.ReadUShort(out _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					} else {#>
+				ushort value;
+                bitStream_readFrom.ReadUShort(out value);
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#					}#>
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName)
+				{
+#>
+				int count = 2;
+				byte[] bytes = new byte[count];<# /* TODO: new byte array!!!! no no no, use pool here! */ #>
+				for (int i = 0; i < count; ++i)
+				{
+					byte b = (byte)bitStream_readFrom.ReadByte();
+					bytes[i] = b;
+				}
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt16(bytes, 0);
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(int).FullName)
+				{
+#>
+				int count = 4;
+				byte[] bytes = new byte[count];<# /* TODO: new byte array!!!! no no no, use pool here! */ #>
+				for (int i = 0; i < count; ++i)
+				{
+					byte b = (byte)bitStream_readFrom.ReadByte();
+					bytes[i] = b;
+				}
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt32(bytes, 0);
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
+				{
+#>
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = (sbyte)bitStream_readFrom.ReadByte();
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+#>
+				int count = 8;
+				byte[] bytes = new byte[count];<# /* TODO: new byte array!!!! no no no, use pool here! */ #>
+				for (int i = 0; i < count; ++i)
+				{
+					byte b = (byte)bitStream_readFrom.ReadByte();
+					bytes[i] = b;
+				}
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToDouble(bytes, 0);
+<#
+				}
+			}#>
+			}
+<#		}
+	}
+#>
         }
 
         /// <summary>

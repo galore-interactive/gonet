@@ -294,19 +294,38 @@ namespace Assets.Code.GONet.Editor.Generation
             #line 120 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
-                else if (singleMember_memberTypeFullName == typeof(short).FullName
-				 || singleMember_memberTypeFullName == typeof(int).FullName
-				 || singleMember_memberTypeFullName == typeof(long).FullName
-				 || singleMember_memberTypeFullName == typeof(ushort).FullName
-				 || singleMember_memberTypeFullName == typeof(uint).FullName
-				 || singleMember_memberTypeFullName == typeof(float).FullName
-				 || singleMember_memberTypeFullName == typeof(double).FullName)
+				else if (singleMember_memberTypeFullName == typeof(float).FullName)
 				{
 
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tbyte[] bytes = BitConverter.GetBytes(_");
+            this.Write("\t\t\t\tbitStream_appendTo.WriteFloat(_");
+            
+            #line 125 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 125 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 126 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tbitStream_appendTo.WriteLong(_");
             
             #line 131 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -320,20 +339,43 @@ namespace Assets.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write(");\r\n\t\t\t\tint count = bytes.Length;\r\n\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t" +
-                    "\t\t\tbitStream_appendTo.WriteByte(bytes[i]);\r\n\t\t\t\t}\r\n");
+            this.Write(");\r\n");
             
-            #line 137 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 132 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
-				else if (singleMember_memberTypeFullName == typeof(byte).FullName
-				      || singleMember_memberTypeFullName == typeof(sbyte).FullName)
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
 				{
 
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tbitStream_appendTo.WriteByte(_");
+            this.Write("\t\t\t\tbitStream_appendTo.WriteUInt(_");
+            
+            #line 137 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 137 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 138 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_appendTo.WriteString(_");
             
             #line 143 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -352,13 +394,13 @@ namespace Assets.Code.GONet.Editor.Generation
             #line 144 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
-				else if (singleMember_memberTypeFullName == typeof(string).FullName)
-                {
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
 
             
             #line default
             #line hidden
-            this.Write("                bitStream_appendTo.WriteString(_");
+            this.Write("\t\t\t\tbitStream_appendTo.WriteByte(_");
             
             #line 149 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -377,13 +419,67 @@ namespace Assets.Code.GONet.Editor.Generation
             #line 150 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tbitStream_appendTo.WriteUShort(_");
+            
+            #line 155 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 155 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 156 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName
+				 || singleMember_memberTypeFullName == typeof(int).FullName
+				 || singleMember_memberTypeFullName == typeof(sbyte).FullName
+				 || singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tbyte[] bytes = BitConverter.GetBytes(_");
+            
+            #line 164 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 164 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n\t\t\t\tint count = bytes.Length;\r\n\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t" +
+                    "\t\t\tbitStream_appendTo.WriteByte(bytes[i]);\r\n\t\t\t\t}\r\n");
+            
+            #line 170 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
 			}
             
             #line default
             #line hidden
             this.Write("\t\t\t}\r\n");
             
-            #line 154 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 174 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		}
 	}
 
@@ -402,8 +498,558 @@ namespace Assets.Code.GONet.Editor.Generation
         /// </summary>
         internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom)
         {
-            throw new NotImplementedException();
-        }
+");
+            
+            #line 189 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t{ // ");
+            
+            #line 200 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 200 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write("\r\n");
+            
+            #line 201 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {
+				if (singleMember_memberTypeFullName == typeof(bool).FullName)
+                {
+
+            
+            #line default
+            #line hidden
+            
+            #line 208 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadBit(out _");
+            
+            #line 209 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 209 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 210 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tbool value;\r\n                bitStream_readFrom.ReadBit(out value);\r\n\t\t\t\t_");
+            
+            #line 213 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 213 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 214 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 215 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            
+            #line 220 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadFloat(out _");
+            
+            #line 221 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 221 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 222 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tfloat value;\r\n                bitStream_readFrom.ReadFloat(out value);\r\n\t\t\t\t_" +
+                    "");
+            
+            #line 225 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 225 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 226 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 227 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            
+            #line 232 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadLong(out _");
+            
+            #line 233 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 233 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 234 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tlong value;\r\n                bitStream_readFrom.ReadLong(out value);\r\n\t\t\t\t_");
+            
+            #line 237 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 237 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 238 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 239 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            
+            #line 244 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadUInt(out _");
+            
+            #line 245 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 245 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 246 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tuint value;\r\n                bitStream_readFrom.ReadUInt(out value);\r\n\t\t\t\t_");
+            
+            #line 249 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 249 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 250 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 251 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+
+            
+            #line default
+            #line hidden
+            
+            #line 256 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadString(out _");
+            
+            #line 257 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 257 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 258 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tstring value;\r\n                bitStream_readFrom.ReadString(out value);\r\n\t\t\t" +
+                    "\t_");
+            
+            #line 261 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 261 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 262 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 263 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\t_");
+            
+            #line 268 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 268 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = (byte)bitStream_readFrom.ReadByte();\r\n");
+            
+            #line 269 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            
+            #line 274 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					if (singleMember.isField) {
+            
+            #line default
+            #line hidden
+            this.Write("                bitStream_readFrom.ReadUShort(out _");
+            
+            #line 275 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 275 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(");\r\n");
+            
+            #line 276 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					} else {
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tushort value;\r\n                bitStream_readFrom.ReadUShort(out value);\r\n\t\t\t" +
+                    "\t_");
+            
+            #line 279 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 279 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = value;\r\n");
+            
+            #line 280 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+					}
+            
+            #line default
+            #line hidden
+            
+            #line 281 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tint count = 2;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
+            
+            #line 287 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+ /* TODO: new byte array!!!! no no no, use pool here! */ 
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
+                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t_");
+            
+            #line 293 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 293 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = BitConverter.ToInt16(bytes, 0);\r\n");
+            
+            #line 294 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+                else if (singleMember_memberTypeFullName == typeof(int).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tint count = 4;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
+            
+            #line 300 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+ /* TODO: new byte array!!!! no no no, use pool here! */ 
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
+                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t_");
+            
+            #line 306 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 306 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = BitConverter.ToInt32(bytes, 0);\r\n");
+            
+            #line 307 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+                else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\t_");
+            
+            #line 312 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 312 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = (sbyte)bitStream_readFrom.ReadByte();\r\n");
+            
+            #line 313 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+                else if (singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tint count = 8;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
+            
+            #line 319 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+ /* TODO: new byte array!!!! no no no, use pool here! */ 
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
+                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t_");
+            
+            #line 325 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 325 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write(" = BitConverter.ToDouble(bytes, 0);\r\n");
+            
+            #line 326 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+
+				}
+			}
+            
+            #line default
+            #line hidden
+            this.Write("\t\t\t}\r\n");
+            
+            #line 330 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+		}
+	}
+
+            
+            #line default
+            #line hidden
+            this.Write(@"        }
 
         /// <summary>
         ///  Deserializes a ginel value (using <paramref name=""singleIndex""/> to know which) from <paramref name=""bitStream_readFrom""/>

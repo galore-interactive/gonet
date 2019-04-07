@@ -294,6 +294,11 @@ namespace GONet.Generation
         internal string memberTypeFullName;
         internal string memberName;
 
+        /// <summary>
+        /// TODO: almost certainly need to use this to support ordering for processing on receipt of messages
+        /// </summary>
+        GONetAutoMagicalSyncAttribute attribute;
+
         // TODO: this is for deserialize/load from persistence: internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() {}
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember)
@@ -303,6 +308,8 @@ namespace GONet.Generation
                                     ? ((PropertyInfo)syncMember).PropertyType.FullName
                                     : ((FieldInfo)syncMember).FieldType.FullName;
             memberName = syncMember.Name;
+
+            attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
         }
     }
 
