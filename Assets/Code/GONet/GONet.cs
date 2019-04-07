@@ -126,6 +126,11 @@ namespace GONet
             {
                 gonetClient?.Disconnect();
             }
+
+#if CSHARP_7_3_OR_NEWER
+            GetAddressOfField_Example.Go();
+            NotSoSoftCour.FreeAllGCHandles();
+#endif
         }
 
         struct NetworkData
@@ -220,11 +225,34 @@ namespace GONet
             internal GONetParticipant gonetParticipant;
             internal MonoBehaviour syncMemberOwner;
             internal MemberInfo syncMember;
+            internal Type syncMemberValueType;
             internal GONetAutoMagicalSyncAttribute syncAttribute;
             internal object lastKnownValue;
             internal object lastKnownValue_previous;
-
+#if CSHARP_7_3_OR_NEWER
+            internal IntPtr? syncMemberAddress_fieldOnly;
+#endif
             internal bool hasValueChangedSinceLastSync;
+
+            internal AutoMagicalSync_ValueMonitoringSupport(uint indexInList, GONetParticipant gonetParticipant, MonoBehaviour syncMemberOwner, MemberInfo syncMember, GONetAutoMagicalSyncAttribute syncAttribute)
+            {
+                this.indexInList = indexInList;
+                this.gonetParticipant = gonetParticipant;
+                this.syncMemberOwner = syncMemberOwner;
+                this.syncMember = syncMember;
+                this.syncAttribute = syncAttribute;
+
+                syncMemberValueType = syncMember.MemberType == MemberTypes.Field ? ((FieldInfo)syncMember).FieldType : ((PropertyInfo)syncMember).PropertyType;
+
+#if CSHARP_7_3_OR_NEWER
+                if (syncMember.MemberType == MemberTypes.Field)
+                {
+                    //syncMemberAddress_fieldOnly = NotSoSoftCour.GetAddressOfField(syncMemberOwner, syncMember.Name);
+                }
+#endif
+
+                UpdateLastKnownValue();
+            }
 
             internal void UpdateLastKnownValue() // TODO FIXME need to use some code generation up in this piece for increased runtime/execution performance instead of reflection herein
             {
@@ -234,6 +262,17 @@ namespace GONet
                                     : ((FieldInfo)syncMember).GetValue(syncMemberOwner); // ASSuming field here since only field and property allowed
 
                 hasValueChangedSinceLastSync = !Equals(lastKnownValue, lastKnownValue_previous); // NOTE: using != must be somehow not comparing values and instead comparing memory addresses because of object declaration even though if they are floats they have same value
+
+#if CSHARP_7_3_OR_NEWER
+                if (syncMemberAddress_fieldOnly.HasValue && syncMemberValueType == typeof(float))
+                {
+                    unsafe
+                    {
+                        float* valuePointer = (float*)syncMemberAddress_fieldOnly.Value;
+                        GONetLog.Debug(string.Concat("Current Value: ", *valuePointer));
+                    }
+                }
+#endif
             }
         }
 
@@ -242,45 +281,48 @@ namespace GONet
         /// </summary>
         internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         {
-            { // auto-magical sync related housekeeping
-                MonoBehaviour[] monoBehaviours = gonetParticipant.gameObject.GetComponents<MonoBehaviour>();
-                List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = new List<AutoMagicalSync_ValueMonitoringSupport>(25);
-                int length = monoBehaviours.Length;
-                for (int i = 0; i < length; ++i)
-                {
-                    MonoBehaviour monoBehaviour = monoBehaviours[i];
-                    IEnumerable<MemberInfo> syncMembers = monoBehaviour
-                        .GetType()
-                        .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                        .Where(member => (member.MemberType == MemberTypes.Property || member.MemberType == MemberTypes.Field)
-                                        && member.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true) != null);
+            if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
+            {
+                GONetLog.Debug("OnEnable");
 
-                    int syncMemberCount = syncMembers.Count();
-                    for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
+                { // auto-magical sync related housekeeping
+                    MonoBehaviour[] monoBehaviours = gonetParticipant.gameObject.GetComponents<MonoBehaviour>();
+                    List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = new List<AutoMagicalSync_ValueMonitoringSupport>(25);
+                    int length = monoBehaviours.Length;
+                    for (int i = 0; i < length; ++i)
                     {
-                        MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
+                        MonoBehaviour monoBehaviour = monoBehaviours[i];
+                        IEnumerable<MemberInfo> syncMembers = monoBehaviour
+                            .GetType()
+                            .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                            .Where(member => (member.MemberType == MemberTypes.Property || member.MemberType == MemberTypes.Field)
+                                            && member.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true) != null);
 
-                        AutoMagicalSync_ValueMonitoringSupport monitoringSupport = new AutoMagicalSync_ValueMonitoringSupport();
+                        int syncMemberCount = syncMembers.Count();
+                        for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
+                        {
+                            MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
 
-                        monitoringSupport.indexInList = (uint)monitoringSupports.Count; // since this Count is being checked prior to adding monitoring to that list, the Count now will end up being the index in that list after the Add
-                        monitoringSupport.gonetParticipant = gonetParticipant;
-                        monitoringSupport.syncMemberOwner = monoBehaviour;
-                        monitoringSupport.syncMember = syncMember;
-                        monitoringSupport.syncAttribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+                            AutoMagicalSync_ValueMonitoringSupport monitoringSupport = new AutoMagicalSync_ValueMonitoringSupport(
+                                (uint)monitoringSupports.Count, // since this Count is being checked prior to adding monitoring to that list, the Count now will end up being the index in that list after the Add
+                                gonetParticipant,
+                                monoBehaviour,
+                                syncMember,
+                                (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true)
+                            );
 
-                        monitoringSupport.UpdateLastKnownValue();
+                            monitoringSupports.Add(monitoringSupport);
+                        }
+                    }
 
-                        monitoringSupports.Add(monitoringSupport);
+                    if (monitoringSupports.Count > 0)
+                    {
+                        autoSyncMemberDataByGONetParticipantMap[gonetParticipant] = monitoringSupports;
                     }
                 }
 
-                if (monitoringSupports.Count > 0)
-                {
-                    autoSyncMemberDataByGONetParticipantMap[gonetParticipant] = monitoringSupports;
-                }
+                AssignGONetId_IfAppropriate(gonetParticipant);
             }
-
-            AssignGONetId_IfAppropriate(gonetParticipant);
         }
 
         private static void AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
@@ -561,9 +603,12 @@ namespace GONet
         /// </summary>
         internal static void OnDisable_StopMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         {
-            autoSyncMemberDataByGONetParticipantMap.Remove(gonetParticipant);
+            if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
+            {
+                autoSyncMemberDataByGONetParticipantMap.Remove(gonetParticipant);
 
-            // do we need to send event to disable this thing?
+                // do we need to send event to disable this thing?
+            }
         }
 
         #endregion

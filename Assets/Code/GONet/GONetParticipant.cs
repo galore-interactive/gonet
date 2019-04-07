@@ -5,7 +5,7 @@ namespace GONet
     /// <summary>
     /// This is required to be present on any <see cref="GameObject"/> you want to have participate in GONet activities.
     /// </summary>
-    [DisallowMultipleComponent]
+    [DisallowMultipleComponent, ExecuteInEditMode]
     public sealed class GONetParticipant : MonoBehaviour
     {
         #region constants
@@ -15,7 +15,15 @@ namespace GONet
 
         public const uint GONetId_Unset = 0;
 
+        /// <summary>
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public const byte CodeGenerationId_Unset = 0;
+
         #endregion
+
+        [SerializeField, HideInInspector]
+        internal byte codeGenerationId;
 
         /// <summary>
         /// This is set to a value that represents which machine in the game spawned this instance.
@@ -46,6 +54,52 @@ namespace GONet
 
         [GONetAutoMagicalSync]
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
+
+
+        /// <summary>
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public delegate void EditorOnlyDelegate(GONetParticipant gonetParticipant);
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public static event EditorOnlyDelegate EditorOnlyDefaultContructor;
+        public GONetParticipant()
+        {
+            EditorOnlyDefaultContructor?.Invoke(this);
+        }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public static event EditorOnlyDelegate EditorOnlyAwake;
+        private void Awake()
+        {
+            EditorOnlyAwake?.Invoke(this);
+        }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public static event EditorOnlyDelegate EditorOnlyReset;
+        private void Reset()
+        {
+            EditorOnlyReset?.Invoke(this);
+        }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public static event EditorOnlyDelegate EditorOnlyOnDestroy;
+        private void OnDestroy()
+        {
+            EditorOnlyOnDestroy?.Invoke(this);
+        }
 
         private void OnEnable()
         {

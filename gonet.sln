@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gonet", "Assembly-CSharp.csproj", "{B08D0803-4D3E-61BD-032A-5135CCCC3D91}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp", "Assembly-CSharp.csproj", "{B08D0803-4D3E-61BD-032A-5135CCCC3D91}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gonet", "Assembly-CSharp-Editor.csproj", "{1428A281-B8EC-1A48-A3FC-ADA631CCFF73}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp-Editor", "Assembly-CSharp-Editor.csproj", "{1428A281-B8EC-1A48-A3FC-ADA631CCFF73}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

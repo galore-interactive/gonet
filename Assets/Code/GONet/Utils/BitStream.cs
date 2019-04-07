@@ -323,7 +323,7 @@ namespace GONet.Utils
                 byte b = (byte)ReadByte();
                 bytes[i] = b;
             }
-            value = Encoding.UTF8.GetString(bytes, 0, iByteCount);
+            value = Encoding.UTF8.GetString(bytes, 0, iByteCount); // TODO : PERF: need to cache/inntern these beasts!
             byteArrayPoolForStrings.Return(bytes);
         }
 

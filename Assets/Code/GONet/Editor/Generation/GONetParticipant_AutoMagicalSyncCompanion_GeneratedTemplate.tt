@@ -1,0 +1,125 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+
+<#@ assembly name="System.Core" #>
+<#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp.dll" #>
+<#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp-Editor.dll" #>
+
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="GONet" #>
+<#@ import namespace="GONet.Utils" #>
+<#@ import namespace="GONet.Generation" #>
+
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using UnityEngine;
+using GONet;
+
+namespace GONet.Generation
+{
+	internal sealed class <#=ClassName#> : GONetParticipant_AutoMagicalSyncCompanion_Generated
+    {
+<#
+	int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+#>
+		private <#=single.componentTypeFullName#> _<#=single.componentTypeName#>;
+		internal <#=single.componentTypeFullName#> <#=single.componentTypeName#>
+		{
+			get
+			{
+				if ((object)_<#=single.componentTypeName#> == null)
+				{
+					_<#=single.componentTypeName#> = gonetParticipant.GetComponent<<#=single.componentTypeFullName#>>();
+				}
+				return _<#=single.componentTypeName#>;
+			}
+		}
+
+<#	}#>
+
+        internal <#=ClassName#>(GONetParticipant gonetParticipant) : base(gonetParticipant) { }
+
+        internal override void SetAutoMagicalSyncValue(byte index, object value)
+		{
+			switch (index)
+			{
+<#
+	int iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall++#>:
+					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)value;
+					return;
+<#		}
+	}
+#>
+			}
+		}
+
+        internal override object GetAutoMagicalSyncValue(byte index)
+		{
+			switch (index)
+			{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall++#>:
+					return <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+<#		}
+	}
+#>
+			}
+
+			return null;
+		}
+
+        internal override void SerializeAll(Utils.BitStream bitStream_appendTo)
+        {
+            throw new NotImplementedException();
+        }
+
+        internal override void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        ///  Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
+        /// </summary>
+        internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
+        ///  and uses them to modify appropriate member variables internally.
+        /// </summary>
+        internal override void DeserializeInitSingle(Utils.BitStream bitStream_readFrom, byte singleIndex)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
