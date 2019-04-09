@@ -24,6 +24,9 @@ namespace GONet.Generation
 	internal sealed class <#=ClassName#> : GONetParticipant_AutoMagicalSyncCompanion_Generated
     {
 <#
+	int overallCount = 0;
+	Array.ForEach(uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName, uE => overallCount += uE.autoSyncMembers.Length);
+
 	int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
 	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
 	{
@@ -44,14 +47,45 @@ namespace GONet.Generation
 
 <#	}#>
 
-        internal <#=ClassName#>(GONetParticipant gonetParticipant) : base(gonetParticipant) { }
+        internal <#=ClassName#>(GONetParticipant gonetParticipant) : base(gonetParticipant)
+		{
+			valuesCount = <#=overallCount#>;
+		    
+			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
+			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
+
+			valuesChangesSupport = valuesChangesSupportArrayPool.Borrow((int)valuesCount);
+			
+<#
+	int iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+			var support<#=iOverall#> = valuesChangesSupport[<#=iOverall#>] = valueChangeSupportArrayPool.Borrow();
+			support<#=iOverall#>.syncCompanion = this;
+			support<#=iOverall#>.index = <#=iOverall#>;
+			support<#=iOverall#>.syncAttribute_ProcessingPriority = <#=singleMember.attribute.ProcessingPriority#>;
+			support<#=iOverall#>.syncAttribute_ProcessingPriority_GONetInternalOverride = <#=singleMember.attribute.ProcessingPriority_GONetInternalOverride#>;
+
+<#
+			iOverall++;
+		}
+	}
+#>
+		}
 
         internal override void SetAutoMagicalSyncValue(byte index, object value)
 		{
 			switch (index)
 			{
 <#
-	int iOverall = 0;
+	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
 	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
 	{
@@ -340,5 +374,28 @@ namespace GONet.Generation
         {
             throw new NotImplementedException();
         }
+
+		internal override void UpdateLastKnownValues()
+		{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				valuesChangesSupport[<#=iOverall#>].lastKnownValue_previous = valuesChangesSupport[<#=iOverall#>].lastKnownValue;
+				valuesChangesSupport[<#=iOverall#>].lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+
+<#		
+			iOverall++;
+		}
+	}
+#>
+		}
     }
 }

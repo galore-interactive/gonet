@@ -1,4 +1,6 @@
-﻿using System;
+﻿using GONet.Utils;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GONet
@@ -80,5 +82,71 @@ namespace GONet
         public int ProcessingPriority_GONetInternalOverride = 0;
 
         #endregion
+
+        /// <summary>
+        /// OPTIONAL.
+        /// You can use this when there is a special case for serialization (e.g., when not blittable or not GONet natively support type).
+        /// IMPORTANT: Due to C# attribute parameter type limitations (see https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/attributes),
+        ///            the type here is <see cref="Type"/> when it really needs to be an instance of <see cref="IGONetAutoMagicalSync_CustomSerializer"/>.
+        ///            An instance of this type will be created and cast to <see cref="IGONetAutoMagicalSync_CustomSerializer"/> and 
+        ///            set on <see cref="CustomSerialize_Instance"/> and that is what will be used.
+        /// </summary>
+        public Type CustomSerialize_Type = null;
+
+        static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer>(25);
+        IGONetAutoMagicalSync_CustomSerializer customSerialize_Instance = null;
+        /// <summary>
+        /// This will only be non-null when <see cref="CustomSerialize_Type"/> is set to a non-abstract type
+        /// that implements <see cref="IGONetAutoMagicalSync_CustomSerializer"/>.
+        /// </summary>
+        internal IGONetAutoMagicalSync_CustomSerializer CustomSerialize_Instance
+        {
+            get
+            {
+                if (CustomSerialize_Type != null &&
+                    customSerialize_Instance == null &&
+                    TypeUtils.IsTypeAInstanceOfTypeB(CustomSerialize_Type, typeof(IGONetAutoMagicalSync_CustomSerializer)) &&
+                    !CustomSerialize_Type.IsAbstract)
+                { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
+                    if (!customSerializerInstanceByTypeMap.TryGetValue(CustomSerialize_Type, out customSerialize_Instance))
+                    {
+                        customSerialize_Instance = (IGONetAutoMagicalSync_CustomSerializer)Activator.CreateInstance(CustomSerialize_Type);
+                        customSerializerInstanceByTypeMap[CustomSerialize_Type] = customSerialize_Instance;
+                    }
+                }
+                return customSerialize_Instance;
+            }
+        }
+
+        public static T GetCustomSerializer<T>() where T : IGONetAutoMagicalSync_CustomSerializer
+        {
+            T customSerializer = default(T);
+            Type typeofT = typeof(T);
+            if (!typeofT.IsAbstract)
+            { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
+                IGONetAutoMagicalSync_CustomSerializer customSerializer_raw;
+                if (customSerializerInstanceByTypeMap.TryGetValue(typeofT, out customSerializer_raw))
+                {
+                    if (customSerializer_raw.GetType() == typeofT) // just double checking...probabaly overkill since we ensure this is true through other steps
+                    {
+                        customSerializer = (T)customSerializer_raw;
+                    }
+                }
+                else
+                {
+                    customSerializer = Activator.CreateInstance<T>();
+                    customSerializerInstanceByTypeMap[typeofT] = customSerializer;
+                }
+            }
+            return customSerializer;
+        }
+    }
+
+    public interface IGONetAutoMagicalSync_CustomSerializer
+    {
+        /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
+        void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value);
+
+        object Deserialize(Utils.BitStream bitStream_readFrom);
     }
 }

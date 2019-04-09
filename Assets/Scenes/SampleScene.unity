@@ -428,7 +428,7 @@ MonoBehaviour:
   codeGenerationId: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
---- !u!1 &2026715016
+--- !u!1 &917631512
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -436,8 +436,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2026715018}
-  - component: {fileID: 2026715017}
+  - component: {fileID: 917631514}
+  - component: {fileID: 917631513}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -445,13 +445,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2026715017
+--- !u!114 &917631513
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026715016}
+  m_GameObject: {fileID: 917631512}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
@@ -460,13 +460,13 @@ MonoBehaviour:
   codeGenerationId: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
---- !u!4 &2026715018
+--- !u!4 &917631514
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026715016}
+  m_GameObject: {fileID: 917631512}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 30.144913, y: 2.3399231, z: -68.09898}
   m_LocalScale: {x: 1, y: 1, z: 1}

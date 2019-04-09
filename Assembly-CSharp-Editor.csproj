@@ -61,6 +61,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
+    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
+    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -70,6 +73,7 @@
     <Compile Include="Assets\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
     <Compile Include="Assets\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
+    <None Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
     <None Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs</LastGenOutput>

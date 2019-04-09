@@ -1,4 +1,5 @@
-﻿using GONet.Utils;
+﻿using GONet.Generation;
+using GONet.Utils;
 using Microsoft.IO;
 using ReliableNetcode;
 using System;
@@ -213,66 +214,45 @@ namespace GONet
         #region what once was GONetAutoMagicalSyncManager
 
         static uint lastAssignedGONetId = GONetParticipant.GONetId_Unset;
-        static readonly Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>> autoSyncMemberDataByGONetParticipantMap = new Dictionary<GONetParticipant, List<AutoMagicalSync_ValueMonitoringSupport>>(1000);
+        /// <summary>
+        /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
+        /// The key into this is the <see cref="GONetParticipant.codeGenerationId"/>.
+        /// TODO: once implementation supports it, this replaces <see cref="autoSyncMemberDataByGONetParticipantMap"/> and make sure to remove it.
+        /// </summary>
+        static readonly Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = new Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(byte.MaxValue);
 
-        internal class AutoMagicalSync_ValueMonitoringSupport
+        internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
+            internal byte index;
+            internal GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
             /// <summary>
-            /// NOTE: The list this is an index for is a list value inside <see cref="autoSyncMemberDataByGONetParticipantMap"/>.
-            /// IMPORTANT: The list it indexes therein MUST be predictably ordered on all sides of the networking fence in order for this to be useful!
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ProcessingPriority"/>
             /// </summary>
-            internal uint indexInList;
-            internal GONetParticipant gonetParticipant;
-            internal MonoBehaviour syncMemberOwner;
-            internal MemberInfo syncMember;
-            internal Type syncMemberValueType;
-            internal GONetAutoMagicalSyncAttribute syncAttribute;
+            internal int syncAttribute_ProcessingPriority;
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ProcessingPriority_GONetInternalOverride"/>
+            /// </summary>
+            internal int syncAttribute_ProcessingPriority_GONetInternalOverride;
+
             internal object lastKnownValue;
             internal object lastKnownValue_previous;
-#if CSHARP_7_3_OR_NEWER
-            internal IntPtr? syncMemberAddress_fieldOnly;
-#endif
-            internal bool hasValueChangedSinceLastSync;
 
-            internal AutoMagicalSync_ValueMonitoringSupport(uint indexInList, GONetParticipant gonetParticipant, MonoBehaviour syncMemberOwner, MemberInfo syncMember, GONetAutoMagicalSyncAttribute syncAttribute)
+            /// <summary>
+            /// DO NOT USE THIS.
+            /// Public default constructor is required for object pool instantiation under current impl of <see cref="ObjectPool{T}"/>;
+            /// </summary>
+            public AutoMagicalSync_ValueMonitoringSupport_ChangedValue() { }
+
+            internal AutoMagicalSync_ValueMonitoringSupport_ChangedValue(
+                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion,
+                byte index,
+                int syncAttribute_ProcessingPriority,
+                int syncAttribute_ProcessingPriority_GONetInternalOverride)
             {
-                this.indexInList = indexInList;
-                this.gonetParticipant = gonetParticipant;
-                this.syncMemberOwner = syncMemberOwner;
-                this.syncMember = syncMember;
-                this.syncAttribute = syncAttribute;
-
-                syncMemberValueType = syncMember.MemberType == MemberTypes.Field ? ((FieldInfo)syncMember).FieldType : ((PropertyInfo)syncMember).PropertyType;
-
-#if CSHARP_7_3_OR_NEWER
-                if (syncMember.MemberType == MemberTypes.Field)
-                {
-                    //syncMemberAddress_fieldOnly = NotSoSoftCour.GetAddressOfField(syncMemberOwner, syncMember.Name);
-                }
-#endif
-
-                UpdateLastKnownValue();
-            }
-
-            internal void UpdateLastKnownValue() // TODO FIXME need to use some code generation up in this piece for increased runtime/execution performance instead of reflection herein
-            {
-                lastKnownValue_previous = lastKnownValue;
-                lastKnownValue = syncMember.MemberType == MemberTypes.Property
-                                    ? ((PropertyInfo)syncMember).GetValue(syncMemberOwner)
-                                    : ((FieldInfo)syncMember).GetValue(syncMemberOwner); // ASSuming field here since only field and property allowed
-
-                hasValueChangedSinceLastSync = !Equals(lastKnownValue, lastKnownValue_previous); // NOTE: using != must be somehow not comparing values and instead comparing memory addresses because of object declaration even though if they are floats they have same value
-
-#if CSHARP_7_3_OR_NEWER
-                if (syncMemberAddress_fieldOnly.HasValue && syncMemberValueType == typeof(float))
-                {
-                    unsafe
-                    {
-                        float* valuePointer = (float*)syncMemberAddress_fieldOnly.Value;
-                        GONetLog.Debug(string.Concat("Current Value: ", *valuePointer));
-                    }
-                }
-#endif
+                this.syncCompanion = syncCompanion;
+                this.index = index;
+                this.syncAttribute_ProcessingPriority = syncAttribute_ProcessingPriority;
+                this.syncAttribute_ProcessingPriority_GONetInternalOverride = syncAttribute_ProcessingPriority_GONetInternalOverride;
             }
         }
 
@@ -286,39 +266,14 @@ namespace GONet
                 GONetLog.Debug("OnEnable");
 
                 { // auto-magical sync related housekeeping
-                    MonoBehaviour[] monoBehaviours = gonetParticipant.gameObject.GetComponents<MonoBehaviour>();
-                    List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = new List<AutoMagicalSync_ValueMonitoringSupport>(25);
-                    int length = monoBehaviours.Length;
-                    for (int i = 0; i < length; ++i)
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
+                    if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions))
                     {
-                        MonoBehaviour monoBehaviour = monoBehaviours[i];
-                        IEnumerable<MemberInfo> syncMembers = monoBehaviour
-                            .GetType()
-                            .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                            .Where(member => (member.MemberType == MemberTypes.Property || member.MemberType == MemberTypes.Field)
-                                            && member.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true) != null);
-
-                        int syncMemberCount = syncMembers.Count();
-                        for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
-                        {
-                            MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
-
-                            AutoMagicalSync_ValueMonitoringSupport monitoringSupport = new AutoMagicalSync_ValueMonitoringSupport(
-                                (uint)monitoringSupports.Count, // since this Count is being checked prior to adding monitoring to that list, the Count now will end up being the index in that list after the Add
-                                gonetParticipant,
-                                monoBehaviour,
-                                syncMember,
-                                (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true)
-                            );
-
-                            monitoringSupports.Add(monitoringSupport);
-                        }
+                        autoSyncCompanions = new Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>(1000);
+                        activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId] = autoSyncCompanions;
                     }
-
-                    if (monitoringSupports.Count > 0)
-                    {
-                        autoSyncMemberDataByGONetParticipantMap[gonetParticipant] = monitoringSupports;
-                    }
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated companion = GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.CreateInstance(gonetParticipant);
+                    autoSyncCompanions[gonetParticipant] = companion;
                 }
 
                 AssignGONetId_IfAppropriate(gonetParticipant);
@@ -345,7 +300,8 @@ namespace GONet
         /// <summary>
         /// Just a helper data structure just for use in <see cref="ProcessAutoMagicalSyncStuffs(bool, ReliableEndpoint)"/>
         /// </summary>
-        static readonly List<AutoMagicalSync_ValueMonitoringSupport> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport>(1000);
+        static readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
+
         /// <summary>
         /// Determines what has changed since last call (and stores it in <see cref="syncValuesToSend"/>)
         /// and then, depending on the value of <paramref name="isProcessingAllStateRegardlessOfChange"/>, 
@@ -357,26 +313,22 @@ namespace GONet
         /// </summary>
         static void ProcessAutoMagicalSyncStuffs(bool isProcessingAllStateRegardlessOfChange = false, ReliableEndpoint onlySendToEndpoint = null)
         {
-            syncValuesToSend.Clear();
-
-            { // TODO: PERF: look into putting this in another thread...perhaps checking on a frequency....I "believe" MemberInfo.GetValue(obj) is thread safe since it is only a read
-                var enumerator = autoSyncMemberDataByGONetParticipantMap.GetEnumerator();
-                while (enumerator.MoveNext())
+            var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
+            while (enumeratorOuter.MoveNext())
+            {
+                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                var enumeratorInner = currentMap.GetEnumerator();
+                while (enumeratorInner.MoveNext())
                 {
-                    List<AutoMagicalSync_ValueMonitoringSupport> monitoringSupports = enumerator.Current.Value;
-                    int length = monitoringSupports.Count;
-                    for (int i = 0; i < length; ++i)
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                    monitoringSupport.UpdateLastKnownValues();
+                    if (isProcessingAllStateRegardlessOfChange || monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
                     {
-                        AutoMagicalSync_ValueMonitoringSupport monitoringSupport = monitoringSupports[i];
-                        monitoringSupport.UpdateLastKnownValue();
-                        if (isProcessingAllStateRegardlessOfChange || monitoringSupport.hasValueChangedSinceLastSync)
-                        {
-                            syncValuesToSend.Add(monitoringSupport);
+                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend);
 
-                            if (!isProcessingAllStateRegardlessOfChange)
-                            {
-                                monitoringSupport.hasValueChangedSinceLastSync = false;
-                            }
+                        if (!isProcessingAllStateRegardlessOfChange)
+                        {
+                            monitoringSupport.OnValueChangeCheck_Reset();
                         }
                     }
                 }
@@ -433,7 +385,7 @@ namespace GONet
         /// PRE: <paramref name="changes"/> size is greater than 0
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <see cref="valueChangeSerializationArrayPool"/>!
         /// </summary>
-        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport> changes, out int bytesUsedCount)
+        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, out int bytesUsedCount)
         {
             using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
             {
@@ -457,22 +409,22 @@ namespace GONet
             }
         }
 
-        class AutoMagicalSyncChangePriorityComparer : IComparer<AutoMagicalSync_ValueMonitoringSupport>
+        class AutoMagicalSyncChangePriorityComparer : IComparer<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>
         {
             internal static readonly AutoMagicalSyncChangePriorityComparer Instance = new AutoMagicalSyncChangePriorityComparer();
 
             private AutoMagicalSyncChangePriorityComparer() { }
 
-            public int Compare(AutoMagicalSync_ValueMonitoringSupport x, AutoMagicalSync_ValueMonitoringSupport y)
+            public int Compare(AutoMagicalSync_ValueMonitoringSupport_ChangedValue x, AutoMagicalSync_ValueMonitoringSupport_ChangedValue y)
             {
-                int xPriority = x.syncAttribute.ProcessingPriority_GONetInternalOverride != 0 ? x.syncAttribute.ProcessingPriority_GONetInternalOverride : x.syncAttribute.ProcessingPriority;
-                int yPriority = y.syncAttribute.ProcessingPriority_GONetInternalOverride != 0 ? y.syncAttribute.ProcessingPriority_GONetInternalOverride : y.syncAttribute.ProcessingPriority;
+                int xPriority = x.syncAttribute_ProcessingPriority_GONetInternalOverride != 0 ? x.syncAttribute_ProcessingPriority_GONetInternalOverride : x.syncAttribute_ProcessingPriority;
+                int yPriority = y.syncAttribute_ProcessingPriority_GONetInternalOverride != 0 ? y.syncAttribute_ProcessingPriority_GONetInternalOverride : y.syncAttribute_ProcessingPriority;
 
                 return yPriority.CompareTo(xPriority); // descending...highest priority first!
             }
         }
 
-        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport> changes, Utils.BitStream bitStream_headerAlreadyWritten)
+        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitStream bitStream_headerAlreadyWritten)
         {
             int count = changes.Count;
             bitStream_headerAlreadyWritten.WriteUShort((ushort)count);
@@ -482,48 +434,21 @@ namespace GONet
 
             for (int i = 0; i < count; ++i)
             {
-                AutoMagicalSync_ValueMonitoringSupport monitoringSupport = changes[i];
+                AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = changes[i];
 
-                bool canASSumeGONetId = monitoringSupport.syncMember.Name == nameof(GONetParticipant.GONetId);
-
-                bool shouldSendUnityFullUniquePath_insteadOfGONetId = canASSumeGONetId;
-                bitStream_headerAlreadyWritten.WriteBit(shouldSendUnityFullUniquePath_insteadOfGONetId);
-                if (shouldSendUnityFullUniquePath_insteadOfGONetId)
+                const byte ASSumed_GONetId_INDEX = 0; // TODO FIXME ensure netid is always index 0!!!
+                bool canASSumeNetId = monitoringSupport.index == ASSumed_GONetId_INDEX;
+                bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
+                if (canASSumeNetId)
                 {
-                    string fullUniquePath = HierarchyUtils.GetFullUniquePath(monitoringSupport.gonetParticipant.gameObject);
-                    bitStream_headerAlreadyWritten.WriteString(fullUniquePath);
-
-                    GONetLog.Debug("sending full path: " + fullUniquePath);
+                    // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
+                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, ASSumed_GONetId_INDEX);
                 }
                 else
                 {
-                    bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.gonetParticipant.GONetId); // should we order change list by this id ascending and just put diff from last value?
-                }
-
-                bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.indexInList);
-
-                bool isFloatValue = monitoringSupport.lastKnownValue is float;
-                bitStream_headerAlreadyWritten.WriteBit(isFloatValue);
-                if (isFloatValue)
-                {
-                    bitStream_headerAlreadyWritten.WriteFloat((float)monitoringSupport.lastKnownValue); // TODO FIXME this only works with floats for now
-                    // TODO include monitoringSupport.lastKnownValue_previous, which just moght be null and not a float!
-                }
-                else // TODO we are really going down wrong path here with all this if else figuring of what types/fields etc..., but this is PoC land...right..its ok...we'll get code generation in soon-ish
-                {
-                    if (monitoringSupport.lastKnownValue is uint)
-                    {
-                        if (canASSumeGONetId)
-                        {
-                            bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
-
-                            GONetLog.Debug(string.Concat("just wrote new assignment of GONetId: ", monitoringSupport.lastKnownValue));
-                        }
-                        else if (monitoringSupport.syncMember.Name == nameof(GONetParticipant.OwnerAuthorityId))
-                        {
-                            bitStream_headerAlreadyWritten.WriteUInt((uint)monitoringSupport.lastKnownValue);
-                        }
-                    }
+                    bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
+                    bitStream_headerAlreadyWritten.WriteByte(monitoringSupport.index); // then have to write the index, otherwise other end does not know which index to deserialize
+                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, monitoringSupport.index);
                 }
             }
         }
@@ -535,64 +460,24 @@ namespace GONet
             GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
-                bool didReceiveUnityFullUniquePath_insteadOfGONetId;
-                bitStream_headerAlreadyRead.ReadBit(out didReceiveUnityFullUniquePath_insteadOfGONetId);
-
-                GONetParticipant gonetParticipant = null;
-                uint GONetId = default(uint);
-                if (didReceiveUnityFullUniquePath_insteadOfGONetId)
+                bool canASSumeNetId;
+                bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
+                if (canASSumeNetId)
                 {
-                    string fullUniquePath;
-                    bitStream_headerAlreadyRead.ReadString(out fullUniquePath);
-
-                    GONetLog.Debug("received full path: " + fullUniquePath);
-
-                    GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
-                    gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
-                    // NOTE: cannot do the following as we are ASSuming this message here actually represents the assignment of the gonetId for first time: GONetId = gonetParticipant.GONetId;
+                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
                 }
                 else
                 {
-                    bitStream_headerAlreadyRead.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
+                    uint gonetId;
+                    bitStream_headerAlreadyRead.ReadUInt(out gonetId);
 
-                    GONetLog.Debug("did ***not*** receive full path.........process count: " + i + " GONetId: " + GONetId);
+                    GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> m = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = m[gonetParticipant];
 
-                    gonetParticipant = gonetParticipantByGONetIdMap[GONetId];
-                }
+                    byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
 
-                uint indexInList;
-                bitStream_headerAlreadyRead.ReadUInt(out indexInList);
-
-                AutoMagicalSync_ValueMonitoringSupport monitoringSupport = autoSyncMemberDataByGONetParticipantMap[gonetParticipant][(int)indexInList];
-                bool canASSumeGONetId = monitoringSupport.syncMember.Name == nameof(GONetParticipant.GONetId);
-
-                bool isFloatValue;
-                bitStream_headerAlreadyRead.ReadBit(out isFloatValue);
-                if (isFloatValue)
-                {
-                    float lastKnownValue;
-                    bitStream_headerAlreadyRead.ReadFloat(out lastKnownValue); // TODO FIXME this only works with floats for now
-                    // TODO include monitoringSupport.lastKnownValue_previous, which just moght be null and not a float!
-
-                    GONetLog.Debug(string.Concat("just read in auto magic change val.....GONetId: ", GONetId, " indedInList: ", indexInList, " lastKnownValue: ", lastKnownValue));
-                }
-                else
-                {
-                    if (didReceiveUnityFullUniquePath_insteadOfGONetId && canASSumeGONetId)
-                    {// if in here, we are ASSuming this message here actually represents the assignment of the gonetId for first time
-                        bitStream_headerAlreadyRead.ReadUInt(out GONetId);
-
-                        gonetParticipant.GONetId = GONetId;
-
-                        GONetLog.Debug(string.Concat("just processed new <over network> assignment of GONetId: ", GONetId));
-                    }
-                    else if (monitoringSupport.syncMember.Name == nameof(GONetParticipant.OwnerAuthorityId))
-                    {
-                        uint ownerAuthorityId;
-                        bitStream_headerAlreadyRead.ReadUInt(out ownerAuthorityId);
-
-                        gonetParticipant.OwnerAuthorityId = ownerAuthorityId;
-                    }
+                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index);
                 }
             }
             GONetLog.Debug(string.Concat("************done reading changes bundle"));
@@ -605,7 +490,15 @@ namespace GONet
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
-                autoSyncMemberDataByGONetParticipantMap.Remove(gonetParticipant);
+                { // auto-magical sync related housekeeping
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                    if (!autoSyncCompanions.Remove(gonetParticipant))
+                    {
+                        const string PORK = "Expecting to find active auto-sync companion in order to de-active/remove it upon gonetParticipant.OnDisable, but did not. gonetParticipant.GONetId: ";
+                        const string NAME = " gonetParticipant.gameObject.name: ";
+                        GONetLog.Warning(string.Concat(PORK, gonetParticipant.GONetId, NAME, gonetParticipant.gameObject.name));
+                    }
+                }
 
                 // do we need to send event to disable this thing?
             }

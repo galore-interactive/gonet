@@ -26,7 +26,7 @@ namespace GONet.Generation
         /// The index of the inner item matches to the place in order of that attribute being encountered during discovery/enumeration (has to be deterministic).
         /// </summary>
         static List<List<AutoMagicalSyncAttribute_GenerationSupport>> gonetParticipantCombosEncountered = new List<List<AutoMagicalSyncAttribute_GenerationSupport>>();
-        const string GENERATED_FILE_PATH = "Assets/Code/GONet/Generation/Generated/";
+        internal const string GENERATED_FILE_PATH = "Assets/Code/GONet/Generation/Generated/";
         const string FILE_SUFFIX = ".cs";
 
         static GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator()
@@ -239,6 +239,9 @@ namespace GONet.Generation
                     //EditorUtility.SetDirty(ecsComponentDefinition); // have to set dirty in order for the subsequent call to save to register changes
                 }
 
+                byte ASSumedMaxCodeGenerationId = (byte)count;
+                BobWad_Generated_Generator.GenerateClass(ASSumedMaxCodeGenerationId);
+
                 AssetDatabase.SaveAssets(); // since we are generating the class that is the real thing of value here, ensure we also save the asset to match current state
                 AssetDatabase.Refresh(); // get the Unity editor to recognize any new code just added and recompile it
             }
@@ -297,7 +300,7 @@ namespace GONet.Generation
         /// <summary>
         /// TODO: almost certainly need to use this to support ordering for processing on receipt of messages
         /// </summary>
-        GONetAutoMagicalSyncAttribute attribute;
+        internal GONetAutoMagicalSyncAttribute attribute;
 
         // TODO: this is for deserialize/load from persistence: internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() {}
 

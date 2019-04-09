@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using GONet.Utils;
+using UnityEngine;
 
 namespace GONet
 {
@@ -38,7 +40,7 @@ namespace GONet
         /// Every instance of <see cref="GONetParticipant"/> will be assigned a unique value to this variable.
         /// IMPORTANT: This is the most important message to process first as data management in GONet relies on it.
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue)]
+        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue, CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer))]
         public uint GONetId
         {
             get { return gonetId; }
@@ -109,6 +111,40 @@ namespace GONet
         private void OnDisable()
         {
             GONetMain.OnDisable_StopMonitoringForAutoMagicalNetworking(this);
+        }
+
+        internal class GONetId_InitialAssignment_CustomSerializer : IGONetAutoMagicalSync_CustomSerializer
+        {
+            internal static GONetId_InitialAssignment_CustomSerializer Instance => GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONetId_InitialAssignment_CustomSerializer>();
+
+            /// <summary>
+            /// This is needed for <see cref="Activator.CreateInstance(Type)"/> in <see cref="GONetAutoMagicalSyncAttribute"/> method to be able to instantiate this.
+            /// </summary>
+            public GONetId_InitialAssignment_CustomSerializer() { }
+
+            public object Deserialize(Utils.BitStream bitStream_readFrom)
+            {
+                string fullUniquePath;
+                bitStream_readFrom.ReadString(out fullUniquePath);
+                GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
+                GONetParticipant gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+
+                uint GONetId = default(uint);
+                bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
+
+                gonetParticipant.GONetId = GONetId;
+
+                return GONetId;
+            }
+
+            public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+            {
+                string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
+                bitStream_appendTo.WriteString(fullUniquePath);
+
+                uint gonetId = (uint)value;
+                bitStream_appendTo.WriteUInt(gonetId);
+            }
         }
     }
 }

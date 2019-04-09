@@ -1,0 +1,47 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+
+<#@ assembly name="System.Core" #>
+<#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp.dll" #>
+<#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp-Editor.dll" #>
+
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="GONet" #>
+<#@ import namespace="GONet.Utils" #>
+<#@ import namespace="GONet.Generation" #>
+
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using UnityEngine;
+using GONet;
+
+namespace GONet.Generation
+{
+	public partial class BobWad
+	{
+		static BobWad()
+		{
+			GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness;
+		}
+
+		static internal GONetParticipant_AutoMagicalSyncCompanion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)
+		{
+			switch (gonetParticipant.codeGenerationId)
+			{
+<#
+	for (int iCodeGenerationId = 1; iCodeGenerationId <= (int)maxCodeGenerationId; ++iCodeGenerationId)
+    {
+#>
+				case <#=iCodeGenerationId#>:
+					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_<#=iCodeGenerationId#>(gonetParticipant);
+<#	}#>
+			}
+
+			return null;
+		}
+	}
+}
