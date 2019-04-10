@@ -96,10 +96,12 @@ namespace GONet
         static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer>(25);
         IGONetAutoMagicalSync_CustomSerializer customSerialize_Instance = null;
         /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// This will only be non-null when <see cref="CustomSerialize_Type"/> is set to a non-abstract type
         /// that implements <see cref="IGONetAutoMagicalSync_CustomSerializer"/>.
         /// </summary>
-        internal IGONetAutoMagicalSync_CustomSerializer CustomSerialize_Instance
+        public IGONetAutoMagicalSync_CustomSerializer CustomSerialize_Instance
         {
             get
             {

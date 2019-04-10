@@ -147,7 +147,12 @@ namespace GONet.Generation
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
             {
-				if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				if (singleMember.attribute.CustomSerialize_Instance != null)
+                {#>
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, _<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#              }
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
                 {
 #>
 				bitStream_appendTo.WriteBit(_<#=single.componentTypeName#>.<#=singleMember.memberName#>);
@@ -236,7 +241,12 @@ namespace GONet.Generation
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
             {
-				if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				if (singleMember.attribute.CustomSerialize_Instance != null)
+                {#>
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				_<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)customSerializer.Deserialize(bitStream_readFrom);
+<#              }
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
                 {
 #>
 <#					if (singleMember.isField) {#>

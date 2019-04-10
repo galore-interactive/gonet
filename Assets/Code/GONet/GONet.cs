@@ -471,8 +471,8 @@ namespace GONet
                     bitStream_headerAlreadyRead.ReadUInt(out gonetId);
 
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
-                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> m = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = m[gonetParticipant];
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
 
                     byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
 
