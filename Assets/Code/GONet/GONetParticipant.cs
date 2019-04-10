@@ -15,6 +15,11 @@ namespace GONet
         public const uint OwnerAuthorityId_Unset = 0;
         public const uint OwnerAuthorityId_Server = uint.MaxValue;
 
+        /// <summary>
+        /// This represents the index inside <see cref="GONet.Generation.GONetParticipant_ComponentsWithAutoSyncMembers.ComponentMemberNames_By_ComponentTypeFullName"/>
+        /// </summary>
+        internal const byte ASSumed_GONetId_INDEX = 0;
+
         public const uint GONetId_Unset = 0;
 
         /// <summary>

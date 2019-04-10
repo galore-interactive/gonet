@@ -436,13 +436,12 @@ namespace GONet
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = changes[i];
 
-                const byte ASSumed_GONetId_INDEX = 0; // TODO FIXME ensure netid is always index 0!!!
-                bool canASSumeNetId = monitoringSupport.index == ASSumed_GONetId_INDEX;
+                bool canASSumeNetId = monitoringSupport.index == GONetParticipant.ASSumed_GONetId_INDEX;
                 bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
                 if (canASSumeNetId)
                 {
                     // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
-                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, ASSumed_GONetId_INDEX);
+                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
                 }
                 else
                 {

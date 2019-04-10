@@ -353,7 +353,7 @@ namespace GONet.Generation
         internal byte? codeGenerationId;
 
         /// <summary>
-        /// in deterministic order!
+        /// In deterministic order....with the one for <see cref="GONetParticipant.GONetId"/> first due to special case processing....also <see cref="GONetParticipant.ASSumed_GONetId_INDEX"/>
         /// </summary>
         internal GONetParticipant_ComponentsWithAutoSyncMembers_Single[] ComponentMemberNames_By_ComponentTypeFullName;
 
@@ -369,6 +369,10 @@ namespace GONet.Generation
         {
             this.gonetParticipant = gonetParticipant;
 
+            int iSinglesAdded = -1;
+            int gonetIdOriginalIndex_single = -1;
+            int gonetIdOriginalIndex_singleMember = -1;
+
             var componentMemberNames_By_ComponentTypeFullName = new LinkedList<GONetParticipant_ComponentsWithAutoSyncMembers_Single>();
             foreach (MonoBehaviour component in gonetParticipant.GetComponents<MonoBehaviour>().OrderBy(c => c.GetType().FullName))
             {
@@ -382,21 +386,51 @@ namespace GONet.Generation
                     .OrderBy(member => member.Name);
 
                 int syncMemberCount = syncMembers.Count();
-                for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
+                bool willBeAddingBelow = syncMemberCount > 0;
+                if (willBeAddingBelow)
                 {
-                    MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
-                    var singleMember = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(syncMember);
-                    componentAutoSyncMembers.AddLast(singleMember);
-                }
+                    ++iSinglesAdded;
+                    bool isGONetParticipant = component.GetType() == typeof(GONetParticipant);
+                    if (isGONetParticipant)
+                    {
+                        gonetIdOriginalIndex_single = iSinglesAdded;
+                    }
 
-                if (componentAutoSyncMembers.Count > 0)
-                {
+                    for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
+                    {
+                        MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
+                        var singleMember = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(syncMember);
+                        componentAutoSyncMembers.AddLast(singleMember);
+
+                        if (isGONetParticipant && syncMember.Name == nameof(GONetParticipant.GONetId))
+                        {
+                            gonetIdOriginalIndex_singleMember = iSyncMember;
+                        }
+                    }
+
                     var newSingle = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(component, componentAutoSyncMembers.ToArray());
                     componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle);
                 }
             }
 
             ComponentMemberNames_By_ComponentTypeFullName = componentMemberNames_By_ComponentTypeFullName.ToArray();
+
+            // now that we have arrays, we can swap some stuff to ensure GONetId field is index 0!
+            if (gonetIdOriginalIndex_single > 0) // if it is already 0, nothing to do
+            {
+                var tmp = ComponentMemberNames_By_ComponentTypeFullName[0];
+                ComponentMemberNames_By_ComponentTypeFullName[0] = ComponentMemberNames_By_ComponentTypeFullName[gonetIdOriginalIndex_single];
+                ComponentMemberNames_By_ComponentTypeFullName[gonetIdOriginalIndex_single] = tmp;
+            }
+
+            // at this point, we know ComponentMemberNames_By_ComponentTypeFullName[0] represents the GONetParticipant component
+            if (gonetIdOriginalIndex_singleMember > 0) // if it is already 0, nothing to do...yet again
+            {
+                var gonetParticipantCompnent = ComponentMemberNames_By_ComponentTypeFullName[0];
+                var tmp = gonetParticipantCompnent.autoSyncMembers[0];
+                gonetParticipantCompnent.autoSyncMembers[0] = gonetParticipantCompnent.autoSyncMembers[gonetIdOriginalIndex_singleMember];
+                gonetParticipantCompnent.autoSyncMembers[gonetIdOriginalIndex_singleMember] = tmp;
+            }
         }
     }
 
