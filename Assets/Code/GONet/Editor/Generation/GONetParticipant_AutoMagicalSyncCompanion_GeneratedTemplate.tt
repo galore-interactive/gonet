@@ -68,6 +68,8 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 			var support<#=iOverall#> = valuesChangesSupport[<#=iOverall#>] = valueChangeSupportArrayPool.Borrow();
+            support<#=iOverall#>.lastKnownValue = default(<#=singleMember.memberTypeFullName#>);
+            support<#=iOverall#>.lastKnownValue_previous = default(<#=singleMember.memberTypeFullName#>);
 			support<#=iOverall#>.syncCompanion = this;
 			support<#=iOverall#>.index = <#=iOverall#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority = <#=singleMember.attribute.ProcessingPriority#>;
