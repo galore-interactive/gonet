@@ -127,11 +127,6 @@ namespace GONet
             {
                 gonetClient?.Disconnect();
             }
-
-#if CSHARP_7_3_OR_NEWER
-            GetAddressOfField_Example.Go();
-            NotSoSoftCour.FreeAllGCHandles();
-#endif
         }
 
         struct NetworkData

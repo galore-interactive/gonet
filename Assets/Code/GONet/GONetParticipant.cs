@@ -29,8 +29,11 @@ namespace GONet
 
         #endregion
 
+        /// <summary>
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
         [SerializeField, HideInInspector]
-        internal byte codeGenerationId;
+        public byte codeGenerationId = CodeGenerationId_Unset;
 
         /// <summary>
         /// This is set to a value that represents which machine in the game spawned this instance.

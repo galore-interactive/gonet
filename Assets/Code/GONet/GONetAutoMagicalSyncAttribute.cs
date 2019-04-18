@@ -1,4 +1,5 @@
 ﻿using GONet.Utils;
+using MessagePack;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -51,10 +52,16 @@ namespace GONet
     ///     • Structs containing allowable types.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+    [MessagePackObject]
     public class GONetAutoMagicalSyncAttribute : Attribute
     {
+        [IgnoreMember]
+        public override object TypeId => base.TypeId;
+
+        [Key(0)]
         public AutoMagicalSyncSchedule Schedule = AutoMagicalSyncSchedule.EndOfEveryFrame;
 
+        [Key(1)]
         public AutoMagicalSyncReliability Reliability = AutoMagicalSyncReliability.Reliable;
 
         /// <summary>
@@ -63,14 +70,17 @@ namespace GONet
         /// 
         /// NOTE: The higher the number, the higher the priority and the sooner a change of value will be processed in a group of changes being processed at once.
         /// </summary>
+        [Key(2)]
         public int ProcessingPriority = 0;
 
+        [Key(3)]
         public bool IsReadonlyInEditor = false;
 
         /// <summary>
         /// Only applicable to primitive numeric data types, mainly float.
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
         /// </summary>
+        [Key(4)]
         public int QuantizeDownToBitCount = 0;
 
         #region GONet internal only
@@ -79,6 +89,7 @@ namespace GONet
         /// DO NOT use this!  It is used internally within GONet only.
         /// If you use this, results of entire GONet could be compromised and unpredictable....why would you want that?
         /// </summary>
+        [Key(5)]
         public int ProcessingPriority_GONetInternalOverride = 0;
 
         #endregion
@@ -91,9 +102,32 @@ namespace GONet
         ///            An instance of this type will be created and cast to <see cref="IGONetAutoMagicalSync_CustomSerializer"/> and 
         ///            set on <see cref="CustomSerialize_Instance"/> and that is what will be used.
         /// </summary>
+        [IgnoreMember]
         public Type CustomSerialize_Type = null;
 
+        /// <summary>
+        /// Only here to support serialization of <see cref="CustomSerialize_Type"/>
+        /// </summary>
+        [Key(6)]
+        string CustomSerialize_Type_AsString
+        {
+            get { return CustomSerialize_Type != null ? CustomSerialize_Type.AssemblyQualifiedName : null; }
+
+            set
+            {
+                if (value == null)
+                {
+                    CustomSerialize_Type = null;
+                }
+                else
+                {
+                    CustomSerialize_Type = Type.GetType(value);
+                }
+            }
+        }
+
         static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer>(25);
+        [IgnoreMember]
         IGONetAutoMagicalSync_CustomSerializer customSerialize_Instance = null;
         /// <summary>
         /// IMPORTANT: Do NOT use this.
@@ -101,6 +135,7 @@ namespace GONet
         /// This will only be non-null when <see cref="CustomSerialize_Type"/> is set to a non-abstract type
         /// that implements <see cref="IGONetAutoMagicalSync_CustomSerializer"/>.
         /// </summary>
+        [IgnoreMember]
         public IGONetAutoMagicalSync_CustomSerializer CustomSerialize_Instance
         {
             get
