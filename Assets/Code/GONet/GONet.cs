@@ -308,6 +308,8 @@ namespace GONet
         /// </summary>
         static void ProcessAutoMagicalSyncStuffs(bool isProcessingAllStateRegardlessOfChange = false, ReliableEndpoint onlySendToEndpoint = null)
         {
+            syncValuesToSend.Clear();
+
             var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
             while (enumeratorOuter.MoveNext())
             {

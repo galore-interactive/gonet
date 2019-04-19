@@ -68,9 +68,10 @@ namespace GONet.Generation
 
         private static void OnEditorPlayModeStateChanged(PlayModeStateChange state)
         {
-            if (state == PlayModeStateChange.EnteredPlayMode)
+            bool canASSume_GoingFrom_Editer_To_Play = !EditorApplication.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode; // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
+            if (canASSume_GoingFrom_Editer_To_Play)
             {
-                GONetLog.Debug("[DREETS] entering play mode");
+                GONetLog.Debug("[DREETS] entering play mode...not there yet, but about to be....about to generate as that needs to happen before playing!");
                 DoAllTheGenerationStuffs();
             }
         }
@@ -143,7 +144,7 @@ namespace GONet.Generation
 
         private static void GONetParticipant_EditorOnlyOnDestroy(GONetParticipant gonetParticipant)
         {
-            GONetLog.Debug("[DREETS] ***DESTROYED*** GONetParticipant");
+            GONetLog.Debug("[DREETS] ***DESTROYED*** GONetParticipant....");
         }
 
         [DidReloadScripts]
