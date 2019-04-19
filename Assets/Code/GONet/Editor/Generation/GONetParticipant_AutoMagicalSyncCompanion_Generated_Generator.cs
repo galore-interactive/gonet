@@ -563,8 +563,6 @@ namespace GONet.Generation
                                 return false;
                             }
                         }
-
-                        return true;
                     }
                     else
                     {
@@ -572,6 +570,7 @@ namespace GONet.Generation
                         return false;
                     }
                 }
+                return true;
             }
             return false;
         }
