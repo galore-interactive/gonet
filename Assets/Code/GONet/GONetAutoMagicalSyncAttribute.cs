@@ -109,7 +109,7 @@ namespace GONet
         /// Only here to support serialization of <see cref="CustomSerialize_Type"/>
         /// </summary>
         [Key(6)]
-        string CustomSerialize_Type_AsString
+        public string CustomSerialize_Type_AsString
         {
             get { return CustomSerialize_Type != null ? CustomSerialize_Type.AssemblyQualifiedName : null; }
 

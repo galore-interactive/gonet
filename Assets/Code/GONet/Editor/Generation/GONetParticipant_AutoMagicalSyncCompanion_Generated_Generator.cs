@@ -162,10 +162,16 @@ namespace GONet.Generation
             { // TODO remove this test:
                 GONetParticipant_ComponentsWithAutoSyncMembers v = new GONetParticipant_ComponentsWithAutoSyncMembers();
                 v.codeGenerationId = 4;
+                v.ComponentMemberNames_By_ComponentTypeFullName = new GONetParticipant_ComponentsWithAutoSyncMembers_Single[3]
+                {
+                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single(),
+                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single(),
+                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single()
+                };
                 byte[] b = SerializationUtils.SerializeToBytes(v);
                 var vd = SerializationUtils.DeserializeFromBytes<GONetParticipant_ComponentsWithAutoSyncMembers>(b);
 
-                GONetLog.Debug("vd.codeGenerationId: " + vd.codeGenerationId);
+                GONetLog.Debug("vd.codeGenerationId: " + vd.codeGenerationId + " vd.ComponentMemberNames_By_ComponentTypeFullName.Length: " + vd.ComponentMemberNames_By_ComponentTypeFullName.Length);
             }
 
             /* auto-sync code gen psuedo:
@@ -189,7 +195,7 @@ namespace GONet.Generation
             */
 
             List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence = LoadAllSnapsFromPersistence();
-            allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId));
+            allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
 
             List<GONetParticipant> gonetParticipantsInOpenScenes = new List<GONetParticipant>();
 
@@ -232,14 +238,14 @@ namespace GONet.Generation
                     {
                         GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
-                        possibleNew.codeGenerationId = /*possibleNew.gonetParticipant.codeGenerationId = */ matchFromPersistence.codeGenerationId;
-
-                        SerializedObject so = new SerializedObject(possibleNew.gonetParticipant);
-                        so.Update();
-                        so.FindProperty(nameof(GONetParticipant.codeGenerationId)).intValue = matchFromPersistence.codeGenerationId;
-                        so.ApplyModifiedProperties();
-                        //EditorSceneManager.MarkAllScenesDirty();
-
+                        possibleNew.codeGenerationId = matchFromPersistence.codeGenerationId;
+                        { // cannot simply do the following: possibleNew.gonetParticipant.codeGenerationId = matchFromPersistence.codeGenerationId;
+                            SerializedObject so = new SerializedObject(possibleNew.gonetParticipant);
+                            so.Update();
+                            so.FindProperty(nameof(GONetParticipant.codeGenerationId)).intValue = matchFromPersistence.codeGenerationId;
+                            so.ApplyModifiedProperties();
+                            //EditorSceneManager.MarkAllScenesDirty(); this causes endless loop
+                        }
 
                         GONetLog.Debug("match found from persistence... AFTER possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
@@ -284,7 +290,7 @@ namespace GONet.Generation
 
         #region persistence
 
-        const string SNAPS_FILE = GENERATION_FILE_PATH + "snaps.bin";
+        const string SNAPS_FILE = GENERATION_FILE_PATH + "Unique_GONetParticipant_ComponentsWithAutoSyncMembers.bin";
 
         /// <summary>
         /// returns empty list if nothing persisted.
@@ -308,6 +314,8 @@ namespace GONet.Generation
             {
                 Directory.CreateDirectory(GENERATION_FILE_PATH);
             }
+
+            allSnaps.ForEach(x => GONetLog.Debug("SAVING to persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
 
             byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps);
             File.WriteAllBytes(SNAPS_FILE, snapsFileBytes);
@@ -344,17 +352,17 @@ namespace GONet.Generation
         /// If false, the member is a property.
         /// </summary>
         [Key(0)]
-        internal bool isField;
+        public bool isField;
         [Key(1)]
-        internal string memberTypeFullName;
+        public string memberTypeFullName;
         [Key(2)]
-        internal string memberName;
+        public string memberName;
 
         /// <summary>
         /// TODO: almost certainly need to use this to support ordering for processing on receipt of messages
         /// </summary>
         [Key(3)]
-        internal GONetAutoMagicalSyncAttribute attribute;
+        public GONetAutoMagicalSyncAttribute attribute;
 
         /// <summary>
         /// IMPORTANT: do NOT use.  This is for deserialize/load from persistence:
@@ -380,17 +388,17 @@ namespace GONet.Generation
     public class GONetParticipant_ComponentsWithAutoSyncMembers_Single
     {
         [Key(0)]
-        internal string componentTypeName;
+        public string componentTypeName;
         [Key(1)]
-        internal string componentTypeFullName;
+        public string componentTypeFullName;
         [Key(2)]
-        internal string componentTypeAssemblyQualifiedName;
+        public string componentTypeAssemblyQualifiedName;
 
         /// <summary>
         /// in deterministic order!
         /// </summary>
         [Key(3)]
-        internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[] autoSyncMembers;
+        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[] autoSyncMembers;
 
         /// <summary>
         /// IMPORTANT: do NOT use.  This is for deserialize/load from persistence:
@@ -410,7 +418,11 @@ namespace GONet.Generation
     }
 
     /// <summary>
+    /// This is what represents a unique combination of <see cref="GONetAutoMagicalSyncAttribute"/>s on a <see cref="GameObject"/> with <see cref="GONetParticipant"/> "installed."
+    /// A set of these gets persisted into a file at <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.SNAPS_FILE"/>.
+    /// 
     /// NOTE: once called this Snap...renamed to this.
+    /// 
     /// </summary>
     [MessagePackObject]
     public class GONetParticipant_ComponentsWithAutoSyncMembers
@@ -427,7 +439,7 @@ namespace GONet.Generation
         /// In deterministic order....with the one for <see cref="GONetParticipant.GONetId"/> first due to special case processing....also <see cref="GONetParticipant.ASSumed_GONetId_INDEX"/>
         /// </summary>
         [Key(1)]
-        internal GONetParticipant_ComponentsWithAutoSyncMembers_Single[] ComponentMemberNames_By_ComponentTypeFullName;
+        public GONetParticipant_ComponentsWithAutoSyncMembers_Single[] ComponentMemberNames_By_ComponentTypeFullName;
 
         /// <summary>
         /// This is ONLY populated when <see cref="GONetParticipant_ComponentsWithAutoSyncMembers.GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant)"/> is used during 
@@ -490,6 +502,7 @@ namespace GONet.Generation
             }
 
             ComponentMemberNames_By_ComponentTypeFullName = componentMemberNames_By_ComponentTypeFullName.ToArray();
+            GONetLog.Debug("new ComponentMemberNames_By_ComponentTypeFullName.length: " + ComponentMemberNames_By_ComponentTypeFullName.Length);
 
             { // now that we have arrays, we can swap some stuff to ensure GONetId field is index 0!
                 if (gonetIdOriginalIndex_single > 0) // if it is already 0, nothing to do
@@ -524,6 +537,9 @@ namespace GONet.Generation
                 x != null && y != null &&
                 x.ComponentMemberNames_By_ComponentTypeFullName != null && y.ComponentMemberNames_By_ComponentTypeFullName != null &&
                 x.ComponentMemberNames_By_ComponentTypeFullName.Length == y.ComponentMemberNames_By_ComponentTypeFullName.Length;
+
+            GONetLog.Debug("areInitiallyEqual: " + areInitiallyEqual);
+
             if (areInitiallyEqual)
             {
                 int componentCount = x.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -543,6 +559,7 @@ namespace GONet.Generation
                             string yMemberName = ySingle.autoSyncMembers[iMember].memberName;
                             if (xMemberName != yMemberName)
                             {
+                                GONetLog.Debug("member names differ, iMember: " + iMember + " xMemberName: " + xMemberName + " yMemberName: " + yMemberName);
                                 return false;
                             }
                         }
@@ -551,6 +568,7 @@ namespace GONet.Generation
                     }
                     else
                     {
+                        GONetLog.Debug("qualified names not same or different count");
                         return false;
                     }
                 }
