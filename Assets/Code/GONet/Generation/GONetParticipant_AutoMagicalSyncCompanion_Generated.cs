@@ -104,6 +104,14 @@ namespace GONet.Generation
                 }
             }
         }
+
+        internal void AppendListWithAllValues(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                syncValuesToSend.Add(valuesChangesSupport[i]);
+            }
+        }
     }
 
     internal static class GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory

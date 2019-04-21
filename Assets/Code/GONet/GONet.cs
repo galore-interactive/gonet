@@ -201,7 +201,7 @@ namespace GONet
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
-            ProcessAutoMagicalSyncStuffs(true, gonetConnection_ServerToClient);
+            ProcessAutoMagicalSyncStuffs(gonetConnection_ServerToClient);
         }
 
         #endregion
@@ -304,9 +304,9 @@ namespace GONet
         /// either (if true) sends all current values...
         /// or (if false) sends only the changed things...
         /// 
-        /// ...to all remote connections (or just to <paramref name="onlySendToEndpoint"/> if not null)
+        /// ...to all remote connections (or just to <paramref name="sendAllCurrentValuesToOnlyThisConnection"/> if not null)
         /// </summary>
-        static void ProcessAutoMagicalSyncStuffs(bool isProcessingAllStateRegardlessOfChange = false, ReliableEndpoint onlySendToEndpoint = null)
+        static void ProcessAutoMagicalSyncStuffs(ReliableEndpoint sendAllCurrentValuesToOnlyThisConnection = null)
         {
             syncValuesToSend.Clear();
 
@@ -318,15 +318,16 @@ namespace GONet
                 while (enumeratorInner.MoveNext())
                 {
                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-                    monitoringSupport.UpdateLastKnownValues();
-                    if (isProcessingAllStateRegardlessOfChange || monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
+                    monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
+                    if (sendAllCurrentValuesToOnlyThisConnection != null)
+                    {
+                        // TODO can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
+                        monitoringSupport.AppendListWithAllValues(syncValuesToSend);
+                    }
+                    else if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
                     {
                         monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend);
-
-                        if (!isProcessingAllStateRegardlessOfChange)
-                        {
-                            monitoringSupport.OnValueChangeCheck_Reset();
-                        }
+                        monitoringSupport.OnValueChangeCheck_Reset();
                     }
                 }
             }
@@ -336,14 +337,14 @@ namespace GONet
                 int bytesUsedCount;
                 byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount);
 
-                if (onlySendToEndpoint == null)
+                if (sendAllCurrentValuesToOnlyThisConnection == null)
                 {
                     GONetLog.Debug("sending changed auto-magical sync values to all connections");
                     SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
                 }
                 else
                 {
-                    onlySendToEndpoint.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
+                    sendAllCurrentValuesToOnlyThisConnection.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
                 }
 
                 valueChangeSerializationArrayPool.Return(changesSerialized);

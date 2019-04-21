@@ -6,6 +6,13 @@ public class FieldChangeTest : MonoBehaviour
     [GONetAutoMagicalSync]
     public float someCoolGuyFloat;
 
+    Vector3 startPosition;
+
+    private void Awake()
+    {
+        startPosition = transform.position;
+    }
+
     /* test with an ever-changing field value:
     private void Update()
     {
@@ -15,4 +22,9 @@ public class FieldChangeTest : MonoBehaviour
         }
     }
     */
+
+    private void Update()
+    {
+        transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
+    }
 }
