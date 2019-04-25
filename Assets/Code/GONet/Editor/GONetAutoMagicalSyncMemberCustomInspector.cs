@@ -72,9 +72,9 @@ namespace GONet.Editor
                 GUI.enabled = false;
 
                 const string GONET_SERVER = "<GONet server>";
-                string value = targetGONetParticipant.OwnerAuthorityId == GONetParticipant.OwnerAuthorityId_Server
+                string value = targetGONetParticipant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Server
                     ? GONET_SERVER
-                    : (targetGONetParticipant.OwnerAuthorityId == GONetParticipant.OwnerAuthorityId_Unset ? NOT_SET : targetGONetParticipant.OwnerAuthorityId.ToString());
+                    : (targetGONetParticipant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset ? NOT_SET : targetGONetParticipant.OwnerAuthorityId.ToString());
                 EditorGUILayout.TextField(value);
 
                 GUI.enabled = guiEnabledPrevious;

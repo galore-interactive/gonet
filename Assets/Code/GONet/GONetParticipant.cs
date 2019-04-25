@@ -12,9 +12,6 @@ namespace GONet
     {
         #region constants
 
-        public const uint OwnerAuthorityId_Unset = 0;
-        public const uint OwnerAuthorityId_Server = uint.MaxValue;
-
         /// <summary>
         /// This represents the index inside <see cref="GONet.Generation.GONetParticipant_ComponentsWithAutoSyncMembers.ComponentMemberNames_By_ComponentTypeFullName"/>
         /// </summary>
@@ -41,14 +38,17 @@ namespace GONet
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
         /// </summary>
         [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1)]
-        public uint OwnerAuthorityId { get; internal set; } = OwnerAuthorityId_Unset;
+        public uint OwnerAuthorityId { get; internal set; } = GONetMain.OwnerAuthorityId_Unset;
 
         private uint gonetId = GONetId_Unset;
         /// <summary>
         /// Every instance of <see cref="GONetParticipant"/> will be assigned a unique value to this variable.
         /// IMPORTANT: This is the most important message to process first as data management in GONet relies on it.
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue, CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer))]
+        [GONetAutoMagicalSync(
+            SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
+            ProcessingPriority_GONetInternalOverride = int.MaxValue, 
+            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer))]
         public uint GONetId
         {
             get { return gonetId; }

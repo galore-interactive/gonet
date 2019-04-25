@@ -7,6 +7,8 @@ namespace GONet
 {
     public abstract class GONetConnection : ReliableEndpoint
     {
+        public uint OwnerAuthorityId { get; internal set; }
+
         protected GONetConnection()
         {
             ReceiveCallback = OnReceiveCallback;

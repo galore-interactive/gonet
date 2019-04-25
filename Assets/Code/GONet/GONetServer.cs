@@ -92,6 +92,15 @@ namespace GONet
             }
         }
 
+        public void ForEachClient(Action<GONetConnection_ServerToClient> doThis)
+        {
+            for (int iConnection = 0; iConnection < numConnections; ++iConnection)
+            {
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
+                doThis(gONetConnection_ServerToClient);
+            }
+        }
+
         /// <summary>
         /// NOTE: This will likely be called on a thread other than the main Unity thread
         /// </summary>

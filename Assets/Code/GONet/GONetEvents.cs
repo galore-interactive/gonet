@@ -8,7 +8,9 @@ namespace GONet
 
     public class AutoMagicalSync_ValueChangesMessage : IGONetEvent
     {
-        List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes;
     }
 
+    public class OwnerAuthorityIdAssignmentMessage : IGONetEvent
+    {
+    }
 }

@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace GONet
 {
@@ -19,7 +21,36 @@ namespace GONet
 
         private void Awake()
         {
+            SceneManager.sceneLoaded += OnSceneLoaded;
+
             GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
+        }
+
+        private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)
+        {
+            { // do auto-assign authority id stuffs for all gonet stuff in scene
+                List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
+                GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
+                FindAndAppend(sceneObjects, gonetParticipantsInLevel);
+                GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+            }
+        }
+
+        private static void FindAndAppend<T>(GameObject[] gameObjects, /* IN/OUT */ List<T> listToAppend)
+        {
+            int count = gameObjects != null ? gameObjects.Length : 0;
+            for (int i = 0; i < count; ++i)
+            {
+                T t = gameObjects[i].GetComponent<T>();
+                if (t != null)
+                {
+                    listToAppend.Add(t);
+                }
+                foreach (Transform childTransform in gameObjects[i].transform)
+                {
+                    FindAndAppend(new[] { childTransform.gameObject }, listToAppend);
+                }
+            }
         }
 
         private void Update()

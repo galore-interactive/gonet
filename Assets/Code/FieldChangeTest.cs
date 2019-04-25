@@ -3,28 +3,31 @@ using UnityEngine;
 
 public class FieldChangeTest : MonoBehaviour
 {
-    [GONetAutoMagicalSync]
+    [GONetAutoMagicalSync(SyncChangesEverySeconds = 4.5f)]
     public float someCoolGuyFloat;
 
     Vector3 startPosition;
+
+    float moveAmount = 1f;
 
     private void Awake()
     {
         startPosition = transform.position;
     }
 
-    /* test with an ever-changing field value:
     private void Update()
     {
+        /* test with an ever-changing field value: */
         if (GONetMain.IsServer)
         {
-            someCoolGuyFloat += 0.0001f;
+            someCoolGuyFloat += moveAmount * Time.deltaTime;
+            if (someCoolGuyFloat >= 5 || someCoolGuyFloat <= -5)
+            {
+                moveAmount *= -1;
+            }
         }
-    }
-    */
+        /* */
 
-    private void Update()
-    {
         transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
     }
 }

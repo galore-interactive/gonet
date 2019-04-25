@@ -6,16 +6,22 @@ using UnityEngine;
 
 namespace GONet
 {
-    public enum AutoMagicalSyncSchedule : byte
+    /// <summary>
+    /// This class only holds constant value fields that can be used as <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/> values.
+    /// </summary>
+    public static class AutoMagicalSyncFrequencies
     {
-        EndOfEveryFrame,
+        /// <summary>
+        /// Use this if tevery chang should be processed at the end of the game update frame in which the change occurred.
+        /// This is the fastest GONet can deliver results. 
+        /// Try not to use this for everything or else the network performance will be negatively affected with what is likely traffic that is not all vital.
+        /// </summary>
+        public const float END_OF_FRAME_IN_WHICH_CHANGE_OCCURS = 0f;
 
         /// <summary>
-        /// Less often than every frame...maybe once a second
-        /// 
-        /// TODO: have to define where this is configured!
+        /// This is a great default value for most data items that is not considered absolutely vital to arrive ASAP.
         /// </summary>
-        OnConfigurableFrequency
+        public const float _24_Hz = 1f / 24f;
     }
 
     public enum AutoMagicalSyncReliability : byte
@@ -58,8 +64,12 @@ namespace GONet
         [IgnoreMember]
         public override object TypeId => base.TypeId;
 
+        /// <summary>
+        /// How often (in seconds) the system will check the field/property value for a change and send it across the network if it did change.
+        /// <see cref="AutoMagicalSyncFrequencies"/> for some standard options to use here.
+        /// </summary>
         [Key(0)]
-        public AutoMagicalSyncSchedule Schedule = AutoMagicalSyncSchedule.EndOfEveryFrame;
+        public float SyncChangesEverySeconds = AutoMagicalSyncFrequencies._24_Hz;
 
         [Key(1)]
         public AutoMagicalSyncReliability Reliability = AutoMagicalSyncReliability.Reliable;

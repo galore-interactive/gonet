@@ -9,7 +9,7 @@ namespace GONet
     {
         public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;
 
-        GONetConnection_ClientToServer connectionToServer;
+        internal GONetConnection_ClientToServer connectionToServer;
 
         private Client client;
 
