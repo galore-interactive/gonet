@@ -28,6 +28,8 @@ namespace GONet
         {
             this.client = client;
 
+            OwnerAuthorityId = GONetMain.OwnerAuthorityId_Server;
+
             client.OnMessageReceived += OnReceivedFromServer_AnyLittleThingTheProtocolLayerDeemsNecessary;
 
             TransmitCallback = SendToServer_AnyLittleThingTheProtocolLayerDeemsNecessary;

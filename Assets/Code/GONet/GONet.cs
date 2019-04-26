@@ -204,7 +204,6 @@ namespace GONet
                                 
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
                                 {
-                                    gonetClient.connectionToServer.OwnerAuthorityId = ownerAuthorityId;
                                     MyAuthorityId = ownerAuthorityId;
                                 } // else log warning?
                             } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
@@ -409,7 +408,7 @@ namespace GONet
                 int bytesUsedCount;
                 if (sendAllCurrentValuesToOnlyThisConnection == null)
                 { // if in here, we are sending only changes (since last send) to everyone
-                    GONetLog.Debug("sending changed auto-magical sync values to all connections");
+                    //GONetLog.Debug("sending changed auto-magical sync values to all connections");
                     if (IsServer)
                     {
                         // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
@@ -422,7 +421,7 @@ namespace GONet
                     }
                     else
                     {
-                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount);
+                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
                         SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
                         valueChangeSerializationArrayPool.Return(changesSerialized);
                     }
@@ -523,7 +522,7 @@ namespace GONet
             }
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
-            GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
+            //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
             changes.Sort(AutoMagicalSyncChangePriorityComparer.Instance);
 
@@ -556,7 +555,7 @@ namespace GONet
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
-            GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
+            //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
                 bool canASSumeNetId;
@@ -580,7 +579,7 @@ namespace GONet
                     syncCompanion.valuesChangesSupport[index].lastKnownValue_SetByAuthorityId = sourceOfChangeConnection.OwnerAuthorityId; // keep track of the authority of every change!
                 }
             }
-            GONetLog.Debug(string.Concat("************done reading changes bundle"));
+            //GONetLog.Debug(string.Concat("************done reading changes bundle"));
         }
 
         /// <summary>
