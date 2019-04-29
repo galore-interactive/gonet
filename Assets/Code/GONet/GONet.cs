@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using UnityEngine;
 
 namespace GONet
@@ -114,7 +115,12 @@ namespace GONet
         internal static void Update()
         {
             ProcessIncomingBytes_QueuedNetworkData();
-            ProcessAutoMagicalSyncStuffs(); // TODO may want to call this at end of frame in same frame as the other MonoBehaviour instances in teh game have run to make changes...send out same frame as opposed to "beginning" of next frame?
+
+            AutoMagicalSyncProcessing_SingleFrequency itemsToProcessEveryFrame;
+            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, out itemsToProcessEveryFrame))
+            {
+                itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+            }
 
             if (IsServer)
             {
@@ -265,11 +271,14 @@ namespace GONet
         /// TODO: once implementation supports it, this replaces <see cref="autoSyncMemberDataByGONetParticipantMap"/> and make sure to remove it.
         /// </summary>
         static readonly Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = new Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(byte.MaxValue);
+        static readonly Dictionary<float, AutoMagicalSyncProcessing_SingleFrequency> autoSyncProcessingSupportByFrequencyMap = new Dictionary<float, AutoMagicalSyncProcessing_SingleFrequency>(5);
 
         internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
             internal byte index;
             internal GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
+            
+            #region properties copied off of GONetAutoMagicalSyncAttribute
             /// <summary>
             /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ProcessingPriority"/>
             /// </summary>
@@ -278,11 +287,22 @@ namespace GONet
             /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ProcessingPriority_GONetInternalOverride"/>
             /// </summary>
             internal int syncAttribute_ProcessingPriority_GONetInternalOverride;
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>
+            /// </summary>
+            internal float syncAttribute_SyncChangesEverySeconds;
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.Reliability"/>
+            /// </summary>
+            internal AutoMagicalSyncReliability syncAttribute_Reliability;
+            #endregion
 
             internal object lastKnownValue;
             internal object lastKnownValue_previous;
 
             /// <summary>
+            /// This used to keep track of who (i.e., which network owner authority) made the last change to the value.
+            /// It is used to know if we need to avoid sending the value to anyone or not (i.e., do not send to owner who made the change...that would be redundant, unnecessary and unwanted traffic/processing).
             /// NOTE: When this is set to <see cref="GONetParticipant.OwnerAuthorityId_Unset"/>, the ASSumption is that it was set locally by "me."
             /// </summary>
             internal uint lastKnownValue_SetByAuthorityId = OwnerAuthorityId_Unset;
@@ -307,6 +327,11 @@ namespace GONet
         }
 
         /// <summary>
+        /// Only (re)used in <see cref="OnEnable_StartMonitoringForAutoMagicalNetworking"/>.
+        /// </summary>
+        static readonly HashSet<float> uniqueSyncFrequencies = new HashSet<float>();
+
+        /// <summary>
         /// Call me in the <paramref name="gonetParticipant"/>'s OnEnable method.
         /// </summary>
         internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
@@ -324,6 +349,20 @@ namespace GONet
                     }
                     GONetParticipant_AutoMagicalSyncCompanion_Generated companion = GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.CreateInstance(gonetParticipant);
                     autoSyncCompanions[gonetParticipant] = companion;
+
+                    uniqueSyncFrequencies.Clear();
+                    for (int i = 0; i < companion.valuesCount; ++i)
+                    {
+                        uniqueSyncFrequencies.Add(companion.valuesChangesSupport[i].syncAttribute_SyncChangesEverySeconds); // since it is a set, duplicates will be discarded
+                    }
+                    foreach (float uniqueSyncFrequency in uniqueSyncFrequencies)
+                    {
+                        if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncFrequency))
+                        {
+                            var autoSyncProcessingSupport = new AutoMagicalSyncProcessing_SingleFrequency(uniqueSyncFrequency, activeAutoSyncCompanionsByCodeGenerationIdMap);
+                            autoSyncProcessingSupportByFrequencyMap[uniqueSyncFrequency] = autoSyncProcessingSupport;
+                        }
+                    }
                 }
 
                 AssignGONetId_IfAppropriate(gonetParticipant);
@@ -392,7 +431,7 @@ namespace GONet
                     monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
                     if (sendAllCurrentValuesToOnlyThisConnection != null)
                     {
-                        // TODO can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
+                        // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
                         monitoringSupport.AppendListWithAllValues(syncValuesToSend);
                     }
                     else if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
@@ -432,6 +471,134 @@ namespace GONet
                     sendAllCurrentValuesToOnlyThisConnection.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
                     valueChangeSerializationArrayPool.Return(changesSerialized);
                 }
+            }
+        }
+
+        /// <summary>
+        /// For every uniqyue value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
+        /// class will be created and used to process only those fields/properties set to be sync'd on that frequency.
+        /// </summary>
+        internal sealed class AutoMagicalSyncProcessing_SingleFrequency
+        {
+            Thread thread;
+            volatile bool isThreadRunning;
+            volatile bool shouldProcessASAP = false;
+            long lastProcessCompleteTicks;
+
+            static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS).Ticks;
+
+            float scheduleFrequency;
+            long scheduleFrequencyTicks;
+            Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency;
+
+            /// <summary>
+            /// Indicates whether or not <see cref="ProcessASAP"/> must be called (manually) from an outside part in order for sync processing to occur.
+            /// </summary>
+            internal bool DoesRequireManualProcessInitiation => scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS;
+
+            /// <summary>
+            /// Just a helper data structure just for use in <see cref="ProcessAutoMagicalSyncStuffs(bool, ReliableEndpoint)"/>
+            /// </summary>
+            readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
+
+            /// <summary>
+            /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
+            ///            then nothing will happen in here automatically....<see cref="GONetMain"/> or some other party will have to manually call <see cref="ProcessASAP"/>.
+            /// </summary>
+            internal AutoMagicalSyncProcessing_SingleFrequency(float scheduleFrequency, Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency)
+            {
+                this.scheduleFrequency = scheduleFrequency;
+                scheduleFrequencyTicks = TimeSpan.FromSeconds(scheduleFrequency).Ticks;
+                this.everythingMap_evenStuffNotOnThisScheduleFrequency = everythingMap_evenStuffNotOnThisScheduleFrequency;
+
+                thread = new Thread(ContinuallyProcess);
+                isThreadRunning = true;
+                thread.Start();
+            }
+
+            ~AutoMagicalSyncProcessing_SingleFrequency()
+            {
+                isThreadRunning = false;
+                thread.Abort();
+            }
+
+            private void ContinuallyProcess()
+            {
+                bool doesRequireManualProcessInitiation = DoesRequireManualProcessInitiation;
+                while (isThreadRunning)
+                {
+                    if (doesRequireManualProcessInitiation && !shouldProcessASAP)
+                    {
+                        Thread.Sleep(1); // TODO come up with appropriate sleep time/value 
+                    }
+                    else
+                    {
+                        { // process:
+                            // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
+                            syncValuesToSend.Clear();
+
+                            var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
+                            while (enumeratorOuter.MoveNext())
+                            {
+                                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                                var enumeratorInner = currentMap.GetEnumerator();
+                                while (enumeratorInner.MoveNext())
+                                {
+                                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+
+                                    // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
+                                    monitoringSupport.UpdateLastKnownValues(scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(scheduleFrequency)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    {
+                                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                        monitoringSupport.OnValueChangeCheck_Reset(scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    }
+                                }
+                            }
+
+                            if (syncValuesToSend.Count > 0)
+                            {
+                                int bytesUsedCount;
+                                //GONetLog.Debug("sending changed auto-magical sync values to all connections");
+                                if (IsServer)
+                                {
+                                    // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
+                                    gonetServer?.ForEachClient((clientConnection) =>
+                                    {
+                                        byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount, clientConnection.OwnerAuthorityId);
+                                        clientConnection.SendMessage(changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
+                                        valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                                    });
+                                }
+                                else
+                                {
+                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
+                                    SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
+                                    valueChangeSerializationArrayPool.Return(changesSerialized);
+                                }
+                            }
+
+                            shouldProcessASAP = false; // reset this
+                        }
+
+                        if (!doesRequireManualProcessInitiation)
+                        { // (auto sync) frequency control:
+                            long nextProcessStartTicks = lastProcessCompleteTicks + scheduleFrequencyTicks;
+                            long nowTicks = HighResolutionTimeUtils.Now.Ticks;
+                            lastProcessCompleteTicks = nowTicks;
+                            long ticksToSleep = nextProcessStartTicks - nowTicks;
+                            if (ticksToSleep > 0)
+                            {
+                                Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
+                            }
+                        }
+                    }
+                }
+            }
+
+            internal void ProcessASAP()
+            {
+                shouldProcessASAP = true;
             }
         }
 

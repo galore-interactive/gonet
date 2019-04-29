@@ -29,7 +29,7 @@ namespace GONet.Generation
         /// <summary>
         /// NOTE: Set inside generated constructor
         /// </summary>
-        protected byte valuesCount;
+        internal byte valuesCount;
 
         protected bool[] lastKnownValueChangesSinceLastCheck;
 
@@ -38,12 +38,14 @@ namespace GONet.Generation
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
         /// </summary>
-        internal bool HaveAnyValuesChangedSinceLastCheck()
+        internal bool HaveAnyValuesChangedSinceLastCheck(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
         {
             bool hasChange = false;
             for (int i = 0; i < valuesCount; ++i)
             {
-                if (!Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if ((!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valueChangeSupport.syncAttribute_SyncChangesEverySeconds) &&
+                    !Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
                 {
                     lastKnownValueChangesSinceLastCheck[i] = true;
                     hasChange = true;
@@ -52,9 +54,22 @@ namespace GONet.Generation
             return hasChange;
         }
 
-        internal void OnValueChangeCheck_Reset()
+        internal void OnValueChangeCheck_Reset(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
         {
-            Array.Clear(lastKnownValueChangesSinceLastCheck, 0, valuesCount);
+            if (!onlyMatchIfScheduleFrequencyMatches.HasValue)
+            {
+                Array.Clear(lastKnownValueChangesSinceLastCheck, 0, valuesCount);
+            }
+            else
+            {
+                for (int i = 0; i < valuesCount; ++i)
+                {
+                    if (onlyMatchIfScheduleFrequencyMatches.Value == valuesChangesSupport[i].syncAttribute_SyncChangesEverySeconds)
+                    {
+                        lastKnownValueChangesSinceLastCheck[i] = false;
+                    }
+                }
+            }
         }
 
         internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)
@@ -92,15 +107,16 @@ namespace GONet.Generation
         /// </summary>
         internal abstract void DeserializeInitSingle(BitStream bitStream_readFrom, byte singleIndex);
 
-        internal abstract void UpdateLastKnownValues();
+        internal abstract void UpdateLastKnownValues(float? onlyMatchIfScheduleFrequencyMatches = default(float?));
 
-        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend)
+        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend, float? onlyMatchIfScheduleFrequencyMatches = default(float?))
         {
             for (int i = 0; i < valuesCount; ++i)
             {
-                if (lastKnownValueChangesSinceLastCheck[i])
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (lastKnownValueChangesSinceLastCheck[i] && (!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valueChangeSupport.syncAttribute_SyncChangesEverySeconds))
                 {
-                    syncValuesToSend.Add(valuesChangesSupport[i]);
+                    syncValuesToSend.Add(valueChangeSupport);
                 }
             }
         }

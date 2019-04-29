@@ -74,6 +74,9 @@ namespace GONet.Generation
 			support<#=iOverall#>.index = <#=iOverall#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority = <#=singleMember.attribute.ProcessingPriority#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority_GONetInternalOverride = <#=singleMember.attribute.ProcessingPriority_GONetInternalOverride#>;
+			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
+			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
+			var dummyToEnsureGetterCalledOnceBeforeHeatOfBattle<#=iOverall#> = <#=single.componentTypeName#>; // let's ensure GetComponnet<T>() called up front
 
 <#
 			iOverall++;
@@ -631,7 +634,7 @@ namespace GONet.Generation
 			}
         }
 
-		internal override void UpdateLastKnownValues()
+		internal override void UpdateLastKnownValues(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
 		{
 <#
 	iOverall = 0;
@@ -644,8 +647,12 @@ namespace GONet.Generation
         {
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
-				valuesChangesSupport[<#=iOverall#>].lastKnownValue_previous = valuesChangesSupport[<#=iOverall#>].lastKnownValue;
-				valuesChangesSupport[<#=iOverall#>].lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+				var valuesChangesSupport<#=iOverall#> = valuesChangesSupport[<#=iOverall#>];
+				if (!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valuesChangesSupport<#=iOverall#>.syncAttribute_SyncChangesEverySeconds)
+				{
+					valuesChangesSupport<#=iOverall#>.lastKnownValue_previous = valuesChangesSupport<#=iOverall#>.lastKnownValue;
+					valuesChangesSupport<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+				}
 
 <#		
 			iOverall++;
