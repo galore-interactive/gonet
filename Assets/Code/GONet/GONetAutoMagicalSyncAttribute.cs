@@ -26,15 +26,9 @@ namespace GONet
 
     public enum AutoMagicalSyncReliability : byte
     {
-        /// <summary>
-        /// Every time the value changes, it is sent reliably
-        /// </summary>
         Reliable,
 
-        /// <summary>
-        /// Expectation is that the value changes frequently and should be sent as an unreliable stream of changes, using interpolation/extrapolation
-        /// </summary>
-        UnreliableStream
+        Unreliable
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 ﻿using GONet.Utils;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace GONet.Generation
 {
@@ -38,13 +39,13 @@ namespace GONet.Generation
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
         /// </summary>
-        internal bool HaveAnyValuesChangedSinceLastCheck(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
+        internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
         {
             bool hasChange = false;
             for (int i = 0; i < valuesCount; ++i)
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if ((!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valueChangeSupport.syncAttribute_SyncChangesEverySeconds) &&
+                if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
                     !Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
                 {
                     lastKnownValueChangesSinceLastCheck[i] = true;
@@ -54,9 +55,9 @@ namespace GONet.Generation
             return hasChange;
         }
 
-        internal void OnValueChangeCheck_Reset(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
+        internal void OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
         {
-            if (!onlyMatchIfScheduleFrequencyMatches.HasValue)
+            if (!onlyMatchIfUniqueGroupingMatches.HasValue)
             {
                 Array.Clear(lastKnownValueChangesSinceLastCheck, 0, valuesCount);
             }
@@ -64,7 +65,7 @@ namespace GONet.Generation
             {
                 for (int i = 0; i < valuesCount; ++i)
                 {
-                    if (onlyMatchIfScheduleFrequencyMatches.Value == valuesChangesSupport[i].syncAttribute_SyncChangesEverySeconds)
+                    if (DoesMatchUniqueGrouping(valuesChangesSupport[i], onlyMatchIfUniqueGroupingMatches))
                     {
                         lastKnownValueChangesSinceLastCheck[i] = false;
                     }
@@ -107,18 +108,26 @@ namespace GONet.Generation
         /// </summary>
         internal abstract void DeserializeInitSingle(BitStream bitStream_readFrom, byte singleIndex);
 
-        internal abstract void UpdateLastKnownValues(float? onlyMatchIfScheduleFrequencyMatches = default(float?));
+        internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default);
 
-        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend, float? onlyMatchIfScheduleFrequencyMatches = default(float?))
+        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend, GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
         {
             for (int i = 0; i < valuesCount; ++i)
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if (lastKnownValueChangesSinceLastCheck[i] && (!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valueChangeSupport.syncAttribute_SyncChangesEverySeconds))
+                if (lastKnownValueChangesSinceLastCheck[i] && DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
                 {
                     syncValuesToSend.Add(valueChangeSupport);
                 }
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches)
+        {
+            return !onlyMatchIfUniqueGroupingMatches.HasValue ||
+                (onlyMatchIfUniqueGroupingMatches.Value.scheduleFrequency == valueChangeSupport.syncAttribute_SyncChangesEverySeconds &&
+                 onlyMatchIfUniqueGroupingMatches.Value.reliability == valueChangeSupport.syncAttribute_Reliability);
         }
 
         internal void AppendListWithAllValues(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend)

@@ -634,7 +634,7 @@ namespace GONet.Generation
 			}
         }
 
-		internal override void UpdateLastKnownValues(float? onlyMatchIfScheduleFrequencyMatches = default(float?))
+		internal override void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
 		{
 <#
 	iOverall = 0;
@@ -648,7 +648,7 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 				var valuesChangesSupport<#=iOverall#> = valuesChangesSupport[<#=iOverall#>];
-				if (!onlyMatchIfScheduleFrequencyMatches.HasValue || onlyMatchIfScheduleFrequencyMatches.Value == valuesChangesSupport<#=iOverall#>.syncAttribute_SyncChangesEverySeconds)
+				if (DoesMatchUniqueGrouping(valuesChangesSupport<#=iOverall#>, onlyMatchIfUniqueGroupingMatches))
 				{
 					valuesChangesSupport<#=iOverall#>.lastKnownValue_previous = valuesChangesSupport<#=iOverall#>.lastKnownValue;
 					valuesChangesSupport<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;

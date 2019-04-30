@@ -109,6 +109,9 @@ namespace GONet
 
         #region internal methods
 
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Reliable);
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Unreliable);
+
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/>
         /// </summary>
@@ -116,8 +119,12 @@ namespace GONet
         {
             ProcessIncomingBytes_QueuedNetworkData();
 
-            AutoMagicalSyncProcessing_SingleFrequency itemsToProcessEveryFrame;
-            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, out itemsToProcessEveryFrame))
+            AutoMagicalSyncProcessing_SingleGrouping itemsToProcessEveryFrame;
+            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_reliable, out itemsToProcessEveryFrame))
+            {
+                itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+            }
+            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_unreliable, out itemsToProcessEveryFrame))
             {
                 itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
             }
@@ -166,7 +173,7 @@ namespace GONet
             NetworkData networkData = new NetworkData()
             {
                 sourceConnection = sourceConnection,
-                messageBytes = incomingNetworkDataArrayPool.Borrow(bytesUsedCount),
+                messageBytes = incomingNetworkDataArrayPool.Borrow(bytesUsedCount), // TODO FIXME there needs to be one pool per incoming thread!..and then return to correct one too!
                 bytesUsedCount = bytesUsedCount
             };
 
@@ -218,7 +225,7 @@ namespace GONet
 
                     // TODO this should only deserialize the message....and then send over to an EventBus where subscribers to that event/message from the bus can process accordingly
 
-                    incomingNetworkDataArrayPool.Return(networkData.messageBytes);
+                    incomingNetworkDataArrayPool.Return(networkData.messageBytes); // TODO FIXME there needs to be one pool per incoming thread!..and then return to correct one too!
                 }
                 else
                 {
@@ -231,7 +238,7 @@ namespace GONet
         {
             Server_AssignNewClientAuthorityId(gonetConnection_ServerToClient);
 
-            ProcessAutoMagicalSyncStuffs(gonetConnection_ServerToClient);
+            Server_SendClientCurrentState_AllAutoMagicalSync(gonetConnection_ServerToClient);
         }
 
         private static void Server_AssignNewClientAuthorityId(GONetConnection_ServerToClient gonetConnection_ServerToClient)
@@ -271,7 +278,7 @@ namespace GONet
         /// TODO: once implementation supports it, this replaces <see cref="autoSyncMemberDataByGONetParticipantMap"/> and make sure to remove it.
         /// </summary>
         static readonly Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = new Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(byte.MaxValue);
-        static readonly Dictionary<float, AutoMagicalSyncProcessing_SingleFrequency> autoSyncProcessingSupportByFrequencyMap = new Dictionary<float, AutoMagicalSyncProcessing_SingleFrequency>(5);
+        static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping> autoSyncProcessingSupportByFrequencyMap = new Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping>(5);
 
         internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
@@ -329,7 +336,39 @@ namespace GONet
         /// <summary>
         /// Only (re)used in <see cref="OnEnable_StartMonitoringForAutoMagicalNetworking"/>.
         /// </summary>
-        static readonly HashSet<float> uniqueSyncFrequencies = new HashSet<float>();
+        static readonly HashSet<SyncBundleUniqueGrouping> uniqueSyncGroupings = new HashSet<SyncBundleUniqueGrouping>();
+
+        internal struct SyncBundleUniqueGrouping
+        {
+            internal readonly float scheduleFrequency;
+            internal readonly AutoMagicalSyncReliability reliability;
+
+            internal SyncBundleUniqueGrouping(float scheduleFrequency, AutoMagicalSyncReliability reliability)
+            {
+                this.scheduleFrequency = scheduleFrequency;
+                this.reliability = reliability;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (!(obj is SyncBundleUniqueGrouping))
+                {
+                    return false;
+                }
+
+                var grouping = (SyncBundleUniqueGrouping)obj;
+                return scheduleFrequency == grouping.scheduleFrequency &&
+                       reliability == grouping.reliability;
+            }
+
+            public override int GetHashCode()
+            {
+                var hashCode = 460550935;
+                hashCode = hashCode * -1521134295 + scheduleFrequency.GetHashCode();
+                hashCode = hashCode * -1521134295 + reliability.GetHashCode();
+                return hashCode;
+            }
+        }
 
         /// <summary>
         /// Call me in the <paramref name="gonetParticipant"/>'s OnEnable method.
@@ -350,17 +389,21 @@ namespace GONet
                     GONetParticipant_AutoMagicalSyncCompanion_Generated companion = GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.CreateInstance(gonetParticipant);
                     autoSyncCompanions[gonetParticipant] = companion;
 
-                    uniqueSyncFrequencies.Clear();
+                    uniqueSyncGroupings.Clear();
                     for (int i = 0; i < companion.valuesCount; ++i)
                     {
-                        uniqueSyncFrequencies.Add(companion.valuesChangesSupport[i].syncAttribute_SyncChangesEverySeconds); // since it is a set, duplicates will be discarded
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = companion.valuesChangesSupport[i];
+                        SyncBundleUniqueGrouping grouping = new SyncBundleUniqueGrouping(monitoringSupport.syncAttribute_SyncChangesEverySeconds, monitoringSupport.syncAttribute_Reliability);
+                        uniqueSyncGroupings.Add(grouping); // since it is a set, duplicates will be discarded
                     }
-                    foreach (float uniqueSyncFrequency in uniqueSyncFrequencies)
+                    foreach (SyncBundleUniqueGrouping uniqueSyncGrouping in uniqueSyncGroupings)
                     {
-                        if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncFrequency))
+                        if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))
                         {
-                            var autoSyncProcessingSupport = new AutoMagicalSyncProcessing_SingleFrequency(uniqueSyncFrequency, activeAutoSyncCompanionsByCodeGenerationIdMap);
-                            autoSyncProcessingSupportByFrequencyMap[uniqueSyncFrequency] = autoSyncProcessingSupport;
+                            var autoSyncProcessingSupport = 
+                                new AutoMagicalSyncProcessing_SingleGrouping(uniqueSyncGrouping, activeAutoSyncCompanionsByCodeGenerationIdMap); // IMPORTANT: this starts the thread!
+
+                            autoSyncProcessingSupportByFrequencyMap[uniqueSyncGrouping] = autoSyncProcessingSupport;
                         }
                     }
                 }
@@ -407,16 +450,7 @@ namespace GONet
         /// </summary>
         static readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
 
-        /// <summary>
-        /// Determines what has changed since last call (and stores it in <see cref="syncValuesToSend"/>)
-        /// and then, depending on the value of <paramref name="isProcessingAllStateRegardlessOfChange"/>, 
-        /// 
-        /// either (if true) sends all current values...
-        /// or (if false) sends only the changed things...
-        /// 
-        /// ...to all remote connections (or just to <paramref name="sendAllCurrentValuesToOnlyThisConnection"/> if not null)
-        /// </summary>
-        static void ProcessAutoMagicalSyncStuffs(ReliableEndpoint sendAllCurrentValuesToOnlyThisConnection = null)
+        static void Server_SendClientCurrentState_AllAutoMagicalSync(ReliableEndpoint connectionToClient)
         {
             syncValuesToSend.Clear();
 
@@ -429,7 +463,7 @@ namespace GONet
                 {
                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
                     monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
-                    if (sendAllCurrentValuesToOnlyThisConnection != null)
+                    if (connectionToClient != null)
                     {
                         // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
                         monitoringSupport.AppendListWithAllValues(syncValuesToSend);
@@ -445,7 +479,7 @@ namespace GONet
             if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                if (sendAllCurrentValuesToOnlyThisConnection == null)
+                if (connectionToClient == null)
                 { // if in here, we are sending only changes (since last send) to everyone
                     //GONetLog.Debug("sending changed auto-magical sync values to all connections");
                     if (IsServer)
@@ -468,17 +502,17 @@ namespace GONet
                 else
                 {
                     byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount);
-                    sendAllCurrentValuesToOnlyThisConnection.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
+                    connectionToClient.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
                     valueChangeSerializationArrayPool.Return(changesSerialized);
                 }
             }
         }
 
         /// <summary>
-        /// For every uniqyue value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
+        /// For every unique value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
         /// class will be created and used to process only those fields/properties set to be sync'd on that frequency.
         /// </summary>
-        internal sealed class AutoMagicalSyncProcessing_SingleFrequency
+        internal sealed class AutoMagicalSyncProcessing_SingleGrouping
         {
             Thread thread;
             volatile bool isThreadRunning;
@@ -487,9 +521,10 @@ namespace GONet
 
             static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS).Ticks;
 
-            float scheduleFrequency;
+            SyncBundleUniqueGrouping uniqueGrouping;
             long scheduleFrequencyTicks;
             Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency;
+            QosType uniqueGrouping_qualityOfService;
 
             /// <summary>
             /// Indicates whether or not <see cref="ProcessASAP"/> must be called (manually) from an outside part in order for sync processing to occur.
@@ -505,10 +540,12 @@ namespace GONet
             /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
             ///            then nothing will happen in here automatically....<see cref="GONetMain"/> or some other party will have to manually call <see cref="ProcessASAP"/>.
             /// </summary>
-            internal AutoMagicalSyncProcessing_SingleFrequency(float scheduleFrequency, Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency)
+            internal AutoMagicalSyncProcessing_SingleGrouping(SyncBundleUniqueGrouping uniqueGrouping, Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency)
             {
-                this.scheduleFrequency = scheduleFrequency;
-                scheduleFrequencyTicks = TimeSpan.FromSeconds(scheduleFrequency).Ticks;
+                this.uniqueGrouping = uniqueGrouping;
+                scheduleFrequencyTicks = TimeSpan.FromSeconds(uniqueGrouping.scheduleFrequency).Ticks;
+                uniqueGrouping_qualityOfService = uniqueGrouping.reliability == AutoMagicalSyncReliability.Reliable ? QosType.Reliable : QosType.Unreliable;
+
                 this.everythingMap_evenStuffNotOnThisScheduleFrequency = everythingMap_evenStuffNotOnThisScheduleFrequency;
 
                 thread = new Thread(ContinuallyProcess);
@@ -516,7 +553,7 @@ namespace GONet
                 thread.Start();
             }
 
-            ~AutoMagicalSyncProcessing_SingleFrequency()
+            ~AutoMagicalSyncProcessing_SingleGrouping()
             {
                 isThreadRunning = false;
                 thread.Abort();
@@ -547,11 +584,11 @@ namespace GONet
                                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
 
                                     // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
-                                    monitoringSupport.UpdateLastKnownValues(scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                    if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(scheduleFrequency)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(uniqueGrouping)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                                     {
-                                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                        monitoringSupport.OnValueChangeCheck_Reset(scheduleFrequency); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                        monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                                     }
                                 }
                             }
@@ -566,14 +603,14 @@ namespace GONet
                                     gonetServer?.ForEachClient((clientConnection) =>
                                     {
                                         byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount, clientConnection.OwnerAuthorityId);
-                                        clientConnection.SendMessage(changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
+                                        clientConnection.SendMessage(changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
                                         valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                                     });
                                 }
                                 else
                                 {
                                     byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
-                                    SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
+                                    SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, qualityOfService: uniqueGrouping_qualityOfService);
                                     valueChangeSerializationArrayPool.Return(changesSerialized);
                                 }
                             }
