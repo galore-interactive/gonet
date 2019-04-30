@@ -160,21 +160,6 @@ namespace GONet.Generation
 
         internal static void DoAllTheGenerationStuffs()
         {
-            { // TODO remove this test:
-                GONetParticipant_ComponentsWithAutoSyncMembers v = new GONetParticipant_ComponentsWithAutoSyncMembers();
-                v.codeGenerationId = 4;
-                v.ComponentMemberNames_By_ComponentTypeFullName = new GONetParticipant_ComponentsWithAutoSyncMembers_Single[3]
-                {
-                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single(),
-                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single(),
-                    new GONetParticipant_ComponentsWithAutoSyncMembers_Single()
-                };
-                byte[] b = SerializationUtils.SerializeToBytes(v);
-                var vd = SerializationUtils.DeserializeFromBytes<GONetParticipant_ComponentsWithAutoSyncMembers>(b);
-
-                GONetLog.Debug("vd.codeGenerationId: " + vd.codeGenerationId + " vd.ComponentMemberNames_By_ComponentTypeFullName.Length: " + vd.ComponentMemberNames_By_ComponentTypeFullName.Length);
-            }
-
             /* auto-sync code gen psuedo:
 
             // NOTE: This method is thought to be called when editor save scene called
@@ -301,7 +286,18 @@ namespace GONet.Generation
             if (File.Exists(SNAPS_FILE))
             {
                 byte[] snapsFileBytes = File.ReadAllBytes(SNAPS_FILE);
-                return SerializationUtils.DeserializeFromBytes<List<GONetParticipant_ComponentsWithAutoSyncMembers>>(snapsFileBytes);
+                var l = SerializationUtils.DeserializeFromBytes<List<GONetParticipant_ComponentsWithAutoSyncMembers>>(snapsFileBytes);
+                foreach (var ll in l)
+                {
+                    foreach (var lll in ll.ComponentMemberNames_By_ComponentTypeFullName)
+                    {
+                        foreach (var llll in lll.autoSyncMembers)
+                        {
+                            llll.PostDeserialize_InitAttribute(lll.componentTypeAssemblyQualifiedName);
+                        }
+                    }
+                }
+                return l;
             }
             else
             {
@@ -359,16 +355,13 @@ namespace GONet.Generation
         [Key(2)]
         public string memberName;
 
-        /// <summary>
-        /// TODO: almost certainly need to use this to support ordering for processing on receipt of messages
-        /// </summary>
-        [Key(3)]
+        [IgnoreMember]
         public GONetAutoMagicalSyncAttribute attribute;
 
         /// <summary>
         /// IMPORTANT: do NOT use.  This is for deserialize/load from persistence:
         /// </summary>
-        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() {}
+        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() { }
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember)
         {
@@ -378,6 +371,13 @@ namespace GONet.Generation
                                     : ((FieldInfo)syncMember).FieldType.FullName;
             memberName = syncMember.Name;
 
+            attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+        }
+
+        internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
+        {
+            Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
+            MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
             attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
         }
     }
