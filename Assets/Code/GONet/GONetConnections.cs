@@ -9,6 +9,51 @@ namespace GONet
     {
         public uint OwnerAuthorityId { get; internal set; }
 
+        #region round trip time stuffs (RTT)
+
+        private float rtt_latest;
+        public float RTT_Latest
+        {
+            get { return rtt_latest; }
+            internal set
+            {
+                rtt_latest = value;
+
+                if (++iLast_rtt_recent == RTT_HISTORY_COUNT)
+                {
+                    iLast_rtt_recent = 0;
+                }
+                rtt_recent[iLast_rtt_recent] = value;
+
+                if (hasBeenSetOnce_rtt_latest)
+                {
+                    float sum = 0f;
+                    for (int i = 0; i < RTT_HISTORY_COUNT; ++i)
+                    {
+                        sum += rtt_recent[i];
+                    }
+                    RTT_RecentAverage = sum / RTT_HISTORY_COUNT;
+                }
+                else
+                {
+                    for (int i = 0; i < RTT_HISTORY_COUNT; ++i)
+                    {
+                        rtt_recent[i] = value;
+                    }
+                    hasBeenSetOnce_rtt_latest = true;
+                    RTT_RecentAverage = value;
+                }
+            }
+        }
+        public float RTT_RecentAverage { get; private set; }
+
+        private const int RTT_HISTORY_COUNT = 5;
+        bool hasBeenSetOnce_rtt_latest = false;
+        int iLast_rtt_recent = -1;
+        readonly float[] rtt_recent = new float[RTT_HISTORY_COUNT];
+
+        #endregion
+
         protected GONetConnection()
         {
             ReceiveCallback = OnReceiveCallback;

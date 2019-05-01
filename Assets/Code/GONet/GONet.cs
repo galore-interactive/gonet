@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
 
@@ -86,6 +87,8 @@ namespace GONet
         /// </summary>
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
+        internal static readonly Temporal Time = new Temporal();
+
         static GONetMain()
         {
             InitMessageTypeToMessageIDMap();
@@ -117,6 +120,8 @@ namespace GONet
         /// </summary>
         internal static void Update()
         {
+            Time.Update();
+
             ProcessIncomingBytes_QueuedNetworkData();
 
             AutoMagicalSyncProcessing_SingleGrouping itemsToProcessEveryFrame;
@@ -135,9 +140,123 @@ namespace GONet
             }
             else
             {
+                Client_SyncTimeWithServer_Initiate_IfAppropriate();
                 gonetClient?.Update();
             }
         }
+
+        #region time sync client-server-client
+
+        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS = TimeSpan.FromSeconds(1f / 4f).Ticks;
+        static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT = (float)CLIENT_SYNC_TIME_EVERY_TICKS;
+        static bool client_hasSentSyncTimeRequest;
+        static DateTime client_lastSyncTimeRequestSent;
+        const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
+        static readonly Dictionary<long, RequestMessage> client_lastFewTimeSyncsSentByUID = new Dictionary<long, RequestMessage>(CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE);
+        static long client_mostRecentTimeSyncResponseSentTicks;
+
+        /// <summary>
+        /// "IfAppropriate" is to indicate this runs on a schedule....if it is not the right time, this will do nothing.
+        /// </summary>
+        private static void Client_SyncTimeWithServer_Initiate_IfAppropriate()
+        {
+            DateTime now = DateTime.Now;
+            bool isAppropriate = !client_hasSentSyncTimeRequest || (now - client_lastSyncTimeRequestSent).Duration().Ticks > CLIENT_SYNC_TIME_EVERY_TICKS;
+            if (isAppropriate)
+            {
+                client_hasSentSyncTimeRequest = true;
+                client_lastSyncTimeRequestSent = now;
+
+                { // the actual sync request:
+                    RequestMessage timeSync = new RequestMessage();
+                    timeSync.ElapsedTicksAtSend = Time.ElapsedTicks;
+
+                    client_lastFewTimeSyncsSentByUID[timeSync.UID] = timeSync;
+                    if (client_lastFewTimeSyncsSentByUID.Count > CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE)
+                    {
+                        // TODO do not let client_lastFewTimeSyncsSentByUID get larger than TIME_SYNCS_SENT_QUEUE_SIZE.....delete oldest
+                    }
+
+                    using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+                    {
+                        using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
+                        {
+                            { // header...just message type/id...well, and now time 
+                                uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
+                                bitStream.WriteUInt(messageID);
+
+                                bitStream.WriteLong(timeSync.ElapsedTicksAtSend);
+                            }
+
+                            // body
+                            bitStream.WriteLong(timeSync.UID);
+
+                            bitStream.WriteCurrentPartialByte();
+
+                            int bytesUsedCount = (int)memoryStream.Length;
+                            byte[] bytes = valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
+                            Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                            SendBytesToRemoteConnections(bytes, bytesUsedCount, QosType.Unreliable);
+
+                            valueChangeSerializationArrayPool.Return(bytes);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void Server_SyncTimeWithClient_Respond(long requestUID, GONetConnection connectionToClient)
+        {
+            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+            {
+                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
+                {
+                    { // header...just message type/id...well, and now time 
+                        uint messageID = messageTypeToMessageIDMap[typeof(ResponseMessage)];
+                        bitStream.WriteUInt(messageID);
+
+                        bitStream.WriteLong(Time.ElapsedTicks);
+                    }
+
+                    // body
+                    bitStream.WriteLong(requestUID);
+
+                    bitStream.WriteCurrentPartialByte();
+
+                    int bytesUsedCount = (int)memoryStream.Length;
+                    byte[] bytes = valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
+                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                    connectionToClient.SendMessage(bytes, bytesUsedCount, QosType.Unreliable);
+
+                    valueChangeSerializationArrayPool.Return(bytes);
+                }
+            }
+        }
+
+        private static void Client_SyncTimeWithServer_ProcessResponse(long requestUID, long server_elapsedTicksAtSendResponse)
+        {
+            RequestMessage requestMessage;
+            if (client_lastFewTimeSyncsSentByUID.TryGetValue(requestUID, out requestMessage)) // if we cannot find it, we cannot really do anything....now can we?
+            {
+                if (server_elapsedTicksAtSendResponse > client_mostRecentTimeSyncResponseSentTicks) // only process the latest send from server, ignore older stuff
+                {
+                    client_mostRecentTimeSyncResponseSentTicks = server_elapsedTicksAtSendResponse;
+
+                    long responseReceivedTicks_Client = Time.ElapsedTicks;
+                    long requestSentTicks_Client = requestMessage.ElapsedTicksAtSend;
+                    long rtt_ticks = responseReceivedTicks_Client - requestSentTicks_Client;
+                    gonetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
+                    long assumedNetworkDelayTicks = rtt_ticks >> 1; // divide by 2
+                    long newClientTimeTicks = server_elapsedTicksAtSendResponse + assumedNetworkDelayTicks;
+
+                    Time.SetFromAuthority(newClientTimeTicks);
+                }
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/>
@@ -163,6 +282,81 @@ namespace GONet
 
         static readonly ArrayPool<byte> incomingNetworkDataArrayPool = new ArrayPool<byte>(1000, 10, 1024, 2048);
         static readonly ConcurrentQueue<NetworkData> incomingNetworkData = new ConcurrentQueue<NetworkData>();
+
+        public sealed class Temporal
+        {
+            public delegate void TimeChangeArgs(double fromElapsedSeconds, double toElapsedSeconds);
+            public event TimeChangeArgs TimeSetFromAuthority;
+
+            long baselineTicks;
+            long lastSetFromAuthorityDiffTicks;
+            long lastSetFromAuthorityAtTicks;
+
+            public const double ElapsedSecondsUnset = -1;
+
+            public long ElapsedTicks { get; private set; }
+            double elapsedSeconds = ElapsedSecondsUnset;
+            public double ElapsedSeconds => elapsedSeconds;
+
+            public long UpdateCount { get; private set; } = 0;
+
+            internal void SetFromAuthority(long elapsedTicksFromAuthority)
+            {
+                lastSetFromAuthorityDiffTicks = elapsedTicksFromAuthority - ElapsedTicks;
+
+                double elapsedSecondsBefore = elapsedSeconds;
+
+                lastSetFromAuthorityAtTicks = HighResolutionTimeUtils.Now.Ticks;
+                baselineTicks = lastSetFromAuthorityAtTicks - elapsedTicksFromAuthority;
+                ElapsedTicks = lastSetFromAuthorityAtTicks - baselineTicks;
+                elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
+
+                //* if you want debugging in log
+                const string STR_ElapsedTimeClient = "ElapsedTime client of: ";
+                const string STR_BeingOverwritten = " is being overwritten from authority source to: ";
+                const string STR_DoubleCheck = " seconds and here is new client value to double check it worked correctly: ";
+                const string STR_Diff = " lastSetFromAuthorityDiffTicks (well, as ms): ";
+                GONetLog.Info(string.Concat(STR_ElapsedTimeClient, elapsedSecondsBefore, STR_BeingOverwritten, TimeSpan.FromTicks(elapsedTicksFromAuthority).TotalSeconds, STR_DoubleCheck, elapsedSeconds, STR_Diff, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalMilliseconds));
+                //*/
+
+                TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds);
+            }
+
+            /// <summary>
+            /// IMPORTANT: Call this every engine tick.
+            /// See <see cref="UpdateCount"/> to know how many times this has been called this session.
+            /// </summary>
+            internal void Update()
+            {
+                ++UpdateCount;
+
+                if (elapsedSeconds == ElapsedSecondsUnset)
+                {
+                    baselineTicks = HighResolutionTimeUtils.Now.Ticks;
+                }
+
+                long elapsedTicks_withoutEasement = HighResolutionTimeUtils.Now.Ticks - baselineTicks;
+                ElapsedTicks = elapsedTicks_withoutEasement - GetTicksToSubtractForSetFromAuthorityEasing();
+
+                elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private long GetTicksToSubtractForSetFromAuthorityEasing()
+            {
+                if (lastSetFromAuthorityDiffTicks != 0)
+                { // IMPORTANT: This code eases the adjustment (i.e., diff) back to resync time over the entire period between resyncs to avoid a possibly dramatic jump in time just after a resync!
+                    long ticksSinceLastSetFromAuthority = HighResolutionTimeUtils.Now.Ticks - lastSetFromAuthorityAtTicks;
+                    float inverseLerpBetweenSyncs = ticksSinceLastSetFromAuthority / CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT;
+                    if (inverseLerpBetweenSyncs < 1f) // if 1 or greater there will be nothing to add based on calculations
+                    {
+                        return (long)(lastSetFromAuthorityDiffTicks * (1f - inverseLerpBetweenSyncs));
+                    }
+                }
+
+                return 0;
+            }
+        }
 
         /// <summary>
         /// All incoming network bytes need to come here.
@@ -201,25 +395,48 @@ namespace GONet
                     {
                         using (var bitStream = new Utils.BitStream(memoryStream))
                         {
-                            // header...just message type/id
+                            Type messageType;
+                            ////////////////////////////////////////////////////////////////////////////
+                            // header...just message type/id...well, now it is send time too
                             uint messageID;
                             bitStream.ReadUInt(out messageID);
+                            messageType = messageTypeByMessageIDMap[messageID];
 
-                            Type messageType = messageTypeByMessageIDMap[messageID];
-                            if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
-                            {
-                                DeserializeBody_ChangesBundle(bitStream, networkData.sourceConnection);
-                            }
-                            else if (messageType == typeof(OwnerAuthorityIdAssignmentMessage)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
-                            {
-                                uint ownerAuthorityId;
-                                bitStream.ReadUInt(out ownerAuthorityId);
-                                
-                                if (!IsServer) // this only applied to clients....should NEVER happen on server
+                            long elapsedTicksAtSend;
+                            bitStream.ReadLong(out elapsedTicksAtSend);
+                            ////////////////////////////////////////////////////////////////////////////
+
+
+                            {  // body:
+                                if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
                                 {
-                                    MyAuthorityId = ownerAuthorityId;
-                                } // else log warning?
-                            } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
+                                    DeserializeBody_ChangesBundle(bitStream, networkData.sourceConnection);
+                                }
+                                else if (messageType == typeof(RequestMessage))
+                                {
+                                    long requestUID;
+                                    bitStream.ReadLong(out requestUID);
+
+                                    Server_SyncTimeWithClient_Respond(requestUID, networkData.sourceConnection);
+                                }
+                                else if (messageType == typeof(ResponseMessage))
+                                {
+                                    long requestUID;
+                                    bitStream.ReadLong(out requestUID);
+
+                                    Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
+                                }
+                                else if (messageType == typeof(OwnerAuthorityIdAssignmentMessage)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
+                                {
+                                    uint ownerAuthorityId;
+                                    bitStream.ReadUInt(out ownerAuthorityId);
+
+                                    if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                    {
+                                        MyAuthorityId = ownerAuthorityId;
+                                    } // else log warning?
+                                } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
+                            }
                         }
                     }
 
@@ -251,9 +468,11 @@ namespace GONet
             {
                 using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
                 {
-                    { // header...just message type/id
+                    { // header...just message type/id...well, and now time 
                         uint messageID = messageTypeToMessageIDMap[typeof(OwnerAuthorityIdAssignmentMessage)];
                         bitStream.WriteUInt(messageID);
+
+                        bitStream.WriteLong(Time.ElapsedTicks);
                     }
 
                     { // body
@@ -678,9 +897,11 @@ namespace GONet
             {
                 using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
                 {
-                    { // header...just message type/id
+                    { // header...just message type/id...well, and now time 
                         uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChangesMessage)];
                         bitStream.WriteUInt(messageID);
+
+                        bitStream.WriteLong(Time.ElapsedTicks);
                     }
 
                     SerializeBody_ChangesBundle(changes, bitStream, doNotSendIfThisAuthorityId); // body
