@@ -247,7 +247,10 @@ namespace GONet
                     long responseReceivedTicks_Client = Time.ElapsedTicks;
                     long requestSentTicks_Client = requestMessage.ElapsedTicksAtSend;
                     long rtt_ticks = responseReceivedTicks_Client - requestSentTicks_Client;
+
                     gonetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
+                    //GONetLog.Debug("RTT_Latest: " + gonetClient.connectionToServer.RTT_Latest + " RTT_RecentAverage: " + gonetClient.connectionToServer.RTT_RecentAverage + " their.rtt: " + gonetClient.connectionToServer.RTT);
+
                     long assumedNetworkDelayTicks = rtt_ticks >> 1; // divide by 2
                     long newClientTimeTicks = server_elapsedTicksAtSendResponse + assumedNetworkDelayTicks;
 
@@ -311,13 +314,13 @@ namespace GONet
                 ElapsedTicks = lastSetFromAuthorityAtTicks - baselineTicks;
                 elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
 
-                //* if you want debugging in log
+                /* if you want debugging in log
                 const string STR_ElapsedTimeClient = "ElapsedTime client of: ";
                 const string STR_BeingOverwritten = " is being overwritten from authority source to: ";
                 const string STR_DoubleCheck = " seconds and here is new client value to double check it worked correctly: ";
                 const string STR_Diff = " lastSetFromAuthorityDiffTicks (well, as ms): ";
                 GONetLog.Info(string.Concat(STR_ElapsedTimeClient, elapsedSecondsBefore, STR_BeingOverwritten, TimeSpan.FromTicks(elapsedTicksFromAuthority).TotalSeconds, STR_DoubleCheck, elapsedSeconds, STR_Diff, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalMilliseconds));
-                //*/
+                */
 
                 TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds);
             }

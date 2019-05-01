@@ -12,6 +12,9 @@ namespace GONet
         #region round trip time stuffs (RTT)
 
         private float rtt_latest;
+        /// <summary>
+        /// Unit of measure is seconds here.
+        /// </summary>
         public float RTT_Latest
         {
             get { return rtt_latest; }
@@ -45,6 +48,11 @@ namespace GONet
                 }
             }
         }
+        
+        /// <summary>
+        /// This is useful to reference/use instead of <see cref="RTT_Latest"/> in order to account for jitter (i.e., RTT variation) by averaging recent values.
+        /// Unit of measure is seconds here.
+        /// </summary>
         public float RTT_RecentAverage { get; private set; }
 
         private const int RTT_HISTORY_COUNT = 5;
