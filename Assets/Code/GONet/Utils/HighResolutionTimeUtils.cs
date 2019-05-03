@@ -96,7 +96,7 @@ namespace GONet.Utils
             long nowTicksAfterResync = lastResyncTime.Ticks;
             lastResyncDiffTicks = nowTicksAfterResync - nowTicksBeforeResync;
 
-            GONetLog.Debug("lastResyncDiffTicks (well, as ms): " + TimeSpan.FromTicks(lastResyncDiffTicks).TotalMilliseconds);
+            //GONetLog.Debug("lastResyncDiffTicks (well, as ms): " + TimeSpan.FromTicks(lastResyncDiffTicks).TotalMilliseconds);
 
             hasResyncd = true;
         }

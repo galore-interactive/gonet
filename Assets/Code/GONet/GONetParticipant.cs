@@ -32,13 +32,29 @@ namespace GONet
         [SerializeField, HideInInspector]
         public byte codeGenerationId = CodeGenerationId_Unset;
 
+        public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
+        public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;
+
+        uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
         /// This is set to a value that represents which machine in the game spawned this instance.
         /// If the corresponding <see cref="GameObject"/> is included in the/a Unity scene, the owner will be considered the server
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
         /// </summary>
         [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1)]
-        public uint OwnerAuthorityId { get; internal set; } = GONetMain.OwnerAuthorityId_Unset;
+        public uint OwnerAuthorityId
+        {
+            get { return ownerAuthorityId; }
+            internal set
+            {
+                uint previous = ownerAuthorityId;
+                ownerAuthorityId = value;
+                if (previous != ownerAuthorityId)
+                {
+                    OwnerAuthorityIdChanged?.Invoke(this, previous, ownerAuthorityId);
+                }
+            }
+        }
 
         private uint gonetId = GONetId_Unset;
         /// <summary>
@@ -56,6 +72,7 @@ namespace GONet
             {
                 gonetId = value;
                 GONetMain.gonetParticipantByGONetIdMap[value] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
+                GONetLog.Error("slamile...gonetId: " + gonetId);
             }
         }
 
@@ -137,7 +154,7 @@ namespace GONet
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
                 GONetParticipant gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
 
-                uint GONetId = default(uint);
+                uint GONetId = default;
                 bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
 
                 gonetParticipant.GONetId = GONetId;

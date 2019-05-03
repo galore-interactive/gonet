@@ -66,6 +66,15 @@ namespace GONet
         public AutoMagicalSyncReliability Reliability = AutoMagicalSyncReliability.Reliable;
 
         /// <summary>
+        /// Indicates whether or not the receiver of value changes of the property/field should be interpolated or extrapolated between the actual values received.
+        /// This is good for smoothing value changes out over time, especially when using a higher value for <see cref="SyncChangesEverySeconds"/> and even moreso 
+        /// when <see cref="Reliability"/> is set to <see cref="AutoMagicalSyncReliability.Unreliable"/>.
+        /// 
+        /// IMPORTANT: This is ONLY applicable for numeric value types (and likely only floats initially during development).
+        /// </summary>
+        public bool ShouldBlendBetweenValuesReceived = false;
+
+        /// <summary>
         /// Helps identify the order in which this single value change will be processed in a group of auto-magical value changes.
         /// Leave this alone for normal priority.
         /// 

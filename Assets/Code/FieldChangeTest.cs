@@ -4,11 +4,11 @@ using UnityEngine;
 public class FieldChangeTest : MonoBehaviour
 {
     //[GONetAutoMagicalSync(SyncChangesEverySeconds = 4.5f)]
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, SyncChangesEverySeconds = 1.0f)]
+    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true)]
     public float someCoolGuyFloat;
 
     //[GONetAutoMagicalSync(SyncChangesEverySeconds = 0.45f)] // NOTE: 10 times more frequent than someCoolGuyFloat
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, SyncChangesEverySeconds = 1.0f)]
+    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true)]
     public float rottieTotty;
 
     Vector3 startPosition;

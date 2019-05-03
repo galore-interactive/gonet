@@ -76,6 +76,11 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_ProcessingPriority_GONetInternalOverride = <#=singleMember.attribute.ProcessingPriority_GONetInternalOverride#>;
 			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
 			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
+			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
+<#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
+            {#>		
+			support<#=iOverall#>.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE);
+<#			}#>
 			var dummyToEnsureGetterCalledOnceBeforeHeatOfBattle<#=iOverall#> = <#=single.componentTypeName#>; // let's ensure GetComponnet<T>() called up front
 
 <#
@@ -316,7 +321,7 @@ namespace GONet.Generation
         /// <summary>
         ///  Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom)
+        internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange)
         {
 <#
 	iOverall = 0;
@@ -471,10 +476,10 @@ namespace GONet.Generation
         }
 
         /// <summary>
-        ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
+        ///  Deserializes a single value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal override void DeserializeInitSingle(Utils.BitStream bitStream_readFrom, byte singleIndex)
+        internal override void DeserializeInitSingle(Utils.BitStream bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange)
         {
 			switch (singleIndex)
 			{
@@ -498,84 +503,54 @@ namespace GONet.Generation
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)customSerializer.Deserialize(bitStream_readFrom);
+					var value = (<#=singleMember.memberTypeFullName#>)customSerializer.Deserialize(bitStream_readFrom);
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
                 {
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadBit(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					bool value;
 					bitStream_readFrom.ReadBit(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadFloat(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					float value;
 					bitStream_readFrom.ReadFloat(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadLong(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					long value;
 					bitStream_readFrom.ReadLong(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadUInt(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					uint value;
 					bitStream_readFrom.ReadUInt(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
                 {
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadString(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					string value;
 					bitStream_readFrom.ReadString(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
 				{
 #>
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (byte)bitStream_readFrom.ReadByte();
+					var value = (byte)bitStream_readFrom.ReadByte();
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-					bitStream_readFrom.ReadUShort(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 					ushort value;
 					bitStream_readFrom.ReadUShort(out value);
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName)
@@ -588,7 +563,7 @@ namespace GONet.Generation
 						byte b = (byte)bitStream_readFrom.ReadByte();
 						bytes[i] = b;
 					}
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt16(bytes, 0);
+					var value = BitConverter.ToInt16(bytes, 0);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(int).FullName)
@@ -601,13 +576,13 @@ namespace GONet.Generation
 						byte b = (byte)bitStream_readFrom.ReadByte();
 						bytes[i] = b;
 					}
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt32(bytes, 0);
+					var value = BitConverter.ToInt32(bytes, 0);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
 				{
 #>
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (sbyte)bitStream_readFrom.ReadByte();
+					var value = (sbyte)bitStream_readFrom.ReadByte();
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(double).FullName)
@@ -620,10 +595,18 @@ namespace GONet.Generation
 						byte b = (byte)bitStream_readFrom.ReadByte();
 						bytes[i] = b;
 					}
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToDouble(bytes, 0);
+					var value = BitConverter.ToDouble(bytes, 0);
 <#
 				}
 			}#>
+<#				if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
+				{#>
+					valuesChangesSupport[<#=iOverall#>].AddToMostRecentChangeQueue_IfAppropriate((float)value, assumedElapsedTicksAtChange); // NOTE: this queue will be used each frame to blend between this value and others added there
+<#				}
+				else
+				{#>
+					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+<#				}#>
 				}
 				break;
 

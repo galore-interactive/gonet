@@ -84,7 +84,15 @@ namespace GONet.Generation
 
             for (int i = 0; i < valuesCount; ++i)
             {
-                valueChangeSupportArrayPool.Return(valuesChangesSupport[i]); // all of these calls should come prior to returning valuesChangesSupport inside which these object reside currently
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (valueChangeSupport.mostRecentChanges != null)
+                {
+                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Return(valueChangeSupport.mostRecentChanges);
+                    valueChangeSupport.mostRecentChanges = null;
+                    valueChangeSupport.mostRecentChangesSize = 0;
+                }
+                valueChangeSupportArrayPool.Return(valueChangeSupport); // all of these calls should come prior to returning valuesChangesSupport inside which these object reside currently
+                
             }
             valuesChangesSupportArrayPool.Return(valuesChangesSupport);
         }
@@ -100,13 +108,13 @@ namespace GONet.Generation
         /// <summary>
         ///  Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal abstract void DeserializeInitAll(BitStream bitStream_readFrom);
+        internal abstract void DeserializeInitAll(BitStream bitStream_readFrom, long assumedElapsedTicksAtChange);
 
         /// <summary>
         ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal abstract void DeserializeInitSingle(BitStream bitStream_readFrom, byte singleIndex);
+        internal abstract void DeserializeInitSingle(BitStream bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
 
         internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default);
 

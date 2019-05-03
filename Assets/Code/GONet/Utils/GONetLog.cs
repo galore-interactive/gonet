@@ -2,6 +2,7 @@
 using System.IO;
 using UnityEngine;
 using log4net;
+using System;
 
 namespace GONet.Utils
 {
@@ -91,8 +92,8 @@ namespace GONet.Utils
 
         private static object FormatMessage(string level, string message)
         {
-            const string FORMAT = "[{0}] ({1:dd MMM yyyy H:mm:ss.fff}) {2}";
-            return string.Format(FORMAT, level, HighResolutionTimeUtils.Now, message);
+            const string FORMAT = "[{0}] ({1:dd MMM yyyy H:mm:ss.fff}) ({2}s) {3}";
+            return string.Format(FORMAT, level, DateTime.Now, GONetMain.Time.ElapsedSeconds, message);
         }
 
         [Conditional("LOG_VERBOSE")]
