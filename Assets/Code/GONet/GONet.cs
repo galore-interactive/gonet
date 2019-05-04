@@ -110,7 +110,7 @@ namespace GONet
         #region public methods
 
         /// <summary>
-        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_SeparateThread"/>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
         /// </summary>
         public static void SendBytesToRemoteConnections(byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
         {
@@ -118,7 +118,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_SeparateThread"/>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
         /// </summary>
         private static void SendBytesToRemoteConnection(GONetConnection sendToConnection, byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
         {
@@ -166,7 +166,7 @@ namespace GONet
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_outgoingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
         private static volatile bool isRunning_endOfTheLineSend_Thread;
-        private static void SendBytes_EndOfTheLine_SeparateThread()
+        private static void SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread()
         {
             while (isRunning_endOfTheLineSend_Thread)
             {
@@ -253,7 +253,7 @@ namespace GONet
             if (endOfLineSendThread == null)
             {
                 isRunning_endOfTheLineSend_Thread = true;
-                endOfLineSendThread = new Thread(SendBytes_EndOfTheLine_SeparateThread);
+                endOfLineSendThread = new Thread(SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread);
                 endOfLineSendThread.Start();
             }
 
@@ -720,13 +720,11 @@ namespace GONet
             {
                 internal float value;
                 internal long elapsedTicksAtChange;
-                internal uint changedByOwnerAuthorityId;
 
-                internal NumericValueChangeSnapshot(float value, long elapsedTicksAtChange, uint changedByOwnerAuthorityId)
+                internal NumericValueChangeSnapshot(float value, long elapsedTicksAtChange)
                 {
                     this.value = value;
                     this.elapsedTicksAtChange = elapsedTicksAtChange;
-                    this.changedByOwnerAuthorityId = changedByOwnerAuthorityId;
                 }
 
                 public override bool Equals(object obj)
@@ -738,21 +736,19 @@ namespace GONet
 
                     var snapshot = (NumericValueChangeSnapshot)obj;
                     return value == snapshot.value &&
-                           elapsedTicksAtChange == snapshot.elapsedTicksAtChange &&
-                           changedByOwnerAuthorityId == snapshot.changedByOwnerAuthorityId;
+                           elapsedTicksAtChange == snapshot.elapsedTicksAtChange;
                 }
 
                 public override int GetHashCode()
                 {
-                    var hashCode = -1222179493;
+                    var hashCode = 1751414636;
                     hashCode = hashCode * -1521134295 + value.GetHashCode();
                     hashCode = hashCode * -1521134295 + elapsedTicksAtChange.GetHashCode();
-                    hashCode = hashCode * -1521134295 + changedByOwnerAuthorityId.GetHashCode();
                     return hashCode;
                 }
             }
 
-            internal const int MOST_RECENT_CHANGEs_SIZE = 500; // TODO FIXME, put this back down to 10...or whatever is determined best for supporting whichever impl(s) of extrapolation call for!
+            internal const int MOST_RECENT_CHANGEs_SIZE = 10; // TODO FIXME, put this back down to 10...or whatever is determined best for supporting whichever impl(s) of extrapolation call for!
             internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE, MOST_RECENT_CHANGEs_SIZE);
             static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(2).Ticks;
 
@@ -762,6 +758,7 @@ namespace GONet
             /// </summary>
             internal NumericValueChangeSnapshot[] mostRecentChanges;
             internal int mostRecentChangesSize = 0;
+            private uint mostRecentChanges_UpdatedByAuthorityId;
 
             /// <summary>
             /// This used to keep track of who (i.e., which network owner authority) made the last change to the value.
@@ -792,7 +789,7 @@ namespace GONet
                             }
                         }
 
-                        mostRecentChanges[i] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange, OwnerAuthorityId_Unset);
+                        mostRecentChanges[i] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
                         if (mostRecentChangesSize < MOST_RECENT_CHANGEs_SIZE)
                         {
                             ++mostRecentChangesSize;
@@ -804,7 +801,7 @@ namespace GONet
 
                 if (mostRecentChangesSize < MOST_RECENT_CHANGEs_SIZE)
                 {
-                    mostRecentChanges[mostRecentChangesSize] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange, OwnerAuthorityId_Unset);
+                    mostRecentChanges[mostRecentChangesSize] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
                     ++mostRecentChangesSize;
                 }
 
@@ -812,6 +809,7 @@ namespace GONet
             }
 
             long lastLogBufferContentsTicks;
+
             private void LogBufferContentsIfAppropriate()
             {
                 if (mostRecentChangesSize == MOST_RECENT_CHANGEs_SIZE && (TimeSpan.FromTicks(DateTime.Now.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
@@ -891,7 +889,7 @@ namespace GONet
                                                 older.value,
                                                 newer.value,
                                                 interpolationTime);
-                                            GONetLog.Debug("we loip'd 'eem");
+                                            //GONetLog.Debug("we loip'd 'eem");
                                             didWeLoip = true;
                                             break;
                                         }
@@ -915,7 +913,7 @@ namespace GONet
                         }
 
                         syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
-                        syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(newest.changedByOwnerAuthorityId); // keep track of the authority of every change!
+                        syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(mostRecentChanges_UpdatedByAuthorityId); // keep track of the authority of every change!
                     }
                 }
             }
@@ -926,7 +924,7 @@ namespace GONet
 
                 if (mostRecentChanges != null)
                 {
-                    mostRecentChanges[0].changedByOwnerAuthorityId = ownerAuthorityId;
+                    mostRecentChanges_UpdatedByAuthorityId = ownerAuthorityId;
                 }
             }
         }
