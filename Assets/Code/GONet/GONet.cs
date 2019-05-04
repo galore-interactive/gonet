@@ -181,7 +181,7 @@ namespace GONet
                         {
                             if (gonetServer != null)
                             {
-                                GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
                             }
                             gonetServer?.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
                         }
@@ -189,7 +189,7 @@ namespace GONet
                         {
                             if (gonetClient != null)
                             {
-                                GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
                             }
 
                             gonetClient?.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
@@ -353,7 +353,7 @@ namespace GONet
                     byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
                     Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
 
-                    GONetLog.Debug("about to send time sync to client....my seconds: " + Time.ElapsedSeconds);
+                    //GONetLog.Debug("about to send time sync to client....");
 
                     SendBytesToRemoteConnection(connectionToClient, bytes, bytesUsedCount, QosType.Unreliable);
 
@@ -452,13 +452,13 @@ namespace GONet
                 ElapsedTicks = lastSetFromAuthorityAtTicks - baselineTicks;
                 elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
 
-                //* if you want debugging in log
+                /* if you want debugging in log
                 const string STR_ElapsedTimeClient = "ElapsedTime client of: ";
                 const string STR_BeingOverwritten = " is being overwritten from authority source to: ";
                 const string STR_DoubleCheck = " seconds and here is new client value to double check it worked correctly: ";
                 const string STR_Diff = " lastSetFromAuthorityDiffTicks (well, as ms): ";
                 GONetLog.Info(string.Concat(STR_ElapsedTimeClient, elapsedSecondsBefore, STR_BeingOverwritten, TimeSpan.FromTicks(elapsedTicksFromAuthority).TotalSeconds, STR_DoubleCheck, elapsedSeconds, STR_Diff, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalMilliseconds));
-                //*/
+                */
 
                 TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds);
             }
@@ -506,7 +506,7 @@ namespace GONet
         /// </summary>
         internal static void ProcessIncomingBytes(GONetConnection sourceConnection, byte[] messageBytes, int bytesUsedCount)
         {
-            GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+            //GONetLog.Debug("received something....");
 
             ArrayPool<byte> pool;
             if (!netThread_incomingNetworkDataArrayPool_ThreadMap.TryGetValue(Thread.CurrentThread, out pool))
@@ -578,7 +578,7 @@ namespace GONet
                                 bitStream.ReadLong(out elapsedTicksAtSend);
                                 ////////////////////////////////////////////////////////////////////////////
 
-                                GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+                                //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
 
                                 {  // body:
@@ -797,7 +797,7 @@ namespace GONet
                         {
                             ++mostRecentChangesSize;
                         }
-                        LogBufferContentsIfAppropriate();
+                        //LogBufferContentsIfAppropriate();
                         return;
                     }
                 }
@@ -808,7 +808,7 @@ namespace GONet
                     ++mostRecentChangesSize;
                 }
 
-                LogBufferContentsIfAppropriate();
+                //LogBufferContentsIfAppropriate();
             }
 
             long lastLogBufferContentsTicks;
@@ -838,7 +838,8 @@ namespace GONet
                         float blendedValue = default;
                         int newestBufferIndex = 0;
                         NumericValueChangeSnapshot newest = mostRecentChanges[newestBufferIndex];
-                        NumericValueChangeSnapshot oldest = mostRecentChanges[mostRecentChangesSize - 1];
+                        int oldestBufferIndex = mostRecentChangesSize - 1;
+                        NumericValueChangeSnapshot oldest = mostRecentChanges[oldestBufferIndex];
                         float oldestValue = oldest.value;
                         bool isNewestRecentEnoughToProcess = (Time.ElapsedTicks - newest.elapsedTicksAtChange) < AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
                         if (isNewestRecentEnoughToProcess)
@@ -876,7 +877,8 @@ namespace GONet
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
-                                    for (int i = newestBufferIndex; i >= 1; --i)
+                                    bool didWeLoip = false;
+                                    for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
                                     {
                                         NumericValueChangeSnapshot newer = mostRecentChanges[i - 1];
 
@@ -890,8 +892,13 @@ namespace GONet
                                                 newer.value,
                                                 interpolationTime);
                                             GONetLog.Debug("we loip'd 'eem");
+                                            didWeLoip = true;
                                             break;
                                         }
+                                    }
+                                    if (!didWeLoip)
+                                    {
+                                        GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                     }
                                 }
                             }

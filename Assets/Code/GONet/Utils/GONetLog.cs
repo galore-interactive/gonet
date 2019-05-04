@@ -28,6 +28,7 @@ namespace GONet.Utils
         const string KeyFatal = "Log:Fatal";
         const string KeyVerbose = "Log:Verbose"; //this isn't really implemented the way we want yet
 
+        const string SPACE = " ";
         const char NewLine = '\n';
 
         private static string lastLog;
@@ -48,49 +49,49 @@ namespace GONet.Utils
         [Conditional("LOG_INFO")]
         public static void Info(string message)
         {
-            UnityEngine.Debug.Log(FormatMessage(KeyInfo, message));
+            string formattedMessage = FormatMessage(KeyInfo, message);
+            UnityEngine.Debug.Log(formattedMessage);
             StackTrace trace = new StackTrace(1, true);
-            const string SPACE = " ";
-            GONetLog.OnLogMessageReceived(string.Concat(KeyInfo, SPACE, message), trace.ToString(), LogType.Log);
+            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Log);
         }
 
         [Conditional("LOG_DEBUG")]
         public static void Debug(string message)
         {
-            UnityEngine.Debug.Log(FormatMessage(KeyDebug, message));
+            string formattedMessage = FormatMessage(KeyDebug, message);
+            UnityEngine.Debug.Log(formattedMessage);
             StackTrace trace = new StackTrace(1, true);
-            const string SPACE = " ";
-            GONetLog.OnLogMessageReceived(string.Concat(KeyDebug, SPACE, message), trace.ToString(), LogType.Log);
+            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Log);
         }
 
         [Conditional("LOG_WARNING")]
         public static void Warning(string message)
         {
-            UnityEngine.Debug.LogWarning(FormatMessage(KeyWarning, message));
+            string formattedMessage = FormatMessage(KeyWarning, message);
+            UnityEngine.Debug.LogWarning(formattedMessage);
             StackTrace trace = new StackTrace(1, true);
-            const string SPACE = " ";
-            GONetLog.OnLogMessageReceived(string.Concat(KeyWarning, SPACE, message), trace.ToString(), LogType.Warning);
+            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Warning);
         }
 
         [Conditional("LOG_ERROR")]
         public static void Error(string message)
         {
-            UnityEngine.Debug.LogError(FormatMessage(KeyError, message));
+            string formattedMessage = FormatMessage(KeyError, message);
+            UnityEngine.Debug.LogError(formattedMessage);
             StackTrace trace = new StackTrace(1, true);
-            const string SPACE = " ";
-            GONetLog.OnLogMessageReceived(string.Concat(KeyError, SPACE, message), trace.ToString(), LogType.Error);
+            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Error);
         }
 
         [Conditional("LOG_FATAL")]
         public static void Fatal(string message)
         {
-            UnityEngine.Debug.LogError(FormatMessage(KeyFatal, message));
+            string formattedMessage = FormatMessage(KeyFatal, message);
+            UnityEngine.Debug.LogError(formattedMessage);
             StackTrace trace = new StackTrace(1, true);
-            const string SPACE = " ";
-            GONetLog.OnLogMessageReceived(string.Concat(KeyFatal, SPACE, message), trace.ToString(), LogType.Error);
+            GONetLog.OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Error);
         }
 
-        private static object FormatMessage(string level, string message)
+        private static string FormatMessage(string level, string message)
         {
             const string FORMAT = "[{0}] ({1:dd MMM yyyy H:mm:ss.fff}) ({2}s) {3}";
             return string.Format(FORMAT, level, DateTime.Now, GONetMain.Time.ElapsedSeconds, message);
