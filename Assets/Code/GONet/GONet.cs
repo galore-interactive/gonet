@@ -109,24 +109,102 @@ namespace GONet
 
         #region public methods
 
+        /// <summary>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_SeparateThread"/>
+        /// </summary>
         public static void SendBytesToRemoteConnections(byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
         {
-            if (IsServer)
+            SendBytesToRemoteConnection(null, bytes, bytesUsedCount, qualityOfService); // passing null will result in sending to all remote connections
+        }
+
+        /// <summary>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_SeparateThread"/>
+        /// </summary>
+        private static void SendBytesToRemoteConnection(GONetConnection sendToConnection, byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
+        {
+            ConcurrentQueue<NetworkData> readyToReturnQueue;
+            if (readyToReturnQueue_ThreadMap.TryGetValue(Thread.CurrentThread, out readyToReturnQueue))
             {
-                if (gonetServer != null)
+                int processedCount = 0;
+                int readyCount = readyToReturnQueue.Count;
+                NetworkData readyToReturn;
+                while (processedCount < readyCount && readyToReturnQueue.TryDequeue(out readyToReturn))
                 {
-                    GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                    readyToReturn.messageBytesBorrowedFromPool.Return(readyToReturn.messageBytes); // since we now know we are on the correct thread (i.e.., same as borrowed on) we can return it to pool
+                    ++processedCount;
                 }
-                gonetServer?.SendBytesToAllClients(bytes, bytesUsedCount, qualityOfService);
             }
             else
             {
-                if (gonetClient != null)
-                {
-                    GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
-                }
+                readyToReturnQueue_ThreadMap[Thread.CurrentThread] = new ConcurrentQueue<NetworkData>();
+            }
 
-                gonetClient?.SendBytesToServer(bytes, bytesUsedCount, qualityOfService);
+            ArrayPool<byte> endOfTheLineSendArrayPool;
+            if (!netThread_outgoingNetworkDataArrayPool_ThreadMap.TryGetValue(Thread.CurrentThread, out endOfTheLineSendArrayPool))
+            {
+                endOfTheLineSendArrayPool = new ArrayPool<byte>(100, 10, 1024, 2048);
+                netThread_outgoingNetworkDataArrayPool_ThreadMap[Thread.CurrentThread] = endOfTheLineSendArrayPool;
+            }
+                
+            byte[] bytesCopy = endOfTheLineSendArrayPool.Borrow(bytesUsedCount);
+            Buffer.BlockCopy(bytes, 0, bytesCopy, 0, bytesUsedCount);
+
+            NetworkData networkData = new NetworkData()
+            {
+                messageBytesBorrowedFromPool = endOfTheLineSendArrayPool,
+                messageBytesBorrowedOnThread = Thread.CurrentThread,
+                messageBytes = bytesCopy,
+                bytesUsedCount = bytesUsedCount,
+                relatedConnection = sendToConnection,
+                qualityOfService = qualityOfService
+            };
+
+            endOfTheLineSendQueue.Enqueue(networkData);
+        }
+
+        static readonly ConcurrentQueue<NetworkData> endOfTheLineSendQueue = new ConcurrentQueue<NetworkData>();
+        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_outgoingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
+
+        private static volatile bool isRunning_endOfTheLineSend_Thread;
+        private static void SendBytes_EndOfTheLine_SeparateThread()
+        {
+            while (isRunning_endOfTheLineSend_Thread)
+            {
+                int processedCount = 0;
+                int count = endOfTheLineSendQueue.Count;
+                NetworkData networkData;
+                while (processedCount < count && endOfTheLineSendQueue.TryDequeue(out networkData))
+                {
+                    if (networkData.relatedConnection == null)
+                    {
+                        if (IsServer)
+                        {
+                            if (gonetServer != null)
+                            {
+                                GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                            }
+                            gonetServer?.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
+                        }
+                        else
+                        {
+                            if (gonetClient != null)
+                            {
+                                GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                            }
+
+                            gonetClient?.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
+                        }
+                    }
+                    else
+                    {
+                        networkData.relatedConnection.SendMessage(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
+                    }
+
+                    { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
+                        ConcurrentQueue<NetworkData> readyToReturnQueue = readyToReturnQueue_ThreadMap[networkData.messageBytesBorrowedOnThread];
+                        readyToReturnQueue.Enqueue(networkData);
+                    }
+                }
             }
         }
 
@@ -136,6 +214,8 @@ namespace GONet
 
         static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Reliable);
         static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Unreliable);
+
+        static Thread endOfLineSendThread;
 
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/>
@@ -168,6 +248,13 @@ namespace GONet
                         }
                     }
                 }
+            }
+
+            if (endOfLineSendThread == null)
+            {
+                isRunning_endOfTheLineSend_Thread = true;
+                endOfLineSendThread = new Thread(SendBytes_EndOfTheLine_SeparateThread);
+                endOfLineSendThread.Start();
             }
 
             if (IsServer)
@@ -268,7 +355,7 @@ namespace GONet
 
                     GONetLog.Debug("about to send time sync to client....my seconds: " + Time.ElapsedSeconds);
 
-                    connectionToClient.SendMessage(bytes, bytesUsedCount, QosType.Unreliable);
+                    SendBytesToRemoteConnection(connectionToClient, bytes, bytesUsedCount, QosType.Unreliable);
 
                     mainThread_miscSerializationArrayPool.Return(bytes);
                 }
@@ -306,6 +393,8 @@ namespace GONet
         /// </summary>
         internal static void Shutdown()
         {
+            isRunning_endOfTheLineSend_Thread = false;
+
             if (IsServer)
             {
                 gonetServer?.Stop();
@@ -318,11 +407,12 @@ namespace GONet
 
         struct NetworkData
         {
-            public GONetConnection sourceConnection;
+            public GONetConnection relatedConnection;
             public ArrayPool<byte> messageBytesBorrowedFromPool;
             public Thread messageBytesBorrowedOnThread;
             public byte[] messageBytes;
             public int bytesUsedCount;
+            public QosType qualityOfService;
         }
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_incomingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
@@ -444,7 +534,7 @@ namespace GONet
 
             NetworkData networkData = new NetworkData()
             {
-                sourceConnection = sourceConnection,
+                relatedConnection = sourceConnection,
                 messageBytes = pool.Borrow(bytesUsedCount),
                 messageBytesBorrowedFromPool = pool,
                 messageBytesBorrowedOnThread = Thread.CurrentThread,
@@ -494,14 +584,14 @@ namespace GONet
                                 {  // body:
                                     if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
                                     {
-                                        DeserializeBody_ChangesBundle(bitStream, networkData.sourceConnection, elapsedTicksAtSend);
+                                        DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
                                     }
                                     else if (messageType == typeof(RequestMessage))
                                     {
                                         long requestUID;
                                         bitStream.ReadLong(out requestUID);
 
-                                        Server_SyncTimeWithClient_Respond(requestUID, networkData.sourceConnection);
+                                        Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
                                     }
                                     else if (messageType == typeof(ResponseMessage))
                                     {
@@ -533,7 +623,6 @@ namespace GONet
                     finally
                     {
                         { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
-                            networkData.messageBytesBorrowedFromPool.Return(networkData.messageBytes);
                             ConcurrentQueue<NetworkData> readyToReturnQueue = readyToReturnQueue_ThreadMap[networkData.messageBytesBorrowedOnThread];
                             readyToReturnQueue.Enqueue(networkData);
                         }
@@ -576,7 +665,7 @@ namespace GONet
 
                     bitStream.WriteCurrentPartialByte();
 
-                    gonetConnection_ServerToClient.SendMessage(memoryStream.GetBuffer(), (int)memoryStream.Length, QosType.Reliable);
+                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, QosType.Reliable);
                 }
             }
         }
@@ -974,7 +1063,7 @@ namespace GONet
         /// </summary>
         static readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
 
-        static void Server_SendClientCurrentState_AllAutoMagicalSync(ReliableEndpoint connectionToClient)
+        static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
             syncValuesToSend.Clear();
 
@@ -1012,7 +1101,7 @@ namespace GONet
                         gonetServer?.ForEachClient((clientConnection) =>
                         {
                             byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId);
-                            clientConnection.SendMessage(changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
+                            SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
                             mainThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                         });
                     }
@@ -1026,7 +1115,7 @@ namespace GONet
                 else
                 {
                     byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
-                    connectionToClient.SendMessage(changesSerialized, bytesUsedCount, QosType.Reliable);
+                    SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
                     mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                 }
             }
@@ -1135,7 +1224,7 @@ namespace GONet
                                     gonetServer?.ForEachClient((clientConnection) =>
                                     {
                                         byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId);
-                                        clientConnection.SendMessage(changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
+                                        SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
                                         myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                                     });
                                 }
