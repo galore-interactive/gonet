@@ -832,6 +832,7 @@ namespace GONet
             {
                 if (mostRecentChangesSize > 0)
                 {
+                    lock (LOCKY_BALBOA)
                     { // use buffer to determine the actual value that we think is most appropriate for this moment in time
                         float blendedValue = default;
                         int newestBufferIndex = 0;
@@ -860,18 +861,18 @@ namespace GONet
                                         float extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                         float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
                                         blendedValue = Mathf.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
-                                        GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                     }
                                     else
                                     {
                                         blendedValue = newestValue;
-                                        GONetLog.Debug("new new beast");
+                                        //GONetLog.Debug("new new beast");
                                     }
                                 }
                                 else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                                 {
                                     blendedValue = oldestValue;
-                                    GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
+                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
@@ -896,7 +897,7 @@ namespace GONet
                                     }
                                     if (!didWeLoip)
                                     {
-                                        GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                        //GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                     }
                                 }
                             }
@@ -908,7 +909,7 @@ namespace GONet
                         }
                         else
                         {
-                            GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
+                            //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
                             return; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
                         }
 
@@ -1072,29 +1073,32 @@ namespace GONet
 
         static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
-            syncValuesToSend.Clear();
-
-            var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
-            while (enumeratorOuter.MoveNext())
+            lock (LOCKY_BALBOA)
             {
-                ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
-                var enumeratorInner = currentMap.GetEnumerator();
-                while (enumeratorInner.MoveNext())
+                syncValuesToSend.Clear();
+
+                var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
+                while (enumeratorOuter.MoveNext())
                 {
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-                    monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
+                    ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                    var enumeratorInner = currentMap.GetEnumerator();
+                    while (enumeratorInner.MoveNext())
+                    {
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                        monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
 
-                    // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
-                    monitoringSupport.AppendListWithAllValues(syncValuesToSend);
+                        // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
+                        monitoringSupport.AppendListWithAllValues(syncValuesToSend);
+                    }
                 }
-            }
 
-            if (syncValuesToSend.Count > 0)
-            {
-                int bytesUsedCount;
-                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
-                SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
-                mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
+                if (syncValuesToSend.Count > 0)
+                {
+                    int bytesUsedCount;
+                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
+                    SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
+                    mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
+                }
             }
         }
 
@@ -1168,6 +1172,7 @@ namespace GONet
                     }
                     else
                     {
+                        lock (LOCKY_BALBOA)
                         { // process:
                             // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
                             syncValuesToSend.Clear();
@@ -1369,37 +1374,40 @@ namespace GONet
 
         private static void DeserializeBody_ChangesBundle(Utils.BitStream bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
-            ushort count;
-            bitStream_headerAlreadyRead.ReadUShort(out count);
-            //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
-            for (int i = 0; i < count; ++i)
+            lock (LOCKY_BALBOA)
             {
-                bool canASSumeNetId;
-                bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
-                if (canASSumeNetId)
+                ushort count;
+                bitStream_headerAlreadyRead.ReadUShort(out count);
+                //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
+                for (int i = 0; i < count; ++i)
                 {
-                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
-                }
-                else
-                {
-                    uint gonetId;
-                    bitStream_headerAlreadyRead.ReadUInt(out gonetId);
-
-                    if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
+                    bool canASSumeNetId;
+                    bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
+                    if (canASSumeNetId)
                     {
-                        GONetLog.Error("gladousche...gonetId: " + gonetId);
+                        GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
                     }
+                    else
+                    {
+                        uint gonetId;
+                        bitStream_headerAlreadyRead.ReadUInt(out gonetId);
 
-                    GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
-                    ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
+                        if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
+                        {
+                            GONetLog.Error("gladousche...gonetId: " + gonetId);
+                        }
 
-                    byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
-                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
-                    syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(sourceOfChangeConnection.OwnerAuthorityId); // keep track of the authority of every change!
+                        GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
+                        ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
+
+                        byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
+                        syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                        syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(sourceOfChangeConnection.OwnerAuthorityId); // keep track of the authority of every change!
+                    }
                 }
+                //GONetLog.Debug(string.Concat("************done reading changes bundle"));
             }
-            //GONetLog.Debug(string.Concat("************done reading changes bundle"));
         }
 
         /// <summary>
