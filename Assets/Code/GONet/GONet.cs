@@ -687,6 +687,8 @@ namespace GONet
 
         internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
+            internal readonly Mutex mutex = new Mutex();
+
             internal byte index;
             internal GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
             
@@ -860,18 +862,18 @@ namespace GONet
                                         float extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                         float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
                                         blendedValue = Mathf.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
-                                        GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                       // GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                     }
                                     else
                                     {
                                         blendedValue = newestValue;
-                                        GONetLog.Debug("new new beast");
+                                        //GONetLog.Debug("new new beast");
                                     }
                                 }
                                 else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                                 {
                                     blendedValue = oldestValue;
-                                    GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
+                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
@@ -896,7 +898,7 @@ namespace GONet
                                     }
                                     if (!didWeLoip)
                                     {
-                                        GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                        //GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                     }
                                 }
                             }
@@ -908,24 +910,36 @@ namespace GONet
                         }
                         else
                         {
-                            GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
+                            //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
                             return; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
                         }
 
-                        syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
-                        syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(mostRecentChanges_UpdatedByAuthorityId); // keep track of the authority of every change!
+                        {
+                            mutex.WaitOne();
+                            try
+                            {
+                                SetLastChangedByOwnerAuthorityId(mostRecentChanges_UpdatedByAuthorityId); // keep track of the authority of every change! to avoid sending the owner of the change the change message back via auto-sync logic
+                                syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
+                            }
+                            finally
+                            {
+                                mutex.ReleaseMutex();
+                            }
+                        }
                     }
                 }
             }
 
+            /// <summary>
+            /// IMPORTANT: Ensure this is called BEFORE changing the value as multithreaded code may be checking who changed it as soon as it shows as changed and this needs to be set
+            ///            in order to know who (if anyone) to send the change to.
+            /// </summary>
+            /// <param name="ownerAuthorityId"></param>
             internal void SetLastChangedByOwnerAuthorityId(uint ownerAuthorityId)
             {
+                //GONetLog.Debug("+++++ setting");
                 lastKnownValue_SetByAuthorityId = ownerAuthorityId;
-
-                if (mostRecentChanges != null)
-                {
-                    mostRecentChanges_UpdatedByAuthorityId = ownerAuthorityId;
-                }
+                mostRecentChanges_UpdatedByAuthorityId = ownerAuthorityId;
             }
         }
 
@@ -1080,49 +1094,20 @@ namespace GONet
                 while (enumeratorInner.MoveNext())
                 {
                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                    monitoringSupport.Mutex_WaitOne();
                     monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
-                    if (connectionToClient != null)
-                    {
-                        // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
-                        monitoringSupport.AppendListWithAllValues(syncValuesToSend);
-                    }
-                    else if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
-                    {
-                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend);
-                        monitoringSupport.OnValueChangeCheck_Reset();
-                    }
+
+                    // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
+                    monitoringSupport.AppendListWithAllValues(syncValuesToSend);
                 }
             }
 
             if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                if (connectionToClient == null)
-                { // if in here, we are sending only changes (since last send) to everyone
-                    //GONetLog.Debug("sending changed auto-magical sync values to all connections");
-                    if (IsServer)
-                    {
-                        // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
-                        gonetServer?.ForEachClient((clientConnection) =>
-                        {
-                            byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId);
-                            SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
-                            mainThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
-                        });
-                    }
-                    else
-                    {
-                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
-                        SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
-                        mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
-                    }
-                }
-                else
-                {
-                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
-                    SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
-                    mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
-                }
+                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
+                SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
+                mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
             }
         }
 
@@ -1208,13 +1193,17 @@ namespace GONet
                                 while (enumeratorInner.MoveNext())
                                 {
                                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-
+                                    monitoringSupport.Mutex_WaitOne(uniqueGrouping);
                                     // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
                                     monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                                     if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(uniqueGrouping)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                                     {
                                         monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                                         monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                    }
+                                    else
+                                    {
+                                        monitoringSupport.Mutex_Release(uniqueGrouping);
                                     }
                                 }
                             }
@@ -1361,8 +1350,8 @@ namespace GONet
             }
             else
             {
-                // filter out changes that are for doNotSendIfThisAuthorityId
-                countFiltered = changes.Count(change => change.lastKnownValue_SetByAuthorityId != doNotSendIfThisAuthorityId);
+                // filter out changes that will not be sent
+                countFiltered = changes.Count(change => !ShouldSkipSending_ConsideringWhoChangedTheValue(doNotSendIfThisAuthorityId, change));
             }
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
@@ -1373,9 +1362,11 @@ namespace GONet
             for (int i = 0; i < countTotal; ++i)
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = changes[i];
-                if (doNotSendIfThisAuthorityId != OwnerAuthorityId_Unset && monitoringSupport.lastKnownValue_SetByAuthorityId == doNotSendIfThisAuthorityId)
+                bool shouldSkip = ShouldSkipSending_ConsideringWhoChangedTheValue(doNotSendIfThisAuthorityId, monitoringSupport);
+                monitoringSupport.lastKnownValue_SetByAuthorityId = OwnerAuthorityId_Unset; // ensuring this is reset (AFTER using it to check about skipping!) as it served its purpose
+                if (shouldSkip)
                 {
-                    monitoringSupport.lastKnownValue_SetByAuthorityId = OwnerAuthorityId_Unset; // reset this as it served its purpose
+                    monitoringSupport.mutex.ReleaseMutex();
                     continue; // skip this guy (i.e., apply the "filter")
                 }
 
@@ -1391,7 +1382,29 @@ namespace GONet
                     bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
                     bitStream_headerAlreadyWritten.WriteByte(monitoringSupport.index); // then have to write the index, otherwise other end does not know which index to deserialize
                     monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, monitoringSupport.index);
+
+                    //GONetLog.Debug("====================================================================just wroteski auto sync change to send to others");
                 }
+
+                monitoringSupport.mutex.ReleaseMutex();
+            }
+        }
+
+        private static bool ShouldSkipSending_ConsideringWhoChangedTheValue(uint doNotSendIfThisAuthorityId, AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport)
+        {
+            if (IsServer)
+            {
+                // for the server, the only time to skip sending is if the change was made by the client we are sending to
+                return doNotSendIfThisAuthorityId != OwnerAuthorityId_Unset && monitoringSupport.lastKnownValue_SetByAuthorityId == doNotSendIfThisAuthorityId;
+            }
+            else
+            {
+                if (monitoringSupport.lastKnownValue_SetByAuthorityId == OwnerAuthorityId_Unset)
+                {
+                    GONetLog.Debug("client NOT skipping....why?");
+                }
+                // for clients, if someone other than themselves was the last known setter (indicated by the value being set at all), then it is not their business to send to others....so skip
+                return monitoringSupport.lastKnownValue_SetByAuthorityId != OwnerAuthorityId_Unset;
             }
         }
 
@@ -1423,8 +1436,20 @@ namespace GONet
                     GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
 
                     byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
-                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
-                    syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(sourceOfChangeConnection.OwnerAuthorityId); // keep track of the authority of every change!
+                    {
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport = syncCompanion.valuesChangesSupport[index];
+                        valueMonitoringSupport.mutex.WaitOne();
+                        try
+                        {
+                            valueMonitoringSupport.SetLastChangedByOwnerAuthorityId(sourceOfChangeConnection.OwnerAuthorityId); // keep track of the authority of every change!
+                            syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                        }
+                        finally
+                        {
+                            valueMonitoringSupport.mutex.ReleaseMutex();
+                        }
+                    }
+
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));

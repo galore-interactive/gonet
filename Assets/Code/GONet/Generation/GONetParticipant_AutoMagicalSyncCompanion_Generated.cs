@@ -45,8 +45,7 @@ namespace GONet.Generation
             for (int i = 0; i < valuesCount; ++i)
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
-                    !Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
+                if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) && !Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
                 {
                     lastKnownValueChangesSinceLastCheck[i] = true;
                     hasChange = true;
@@ -123,9 +122,17 @@ namespace GONet.Generation
             for (int i = 0; i < valuesCount; ++i)
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if (lastKnownValueChangesSinceLastCheck[i] && DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
+                if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
                 {
-                    syncValuesToSend.Add(valueChangeSupport);
+                    if (lastKnownValueChangesSinceLastCheck[i])
+                    {
+                        syncValuesToSend.Add(valueChangeSupport);
+                    }
+                    else
+                    {
+                        //GONetLog.Debug("releasing, index: " + i);
+                        valueChangeSupport.mutex.ReleaseMutex();
+                    }
                 }
             }
         }
@@ -143,6 +150,33 @@ namespace GONet.Generation
             for (int i = 0; i < valuesCount; ++i)
             {
                 syncValuesToSend.Add(valuesChangesSupport[i]);
+            }
+        }
+
+        internal void Mutex_WaitOne(GONetMain.SyncBundleUniqueGrouping? uniqueGrouping = default)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (DoesMatchUniqueGrouping(valueChangeSupport, uniqueGrouping))
+                {
+                    GONetLog.Debug("waiting, index: " + i);
+                    valueChangeSupport.mutex.WaitOne();
+                    GONetLog.Debug("done waiting, index: " + i);
+                }
+            }
+        }
+
+        internal void Mutex_Release(GONetMain.SyncBundleUniqueGrouping? uniqueGrouping = default)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (DoesMatchUniqueGrouping(valueChangeSupport, uniqueGrouping))
+                {
+                    //GONetLog.Debug("releasing, index: " + i);
+                    valueChangeSupport.mutex.ReleaseMutex();
+                }
             }
         }
     }
