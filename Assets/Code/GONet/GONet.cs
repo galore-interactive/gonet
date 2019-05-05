@@ -1068,6 +1068,8 @@ namespace GONet
         /// </summary>
         static readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
 
+        static readonly object LOCKY_BALBOA = new object();
+
         static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
             syncValuesToSend.Clear();
@@ -1081,48 +1083,18 @@ namespace GONet
                 {
                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
                     monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
-                    if (connectionToClient != null)
-                    {
-                        // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
-                        monitoringSupport.AppendListWithAllValues(syncValuesToSend);
-                    }
-                    else if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck())
-                    {
-                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend);
-                        monitoringSupport.OnValueChangeCheck_Reset();
-                    }
+
+                    // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
+                    monitoringSupport.AppendListWithAllValues(syncValuesToSend);
                 }
             }
 
             if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                if (connectionToClient == null)
-                { // if in here, we are sending only changes (since last send) to everyone
-                    //GONetLog.Debug("sending changed auto-magical sync values to all connections");
-                    if (IsServer)
-                    {
-                        // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
-                        gonetServer?.ForEachClient((clientConnection) =>
-                        {
-                            byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId);
-                            SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, QosType.Reliable);
-                            mainThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
-                        });
-                    }
-                    else
-                    {
-                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
-                        SendBytesToRemoteConnections(changesSerialized, bytesUsedCount);
-                        mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
-                    }
-                }
-                else
-                {
-                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
-                    SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
-                    mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
-                }
+                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
+                SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
+                mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
             }
         }
 
