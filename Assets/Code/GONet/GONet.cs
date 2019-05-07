@@ -273,7 +273,7 @@ namespace GONet
         static readonly long CLIENT_SYNC_TIME_EVERY_TICKS = TimeSpan.FromSeconds(1).Ticks;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT = (float)CLIENT_SYNC_TIME_EVERY_TICKS;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromMilliseconds(250).Ticks;
+        static readonly long BLENDING_BUFFER_LEAD_TICKS = 0; // TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
