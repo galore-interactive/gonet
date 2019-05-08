@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Security;
+using System.Threading;
 
 namespace GONet.Utils
 {
@@ -9,10 +11,31 @@ namespace GONet.Utils
     /// </summary>
     public unsafe static class BitConverter
     {
+        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
+
         /// <summary>
-        /// Use this to borrow and return byte arrays as needed for the GetBytes calls.
+        /// Use this to borrow byte arrays as needed for the GetBytes calls.
+        /// Ensure you subsequently call <see cref=""/>
         /// </summary>
-        public static readonly ArrayPool<byte> ByteArrayPool = new ArrayPool<byte>(25, 5, 8, 8);
+        /// <returns>byte array of size 8</returns>
+        public static byte[] BorrowByteArray()
+        {
+            ArrayPool<byte> arrayPool;
+            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
+            {
+                arrayPool = new ArrayPool<byte>(25, 5, 8, 8);
+                byteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
+            }
+            return arrayPool.Borrow();
+        }
+
+        /// <summary>
+        /// PRE: Required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
+        /// </summary>
+        public static void ReturnByteArray(byte[] borrowed)
+        {
+            byteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);
+        }
 
         /// <param name="value">input</param>
         /// <param name="destination">input and output</param>

@@ -376,48 +376,48 @@ namespace GONet.Utils
         {
             Debug.Assert(bitCount <= 16);
 
-            byte[] bytes = BitConverter.ByteArrayPool.Borrow(); // use pool to avoid allocating byte[] if using System.BitConverter
+            byte[] bytes = BitConverter.BorrowByteArray(); // use pool to avoid allocating byte[] if using System.BitConverter
 
             BitConverter.GetBytes(iUShort, bytes);
             WriteBits(bytes, 0, bitCount);
 
-            BitConverter.ByteArrayPool.Return(bytes);
+            BitConverter.ReturnByteArray(bytes);
         }
 
         public void WriteFloat(float iFloat, ulong bitCount = 32)
         {
             Debug.Assert(bitCount <= 32);
 
-            byte[] bytes = BitConverter.ByteArrayPool.Borrow(); // use pool to avoid allocating byte[] if using System.BitConverter
+            byte[] bytes = BitConverter.BorrowByteArray(); // use pool to avoid allocating byte[] if using System.BitConverter
 
             BitConverter.GetBytes(iFloat, bytes);
             WriteBits(bytes, 0, bitCount);
 
-            BitConverter.ByteArrayPool.Return(bytes);
+            BitConverter.ReturnByteArray(bytes);
         }
 
         public void WriteUInt(uint iUInt, ulong bitCount = 32)
         {
             Debug.Assert(bitCount <= 32);
 
-            byte[] bytes = BitConverter.ByteArrayPool.Borrow(); // use pool to avoid allocating byte[] if using System.BitConverter
+            byte[] bytes = BitConverter.BorrowByteArray(); // use pool to avoid allocating byte[] if using System.BitConverter
 
             BitConverter.GetBytes(iUInt, bytes);
             WriteBits(bytes, 0, bitCount);
 
-            BitConverter.ByteArrayPool.Return(bytes);
+            BitConverter.ReturnByteArray(bytes);
         }
 
         public void WriteLong(long iLong, ulong bitCount = 64)
         {
             Debug.Assert(bitCount <= 64);
 
-            byte[] bytes = BitConverter.ByteArrayPool.Borrow(); // use pool to avoid allocating byte[] if using System.BitConverter
+            byte[] bytes = BitConverter.BorrowByteArray(); // use pool to avoid allocating byte[] if using System.BitConverter
 
             BitConverter.GetBytes(iLong, bytes);
             WriteBits(bytes, 0, bitCount);
 
-            BitConverter.ByteArrayPool.Return(bytes);
+            BitConverter.ReturnByteArray(bytes);
         }
 
 
