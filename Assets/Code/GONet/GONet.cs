@@ -273,7 +273,7 @@ namespace GONet
         static readonly long CLIENT_SYNC_TIME_EVERY_TICKS = TimeSpan.FromSeconds(1).Ticks;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT = (float)CLIENT_SYNC_TIME_EVERY_TICKS;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromMilliseconds(250).Ticks;
+        static readonly long BLENDING_BUFFER_LEAD_TICKS = 0; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
@@ -761,13 +761,6 @@ namespace GONet
             private uint mostRecentChanges_UpdatedByAuthorityId;
 
             /// <summary>
-            /// This used to keep track of who (i.e., which network owner authority) made the last change to the value.
-            /// It is used to know if we need to avoid sending the value to anyone or not (i.e., do not send to owner who made the change...that would be redundant, unnecessary and unwanted traffic/processing).
-            /// NOTE: When this is set to <see cref="GONetParticipant.OwnerAuthorityId_Unset"/>, the ASSumption is that it was set locally by "me."
-            /// </summary>
-            internal uint lastKnownValue_SetByAuthorityId = OwnerAuthorityId_Unset;
-
-            /// <summary>
             /// DO NOT USE THIS.
             /// Public default constructor is required for object pool instantiation under current impl of <see cref="ObjectPool{T}"/>;
             /// </summary>
@@ -860,18 +853,18 @@ namespace GONet
                                         float extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                         float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
                                         blendedValue = Mathf.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
-                                        GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                     }
                                     else
                                     {
                                         blendedValue = newestValue;
-                                        GONetLog.Debug("new new beast");
+                                        //GONetLog.Debug("new new beast");
                                     }
                                 }
                                 else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                                 {
                                     blendedValue = oldestValue;
-                                    GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
+                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
@@ -913,18 +906,7 @@ namespace GONet
                         }
 
                         syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
-                        syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(mostRecentChanges_UpdatedByAuthorityId); // keep track of the authority of every change!
                     }
-                }
-            }
-
-            internal void SetLastChangedByOwnerAuthorityId(uint ownerAuthorityId)
-            {
-                lastKnownValue_SetByAuthorityId = ownerAuthorityId;
-
-                if (mostRecentChanges != null)
-                {
-                    mostRecentChanges_UpdatedByAuthorityId = ownerAuthorityId;
                 }
             }
         }
@@ -1070,6 +1052,9 @@ namespace GONet
 
         static readonly object LOCKY_BALBOA = new object();
 
+        /// <summary>
+        /// PRE: <paramref name="connectionToClient"/> already has been assigned a good value to <see cref="GONetConnection.OwnerAuthorityId"/>.
+        /// </summary>
         static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
             syncValuesToSend.Clear();
@@ -1092,7 +1077,7 @@ namespace GONet
             if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount);
+                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, connectionToClient.OwnerAuthorityId);
                 SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
                 mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
             }
@@ -1207,7 +1192,11 @@ namespace GONet
                                 }
                                 else
                                 {
-                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, OwnerAuthorityId_Server); // don't send anything the server sent to us back to the server
+                                    if (MyAuthorityId == OwnerAuthorityId_Unset)
+                                    {
+                                        throw new Exception("Magoo.....we need this set before doing the following:");
+                                    }
+                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId);
                                     SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, qualityOfService: uniqueGrouping_qualityOfService);
                                     myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                                 }
@@ -1280,10 +1269,16 @@ namespace GONet
 
         /// <summary>
         /// PRE: <paramref name="changes"/> size is greater than 0
+        /// PRE: <paramref name="filterUsingOwnerAuthorityId"/> is not <see cref="OwnerAuthorityId_Unset"/> otherwise an exception is thrown
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <paramref name="byteArrayPool"/>
         /// </summary>
-        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint doNotSendIfThisAuthorityId = OwnerAuthorityId_Unset)
+        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint filterUsingOwnerAuthorityId)
         {
+            if (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset)
+            {
+                throw new ArgumentOutOfRangeException(nameof(filterUsingOwnerAuthorityId));
+            }
+
             using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
             {
                 using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
@@ -1295,7 +1290,7 @@ namespace GONet
                         bitStream.WriteLong(Time.ElapsedTicks);
                     }
 
-                    SerializeBody_ChangesBundle(changes, bitStream, doNotSendIfThisAuthorityId); // body
+                    SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
 
                     bitStream.WriteCurrentPartialByte();
 
@@ -1323,19 +1318,10 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitStream bitStream_headerAlreadyWritten, uint doNotSendIfThisAuthorityId = OwnerAuthorityId_Unset)
+        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitStream bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
         {
             int countTotal = changes.Count;
-            int countFiltered = 0;
-            if (doNotSendIfThisAuthorityId == OwnerAuthorityId_Unset)
-            {
-                countFiltered = countTotal;
-            }
-            else
-            {
-                // filter out changes that are for doNotSendIfThisAuthorityId
-                countFiltered = changes.Count(change => change.lastKnownValue_SetByAuthorityId != doNotSendIfThisAuthorityId);
-            }
+            int countFiltered = changes.Count(change => ShouldSendChange(change, filterUsingOwnerAuthorityId));
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
             //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
@@ -1344,27 +1330,34 @@ namespace GONet
 
             for (int i = 0; i < countTotal; ++i)
             {
-                AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = changes[i];
-                if (doNotSendIfThisAuthorityId != OwnerAuthorityId_Unset && monitoringSupport.lastKnownValue_SetByAuthorityId == doNotSendIfThisAuthorityId)
+                AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
+                if (!ShouldSendChange(change, filterUsingOwnerAuthorityId))
                 {
-                    monitoringSupport.lastKnownValue_SetByAuthorityId = OwnerAuthorityId_Unset; // reset this as it served its purpose
                     continue; // skip this guy (i.e., apply the "filter")
                 }
 
-                bool canASSumeNetId = monitoringSupport.index == GONetParticipant.ASSumed_GONetId_INDEX;
+                bool canASSumeNetId = change.index == GONetParticipant.ASSumed_GONetId_INDEX;
                 bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
                 if (canASSumeNetId)
                 {
                     // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
-                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
+                    change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
                 }
                 else
                 {
-                    bitStream_headerAlreadyWritten.WriteUInt(monitoringSupport.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
-                    bitStream_headerAlreadyWritten.WriteByte(monitoringSupport.index); // then have to write the index, otherwise other end does not know which index to deserialize
-                    monitoringSupport.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, monitoringSupport.index);
+                    bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
+                    bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
+                    change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
                 }
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, uint filterUsingOwnerAuthorityId)
+        {
+            return IsServer 
+                    ? change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // the server should send every change exception for changes back to the owner itself
+                    : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId; // clients should only send out changes it owns
         }
 
         private static void DeserializeBody_ChangesBundle(Utils.BitStream bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
@@ -1396,7 +1389,6 @@ namespace GONet
 
                     byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
-                    syncCompanion.valuesChangesSupport[index].SetLastChangedByOwnerAuthorityId(sourceOfChangeConnection.OwnerAuthorityId); // keep track of the authority of every change!
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));

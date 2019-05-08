@@ -14,7 +14,7 @@ public class FieldChangeTest : MonoBehaviour
     Vector3 startPosition;
     Quaternion startRotation;
 
-    float moveAmount = 1f;
+    float moveAmount = 5f;
     float moveAmount_rottieTotty = 0.15f;
 
     private void Awake()
@@ -29,7 +29,7 @@ public class FieldChangeTest : MonoBehaviour
         if (GONetMain.IsServer)
         {
             someCoolGuyFloat += moveAmount * Time.deltaTime;
-            if (someCoolGuyFloat >= 5 || someCoolGuyFloat <= -5)
+            if (someCoolGuyFloat >= 6 || someCoolGuyFloat <= -6)
             {
                 moveAmount *= -1;
             }
