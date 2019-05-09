@@ -270,8 +270,17 @@ namespace GONet
 
         #region time sync client-server-client
 
-        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS = TimeSpan.FromSeconds(1).Ticks;
-        static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT = (float)CLIENT_SYNC_TIME_EVERY_TICKS;
+        /// <summary>
+        /// How close the clients time must be to the server before the gap is considered closed and time can go
+        /// from being sync'd every <see cref="CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED"/> ticks 
+        /// to every <see cref="CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED"/> ticks for maintenance.
+        /// </summary>
+        static readonly long CLIENT_SYNC_TIME_GAP_TICKS = TimeSpan.FromSeconds(1f / 60f).Ticks;
+        static bool client_hasClosedTimeSyncGapWithServer;
+        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED = TimeSpan.FromSeconds(1f / 4f).Ticks;
+        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED = TimeSpan.FromSeconds(30f).Ticks;
+        static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
+        static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
         static readonly long BLENDING_BUFFER_LEAD_TICKS = 0; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
@@ -286,7 +295,8 @@ namespace GONet
         private static void Client_SyncTimeWithServer_Initiate_IfAppropriate()
         {
             DateTime now = DateTime.Now;
-            bool isAppropriate = !client_hasSentSyncTimeRequest || (now - client_lastSyncTimeRequestSent).Duration().Ticks > CLIENT_SYNC_TIME_EVERY_TICKS;
+            long syncEveryTicks = client_hasClosedTimeSyncGapWithServer ? CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED : CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
+            bool isAppropriate = !client_hasSentSyncTimeRequest || (now - client_lastSyncTimeRequestSent).Duration().Ticks > syncEveryTicks;
             if (isAppropriate)
             {
                 client_hasSentSyncTimeRequest = true;
@@ -382,6 +392,16 @@ namespace GONet
                     long newClientTimeTicks = server_elapsedTicksAtSendResponse + assumedNetworkDelayTicks;
 
                     Time.SetFromAuthority(newClientTimeTicks);
+
+                    if (!client_hasClosedTimeSyncGapWithServer)
+                    {
+                        long diffTicksABS = Math.Abs(responseReceivedTicks_Client - newClientTimeTicks);
+                        if (diffTicksABS < CLIENT_SYNC_TIME_GAP_TICKS)
+                        {
+                            client_hasClosedTimeSyncGapWithServer = true;
+                        }
+                    }
+
                 }
             }
         }
@@ -452,13 +472,13 @@ namespace GONet
                 ElapsedTicks = lastSetFromAuthorityAtTicks - baselineTicks;
                 elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
 
-                /* if you want debugging in log
+                //* if you want debugging in log
                 const string STR_ElapsedTimeClient = "ElapsedTime client of: ";
                 const string STR_BeingOverwritten = " is being overwritten from authority source to: ";
                 const string STR_DoubleCheck = " seconds and here is new client value to double check it worked correctly: ";
                 const string STR_Diff = " lastSetFromAuthorityDiffTicks (well, as ms): ";
                 GONetLog.Info(string.Concat(STR_ElapsedTimeClient, elapsedSecondsBefore, STR_BeingOverwritten, TimeSpan.FromTicks(elapsedTicksFromAuthority).TotalSeconds, STR_DoubleCheck, elapsedSeconds, STR_Diff, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalMilliseconds));
-                */
+                //*/
 
                 TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds);
             }
@@ -485,11 +505,12 @@ namespace GONet
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private long GetTicksToSubtractForSetFromAuthorityEasing()
             {
-                bool shouldNotEase = false; // TODO FIXME put this back in once verified not to cause the pause/hiccup issue: lastSetFromAuthorityDiffTicks > DIFF_TICKS_TOO_BIG_FOR_EASING;
+                bool shouldNotEase = lastSetFromAuthorityDiffTicks > DIFF_TICKS_TOO_BIG_FOR_EASING;
                 if (!shouldNotEase && lastSetFromAuthorityDiffTicks != 0)
                 { // IMPORTANT: This code eases the adjustment (i.e., diff) back to resync time over the entire period between resyncs to avoid a possibly dramatic jump in time just after a resync!
                     long ticksSinceLastSetFromAuthority = HighResolutionTimeUtils.Now.Ticks - lastSetFromAuthorityAtTicks;
-                    float inverseLerpBetweenSyncs = ticksSinceLastSetFromAuthority / CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT;
+                    float syncEveryTicks = client_hasClosedTimeSyncGapWithServer ? CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED : CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED;
+                    float inverseLerpBetweenSyncs = ticksSinceLastSetFromAuthority / syncEveryTicks;
                     if (inverseLerpBetweenSyncs < 1f) // if 1 or greater there will be nothing to add based on calculations
                     {
                         return (long)(lastSetFromAuthorityDiffTicks * (1f - inverseLerpBetweenSyncs));
