@@ -79,7 +79,9 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
 <#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
             {#>		
-			support<#=iOverall#>.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE);
+            int support<#=iOverall#>_mostRecentChanges_calcdSize = support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.BLENDING_BUFFER_LEAD_SECONDS / support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
+            support<#=iOverall#>.mostRecentChanges_capacitySize = Math.Max(support<#=iOverall#>_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
+			support<#=iOverall#>.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support<#=iOverall#>.mostRecentChanges_capacitySize);
 <#			}#>
 			var dummyToEnsureGetterCalledOnceBeforeHeatOfBattle<#=iOverall#> = <#=single.componentTypeName#>; // let's ensure GetComponnet<T>() called up front
 

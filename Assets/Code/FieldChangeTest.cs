@@ -8,7 +8,7 @@ public class FieldChangeTest : MonoBehaviour
     public float someCoolGuyFloat;
 
     //[GONetAutoMagicalSync(SyncChangesEverySeconds = 0.45f)] // NOTE: 10 times more frequent than someCoolGuyFloat
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true)]
+    //[GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, SyncChangesEverySeconds = 1f / 6f)]
     public float rottieTotty;
 
     Vector3 startPosition;
@@ -43,6 +43,6 @@ public class FieldChangeTest : MonoBehaviour
         /* */
 
         transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
-        transform.rotation = Quaternion.Euler(startRotation.eulerAngles * rottieTotty);
+        //transform.rotation = Quaternion.Euler(startRotation.eulerAngles * rottieTotty);
     }
 }

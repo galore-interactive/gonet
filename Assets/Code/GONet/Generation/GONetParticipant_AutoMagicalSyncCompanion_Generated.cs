@@ -89,7 +89,8 @@ namespace GONet.Generation
                 {
                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Return(valueChangeSupport.mostRecentChanges);
                     valueChangeSupport.mostRecentChanges = null;
-                    valueChangeSupport.mostRecentChangesSize = 0;
+                    valueChangeSupport.mostRecentChanges_capacitySize = 0;
+                    valueChangeSupport.mostRecentChanges_usedSize = 0;
                 }
                 valueChangeSupportArrayPool.Return(valueChangeSupport); // all of these calls should come prior to returning valuesChangesSupport inside which these object reside currently
                 

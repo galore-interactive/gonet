@@ -282,7 +282,8 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        static readonly long BLENDING_BUFFER_LEAD_TICKS = 0; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
+        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.5f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
+        static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
@@ -423,6 +424,12 @@ namespace GONet
             {
                 gonetClient?.Disconnect();
             }
+
+            var enumeratorThread = autoSyncProcessingSupportByFrequencyMap.GetEnumerator();
+            while (enumeratorThread.MoveNext())
+            {
+                enumeratorThread.Current.Value.Dispose();
+            }
         }
 
         struct NetworkData
@@ -441,7 +448,7 @@ namespace GONet
 
         public sealed class Temporal
         {
-            public delegate void TimeChangeArgs(double fromElapsedSeconds, double toElapsedSeconds);
+            public delegate void TimeChangeArgs(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks);
             public event TimeChangeArgs TimeSetFromAuthority;
 
             long baselineTicks;
@@ -465,6 +472,7 @@ namespace GONet
             {
                 lastSetFromAuthorityDiffTicks = elapsedTicksFromAuthority - ElapsedTicks;
 
+                long elapsedTicksBefore = ElapsedTicks;
                 double elapsedSecondsBefore = elapsedSeconds;
 
                 lastSetFromAuthorityAtTicks = HighResolutionTimeUtils.Now.Ticks;
@@ -472,15 +480,15 @@ namespace GONet
                 ElapsedTicks = lastSetFromAuthorityAtTicks - baselineTicks;
                 elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
 
-                //* if you want debugging in log
+                /* if you want debugging in log
                 const string STR_ElapsedTimeClient = "ElapsedTime client of: ";
                 const string STR_BeingOverwritten = " is being overwritten from authority source to: ";
                 const string STR_DoubleCheck = " seconds and here is new client value to double check it worked correctly: ";
                 const string STR_Diff = " lastSetFromAuthorityDiffTicks (well, as ms): ";
                 GONetLog.Info(string.Concat(STR_ElapsedTimeClient, elapsedSecondsBefore, STR_BeingOverwritten, TimeSpan.FromTicks(elapsedTicksFromAuthority).TotalSeconds, STR_DoubleCheck, elapsedSeconds, STR_Diff, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalMilliseconds));
-                //*/
+                */
 
-                TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds);
+                TimeSetFromAuthority?.Invoke(elapsedSecondsBefore, elapsedSeconds, elapsedTicksBefore, ElapsedTicks);
             }
 
             /// <summary>
@@ -769,8 +777,9 @@ namespace GONet
                 }
             }
 
-            internal const int MOST_RECENT_CHANGEs_SIZE = 10; // TODO FIXME, put this back down to 10...or whatever is determined best for supporting whichever impl(s) of extrapolation call for!
-            internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE, MOST_RECENT_CHANGEs_SIZE);
+            internal const int MOST_RECENT_CHANGEs_SIZE_MINIMUM = 10;
+            internal const int MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED = 100;
+            internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE_MINIMUM, MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED);
             static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(2).Ticks;
 
             /// <summary>
@@ -778,7 +787,8 @@ namespace GONet
             /// IMPORTANT: This is always sorted in most recent with lowest index to oldest with highest index order.
             /// </summary>
             internal NumericValueChangeSnapshot[] mostRecentChanges;
-            internal int mostRecentChangesSize = 0;
+            internal int mostRecentChanges_capacitySize;
+            internal int mostRecentChanges_usedSize = 0;
             private uint mostRecentChanges_UpdatedByAuthorityId;
 
             /// <summary>
@@ -789,34 +799,34 @@ namespace GONet
 
             internal void AddToMostRecentChangeQueue_IfAppropriate(object value, long elapsedTicksAtChange)
             {
-                for (int i = 0; i < mostRecentChangesSize; ++i)
+                for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
                     var item = mostRecentChanges[i];
                     if (item.elapsedTicksAtChange < elapsedTicksAtChange)
                     {
                         // insert new guy, who is more recent than current, here at i; but first, move all the ones down a notch as they are all older than the new guy:
-                        for (int j = mostRecentChangesSize; j >= i; --j)
+                        for (int j = mostRecentChanges_usedSize; j >= i; --j)
                         {
-                            if (j < (MOST_RECENT_CHANGEs_SIZE - 1))
+                            if (j < (mostRecentChanges_capacitySize - 1))
                             {
                                 mostRecentChanges[j + 1] = mostRecentChanges[j];
                             }
                         }
 
                         mostRecentChanges[i] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
-                        if (mostRecentChangesSize < MOST_RECENT_CHANGEs_SIZE)
+                        if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
-                            ++mostRecentChangesSize;
+                            ++mostRecentChanges_usedSize;
                         }
                         //LogBufferContentsIfAppropriate();
                         return;
                     }
                 }
 
-                if (mostRecentChangesSize < MOST_RECENT_CHANGEs_SIZE)
+                if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                 {
-                    mostRecentChanges[mostRecentChangesSize] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
-                    ++mostRecentChangesSize;
+                    mostRecentChanges[mostRecentChanges_usedSize] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
+                    ++mostRecentChanges_usedSize;
                 }
 
                 //LogBufferContentsIfAppropriate();
@@ -826,13 +836,13 @@ namespace GONet
 
             private void LogBufferContentsIfAppropriate()
             {
-                if (mostRecentChangesSize == MOST_RECENT_CHANGEs_SIZE && (TimeSpan.FromTicks(DateTime.Now.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
+                if (mostRecentChanges_usedSize == mostRecentChanges_capacitySize && (TimeSpan.FromTicks(DateTime.Now.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
                 {
                     lastLogBufferContentsTicks = DateTime.Now.Ticks;
                     GONetLog.Debug("==============================================================================================");
-                    for (int k = 0; k < mostRecentChangesSize; ++k)
+                    for (int k = 0; k < mostRecentChanges_usedSize; ++k)
                     {
-                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].value, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalMilliseconds));
+                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].value, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalSeconds));
                     }
                 }
             }
@@ -844,13 +854,13 @@ namespace GONet
             /// </summary>
             internal void DoBlendyStuffs_IfAppropriate()
             {
-                if (mostRecentChangesSize > 0)
+                if (mostRecentChanges_usedSize > 0)
                 {
                     { // use buffer to determine the actual value that we think is most appropriate for this moment in time
                         float blendedValue = default;
                         int newestBufferIndex = 0;
                         NumericValueChangeSnapshot newest = mostRecentChanges[newestBufferIndex];
-                        int oldestBufferIndex = mostRecentChangesSize - 1;
+                        int oldestBufferIndex = mostRecentChanges_usedSize - 1;
                         NumericValueChangeSnapshot oldest = mostRecentChanges[oldestBufferIndex];
                         float oldestValue = oldest.value;
                         bool isNewestRecentEnoughToProcess = (Time.ElapsedTicks - newest.elapsedTicksAtChange) < AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
@@ -863,7 +873,7 @@ namespace GONet
                                 long adjustedTicks = Time.ElapsedTicks - BLENDING_BUFFER_LEAD_TICKS;
                                 if (adjustedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                                 {
-                                    bool isEnoughInfoToExtrapolate = mostRecentChangesSize > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
+                                    bool isEnoughInfoToExtrapolate = mostRecentChanges_usedSize > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                     if (isEnoughInfoToExtrapolate)
                                     {
                                         NumericValueChangeSnapshot justBeforeNewest = mostRecentChanges[newestBufferIndex + 1];
@@ -885,7 +895,7 @@ namespace GONet
                                 else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                                 {
                                     blendedValue = oldestValue;
-                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue);
+                                    GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
@@ -1098,7 +1108,7 @@ namespace GONet
             if (syncValuesToSend.Count > 0)
             {
                 int bytesUsedCount;
-                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, connectionToClient.OwnerAuthorityId);
+                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, connectionToClient.OwnerAuthorityId, Time.ElapsedTicks);
                 SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
                 mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
             }
@@ -1108,7 +1118,7 @@ namespace GONet
         /// For every unique value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
         /// class will be created and used to process only those fields/properties set to be sync'd on that frequency.
         /// </summary>
-        internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThread
+        internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThread : IDisposable
         {
             private readonly int timeUpdateCountUponConstruction;
             Thread thread;
@@ -1135,6 +1145,8 @@ namespace GONet
 
             readonly ArrayPool<byte> myThread_valueChangeSerializationArrayPool;
 
+            static readonly Temporal myThread_Time = new Temporal();
+
             /// <summary>
             /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
             ///            then nothing will happen in here automatically....<see cref="GONetMain"/> or some other party will have to manually call <see cref="ProcessASAP"/>.
@@ -1150,16 +1162,21 @@ namespace GONet
                 this.everythingMap_evenStuffNotOnThisScheduleFrequency = everythingMap_evenStuffNotOnThisScheduleFrequency;
 
                 timeUpdateCountUponConstruction = Time.updateCount;
+                Time.TimeSetFromAuthority += Time_TimeSetFromAuthority;
 
                 thread = new Thread(ContinuallyProcess_NotMainThread);
                 isThreadRunning = true;
                 thread.Start();
             }
 
+            private void Time_TimeSetFromAuthority(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks)
+            {
+                myThread_Time.SetFromAuthority(toElapsedTicks);
+            }
+
             ~AutoMagicalSyncProcessing_SingleGrouping_SeparateThread()
             {
-                isThreadRunning = false;
-                thread.Abort();
+                Dispose();
             }
 
             private void ContinuallyProcess_NotMainThread()
@@ -1175,6 +1192,8 @@ namespace GONet
                     else
                     {
                         { // process:
+                            myThread_Time.Update();
+                            long myTicks = myThread_Time.ElapsedTicks;
                             // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
                             syncValuesToSend.Clear();
 
@@ -1206,7 +1225,7 @@ namespace GONet
                                     // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
                                     gonetServer?.ForEachClient((clientConnection) =>
                                     {
-                                        byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId);
+                                        byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId, myTicks);
                                         SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
                                         myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                                     });
@@ -1217,7 +1236,7 @@ namespace GONet
                                     {
                                         throw new Exception("Magoo.....we need this set before doing the following:");
                                     }
-                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId);
+                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
                                     SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, qualityOfService: uniqueGrouping_qualityOfService);
                                     myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                                 }
@@ -1244,6 +1263,12 @@ namespace GONet
             internal void ProcessASAP()
             {
                 shouldProcessASAP = true;
+            }
+
+            public void Dispose()
+            {
+                isThreadRunning = false;
+                thread.Abort();
             }
         }
 
@@ -1293,7 +1318,7 @@ namespace GONet
         /// PRE: <paramref name="filterUsingOwnerAuthorityId"/> is not <see cref="OwnerAuthorityId_Unset"/> otherwise an exception is thrown
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <paramref name="byteArrayPool"/>
         /// </summary>
-        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint filterUsingOwnerAuthorityId)
+        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
         {
             if (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset)
             {
@@ -1308,7 +1333,7 @@ namespace GONet
                         uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChangesMessage)];
                         bitStream.WriteUInt(messageID);
 
-                        bitStream.WriteLong(Time.ElapsedTicks);
+                        bitStream.WriteLong(elapsedTicksAtCapture);
                     }
 
                     SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
