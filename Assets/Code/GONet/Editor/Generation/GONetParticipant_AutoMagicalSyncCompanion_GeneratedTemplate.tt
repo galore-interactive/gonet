@@ -77,6 +77,7 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
 			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
 			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
+			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 <#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
             {#>		
             int support<#=iOverall#>_mostRecentChanges_calcdSize = support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.BLENDING_BUFFER_LEAD_SECONDS / support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
@@ -172,9 +173,18 @@ namespace GONet.Generation
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName)
 				{
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+				SerializeSingleQuantized(bitStream_appendTo, <#=iOverall#>, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+                    }
+					else
+                    {
 #>
 				bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
+                    }
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
 				{
@@ -222,7 +232,8 @@ namespace GONet.Generation
 				}
 			}#>
 			}
-<#		}
+<#			++iOverall;
+		}
 	}
 #>
         }
@@ -261,9 +272,18 @@ namespace GONet.Generation
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName)
 				{
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+					SerializeSingleQuantized(bitStream_appendTo, <#=iOverall#>, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#
+                    }
+					else
+                    {
 #>
 					bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
+                    }
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
 				{
@@ -349,61 +369,54 @@ namespace GONet.Generation
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
                 {
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadBit(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				bool value;
                 bitStream_readFrom.ReadBit(out value);
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadFloat(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				float value;
+<#				
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+				value = (float)DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>);
+<#
+                    }
+					else
+                    {
+#>
                 bitStream_readFrom.ReadFloat(out value);
+<#
+                    }
+#>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadLong(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				long value;
                 bitStream_readFrom.ReadLong(out value);
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadUInt(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				uint value;
                 bitStream_readFrom.ReadUInt(out value);
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
                 {
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadString(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				string value;
                 bitStream_readFrom.ReadString(out value);
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -415,13 +428,9 @@ namespace GONet.Generation
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
 				{
 #>
-<#					if (singleMember.isField) {#>
-                bitStream_readFrom.ReadUShort(out <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#					} else {#>
 				ushort value;
                 bitStream_readFrom.ReadUShort(out value);
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#					}#>
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName)
@@ -518,8 +527,19 @@ namespace GONet.Generation
 				{
 #>
 					float value;
+<#				
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+					value = (float)DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>);
+<#
+                    }
+					else
+                    {
+#>
 					bitStream_readFrom.ReadFloat(out value);
 <#
+                    }
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
 				{

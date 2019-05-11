@@ -36,6 +36,31 @@ namespace GONet.Generation
 
         internal GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue[] valuesChangesSupport;
 
+        internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)
+        {
+            this.gonetParticipant = gonetParticipant;
+        }
+
+        ~GONetParticipant_AutoMagicalSyncCompanion_Generated()
+        {
+            lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
+
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (valueChangeSupport.mostRecentChanges != null)
+                {
+                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Return(valueChangeSupport.mostRecentChanges);
+                    valueChangeSupport.mostRecentChanges = null;
+                    valueChangeSupport.mostRecentChanges_capacitySize = 0;
+                    valueChangeSupport.mostRecentChanges_usedSize = 0;
+                }
+                valueChangeSupportArrayPool.Return(valueChangeSupport); // all of these calls should come prior to returning valuesChangesSupport inside which these object reside currently
+
+            }
+            valuesChangesSupportArrayPool.Return(valuesChangesSupport);
+        }
+
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
         /// </summary>
@@ -73,29 +98,22 @@ namespace GONet.Generation
             }
         }
 
-        internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)
+        internal void SerializeSingleQuantized(BitStream bitStream_appendTo, byte singleIndex, object value)
         {
-            this.gonetParticipant = gonetParticipant;
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
+            float valueAsFloat = (float)value;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
+            QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
+            uint valueQuantized = Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
+            bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
 
-        ~GONetParticipant_AutoMagicalSyncCompanion_Generated()
+        internal object DeserializeSingleQuantized(BitStream bitStream_readFrom, byte singleIndex)
         {
-            lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
-
-            for (int i = 0; i < valuesCount; ++i)
-            {
-                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if (valueChangeSupport.mostRecentChanges != null)
-                {
-                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Return(valueChangeSupport.mostRecentChanges);
-                    valueChangeSupport.mostRecentChanges = null;
-                    valueChangeSupport.mostRecentChanges_capacitySize = 0;
-                    valueChangeSupport.mostRecentChanges_usedSize = 0;
-                }
-                valueChangeSupportArrayPool.Return(valueChangeSupport); // all of these calls should come prior to returning valuesChangesSupport inside which these object reside currently
-                
-            }
-            valuesChangesSupportArrayPool.Return(valuesChangesSupport);
+            QuantizerSettingsGroup quantizeSettings = valuesChangesSupport[singleIndex].syncAttribute_QuantizerSettingsGroup;
+            uint valueQuantized;
+            bitStream_readFrom.ReadUInt(out valueQuantized, quantizeSettings.quantizeToBitCount);
+            float valueUnquantized = Quantizer.LookupQuantizer(quantizeSettings).Unquantize(valueQuantized);
+            return valueUnquantized;
         }
 
         internal abstract void SetAutoMagicalSyncValue(byte index, object value);

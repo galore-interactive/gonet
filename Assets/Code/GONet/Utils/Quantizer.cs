@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace GONet.Utils
@@ -9,6 +11,8 @@ namespace GONet.Utils
 
         static readonly float[] twoToPower = new float[MAX_QUANTIZED_BIT_COUNT + 1];
         static readonly uint[] maxValueForBits = new uint[MAX_QUANTIZED_BIT_COUNT + 1];
+
+        static readonly ConcurrentDictionary<QuantizerSettingsGroup, Quantizer> quantizersBySettingsMap = new ConcurrentDictionary<QuantizerSettingsGroup, Quantizer>();
 
         static Quantizer()
         {
@@ -26,6 +30,17 @@ namespace GONet.Utils
                     maxValueForBits[i] = (uint)((1 << i) - 1);
                 }
             }
+        }
+
+        public static Quantizer LookupQuantizer(QuantizerSettingsGroup settings)
+        {
+            Quantizer quantizer;
+            if (!quantizersBySettingsMap.TryGetValue(settings, out quantizer))
+            {
+                quantizer = new Quantizer(settings);
+                quantizersBySettingsMap[settings] = quantizer;
+            }
+            return quantizer;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -97,6 +112,9 @@ namespace GONet.Utils
         float m_fast_halfStep;
         bool m_fast_shouldClampValue;
 
+        public Quantizer(QuantizerSettingsGroup settings)
+            : this (settings.lowerBound, settings.upperBound, settings.quantizeToBitCount, settings.shouldClampValue) { }
+
         public Quantizer(float lowerBound, float upperBound, uint quantizeToBitCount, bool shouldClampValue)
         {
             if (upperBound <= lowerBound)
@@ -113,8 +131,8 @@ namespace GONet.Utils
             m_fast_quantizeToBitCount = quantizeToBitCount;
             m_fast_shouldClampValue = shouldClampValue;
 
-            float boundRange = upperBound - lowerBound;
-            m_fast_step = boundRange / (twoToPower[quantizeToBitCount] - 1f);
+            double boundRange = upperBound - lowerBound; // IMPORTANT: have to use larger data type to hold difference between what could be float.MaxValue and float.MinValue, which in float terms is Infinity
+            m_fast_step = (float)(boundRange / (double)(twoToPower[quantizeToBitCount] - 1f));
             m_fast_halfStep = m_fast_step / 2f;
         }
 
@@ -235,6 +253,51 @@ namespace GONet.Utils
             float shifted = quantizedValue * step;
             float unquantized = shifted + lowerBound;
             return unquantized;
+        }
+    }
+
+    public struct QuantizerSettingsGroup
+    {
+        public float lowerBound;
+        public float upperBound;
+        public uint quantizeToBitCount;
+        public bool shouldClampValue;
+
+        public QuantizerSettingsGroup(float lowerBound, float upperBound, uint quantizeToBitCount, bool shouldClampValue)
+        {
+            this.lowerBound = lowerBound;
+            this.upperBound = upperBound;
+            this.quantizeToBitCount = quantizeToBitCount;
+            this.shouldClampValue = shouldClampValue;
+        }
+
+        /// <summary>
+        /// only return true if settings are such that a quantizer can even be used......<see cref="quantizeToBitCount"/> of 0 bits means no quantization will/should/can occur.
+        /// </summary>
+        public bool CanBeUsedForQuantization => quantizeToBitCount > 0;
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is QuantizerSettingsGroup))
+            {
+                return false;
+            }
+
+            var group = (QuantizerSettingsGroup)obj;
+            return lowerBound == group.lowerBound &&
+                   upperBound == group.upperBound &&
+                   quantizeToBitCount == group.quantizeToBitCount &&
+                   shouldClampValue == group.shouldClampValue;
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = -258498902;
+            hashCode = hashCode * -1521134295 + lowerBound.GetHashCode();
+            hashCode = hashCode * -1521134295 + upperBound.GetHashCode();
+            hashCode = hashCode * -1521134295 + quantizeToBitCount.GetHashCode();
+            hashCode = hashCode * -1521134295 + shouldClampValue.GetHashCode();
+            return hashCode;
         }
     }
 }

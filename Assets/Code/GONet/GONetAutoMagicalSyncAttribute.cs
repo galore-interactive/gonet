@@ -87,8 +87,19 @@ namespace GONet
         /// <summary>
         /// Only applicable to primitive numeric data types, mainly float.
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
+        /// If value is 1, the result will be the quantized value can only represnt <see cref="QuantizeLowerBound"/> or <see cref="QuantizeUpperBound"/> and the one represented will be dictated by which of the two the original value is closest to.
         /// </summary>
-        public int QuantizeDownToBitCount = 0;
+        public byte QuantizeDownToBitCount = 0;
+
+        /// <summary>
+        /// Only used/applied when <see cref="QuantizeDownToBitCount"/> greater than 0.
+        ///
+        /// This is the known/expected lowest value possible.
+        /// IMPORTANT: 
+        /// PRE: Must be less than <see cref="QuantizeUpperBound"/>.
+        /// </summary>
+        public float QuantizeLowerBound = float.MinValue / 2f;
+        public float QuantizeUpperBound = float.MaxValue / 2f;
 
         #region GONet internal only
 

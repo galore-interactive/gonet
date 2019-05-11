@@ -4,7 +4,7 @@ using UnityEngine;
 public class FieldChangeTest : MonoBehaviour
 {
     //[GONetAutoMagicalSync(SyncChangesEverySeconds = 4.5f)]
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true)]
+    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 10, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
     public float someCoolGuyFloat;
 
     //[GONetAutoMagicalSync(SyncChangesEverySeconds = 0.45f)] // NOTE: 10 times more frequent than someCoolGuyFloat

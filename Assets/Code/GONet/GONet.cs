@@ -7,7 +7,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
@@ -87,6 +86,9 @@ namespace GONet
         /// </summary>
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
+        /// <summary>
+        /// NOTE: The time maintained within is only updated once per main thread frame tick (i.e., call to <see cref="Update"/>).
+        /// </summary>
         internal static readonly Temporal Time = new Temporal();
 
         static GONetMain()
@@ -740,6 +742,13 @@ namespace GONet
             /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/>
             /// </summary>
             internal bool syncAttribute_ShouldBlendBetweenValuesReceived;
+            /// <summary>
+            /// Matches/corresponds with/to each of the following members:
+            ///     <see cref="GONetAutoMagicalSyncAttribute.QuantizeDownToBitCount"/>
+            ///     <see cref="GONetAutoMagicalSyncAttribute.QuantizeLowerBound"/>
+            ///     <see cref="GONetAutoMagicalSyncAttribute.QuantizeUpperBound"/>
+            /// </summary>
+            internal QuantizerSettingsGroup syncAttribute_QuantizerSettingsGroup;
             #endregion
 
             internal object lastKnownValue;
@@ -895,7 +904,7 @@ namespace GONet
                                 else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                                 {
                                     blendedValue = oldestValue;
-                                    GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
+                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
                                 }
                                 else // this is the normal case where we can apply interpolation if the settings call for it!
                                 {
@@ -1006,6 +1015,11 @@ namespace GONet
                         AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = companion.valuesChangesSupport[i];
                         SyncBundleUniqueGrouping grouping = new SyncBundleUniqueGrouping(monitoringSupport.syncAttribute_SyncChangesEverySeconds, monitoringSupport.syncAttribute_Reliability);
                         uniqueSyncGroupings.Add(grouping); // since it is a set, duplicates will be discarded
+
+                        if (monitoringSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization)
+                        {
+                            var quantizer_ensureCachedUpFront = Quantizer.LookupQuantizer(monitoringSupport.syncAttribute_QuantizerSettingsGroup);
+                        }
                     }
                     foreach (SyncBundleUniqueGrouping uniqueSyncGrouping in uniqueSyncGroupings)
                     {
