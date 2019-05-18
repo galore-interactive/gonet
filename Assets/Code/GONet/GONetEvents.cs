@@ -26,13 +26,11 @@ namespace GONet
 
     #endregion
 
-    public class AutoMagicalSync_ValueChangesMessage : TransientEvent
-    {
-    }
+    public class AutoMagicalSync_AllCurrentValues_Message : TransientEvent { }
 
-    public class OwnerAuthorityIdAssignmentMessage : PersistentEvent
-    {
-    }
+    public class AutoMagicalSync_ValueChanges_Message : TransientEvent { }
+
+    public class OwnerAuthorityIdAssignmentMessage : PersistentEvent { }
 
     public class RequestMessage : TransientEvent // TODO probably not always going to be considered transient
     {

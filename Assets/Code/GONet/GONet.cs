@@ -11,6 +11,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
 
+using GONetCodeGenerationId = System.Byte;
+
 namespace GONet
 {
     public static class GONetMain
@@ -613,7 +615,7 @@ namespace GONet
 
 
                                 {  // body:
-                                    if (messageType == typeof(AutoMagicalSync_ValueChangesMessage))
+                                    if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                                     {
                                         DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
                                     }
@@ -640,6 +642,10 @@ namespace GONet
                                         {
                                             MyAuthorityId = ownerAuthorityId;
                                         } // else log warning?
+                                    }
+                                    else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
+                                    {
+                                        DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
                                     } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
@@ -711,8 +717,8 @@ namespace GONet
         /// The key into this is the <see cref="GONetParticipant.codeGenerationId"/>.
         /// TODO: once implementation supports it, this replaces <see cref="autoSyncMemberDataByGONetParticipantMap"/> and make sure to remove it.
         /// </summary>
-        static readonly ConcurrentDictionary<byte, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = 
-            new ConcurrentDictionary<byte, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(2, byte.MaxValue);
+        static readonly ConcurrentDictionary<GONetCodeGenerationId, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = 
+            new ConcurrentDictionary<GONetCodeGenerationId, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(2, byte.MaxValue);
 
         static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThread> autoSyncProcessingSupportByFrequencyMap = new Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThread>(5);
 
@@ -996,7 +1002,7 @@ namespace GONet
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
                 GONetLog.Debug("OnEnable");
-
+                
                 gonetParticipant.OwnerAuthorityIdChanged += OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate;
 
                 { // auto-magical sync related housekeeping
@@ -1091,40 +1097,32 @@ namespace GONet
         }
 
         /// <summary>
-        /// Just a helper data structure just for use in <see cref="ProcessAutoMagicalSyncStuffs(bool, ReliableEndpoint)"/>
-        /// </summary>
-        static readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
-
-        static readonly object LOCKY_BALBOA = new object();
-
-        /// <summary>
         /// PRE: <paramref name="connectionToClient"/> already has been assigned a good value to <see cref="GONetConnection.OwnerAuthorityId"/>.
         /// </summary>
         static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
-            syncValuesToSend.Clear();
-
-            var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
-            while (enumeratorOuter.MoveNext())
+            using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
             {
-                ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
-                var enumeratorInner = currentMap.GetEnumerator();
-                while (enumeratorInner.MoveNext())
+                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
                 {
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-                    monitoringSupport.UpdateLastKnownValues(); // need to call this for every single one to keep track of changes
+                    { // header...just message type/id...well, and now time 
+                        uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_AllCurrentValues_Message)];
+                        bitStream.WriteUInt(messageID);
 
-                    // THOUGHT: can we just loop over all gonet participants and serialize all via its companion instead of each individual here? ... one reason answer is no for now is ensureing the order of priority is adhered to (e.g., GONetId processes very first!!!)
-                    monitoringSupport.AppendListWithAllValues(syncValuesToSend);
+                        bitStream.WriteLong(Time.ElapsedTicks);
+                    }
+
+                    SerializeBody_AllCurrentValuesBundle(bitStream); // body
+
+                    bitStream.WriteCurrentPartialByte();
+
+                    int bytesUsedCount = (int)memoryStream.Length;
+                    byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
+                    Array.Copy(memoryStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
+
+                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, QosType.Reliable);
+                    mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
                 }
-            }
-
-            if (syncValuesToSend.Count > 0)
-            {
-                int bytesUsedCount;
-                byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, mainThread_valueChangeSerializationArrayPool, out bytesUsedCount, connectionToClient.OwnerAuthorityId, Time.ElapsedTicks);
-                SendBytesToRemoteConnection(connectionToClient, changesSerialized, bytesUsedCount, QosType.Reliable);
-                mainThread_valueChangeSerializationArrayPool.Return(changesSerialized);
             }
         }
 
@@ -1344,7 +1342,7 @@ namespace GONet
                 using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
                 {
                     { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChangesMessage)];
+                        uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChanges_Message)];
                         bitStream.WriteUInt(messageID);
 
                         bitStream.WriteLong(elapsedTicksAtCapture);
@@ -1375,6 +1373,26 @@ namespace GONet
                 int yPriority = y.syncAttribute_ProcessingPriority_GONetInternalOverride != 0 ? y.syncAttribute_ProcessingPriority_GONetInternalOverride : y.syncAttribute_ProcessingPriority;
 
                 return yPriority.CompareTo(xPriority); // descending...highest priority first!
+            }
+        }
+
+        private static void SerializeBody_AllCurrentValuesBundle(Utils.BitStream bitStream_headerAlreadyWritten)
+        {
+            var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
+            while (enumeratorOuter.MoveNext())
+            {
+                ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                var enumeratorInner = currentMap.GetEnumerator();
+                while (enumeratorInner.MoveNext())
+                {
+                    var current = enumeratorInner.Current;
+
+                    GONetParticipant gonetParticipant = current.Key;
+                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Serialize(bitStream_headerAlreadyWritten, gonetParticipant, gonetParticipant.GONetId);
+
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = current.Value;
+                    monitoringSupport.SerializeAll(bitStream_headerAlreadyWritten);
+                }
             }
         }
 
@@ -1420,6 +1438,19 @@ namespace GONet
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId; // clients should only send out changes it owns
         }
 
+        private static void DeserializeBody_AllValuesBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        {
+            while (bitStream_headerAlreadyRead.Position < bytesUsedCount) // while more data to read/process
+            {
+                uint gonetId = (uint)GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
+
+                GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
+                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
+
+                syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
+            }
+        }
+
         private static void DeserializeBody_ChangesBundle(Utils.BitStream bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
             ushort count;
@@ -1440,7 +1471,7 @@ namespace GONet
 
                     if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                     {
-                        GONetLog.Error("gladousche...gonetId: " + gonetId);
+                        GONetLog.Error("gladousche...NOT FOUND....expect an exception/ERROR to follow.....gonetId: " + gonetId);
                     }
 
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];

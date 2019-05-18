@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace GONet.Generation
 {
@@ -98,7 +99,7 @@ namespace GONet.Generation
             }
         }
 
-        internal void SerializeSingleQuantized(BitStream bitStream_appendTo, byte singleIndex, object value)
+        internal void SerializeSingleQuantized(Utils.BitStream bitStream_appendTo, byte singleIndex, object value)
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             float valueAsFloat = (float)value;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
@@ -107,7 +108,7 @@ namespace GONet.Generation
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
 
-        internal object DeserializeSingleQuantized(BitStream bitStream_readFrom, byte singleIndex)
+        internal object DeserializeSingleQuantized(Utils.BitStream bitStream_readFrom, byte singleIndex)
         {
             QuantizerSettingsGroup quantizeSettings = valuesChangesSupport[singleIndex].syncAttribute_QuantizerSettingsGroup;
             uint valueQuantized;
@@ -120,20 +121,42 @@ namespace GONet.Generation
 
         internal abstract object GetAutoMagicalSyncValue(byte index);
 
-        internal abstract void SerializeAll(BitStream bitStream_appendTo);
+        /// <summary>
+        /// Serializes all values of appropriaate member variables internally to <paramref name="bitStream_appendTo"/>.
+        /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
+        /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
+        /// </summary>
+        internal virtual void SerializeAll(Utils.BitStream bitStream_appendTo)
+        {
+            if (gonetParticipant.IsRotationSyncd)
+            {
+                IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+                customSerializer.Serialize(bitStream_appendTo, gonetParticipant, gonetParticipant.transform.rotation);
+            }
+        }
 
-        internal abstract void SerializeSingle(BitStream bitStream_appendTo, byte singleIndex);
+        internal abstract void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex);
 
         /// <summary>
-        ///  Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
+        /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
+        /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
+        /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
         /// </summary>
-        internal abstract void DeserializeInitAll(BitStream bitStream_readFrom, long assumedElapsedTicksAtChange);
+        internal virtual void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange)
+        {
+            if (gonetParticipant.IsRotationSyncd)
+            {
+                IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+                Quaternion rotation = (Quaternion)customSerializer.Deserialize(bitStream_readFrom);
+                gonetParticipant.transform.rotation = rotation;
+            }
+        }
 
         /// <summary>
         ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal abstract void DeserializeInitSingle(BitStream bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
+        internal abstract void DeserializeInitSingle(Utils.BitStream bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
 
         internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default);
 

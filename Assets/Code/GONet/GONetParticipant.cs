@@ -2,6 +2,8 @@
 using GONet.Utils;
 using UnityEngine;
 
+using GONetCodeGenerationId = System.Byte;
+
 namespace GONet
 {
     /// <summary>
@@ -22,7 +24,7 @@ namespace GONet
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
-        public const byte CodeGenerationId_Unset = 0;
+        public const GONetCodeGenerationId CodeGenerationId_Unset = 0;
 
         #endregion
 
@@ -30,7 +32,7 @@ namespace GONet
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
         [SerializeField, HideInInspector]
-        public byte codeGenerationId = CodeGenerationId_Unset;
+        public GONetCodeGenerationId codeGenerationId = CodeGenerationId_Unset;
 
         public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
         public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;

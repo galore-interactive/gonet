@@ -199,4 +199,215 @@ namespace GONet
 
         object Deserialize(Utils.BitStream bitStream_readFrom);
     }
+
+    public class QuaternionSerializer : IGONetAutoMagicalSync_CustomSerializer
+    {
+        static readonly float SQUARE_ROOT_OF_2 = Mathf.Sqrt(2.0f);
+        static readonly float QuatValueMinimum = -1.0f / SQUARE_ROOT_OF_2;
+        static readonly float QuatValueMaximum = +1.0f / SQUARE_ROOT_OF_2;
+
+        Quantizer quantizer;
+        byte bitsPerSmallestThreeItem;
+
+        public const byte DEFAULT_BITS_PER_SMALLEST_THREE = 9;
+
+        public QuaternionSerializer() : this(DEFAULT_BITS_PER_SMALLEST_THREE) { }
+
+        public QuaternionSerializer(byte bitsPerSmallestThreeItem)
+        {
+            this.bitsPerSmallestThreeItem = bitsPerSmallestThreeItem;
+            quantizer = new Quantizer(QuatValueMinimum, QuatValueMaximum, bitsPerSmallestThreeItem, true);
+        }
+
+        /// <returns>a <see cref="Quaternion"/></returns>
+        public object Deserialize(Utils.BitStream bitStream_readFrom)
+        {
+            uint LargestIndex;
+            bitStream_readFrom.ReadUInt(out LargestIndex, 2);
+            uint SmallestA;
+            bitStream_readFrom.ReadUInt(out SmallestA, bitsPerSmallestThreeItem);
+            uint SmallestB;
+            bitStream_readFrom.ReadUInt(out SmallestB, bitsPerSmallestThreeItem);
+            uint SmallestC;
+            bitStream_readFrom.ReadUInt(out SmallestC, bitsPerSmallestThreeItem);
+
+            float a = quantizer.Unquantize(SmallestA);
+            float b = quantizer.Unquantize(SmallestB);
+            float c = quantizer.Unquantize(SmallestC);
+
+            float x, y, z, w;
+
+            switch (LargestIndex)
+            {
+                case 0:
+                    {
+                        x = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
+                        y = a;
+                        z = b;
+                        w = c;
+                    }
+                    break;
+
+                case 1:
+                    {
+                        x = a;
+                        y = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
+                        z = b;
+                        w = c;
+                    }
+                    break;
+
+                case 2:
+                    {
+                        x = a;
+                        y = b;
+                        z = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
+                        w = c;
+                    }
+                    break;
+
+                case 3:
+                    {
+                        x = a;
+                        y = b;
+                        z = c;
+                        w = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
+                    }
+                    break;
+
+                default:
+                    {
+                        Debug.Assert(false);
+                        x = 0F;
+                        y = 0F;
+                        z = 0F;
+                        w = 1F;
+                    }
+                    break;
+            }
+
+            return new Quaternion(x, y, z, w);
+        }
+
+        public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        {
+            uint LargestIndex;
+            uint SmallestA;
+            uint SmallestB;
+            uint SmallestC;
+
+            Quaternion quattie = gonetParticipant.transform.rotation;
+            float x = quattie.x;
+            float y = quattie.y;
+            float z = quattie.z;
+            float w = quattie.w;
+
+            float xABS = Math.Abs(x);
+            float yABS = Math.Abs(y);
+            float zABS = Math.Abs(z);
+            float wABS = Math.Abs(w);
+
+            LargestIndex = 0;
+            float largestValue = xABS;
+
+            if (yABS > largestValue)
+            {
+                LargestIndex = 1;
+                largestValue = yABS;
+            }
+
+            if (zABS > largestValue)
+            {
+                LargestIndex = 2;
+                largestValue = zABS;
+            }
+
+            if (wABS > largestValue)
+            {
+                LargestIndex = 3;
+                largestValue = wABS;
+            }
+
+            float a = 0f;
+            float b = 0f;
+            float c = 0f;
+
+            switch (LargestIndex)
+            {
+                case 0:
+                    if (x >= 0)
+                    {
+                        a = y;
+                        b = z;
+                        c = w;
+                    }
+                    else
+                    {
+                        a = -y;
+                        b = -z;
+                        c = -w;
+                    }
+                    break;
+
+                case 1:
+                    if (y >= 0)
+                    {
+                        a = x;
+                        b = z;
+                        c = w;
+                    }
+                    else
+                    {
+                        a = -x;
+                        b = -z;
+                        c = -w;
+                    }
+                    break;
+
+                case 2:
+                    if (z >= 0)
+                    {
+                        a = x;
+                        b = y;
+                        c = w;
+                    }
+                    else
+                    {
+                        a = -x;
+                        b = -y;
+                        c = -w;
+                    }
+                    break;
+
+                case 3:
+                    if (w >= 0)
+                    {
+                        a = x;
+                        b = y;
+                        c = z;
+                    }
+                    else
+                    {
+                        a = -x;
+                        b = -y;
+                        c = -z;
+                    }
+                    break;
+
+                default:
+                    Debug.Assert(false);
+                    break;
+            }
+
+
+            SmallestA = quantizer.Quantize(a);
+            SmallestB = quantizer.Quantize(b);
+            SmallestC = quantizer.Quantize(c);
+
+            bitStream_appendTo.WriteUInt(LargestIndex, 2);
+            bitStream_appendTo.WriteUInt(SmallestA, bitsPerSmallestThreeItem);
+            bitStream_appendTo.WriteUInt(SmallestB, bitsPerSmallestThreeItem);
+            bitStream_appendTo.WriteUInt(SmallestC, bitsPerSmallestThreeItem);
+        }
+    }
 }
