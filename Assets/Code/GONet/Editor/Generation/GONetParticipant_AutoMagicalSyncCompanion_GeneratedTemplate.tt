@@ -72,6 +72,7 @@ namespace GONet.Generation
             support<#=iOverall#>.lastKnownValue_previous = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
 			support<#=iOverall#>.syncCompanion = this;
 			support<#=iOverall#>.index = <#=iOverall#>;
+			support<#=iOverall#>.syncAttribute_MustRunOnUnityMainThread = <#=singleMember.attribute.MustRunOnUnityMainThread ? "true" : "false"#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority = <#=singleMember.attribute.ProcessingPriority#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority_GONetInternalOverride = <#=singleMember.attribute.ProcessingPriority_GONetInternalOverride#>;
 			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
@@ -379,7 +380,7 @@ namespace GONet.Generation
 			{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
 <#
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
-			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+			// switch () boo hoo no switch for string because the case values are not constant!!!  TODO Must make the following more performant!
             {
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>

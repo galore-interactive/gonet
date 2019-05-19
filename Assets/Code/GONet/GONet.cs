@@ -216,8 +216,8 @@ namespace GONet
 
         #region internal methods
 
-        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Reliable);
-        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Unreliable);
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Reliable, false);
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Unreliable, false);
 
         static Thread endOfLineSendThread;
 
@@ -230,7 +230,7 @@ namespace GONet
 
             ProcessIncomingBytes_QueuedNetworkData_MainThread();
 
-            AutoMagicalSyncProcessing_SingleGrouping_SeparateThread itemsToProcessEveryFrame;
+            AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable itemsToProcessEveryFrame;
             if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_reliable, out itemsToProcessEveryFrame))
             {
                 itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
@@ -238,6 +238,13 @@ namespace GONet
             if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_unreliable, out itemsToProcessEveryFrame))
             {
                 itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+            }
+
+            int mainThreadSupportCount = autoSyncProcessingSupports_UnityMainThread.Count;
+            for (int i = 0; i < mainThreadSupportCount; ++i)
+            {
+                AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable autoSyncProcessingSupport_mainThread = autoSyncProcessingSupports_UnityMainThread[i];
+                autoSyncProcessingSupport_mainThread.ProcessASAP();
             }
 
             foreach (var a in activeAutoSyncCompanionsByCodeGenerationIdMap) // TODO no foreach and use better name!
@@ -720,14 +727,22 @@ namespace GONet
         static readonly ConcurrentDictionary<GONetCodeGenerationId, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = 
             new ConcurrentDictionary<GONetCodeGenerationId, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(2, byte.MaxValue);
 
-        static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThread> autoSyncProcessingSupportByFrequencyMap = new Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThread>(5);
+        static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupportByFrequencyMap = 
+            new Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable>(5);
+
+        static readonly List<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupports_UnityMainThread =
+            new List<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable>(5);
 
         internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
             internal byte index;
             internal GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
-            
+
             #region properties copied off of GONetAutoMagicalSyncAttribute
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.MustRunOnUnityMainThread"/>
+            /// </summary>
+            internal bool syncAttribute_MustRunOnUnityMainThread;
             /// <summary>
             /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ProcessingPriority"/>
             /// </summary>
@@ -966,11 +981,13 @@ namespace GONet
         {
             internal readonly float scheduleFrequency;
             internal readonly AutoMagicalSyncReliability reliability;
+            internal readonly bool mustRunOnUnityMainThread;
 
-            internal SyncBundleUniqueGrouping(float scheduleFrequency, AutoMagicalSyncReliability reliability)
+            internal SyncBundleUniqueGrouping(float scheduleFrequency, AutoMagicalSyncReliability reliability, bool mustRunOnUnityMainThread)
             {
                 this.scheduleFrequency = scheduleFrequency;
                 this.reliability = reliability;
+                this.mustRunOnUnityMainThread = mustRunOnUnityMainThread;
             }
 
             public override bool Equals(object obj)
@@ -982,14 +999,16 @@ namespace GONet
 
                 var grouping = (SyncBundleUniqueGrouping)obj;
                 return scheduleFrequency == grouping.scheduleFrequency &&
-                       reliability == grouping.reliability;
+                       reliability == grouping.reliability &&
+                       mustRunOnUnityMainThread == grouping.mustRunOnUnityMainThread;
             }
 
             public override int GetHashCode()
             {
-                var hashCode = 460550935;
+                var hashCode = -1343937139;
                 hashCode = hashCode * -1521134295 + scheduleFrequency.GetHashCode();
                 hashCode = hashCode * -1521134295 + reliability.GetHashCode();
+                hashCode = hashCode * -1521134295 + mustRunOnUnityMainThread.GetHashCode();
                 return hashCode;
             }
         }
@@ -1019,7 +1038,12 @@ namespace GONet
                     for (int i = 0; i < companion.valuesCount; ++i)
                     {
                         AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = companion.valuesChangesSupport[i];
-                        SyncBundleUniqueGrouping grouping = new SyncBundleUniqueGrouping(monitoringSupport.syncAttribute_SyncChangesEverySeconds, monitoringSupport.syncAttribute_Reliability);
+                        SyncBundleUniqueGrouping grouping = 
+                            new SyncBundleUniqueGrouping(
+                                monitoringSupport.syncAttribute_SyncChangesEverySeconds, 
+                                monitoringSupport.syncAttribute_Reliability, 
+                                monitoringSupport.syncAttribute_MustRunOnUnityMainThread);
+
                         uniqueSyncGroupings.Add(grouping); // since it is a set, duplicates will be discarded
 
                         if (monitoringSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization)
@@ -1032,9 +1056,14 @@ namespace GONet
                         if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))
                         {
                             var autoSyncProcessingSupport = 
-                                new AutoMagicalSyncProcessing_SingleGrouping_SeparateThread(uniqueSyncGrouping, activeAutoSyncCompanionsByCodeGenerationIdMap); // IMPORTANT: this starts the thread!
+                                new AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable(uniqueSyncGrouping, activeAutoSyncCompanionsByCodeGenerationIdMap); // IMPORTANT: this starts the thread!
 
                             autoSyncProcessingSupportByFrequencyMap[uniqueSyncGrouping] = autoSyncProcessingSupport;
+
+                            if (uniqueSyncGrouping.mustRunOnUnityMainThread)
+                            {
+                                autoSyncProcessingSupports_UnityMainThread.Add(autoSyncProcessingSupport);
+                            }
                         }
                     }
                 }
@@ -1130,12 +1159,21 @@ namespace GONet
         /// For every unique value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
         /// class will be created and used to process only those fields/properties set to be sync'd on that frequency.
         /// </summary>
-        internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThread : IDisposable
+        internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable : IDisposable
         {
             private readonly int timeUpdateCountUponConstruction;
+
+            bool isSetupToRunInSeparateThread;
+            /// <summary>
+            /// Only non-null when <see cref="isSetupToRunInSeparateThread"/> is true
+            /// </summary>
             Thread thread;
+            /// <summary>
+            /// Can only be true when <see cref="isSetupToRunInSeparateThread"/> is true
+            /// </summary>
             volatile bool isThreadRunning;
-            volatile bool shouldProcessASAP = false;
+
+            volatile bool shouldProcessInSeparateThreadASAP = false;
             long lastProcessCompleteTicks;
 
             static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS).Ticks;
@@ -1148,7 +1186,7 @@ namespace GONet
             /// <summary>
             /// Indicates whether or not <see cref="ProcessASAP"/> must be called (manually) from an outside part in order for sync processing to occur.
             /// </summary>
-            internal bool DoesRequireManualProcessInitiation => scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS;
+            internal bool DoesRequireManualProcessInitiation => scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS || !isSetupToRunInSeparateThread;
 
             /// <summary>
             /// Just a helper data structure just for use in <see cref="ProcessAutoMagicalSyncStuffs(bool, ReliableEndpoint)"/>
@@ -1163,7 +1201,7 @@ namespace GONet
             /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
             ///            then nothing will happen in here automatically....<see cref="GONetMain"/> or some other party will have to manually call <see cref="ProcessASAP"/>.
             /// </summary>
-            internal AutoMagicalSyncProcessing_SingleGrouping_SeparateThread(SyncBundleUniqueGrouping uniqueGrouping, ConcurrentDictionary<byte, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency)
+            internal AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable(SyncBundleUniqueGrouping uniqueGrouping, ConcurrentDictionary<byte, ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency)
             {
                 autoSyncProcessThread_valueChangeSerializationArrayPool_ThreadMap[this] = myThread_valueChangeSerializationArrayPool = new ArrayPool<byte>(100, 10, 1024, 2048);
 
@@ -1176,9 +1214,13 @@ namespace GONet
                 timeUpdateCountUponConstruction = Time.updateCount;
                 Time.TimeSetFromAuthority += Time_TimeSetFromAuthority;
 
-                thread = new Thread(ContinuallyProcess_NotMainThread);
-                isThreadRunning = true;
-                thread.Start();
+                isSetupToRunInSeparateThread = !uniqueGrouping.mustRunOnUnityMainThread;
+                if (isSetupToRunInSeparateThread)
+                {
+                    thread = new Thread(ContinuallyProcess_NotMainThread);
+                    isThreadRunning = true;
+                    thread.Start();
+                }
             }
 
             private void Time_TimeSetFromAuthority(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks)
@@ -1186,7 +1228,7 @@ namespace GONet
                 myThread_Time.SetFromAuthority(toElapsedTicks);
             }
 
-            ~AutoMagicalSyncProcessing_SingleGrouping_SeparateThread()
+            ~AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable()
             {
                 Dispose();
             }
@@ -1197,65 +1239,14 @@ namespace GONet
                 while (isThreadRunning)
                 {
                     bool isNotSafeToContinue = Time.UpdateCount == timeUpdateCountUponConstruction;
-                    if (isNotSafeToContinue || (doesRequireManualProcessInitiation && !shouldProcessASAP))
+                    if (isNotSafeToContinue || (doesRequireManualProcessInitiation && !shouldProcessInSeparateThreadASAP))
                     {
                         Thread.Sleep(1); // TODO come up with appropriate sleep time/value 
                     }
                     else
                     {
-                        { // process:
-                            myThread_Time.Update();
-                            long myTicks = myThread_Time.ElapsedTicks;
-                            // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
-                            syncValuesToSend.Clear();
-
-                            var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
-                            while (enumeratorOuter.MoveNext())
-                            {
-                                ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
-                                var enumeratorInner = currentMap.GetEnumerator();
-                                while (enumeratorInner.MoveNext())
-                                {
-                                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-
-                                    // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
-                                    monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                    if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(uniqueGrouping)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                    {
-                                        monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                        monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                                    }
-                                }
-                            }
-
-                            if (syncValuesToSend.Count > 0)
-                            {
-                                int bytesUsedCount;
-                                //GONetLog.Debug("sending changed auto-magical sync values to all connections");
-                                if (IsServer)
-                                {
-                                    // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
-                                    gonetServer?.ForEachClient((clientConnection) =>
-                                    {
-                                        byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId, myTicks);
-                                        SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
-                                        myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
-                                    });
-                                }
-                                else
-                                {
-                                    if (MyAuthorityId == OwnerAuthorityId_Unset)
-                                    {
-                                        throw new Exception("Magoo.....we need this set before doing the following:");
-                                    }
-                                    byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
-                                    SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, qualityOfService: uniqueGrouping_qualityOfService);
-                                    myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
-                                }
-                            }
-
-                            shouldProcessASAP = false; // reset this
-                        }
+                        Process();
+                        shouldProcessInSeparateThreadASAP = false; // reset this
 
                         if (!doesRequireManualProcessInitiation)
                         { // (auto sync) frequency control:
@@ -1272,15 +1263,94 @@ namespace GONet
                 }
             }
 
+            private void Process()
+            {
+                myThread_Time.Update();
+                long myTicks = myThread_Time.ElapsedTicks;
+                // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
+                syncValuesToSend.Clear();
+
+                var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
+                while (enumeratorOuter.MoveNext())
+                {
+                    ConcurrentDictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                    var enumeratorInner = currentMap.GetEnumerator();
+                    while (enumeratorInner.MoveNext())
+                    {
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+
+                        // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
+                        monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                        if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(uniqueGrouping)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                        {
+                            monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                            monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                        }
+                    }
+                }
+
+                if (syncValuesToSend.Count > 0)
+                {
+                    int bytesUsedCount;
+                    //GONetLog.Debug("sending changed auto-magical sync values to all connections");
+                    if (IsServer)
+                    {
+                        // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
+                        gonetServer?.ForEachClient((clientConnection) =>
+                        {
+                            byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId, myTicks);
+                            SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_qualityOfService);
+                            myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                        });
+                    }
+                    else
+                    {
+                        if (MyAuthorityId == OwnerAuthorityId_Unset)
+                        {
+                            throw new Exception("Magoo.....we need this set before doing the following:");
+                        }
+                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
+                        SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, qualityOfService: uniqueGrouping_qualityOfService);
+                        myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// IMPORTANT: When <see cref="isSetupToRunInSeparateThread"/> is false, calling this will NOT yield a call to <see cref="Process"/> and caller must keep calling this method each frame until proper schedule cycle permits the call to <see cref="Process"/> to go through.
+            /// </summary>
             internal void ProcessASAP()
             {
-                shouldProcessASAP = true;
+                if (isSetupToRunInSeparateThread)
+                {
+                    shouldProcessInSeparateThreadASAP = true;
+                }
+                else
+                {
+                    if (scheduleFrequencyTicks == AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS)
+                    {
+                        Process();
+                    }
+                    else
+                    {
+                        long nowTicks = DateTime.Now.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
+                        bool isASAPNow = (nowTicks - lastProcessCompleteTicks) > scheduleFrequencyTicks;
+                        if (isASAPNow)
+                        {
+                            Process();
+                            lastProcessCompleteTicks = nowTicks;
+                        }
+                    }
+                }
             }
 
             public void Dispose()
             {
-                isThreadRunning = false;
-                thread.Abort();
+                if (isSetupToRunInSeparateThread)
+                {
+                    isThreadRunning = false;
+                    thread.Abort();
+                }
             }
         }
 
@@ -1290,8 +1360,8 @@ namespace GONet
         /// <summary>
         /// this is used as changes are taking place over time....unlike <see cref="mainThread_valueChangeSerializationArrayPool"/>
         /// </summary>
-        static readonly ConcurrentDictionary<AutoMagicalSyncProcessing_SingleGrouping_SeparateThread, ArrayPool<byte>> autoSyncProcessThread_valueChangeSerializationArrayPool_ThreadMap =
-            new ConcurrentDictionary<AutoMagicalSyncProcessing_SingleGrouping_SeparateThread, ArrayPool<byte>>();
+        static readonly ConcurrentDictionary<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable, ArrayPool<byte>> autoSyncProcessThread_valueChangeSerializationArrayPool_ThreadMap =
+            new ConcurrentDictionary<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable, ArrayPool<byte>>();
         /// <summary>
         /// This is used when sending currente state to newly connecting clients unlike <see cref="autoSyncProcessThread_valueChangeSerializationArrayPool_ThreadMap"/>
         /// </summary>

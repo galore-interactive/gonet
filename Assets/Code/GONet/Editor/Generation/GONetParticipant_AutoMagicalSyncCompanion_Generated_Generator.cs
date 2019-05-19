@@ -364,6 +364,11 @@ namespace GONet.Generation
         public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() { }
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember)
+            : this (syncMember, (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true))
+        {
+        }
+
+        internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember, GONetAutoMagicalSyncAttribute attribute)
         {
             isField = syncMember.MemberType == MemberTypes.Field;
             memberTypeFullName = syncMember.MemberType == MemberTypes.Property
@@ -371,7 +376,7 @@ namespace GONet.Generation
                                     : ((FieldInfo)syncMember).FieldType.FullName;
             memberName = syncMember.Name;
 
-            attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+            this.attribute = attribute;
         }
 
         internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
@@ -407,7 +412,7 @@ namespace GONet.Generation
         public GONetParticipant_ComponentsWithAutoSyncMembers_Single() {}
 
         /// <param name="component_autoSyncMembers">in deterministic order!</param>
-        internal GONetParticipant_ComponentsWithAutoSyncMembers_Single(MonoBehaviour component, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[] component_autoSyncMembers)
+        internal GONetParticipant_ComponentsWithAutoSyncMembers_Single(Component component, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[] component_autoSyncMembers)
         {
             Type componentType = component.GetType();
             componentTypeName = componentType.Name;
@@ -500,6 +505,27 @@ namespace GONet.Generation
                     var newSingle = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(component, componentAutoSyncMembers.ToArray());
                     componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle);
                 }
+            }
+
+            { // intrinsic properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
+                var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[1];
+
+                MemberInfo transform_rotation = typeof(Transform).GetMember(nameof(Transform.rotation), BindingFlags.Public | BindingFlags.Instance)[0];
+                GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute() {
+                    Reliability = AutoMagicalSyncReliability.Reliable,
+                    SyncChangesEverySeconds = 1f / 60f,
+                    CustomSerialize_Type = typeof(QuaternionSerializer),
+                    MustRunOnUnityMainThread = true // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+                };
+                component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
+
+                /* when we add in position, do this:
+                MemberInfo transform_position = typeof(Transform).GetMember(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)[0];
+                component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position);
+                */
+
+                var newSingle_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.transform, component_autoSyncMembers_transform);
+                componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle_transform);
             }
 
             ComponentMemberNames_By_ComponentTypeFullName = componentMemberNames_By_ComponentTypeFullName.ToArray();

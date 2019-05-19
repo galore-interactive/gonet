@@ -128,11 +128,13 @@ namespace GONet.Generation
         /// </summary>
         internal virtual void SerializeAll(Utils.BitStream bitStream_appendTo)
         {
+            /* once we figure out how to not always include it and generate with this check...we will leave this here commented out for reference as to what we want geration to produce:
             if (gonetParticipant.IsRotationSyncd)
             {
                 IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
                 customSerializer.Serialize(bitStream_appendTo, gonetParticipant, gonetParticipant.transform.rotation);
             }
+            */
         }
 
         internal abstract void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex);
@@ -144,12 +146,14 @@ namespace GONet.Generation
         /// </summary>
         internal virtual void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange)
         {
+            /* once we figure out how to not always include it and generate with this check...we will leave this here commented out for reference as to what we want geration to produce:
             if (gonetParticipant.IsRotationSyncd)
             {
                 IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
                 Quaternion rotation = (Quaternion)customSerializer.Deserialize(bitStream_readFrom);
                 gonetParticipant.transform.rotation = rotation;
             }
+            */
         }
 
         /// <summary>

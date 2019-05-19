@@ -84,7 +84,6 @@ namespace GONet
         [GONetAutoMagicalSync]
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
-
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>

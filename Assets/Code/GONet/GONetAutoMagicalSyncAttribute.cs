@@ -58,6 +58,14 @@ namespace GONet
         public override object TypeId => base.TypeId;
 
         /// <summary>
+        /// GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.
+        /// Some things just cannot be done outside the main unity thread.
+        /// Therefore, if you know for certain that the value to sync being decorated with this attribute cannot
+        /// run outside unity main thread, set this to true and GONet will ensure it is so.
+        /// </summary>
+        public bool MustRunOnUnityMainThread = false;
+
+        /// <summary>
         /// How often (in seconds) the system will check the field/property value for a change and send it across the network if it did change.
         /// <see cref="AutoMagicalSyncFrequencies"/> for some standard options to use here.
         /// </summary>
