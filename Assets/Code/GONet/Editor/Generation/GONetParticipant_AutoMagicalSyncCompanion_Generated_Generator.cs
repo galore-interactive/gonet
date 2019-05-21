@@ -513,9 +513,10 @@ namespace GONet.Generation
                 MemberInfo transform_rotation = typeof(Transform).GetMember(nameof(Transform.rotation), BindingFlags.Public | BindingFlags.Instance)[0];
                 GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute() {
                     Reliability = AutoMagicalSyncReliability.Reliable,
-                    SyncChangesEverySeconds = 1f / 60f,
+                    SyncChangesEverySeconds = 1f / 10f,
                     CustomSerialize_Type = typeof(QuaternionSerializer),
-                    MustRunOnUnityMainThread = true // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+                    ShouldBlendBetweenValuesReceived = true
                 };
                 component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
 

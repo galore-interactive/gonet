@@ -74,7 +74,7 @@ namespace GONet
             {
                 gonetId = value;
                 GONetMain.gonetParticipantByGONetIdMap[value] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
-                GONetLog.Error("slamile...gonetId: " + gonetId);
+                GONetLog.Info("slamile...gonetId: " + gonetId);
             }
         }
 

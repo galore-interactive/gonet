@@ -94,6 +94,7 @@
     <Compile Include="Assets\Code\GONet\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\Code\GONet\Utils\StringUtils.cs" />
     <Compile Include="Assets\Code\GONet\Utils\TypeUtils.cs" />
+    <Compile Include="Assets\Code\GONet\Utils\ValueBlendUtils.cs" />
     <Compile Include="Assets\Code\GONetTestSpawner.cs" />
     <Compile Include="Assets\Code\Microsoft\IO\Events.cs" />
     <Compile Include="Assets\Code\Microsoft\IO\RecyclableMemoryStream.cs" />

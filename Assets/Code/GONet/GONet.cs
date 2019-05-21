@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
@@ -294,7 +295,7 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
         internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.5f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
-        static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
+        internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
@@ -775,15 +776,41 @@ namespace GONet
             internal object lastKnownValue;
             internal object lastKnownValue_previous;
 
+            [StructLayout(LayoutKind.Explicit)]
             internal struct NumericValueChangeSnapshot
             {
-                internal float value;
+                [FieldOffset(0)]
                 internal long elapsedTicksAtChange;
 
-                internal NumericValueChangeSnapshot(float value, long elapsedTicksAtChange)
+                [FieldOffset(8)]
+                internal GONetBlendyValueType valueType;
+
+                [FieldOffset(9)]
+                internal float value_float;
+                [FieldOffset(9)]
+                internal Quaternion value_Quaternion;
+                [FieldOffset(9)]
+                internal Vector3 value_Vector3;
+
+                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, float value) : this()
                 {
-                    this.value = value;
                     this.elapsedTicksAtChange = elapsedTicksAtChange;
+                    valueType = GONetBlendyValueType.Float;
+                    value_float = value;
+                }
+
+                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, Quaternion value) : this()
+                {
+                    this.elapsedTicksAtChange = elapsedTicksAtChange;
+                    valueType = GONetBlendyValueType.Quaternion;
+                    value_Quaternion = value;
+                }
+
+                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, Vector3 value) : this()
+                {
+                    this.elapsedTicksAtChange = elapsedTicksAtChange;
+                    valueType = GONetBlendyValueType.Vector3;
+                    value_Vector3 = value;
                 }
 
                 public override bool Equals(object obj)
@@ -794,23 +821,37 @@ namespace GONet
                     }
 
                     var snapshot = (NumericValueChangeSnapshot)obj;
-                    return value == snapshot.value &&
-                           elapsedTicksAtChange == snapshot.elapsedTicksAtChange;
+                    return elapsedTicksAtChange == snapshot.elapsedTicksAtChange &&
+                           valueType == snapshot.valueType &&
+                           value_float == snapshot.value_float &&
+                           value_Quaternion.Equals(snapshot.value_Quaternion) &&
+                           value_Vector3.Equals(snapshot.value_Vector3);
                 }
 
                 public override int GetHashCode()
                 {
-                    var hashCode = 1751414636;
-                    hashCode = hashCode * -1521134295 + value.GetHashCode();
+                    var hashCode = -1592683669;
                     hashCode = hashCode * -1521134295 + elapsedTicksAtChange.GetHashCode();
+                    hashCode = hashCode * -1521134295 + valueType.GetHashCode();
+                    hashCode = hashCode * -1521134295 + value_float.GetHashCode();
+                    hashCode = hashCode * -1521134295 + EqualityComparer<Quaternion>.Default.GetHashCode(value_Quaternion);
+                    hashCode = hashCode * -1521134295 + EqualityComparer<Vector3>.Default.GetHashCode(value_Vector3);
                     return hashCode;
                 }
+            }
+
+            [Flags]
+            internal enum GONetBlendyValueType : byte
+            {
+                Float =         1 << 0,
+                Quaternion =    1 << 1,
+                Vector3 =       1 << 2,
             }
 
             internal const int MOST_RECENT_CHANGEs_SIZE_MINIMUM = 10;
             internal const int MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED = 100;
             internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE_MINIMUM, MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED);
-            static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(2).Ticks;
+            internal static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(2).Ticks;
 
             /// <summary>
             /// This will be null when <see cref="syncAttribute_ShouldBlendBetweenValuesReceived"/> is false AND/OR if the value type is NOT numeric (although, the latter will be identified early on in either generation or runtime and cause an exception to essentially disallow that!).
@@ -827,6 +868,10 @@ namespace GONet
             /// </summary>
             public AutoMagicalSync_ValueMonitoringSupport_ChangedValue() { }
 
+            /// <summary>
+            /// This is called in generated code (i.e., sub-classes of <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated"/>) for any
+            /// member decorated with <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/> set to true.
+            /// </summary>
             internal void AddToMostRecentChangeQueue_IfAppropriate(object value, long elapsedTicksAtChange)
             {
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
@@ -843,7 +888,7 @@ namespace GONet
                             }
                         }
 
-                        mostRecentChanges[i] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
+                        mostRecentChanges[i] = new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
                             ++mostRecentChanges_usedSize;
@@ -855,7 +900,7 @@ namespace GONet
 
                 if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                 {
-                    mostRecentChanges[mostRecentChanges_usedSize] = new NumericValueChangeSnapshot((float)value, elapsedTicksAtChange);
+                    mostRecentChanges[mostRecentChanges_usedSize] = new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
                     ++mostRecentChanges_usedSize;
                 }
 
@@ -872,7 +917,7 @@ namespace GONet
                     GONetLog.Debug("==============================================================================================");
                     for (int k = 0; k < mostRecentChanges_usedSize; ++k)
                     {
-                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].value, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalSeconds));
+                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].value_float, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalSeconds));
                     }
                 }
             }
@@ -884,90 +929,10 @@ namespace GONet
             /// </summary>
             internal void DoBlendyStuffs_IfAppropriate()
             {
-                if (mostRecentChanges_usedSize > 0)
+                object blendedValue;
+                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks, out blendedValue))
                 {
-                    { // use buffer to determine the actual value that we think is most appropriate for this moment in time
-                        float blendedValue = default;
-                        int newestBufferIndex = 0;
-                        NumericValueChangeSnapshot newest = mostRecentChanges[newestBufferIndex];
-                        int oldestBufferIndex = mostRecentChanges_usedSize - 1;
-                        NumericValueChangeSnapshot oldest = mostRecentChanges[oldestBufferIndex];
-                        float oldestValue = oldest.value;
-                        bool isNewestRecentEnoughToProcess = (Time.ElapsedTicks - newest.elapsedTicksAtChange) < AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
-                        if (isNewestRecentEnoughToProcess)
-                        {
-                            float newestValue = newest.value;
-                            bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
-                            if (shouldAttemptInterExtraPolation)
-                            {
-                                long adjustedTicks = Time.ElapsedTicks - BLENDING_BUFFER_LEAD_TICKS;
-                                if (adjustedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
-                                {
-                                    bool isEnoughInfoToExtrapolate = mostRecentChanges_usedSize > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
-                                    if (isEnoughInfoToExtrapolate)
-                                    {
-                                        NumericValueChangeSnapshot justBeforeNewest = mostRecentChanges[newestBufferIndex + 1];
-                                        float valueDiffBetweenLastTwo = newestValue - justBeforeNewest.value;
-                                        long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-
-                                        long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
-                                        float extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
-                                        float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
-                                        blendedValue = Mathf.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
-                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
-                                    }
-                                    else
-                                    {
-                                        blendedValue = newestValue;
-                                        //GONetLog.Debug("new new beast");
-                                    }
-                                }
-                                else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
-                                {
-                                    blendedValue = oldestValue;
-                                    //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
-                                }
-                                else // this is the normal case where we can apply interpolation if the settings call for it!
-                                {
-                                    bool didWeLoip = false;
-                                    for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
-                                    {
-                                        NumericValueChangeSnapshot newer = mostRecentChanges[i - 1];
-
-                                        if (adjustedTicks <= newer.elapsedTicksAtChange)
-                                        {
-                                            NumericValueChangeSnapshot older = mostRecentChanges[i];
-
-                                            float interpolationTime = (adjustedTicks - older.elapsedTicksAtChange) / (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
-                                            blendedValue = Mathf.Lerp(
-                                                older.value,
-                                                newer.value,
-                                                interpolationTime);
-                                            //GONetLog.Debug("we loip'd 'eem");
-                                            didWeLoip = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!didWeLoip)
-                                    {
-                                        GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                blendedValue = newestValue;
-                                GONetLog.Debug("not a float?");
-                            }
-                        }
-                        else
-                        {
-                            //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
-                            return; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
-                        }
-
-                        syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
-                    }
+                    syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
                 }
             }
         }
