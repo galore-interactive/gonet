@@ -792,6 +792,27 @@ namespace GONet
                 [FieldOffset(9)]
                 internal Vector3 value_Vector3;
 
+                internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, object value)
+                {
+                    Type type = value.GetType();
+                    if (type == typeof(float))
+                    {
+                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
+                    }
+
+                    if (type == typeof(Quaternion))
+                    {
+                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (Quaternion)value);
+                    }
+
+                    if (type == typeof(Vector3))
+                    {
+                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (Vector3)value);
+                    }
+
+                    throw new ArgumentException("Type not supported.", nameof(value));
+                }
+
                 internal NumericValueChangeSnapshot(long elapsedTicksAtChange, float value) : this()
                 {
                     this.elapsedTicksAtChange = elapsedTicksAtChange;
@@ -872,7 +893,7 @@ namespace GONet
             /// This is called in generated code (i.e., sub-classes of <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated"/>) for any
             /// member decorated with <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/> set to true.
             /// </summary>
-            internal void AddToMostRecentChangeQueue_IfAppropriate(object value, long elapsedTicksAtChange)
+            internal void AddToMostRecentChangeQueue_IfAppropriate(long elapsedTicksAtChange, object value)
             {
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
@@ -888,7 +909,7 @@ namespace GONet
                             }
                         }
 
-                        mostRecentChanges[i] = new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
+                        mostRecentChanges[i] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
                             ++mostRecentChanges_usedSize;
@@ -900,7 +921,7 @@ namespace GONet
 
                 if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                 {
-                    mostRecentChanges[mostRecentChanges_usedSize] = new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
+                    mostRecentChanges[mostRecentChanges_usedSize] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                     ++mostRecentChanges_usedSize;
                 }
 

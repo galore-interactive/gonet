@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class FieldChangeTest : MonoBehaviour
 {
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 4, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
+    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
     public float someCoolGuyFloat;
 
     public float rottieTotty;

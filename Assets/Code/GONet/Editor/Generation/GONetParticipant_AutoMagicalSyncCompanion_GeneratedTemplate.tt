@@ -646,7 +646,7 @@ namespace GONet.Generation
 			}#>
 <#				if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
 				{#>
-					valuesChangesSupport[<#=iOverall#>].AddToMostRecentChangeQueue_IfAppropriate((float)value, assumedElapsedTicksAtChange); // NOTE: this queue will be used each frame to blend between this value and others added there
+					valuesChangesSupport[<#=iOverall#>].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
 <#				}
 				else
 				{#>

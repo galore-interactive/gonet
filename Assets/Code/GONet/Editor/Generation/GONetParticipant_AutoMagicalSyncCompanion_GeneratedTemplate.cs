@@ -1935,9 +1935,9 @@ namespace Assets.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("].AddToMostRecentChangeQueue_IfAppropriate((float)value, assumedElapsedTicksAtCha" +
-                    "nge); // NOTE: this queue will be used each frame to blend between this value an" +
-                    "d others added there\r\n");
+            this.Write("].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); /" +
+                    "/ NOTE: this queue will be used each frame to blend between this value and other" +
+                    "s added there\r\n");
             
             #line 650 "C:\projects\unity\gonet\Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				}
