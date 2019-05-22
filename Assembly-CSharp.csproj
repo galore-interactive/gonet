@@ -64,7 +64,6 @@
     <Compile Include="Assets\Code\FieldChangeTest.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
-    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
     <Compile Include="Assets\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\Code\GONet\GONet.cs" />
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />

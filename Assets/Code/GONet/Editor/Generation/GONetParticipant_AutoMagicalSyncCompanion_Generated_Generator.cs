@@ -508,11 +508,11 @@ namespace GONet.Generation
             }
 
             { // intrinsic properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
-                var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[1];
+                var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[2];
 
                 MemberInfo transform_rotation = typeof(Transform).GetMember(nameof(Transform.rotation), BindingFlags.Public | BindingFlags.Instance)[0];
                 GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute() {
-                    Reliability = AutoMagicalSyncReliability.Reliable,
+                    Reliability = AutoMagicalSyncReliability.Unreliable,
                     SyncChangesEverySeconds = 1f / 10f,
                     CustomSerialize_Type = typeof(QuaternionSerializer),
                     MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
@@ -520,10 +520,16 @@ namespace GONet.Generation
                 };
                 component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
 
-                /* when we add in position, do this:
                 MemberInfo transform_position = typeof(Transform).GetMember(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)[0];
-                component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position);
-                */
+                GONetAutoMagicalSyncAttribute attribute_position = new GONetAutoMagicalSyncAttribute()
+                {
+                    Reliability = AutoMagicalSyncReliability.Unreliable,
+                    SyncChangesEverySeconds = 1f / 10f,
+                    CustomSerialize_Type = typeof(Vector3Serializer),
+                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+                    ShouldBlendBetweenValuesReceived = true
+                };
+                component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position, attribute_position);
 
                 var newSingle_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.transform, component_autoSyncMembers_transform);
                 componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle_transform);

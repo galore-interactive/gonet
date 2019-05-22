@@ -208,6 +208,45 @@ namespace GONet
         object Deserialize(Utils.BitStream bitStream_readFrom);
     }
 
+    public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
+    {
+        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
+        public const float DEFAULT_MAX_VALUE = 100f;
+        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
+
+        readonly Quantizer quantizer;
+        byte bitsPerComponent;
+
+        public Vector3Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+
+        public Vector3Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        {
+            this.bitsPerComponent = bitsPerComponent;
+            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+        }
+
+        public object Deserialize(Utils.BitStream bitStream_readFrom)
+        {
+            uint x;
+            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+            uint y;
+            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+            uint z;
+            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
+
+            return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
+        }
+
+        public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        {
+            Vector3 vector3 = (Vector3)value;
+
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
+        }
+    }
+
     public class QuaternionSerializer : IGONetAutoMagicalSync_CustomSerializer
     {
         static readonly float SQUARE_ROOT_OF_2 = Mathf.Sqrt(2.0f);
@@ -304,7 +343,7 @@ namespace GONet
             uint SmallestB;
             uint SmallestC;
 
-            Quaternion quattie = gonetParticipant.transform.rotation;
+            Quaternion quattie = (Quaternion)value;
             float x = quattie.x;
             float y = quattie.y;
             float z = quattie.z;

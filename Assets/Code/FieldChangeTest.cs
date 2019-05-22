@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class FieldChangeTest : MonoBehaviour
 {
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
+    //[GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
     public float someCoolGuyFloat;
 
     public float rottieTotty;
@@ -12,7 +12,7 @@ public class FieldChangeTest : MonoBehaviour
     Quaternion startRotation;
 
     float moveAmount = 5f;
-    float moveAmount_rottieTotty = 0.15f;
+    float moveAmount_rottieTotty = 0.25f;
 
     private void Awake()
     {
@@ -38,9 +38,8 @@ public class FieldChangeTest : MonoBehaviour
             }
 
             transform.rotation = Quaternion.Euler(startRotation.eulerAngles * rottieTotty);
+            transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
         }
         /* */
-
-        transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
     }
 }
