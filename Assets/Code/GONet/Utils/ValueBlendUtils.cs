@@ -74,7 +74,7 @@ namespace GONet.Utils
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
                                 blendedValue = oldest.value_float;
-                                //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
+                                //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
@@ -159,13 +159,13 @@ namespace GONet.Utils
                                 else
                                 {
                                     blendedValue = newestValue;
-                                    //GONetLog.Debug("new new beast");
+                                    //GONetLog.Debug("QUAT new new beast");
                                 }
                             }
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
                                 blendedValue = oldest.value_Quaternion;
-                                //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount);
+                                //GONetLog.Debug("QUAT went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
@@ -250,13 +250,13 @@ namespace GONet.Utils
                                 else
                                 {
                                     blendedValue = newestValue;
-                                    //GONetLog.Debug("new new beast");
+                                    //GONetLog.Debug("VECTOR3 new new beast");
                                 }
                             }
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
                                 blendedValue = oldest.value_Vector3;
-                                //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize);
+                                //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {

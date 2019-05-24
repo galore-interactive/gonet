@@ -104,12 +104,13 @@ namespace GONet
 
         static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
         {
-            GONetLog.Error(e.Exception.Message);
+            GONetLog.Error(string.Concat("Error Message: ", e.Exception.Message, "\nError Stacktrace:\n", e.Exception.StackTrace));
         }
 
         static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            GONetLog.Error((e.ExceptionObject as Exception).Message);
+            Exception exception = (e.ExceptionObject as Exception);
+            GONetLog.Error(string.Concat("Error Message: ", exception.Message, "\nError Stacktrace:\n", exception.StackTrace));
         }
 
         #region public methods
@@ -187,17 +188,22 @@ namespace GONet
                             if (gonetServer != null)
                             {
                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
                             }
-                            gonetServer?.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
                         }
                         else
                         {
                             if (gonetClient != null)
                             {
-                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
-                            }
+                                while (!gonetClient.IsConnectedToServer)
+                                {
+                                    GONetLog.Info("SLEEP!  So I can send this stuff....not yet connected...that's why.");
+                                    Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
+                                }
 
-                            gonetClient?.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
+                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                gonetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.qualityOfService);
+                            }
                         }
                     }
                     else
@@ -416,6 +422,7 @@ namespace GONet
                     }
 
                 }
+                else { GONetLog.Warning("throwing away older time from server"); }
             }
         }
 
@@ -663,7 +670,7 @@ namespace GONet
                     }
                     catch (Exception e)
                     {
-                        GONetLog.Error(string.Concat("Error Stacktrace:\n", e.StackTrace, "\nError Message: ", e.Message));
+                        GONetLog.Error(string.Concat("Error Message: ", e.Message, "\nError Stacktrace:\n", e.StackTrace));
                     }
                     finally
                     {

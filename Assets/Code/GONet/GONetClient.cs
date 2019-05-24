@@ -7,6 +7,8 @@ namespace GONet
 {
     public class GONetClient
     {
+        public bool IsConnectedToServer => ConnectionState == ClientState.Connected;
+
         public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;
 
         internal GONetConnection_ClientToServer connectionToServer;
