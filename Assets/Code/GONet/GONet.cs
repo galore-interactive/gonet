@@ -300,7 +300,7 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.5f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
+        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
         internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;

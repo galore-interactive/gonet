@@ -147,13 +147,30 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    Quaternion valueDiffBetweenLastTwo = justBeforeNewest.value_Quaternion * Quaternion.Inverse(newestValue);
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-
                                     long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
+
+
+                                    /* option 1:
+                                    Quaternion valueDiffBetweenLastTwo = justBeforeNewest.value_Quaternion * Quaternion.Inverse(newestValue);
                                     Quaternion extrapolated_ValueNew = newestValue * valueDiffBetweenLastTwo;
                                     float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
                                     blendedValue = Quaternion.Slerp(newestValue, extrapolated_ValueNew, interpolationTime);
+                                    */
+
+
+                                    //* option 2:
+                                    var rot = newestValue * Quaternion.Inverse(justBeforeNewest.value_Quaternion); // rot is the rotation from t1 to t2
+                                    var dt = (extrapolated_TicksAtSend - justBeforeNewest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange); // dt = extrapolation factor
+                                    float ang;
+                                    Vector3 axis;
+                                    rot.ToAngleAxis(out ang, out axis); // find axis-angle representation
+                                    if (ang > 180) ang -= 360;  // assume the shortest path
+                                    ang = ang * dt % 360; // multiply angle by the factor
+                                    blendedValue = Quaternion.AngleAxis(ang, axis) * justBeforeNewest.value_Quaternion; // combine with first rotation
+                                    //*/
+
+
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                 }
                                 else
