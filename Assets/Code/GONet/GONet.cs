@@ -100,6 +100,16 @@ namespace GONet
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
 
             InitMessageTypeToMessageIDMap();
+            InitShouldSkipSyncSupport();
+        }
+
+        private static void InitShouldSkipSyncSupport()
+        {
+            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd] =
+                (monitoringSupport, index) => !monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd;
+
+            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd] =
+                (monitoringSupport, index) => !monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd;
         }
 
         static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
@@ -771,6 +781,10 @@ namespace GONet
             /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/>
             /// </summary>
             internal bool syncAttribute_ShouldBlendBetweenValuesReceived;
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncAttribute.ShouldSkipSync"/>
+            /// </summary>
+            internal Func<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue, int, bool> syncAttribute_ShouldSkipSync;
             /// <summary>
             /// Matches/corresponds with/to each of the following members:
             ///     <see cref="GONetAutoMagicalSyncAttribute.QuantizeDownToBitCount"/>

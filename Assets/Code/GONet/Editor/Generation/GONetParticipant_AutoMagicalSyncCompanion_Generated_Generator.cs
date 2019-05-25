@@ -516,7 +516,8 @@ namespace GONet.Generation
                     SyncChangesEverySeconds = 1f / 10f,
                     CustomSerialize_Type = typeof(QuaternionSerializer),
                     MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true
+                    ShouldBlendBetweenValuesReceived = true,
+                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd
                 };
                 component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
 
@@ -527,7 +528,8 @@ namespace GONet.Generation
                     SyncChangesEverySeconds = 1f / 10f,
                     CustomSerialize_Type = typeof(Vector3Serializer),
                     MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true
+                    ShouldBlendBetweenValuesReceived = true,
+                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd
                 };
                 component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position, attribute_position);
 

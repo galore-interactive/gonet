@@ -72,13 +72,20 @@ namespace GONet.Generation
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
                 if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
-                    !Equals(valuesChangesSupport[i].lastKnownValue, valuesChangesSupport[i].lastKnownValue_previous))
+                    !Equals(valueChangeSupport.lastKnownValue, valueChangeSupport.lastKnownValue_previous) &&
+                    !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
                 {
                     lastKnownValueChangesSinceLastCheck[i] = true;
                     hasChange = true;
                 }
             }
             return hasChange;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool ShouldSkipSync(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, int index)
+        {
+            return valueChangeSupport.syncAttribute_ShouldSkipSync != null && valueChangeSupport.syncAttribute_ShouldSkipSync(valueChangeSupport, index);
         }
 
         internal void OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
@@ -126,16 +133,7 @@ namespace GONet.Generation
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
         /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
         /// </summary>
-        internal virtual void SerializeAll(Utils.BitStream bitStream_appendTo)
-        {
-            /* once we figure out how to not always include it and generate with this check...we will leave this here commented out for reference as to what we want geration to produce:
-            if (gonetParticipant.IsRotationSyncd)
-            {
-                IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
-                customSerializer.Serialize(bitStream_appendTo, gonetParticipant, gonetParticipant.transform.rotation);
-            }
-            */
-        }
+        internal abstract void SerializeAll(Utils.BitStream bitStream_appendTo);
 
         internal abstract void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex);
 
@@ -144,17 +142,7 @@ namespace GONet.Generation
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
         /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
         /// </summary>
-        internal virtual void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange)
-        {
-            /* once we figure out how to not always include it and generate with this check...we will leave this here commented out for reference as to what we want geration to produce:
-            if (gonetParticipant.IsRotationSyncd)
-            {
-                IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
-                Quaternion rotation = (Quaternion)customSerializer.Deserialize(bitStream_readFrom);
-                gonetParticipant.transform.rotation = rotation;
-            }
-            */
-        }
+        internal abstract void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange);
 
         /// <summary>
         ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
@@ -198,7 +186,7 @@ namespace GONet.Generation
         internal delegate GONetParticipant_AutoMagicalSyncCompanion_Generated GONetParticipant_AutoMagicalSyncCompanion_Generated_FactoryDelegate(GONetParticipant gonetParticipant);
         internal static GONetParticipant_AutoMagicalSyncCompanion_Generated_FactoryDelegate theRealness = delegate (GONetParticipant gonetParticipant) 
         {
-            throw new System.Exception("You need to run code generation or else the correct generated instance cannot be created");
+            throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
         /// <summary>
         /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.

@@ -117,6 +117,24 @@ namespace GONet
         /// </summary>
         public int ProcessingPriority_GONetInternalOverride = 0;
 
+        internal static readonly Dictionary<int, Func<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue, int, bool>> ShouldSkipSyncByRegistrationIdMap = new Dictionary<int, Func<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue, int, bool>>(2);
+        /// <summary>
+        /// public: Do NOT use this!
+        /// TODO make this internal..only public due to reference inside editor-based code gen tt
+        /// </summary>
+        public int ShouldSkipSync_RegistrationId;
+
+        /// <summary>
+        /// TODO make this internal once internals visible updated
+        /// public: do NOT use this
+        /// </summary>
+        public enum ShouldSkipSyncRegistrationId : int
+        {
+            // IMPORTANT: Leave 0 empty
+            GONetParticipant_IsRotationSyncd = 1,
+            GONetParticipant_IsPositionSyncd,
+        }
+
         #endregion
 
         /// <summary>

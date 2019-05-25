@@ -78,6 +78,7 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
 			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
 			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(<#=singleMember.attribute.ShouldSkipSync_RegistrationId#>, out support<#=iOverall#>.syncAttribute_ShouldSkipSync);
 			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 <#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
             {#>		
@@ -247,8 +248,6 @@ namespace GONet.Generation
 		}
 	}
 #>
-			
-			base.SerializeAll(bitStream_appendTo); // I know.  I know.  OOP says call base first.  Well, we need ours to go last to ensure some prerequsite values are set prior to know what needs doing (e.g., IsRotationSyncd?)
         }
 
         internal override void SerializeSingle(Utils.BitStream bitStream_appendTo, byte singleIndex)
@@ -505,8 +504,6 @@ namespace GONet.Generation
 		}
 	}
 #>
-			
-			base.DeserializeInitAll(bitStream_readFrom, assumedElapsedTicksAtChange); // I know.  I know.  OOP says call base first.  Well, we need ours to go last to ensure some prerequsite values are set prior to know what needs doing (e.g., IsRotationSyncd?)
         }
 
         /// <summary>
@@ -676,7 +673,8 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 				var valuesChangesSupport<#=iOverall#> = valuesChangesSupport[<#=iOverall#>];
-				if (DoesMatchUniqueGrouping(valuesChangesSupport<#=iOverall#>, onlyMatchIfUniqueGroupingMatches))
+				if (DoesMatchUniqueGrouping(valuesChangesSupport<#=iOverall#>, onlyMatchIfUniqueGroupingMatches) &&
+					!ShouldSkipSync(valuesChangesSupport<#=iOverall#>, <#=iOverall#>)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport<#=iOverall#>.lastKnownValue_previous = valuesChangesSupport<#=iOverall#>.lastKnownValue;
 					valuesChangesSupport<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
