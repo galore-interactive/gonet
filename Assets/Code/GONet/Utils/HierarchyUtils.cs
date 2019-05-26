@@ -27,9 +27,7 @@ namespace GONet.Utils
                 return string.Empty;
             }
 
-            string sceneName = gameObject.scene == null /* this will happen in build for DontDestroyOnLoad */ ? DONT_DESTROY_ON_LOAD_SCENE : gameObject.scene.name;
-
-            string path = string.Concat(sceneName, PATH_SEPARATOR, gameObject.name);
+            string path = string.Concat(PATH_SEPARATOR, gameObject.name);
 
             int siblingCount, mySiblingIndex;
             if (DoIHaveSiblingsOfSameName(gameObject, out siblingCount, out mySiblingIndex))
@@ -49,6 +47,11 @@ namespace GONet.Utils
                 }
                 path = string.Concat(PATH_SEPARATOR, myUniqueName, path);
             }
+
+            // now prefix with scene name:
+            string sceneName = gameObject.scene == null /* this will happen in build for DontDestroyOnLoad */ ? DONT_DESTROY_ON_LOAD_SCENE : gameObject.scene.name;
+            path = string.Concat(sceneName, path);
+
             return path;
         }
 

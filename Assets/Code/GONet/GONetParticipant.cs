@@ -85,6 +85,21 @@ namespace GONet
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
         /// <summary>
+        /// public: Do NOT use this.  It is internal to GONet!
+        /// This is ONLY accurate information during design time.  The location can easily change during runtime.
+        /// This is used for referential purposes only and mainly for auto-propogate spawn support.
+        /// </summary>
+        [SerializeField, HideInInspector]
+        public string designTimeLocation;
+        public string DesignTimeLocation => designTimeLocation;
+        
+        [SerializeField, HideInInspector]
+        internal long runtimeUID = GUID.UNSET_VALUE;
+
+        public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
+
+
+        /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
         public delegate void EditorOnlyDelegate(GONetParticipant gonetParticipant);
@@ -132,6 +147,11 @@ namespace GONet
         private void OnEnable()
         {
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
+        }
+
+        private void Start()
+        {
+            GONetMain.Start_AutoPropogateInstantiation_IfAppropriate(this);
         }
 
         private void OnDisable()

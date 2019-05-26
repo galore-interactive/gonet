@@ -12,16 +12,22 @@ namespace GONet
         /// If false, the term used is persistent.
         /// </summary>
         bool IsTransient { get; }
+
+        long OccurredAtElapsedTicks { get; }
     }
 
     public abstract class TransientEvent : IGONetEvent
     {
         public bool IsTransient { get; private set; }  = true;
+
+        public long OccurredAtElapsedTicks { get; }
     }
 
     public abstract class PersistentEvent : IGONetEvent
     {
         public bool IsTransient { get; private set; } = false;
+
+        public long OccurredAtElapsedTicks { get; }
     }
 
     #endregion
@@ -36,6 +42,9 @@ namespace GONet
     {
         public readonly long UID;
 
+        /// <summary>
+        /// TODO replace this with (new) <see cref="IGONetEvent.OccurredAtElapsedTicks"/>
+        /// </summary>
         public long ElapsedTicksAtSend { get; internal set; }
 
         public RequestMessage()

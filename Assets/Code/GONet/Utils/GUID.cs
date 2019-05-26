@@ -17,15 +17,15 @@ namespace GONet.Utils
         internal const int SEVEN_TIMES_EIGHT = 7 * 8;
         #endregion
 
-        public const long NO_UID_SET = default(long);
+        public const long UNSET_VALUE = default(long);
 
-        private long _asInt64 = NO_UID_SET;
+        private long _asInt64 = UNSET_VALUE;
         private int _asInt32 = default(int);
 
         /// <summary>
         /// Check if this instance has a uid set or if it is the default (not set) value.
         /// </summary>
-        public bool IsSet => _asInt64 != NO_UID_SET;
+        public bool IsSet => _asInt64 != UNSET_VALUE;
 
         static GUID()
         {
@@ -99,7 +99,7 @@ namespace GONet.Utils
 
         public static implicit operator long(GUID uid)
         {
-            return uid != null ? uid.AsInt64() : NO_UID_SET;
+            return uid != null ? uid.AsInt64() : UNSET_VALUE;
         }
 
         public override bool Equals(object obj)
@@ -138,7 +138,7 @@ namespace GONet.Utils
                 return new GUID(int64);
             }
 
-            if (int64 == NO_UID_SET)
+            if (int64 == UNSET_VALUE)
             {
                 // assume if all 0's, then this is an unset uid
                 return new GUID(); // not set uid

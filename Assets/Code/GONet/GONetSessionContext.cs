@@ -16,8 +16,11 @@ namespace GONet
         private void Awake()
         {
             GONetLog.Debug(WORKAROUND);
+        }
 
-            DontDestroyOnLoad(gameObject);
+        private void Start()
+        {
+            DontDestroyOnLoad(gameObject); // IMPORTANT: This was moved from Awake to Start so it runs AFTER onSceneLoaded processes and this is recognized as a "design time GONetParticipant"...somehow moving into DDOL in Awake was too soon and it did not get categorized as design time
         }
     }
 }

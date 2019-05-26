@@ -84,7 +84,7 @@ namespace GONet.Generation
 
         private static void OnProjectChanged()
         {
-            if (IsPrefab(Selection.activeGameObject))
+            if (IsInstantiationOfPrefab(Selection.activeGameObject))
             {
                 GONetParticipant gonetParticipant_onPrefab = Selection.activeGameObject.GetComponent<GONetParticipant>();
                 if (gonetParticipant_onPrefab != null)
@@ -114,7 +114,7 @@ namespace GONet.Generation
 
         }
 
-        private static bool IsPrefab(UnityEngine.Object @object)
+        internal static bool IsInstantiationOfPrefab(UnityEngine.Object @object)
         {
             bool isPrefab = @object != null &&
 #if UNITY_2018_3_OR_NEWER
@@ -127,7 +127,7 @@ namespace GONet.Generation
 
         private static void GONetParticipant_EditorOnlyAwake(GONetParticipant gonetParticipant)
         {
-            if (IsPrefab(gonetParticipant))
+            if (IsInstantiationOfPrefab(gonetParticipant))
             {
                 GONetLog.Debug("[DREETS] *********PREFAB*********** GONetParticipant straight been woke!");
             }

@@ -24,6 +24,11 @@ namespace GONet
             SceneManager.sceneLoaded += OnSceneLoaded;
 
             GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
+
+            foreach (var gnp in Resources.FindObjectsOfTypeAll<GONetParticipant>()) // TODO put this in gonetmain and store all the design time only stuffsS
+            {
+                Utils.GONetLog.Debug("found GNP resource....name: " + gnp.name + " enabled?: " + gnp.enabled);
+            }
         }
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)
@@ -32,6 +37,7 @@ namespace GONet
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel);
+                GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
                 GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
             }
         }

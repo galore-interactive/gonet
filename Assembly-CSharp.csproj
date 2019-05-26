@@ -74,6 +74,7 @@
     <Compile Include="Assets\Code\GONet\GONetParticipant.cs" />
     <Compile Include="Assets\Code\GONet\GONetServer.cs" />
     <Compile Include="Assets\Code\GONet\GONetSessionContext.cs" />
+    <Compile Include="Assets\Code\GONet\GONetSpawnSupport_Runtime.cs" />
     <Compile Include="Assets\Code\GONet\Utils\ArrayPool.cs" />
     <Compile Include="Assets\Code\GONet\Utils\BitConverter.cs" />
     <Compile Include="Assets\Code\GONet\Utils\BitStream.cs" />

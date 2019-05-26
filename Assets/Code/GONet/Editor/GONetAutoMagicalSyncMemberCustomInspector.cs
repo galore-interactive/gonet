@@ -36,6 +36,31 @@ namespace GONet.Editor
         private void DrawGONetParticipantSpecifics(GONetParticipant targetGONetParticipant)
         {
             const string NOT_SET = "<not set>";
+
+            if (Application.isPlaying) // this value is only really relevant during play (not to mention, the way we determine this is faulty otherwise...false positives everywhere)
+            { // design time?
+                EditorGUILayout.BeginHorizontal();
+                const string INSTANTI = "Was Instantiated?";
+                EditorGUILayout.LabelField(INSTANTI);
+                bool guiEnabledPrevious = GUI.enabled;
+                GUI.enabled = false;
+                EditorGUILayout.Toggle(targetGONetParticipant.WasInstantiated);
+                GUI.enabled = guiEnabledPrevious;
+                EditorGUILayout.EndHorizontal();
+            }
+
+            {
+                EditorGUILayout.BeginHorizontal();
+                const string DESIGN = "Design Time Location";
+                EditorGUILayout.LabelField(DESIGN);
+                bool guiEnabledPrevious = GUI.enabled;
+                GUI.enabled = false;
+                EditorGUILayout.TextField(targetGONetParticipant.DesignTimeLocation);
+
+                GUI.enabled = guiEnabledPrevious;
+                EditorGUILayout.EndHorizontal();
+            }
+
             { // codeGenerationId
                 EditorGUILayout.BeginHorizontal();
                 const string CODE_GEN_ID = "Code Generation Id";

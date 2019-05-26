@@ -42,6 +42,7 @@ namespace GONet
         public static GONetParticipant GlobalSessionContext_Participant { get; private set; }
 
         private static GONetSessionContext mySessionContext;
+
         public static GONetSessionContext MySessionContext
         {
             get { return mySessionContext; }
@@ -73,6 +74,8 @@ namespace GONet
                 _gonetServer.ClientConnected += Server_OnClientConnected_SendClientCurrentState;
             }
         }
+
+        static readonly Queue<PersistentEvent> persistentEventsThisSession = new Queue<PersistentEvent>();
 
         /// <summary>
         /// TODO FIXME make this private.....its internal temporary for testing
@@ -638,6 +641,7 @@ namespace GONet
 
                                 //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
+                                // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
 
                                 {  // body:
                                     if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
@@ -1058,6 +1062,7 @@ namespace GONet
                             var quantizer_ensureCachedUpFront = Quantizer.LookupQuantizer(monitoringSupport.syncAttribute_QuantizerSettingsGroup);
                         }
                     }
+
                     foreach (SyncBundleUniqueGrouping uniqueSyncGrouping in uniqueSyncGroupings)
                     {
                         if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))
@@ -1075,7 +1080,22 @@ namespace GONet
                     }
                 }
 
-                AssignGONetId_IfAppropriate(gonetParticipant);
+                OnEnable_AssignGONetId_IfAppropriate(gonetParticipant);
+            }
+        }
+
+        public static bool WasDefinedInScene(GONetParticipant gonetParticipant)
+        {
+            return definedInSceneParticipantInstanceIDs.Contains(gonetParticipant.GetInstanceID());
+        }
+
+        internal static void Start_AutoPropogateInstantiation_IfAppropriate(GONetParticipant gonetParticipant)
+        {
+            if (!WasDefinedInScene(gonetParticipant))
+            {
+                GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
+
+                // TODO impl auto propogate stuff
             }
         }
 
@@ -1099,7 +1119,7 @@ namespace GONet
             gonetParticipant.OwnerAuthorityIdChanged -= OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate; // we did what we needed to...done.
         }
 
-        private static void AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
+        private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
         {
             if (IsServer)
             {
@@ -1109,12 +1129,19 @@ namespace GONet
             // TODO move this to OnInstantiated type deal:  becasue this is not every doing anything right now anyway..just leaving in so find all references sees it!!
             else
             {
-                bool isInstantiated = false; // TODO FIXME have to figure out if this is happening as a result of a spawn/instantiate or the related GO is in the scene.
-                if (isInstantiated)
+                bool didIInstantiate = false; // TODO FIXME have to figure out if this is happening as a result of a spawn/instantiate or the related GO is in the scene.
+                if (didIInstantiate)
                 {
                     gonetParticipant.OwnerAuthorityId = MyAuthorityId;
                 } // else the server will do the assigning once it processes this in the scene load up and the value will propogate to clients via the auto-magical sync
             }
+        }
+
+        static readonly HashSet<int> definedInSceneParticipantInstanceIDs = new HashSet<int>();
+
+        internal static void RecordParticipantsAsDefinedInScene(List<GONetParticipant> gonetParticipantsInLevel)
+        {
+            gonetParticipantsInLevel.ForEach(gonetParticipant => definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID()));
         }
 
         internal static void AssignOwnerAuthorityIds_IfAppropriate(List<GONetParticipant> gonetParticipantsInConsideration)
