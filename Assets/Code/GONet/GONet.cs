@@ -97,6 +97,12 @@ namespace GONet
         /// </summary>
         internal static readonly Temporal Time = new Temporal();
 
+        /// <summary>
+        /// This is used to know which instances were instantiated due to a remote spawn message being received/processed.
+        /// See <see cref="Instantiate_Remote(InstantiateGONetParticipantEvent)"/> and <see cref="Start_AutoPropogateInstantiation_IfAppropriate(GONetParticipant)"/>.
+        /// </summary>
+        static readonly List<GONetParticipant> remoteSpawns_avoidAutoPropogateSupport = new List<GONetParticipant>(1000);
+
         static GONetMain()
         {
             //Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
@@ -662,7 +668,7 @@ namespace GONet
 
                                         Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
                                     }
-                                    else if (messageType == typeof(OwnerAuthorityIdAssignmentMessage)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
+                                    else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
                                     {
                                         uint ownerAuthorityId;
                                         bitStream.ReadUInt(out ownerAuthorityId);
@@ -675,6 +681,10 @@ namespace GONet
                                     else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
                                     {
                                         DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                    }
+                                    else if (messageType == typeof(InstantiateGONetParticipantEvent))
+                                    {
+                                        DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
                                     } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
@@ -701,6 +711,53 @@ namespace GONet
             }
         }
 
+        //private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, InstantiateGONetParticipantEvent instantiateEvent)
+        private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, GONetParticipant instantiated)
+        {
+            bitStream_headerAlreadyWritten.WriteString(instantiated.DesignTimeLocation);
+            bitStream_headerAlreadyWritten.WriteUInt(instantiated.GONetId);
+            bitStream_headerAlreadyWritten.WriteUInt(instantiated.OwnerAuthorityId);
+        }
+
+        private static void DeserializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream, int bytesUsedCount, GONetConnection relatedConnection, long elapsedTicksAtSend)
+        {
+            InstantiateGONetParticipantEvent instantiateEvent = new InstantiateGONetParticipantEvent();
+
+            instantiateEvent.OccurredAtElapsedTicks = elapsedTicksAtSend;
+
+            bitStream.ReadString(out instantiateEvent.DesignTimeLocation);
+            bitStream.ReadUInt(out instantiateEvent.GONetId);
+            bitStream.ReadUInt(out instantiateEvent.OwnerAuthorityId);
+
+            ProcessPersistentEvent(instantiateEvent, relatedConnection);
+
+            Instantiate_Remote(instantiateEvent);
+        }
+
+        private static void ProcessPersistentEvent(PersistentEvent @event, GONetConnection fromRelatedConnection)
+        {
+            persistentEventsThisSession.Enqueue(@event);
+
+            if (IsServer)
+            {
+                // TODO FIXME send to all other clients than fromRelatedConnection
+            }
+        }
+
+        /// <summary>
+        /// Process instantiation event from remote source.
+        /// </summary>
+        /// <param name="instantiateEvent"></param>
+        private static void Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
+        {
+            GONetParticipant template = GONetSpawnSupport_Runtime.LookupFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
+            GONetParticipant instance = UnityEngine.Object.Instantiate(template);
+            GONetLog.Debug("Instantiate_Remote, Instantiate complete....instanceID: " + instance.GetInstanceID());
+            instance.GONetId = instantiateEvent.GONetId;
+            instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
+            remoteSpawns_avoidAutoPropogateSupport.Add(instance);
+        }
+
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
             Server_AssignNewClientAuthorityId(gonetConnection_ServerToClient);
@@ -719,7 +776,7 @@ namespace GONet
                 using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
                 {
                     { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(OwnerAuthorityIdAssignmentMessage)];
+                        uint messageID = messageTypeToMessageIDMap[typeof(OwnerAuthorityIdAssignmentEvent)];
                         bitStream.WriteUInt(messageID);
 
                         bitStream.WriteLong(Time.ElapsedTicks);
@@ -1091,11 +1148,51 @@ namespace GONet
 
         internal static void Start_AutoPropogateInstantiation_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            if (!WasDefinedInScene(gonetParticipant))
+            if (Application.isPlaying && !WasDefinedInScene(gonetParticipant))
             {
                 GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
 
-                // TODO impl auto propogate stuff
+                bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropogateSupport.Contains(gonetParticipant);
+                if (isThisCondisideredTheMomentOfInitialInstantiation)
+                {
+                    AutoPropogateInitialInstantiation(gonetParticipant);
+                }
+                else
+                {
+                    // this data item has now served its purpose (i.e., avoid auto propogate since it already came from remote source!), so remove it
+                    remoteSpawns_avoidAutoPropogateSupport.Remove(gonetParticipant);
+                }
+            }
+        }
+
+        private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
+        {
+            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+            {
+                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
+                {
+                    { // header...just message type/id...well, and now time 
+                        uint messageID = messageTypeToMessageIDMap[typeof(InstantiateGONetParticipantEvent)];
+                        bitStream.WriteUInt(messageID);
+
+                        bitStream.WriteLong(Time.ElapsedTicks);
+                    }
+
+                    // body
+                    SerializeBody_InstantiateGONetParticipantEvent(bitStream, gonetParticipant);
+
+                    bitStream.WriteCurrentPartialByte();
+
+                    int bytesUsedCount = (int)memoryStream.Length;
+                    byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
+                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                    //GONetLog.Debug("about to send time sync to client....");
+
+                    SendBytesToRemoteConnections(bytes, bytesUsedCount, QosType.Reliable);
+
+                    mainThread_miscSerializationArrayPool.Return(bytes);
+                }
             }
         }
 

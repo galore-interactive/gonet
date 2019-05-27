@@ -68,7 +68,7 @@
     <Compile Include="Assets\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\GONetSpawnSupport_Editor.cs" />
+    <Compile Include="Assets\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
     <None Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
     <None Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />

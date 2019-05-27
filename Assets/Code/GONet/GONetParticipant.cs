@@ -121,6 +121,7 @@ namespace GONet
         public static event EditorOnlyDelegate EditorOnlyAwake;
         private void Awake()
         {
+            GONetLog.Debug("Awake....instanceID: " + GetInstanceID());
             EditorOnlyAwake?.Invoke(this);
         }
 
@@ -146,11 +147,13 @@ namespace GONet
 
         private void OnEnable()
         {
+            GONetLog.Debug("OnEnable....instanceID: " + GetInstanceID());
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
         }
 
         private void Start()
         {
+            GONetLog.Debug("Start....instanceID: " + GetInstanceID());
             GONetMain.Start_AutoPropogateInstantiation_IfAppropriate(this);
         }
 

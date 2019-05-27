@@ -6,6 +6,8 @@ public class GONetTestSpawner : MonoBehaviour
     public Simpeesimul GONetServerPREFAB;
     public Simpeesimul GONetClientPREFAB;
 
+    public GONetParticipant nonResourcePrefab;
+
     private bool hasServerSpawned;
 
     private void Update()
@@ -21,10 +23,18 @@ public class GONetTestSpawner : MonoBehaviour
             hasServerSpawned = true;
         }
 
-        if (Input.GetKeyDown(KeyCode.D))
+        if (GONetMain.IsServer)
         {
-            GameObject cubeta = GameObject.Find("Cubeta");
-            Instantiate(cubeta);
+            if (Input.GetKeyDown(KeyCode.D))
+            {
+                GameObject cubeta = GameObject.Find("Cubeta");
+                Instantiate(cubeta);
+            }
+
+            if (Input.GetKeyDown(KeyCode.N))
+            {
+                Instantiate(nonResourcePrefab);
+            }
         }
     }
 }

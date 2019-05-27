@@ -16,6 +16,7 @@ namespace GONet.Utils
         public static byte[] SerializeToBytes<T>(T @object)
         {
             return MessagePackSerializer.Serialize(@object, ContractlessStandardResolverAllowPrivate.Instance);
+            //return MessagePackSerializer.Serialize(@object, StandardResolverAllowPrivate.Instance);
         }
 
         /// <summary>

@@ -27,7 +27,7 @@ namespace GONet
     {
         public bool IsTransient { get; private set; } = false;
 
-        public long OccurredAtElapsedTicks { get; }
+        public long OccurredAtElapsedTicks { get; set; }
     }
 
     #endregion
@@ -36,7 +36,7 @@ namespace GONet
 
     public class AutoMagicalSync_ValueChanges_Message : TransientEvent { }
 
-    public class OwnerAuthorityIdAssignmentMessage : PersistentEvent { }
+    public class OwnerAuthorityIdAssignmentEvent : PersistentEvent { }
 
     public class RequestMessage : TransientEvent // TODO probably not always going to be considered transient
     {
@@ -66,5 +66,18 @@ namespace GONet
         {
             RequestUID = requestUID;
         }
+    }
+
+    public class InstantiateGONetParticipantEvent : PersistentEvent
+    {
+        /// <summary>
+        /// this is the information necessary to lookup the source <see cref="UnityEngine.GameObject"/> from which to use as the template in order to call <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.
+        /// TODO add the persisted int->string lookup table that is updated each time a new design time location is encountered (at design time...duh)..so this can be an int!
+        /// </summary>
+        public string DesignTimeLocation;
+
+        public uint GONetId;
+
+        public uint OwnerAuthorityId;
     }
 }

@@ -18,9 +18,6 @@ namespace GONet.Editor
     [InitializeOnLoad]
     public static class GONetSpawnSupport_DesignTime
     {
-        const string SCENE_HIERARCHY_PREFIX = "scene://";
-        const string PROJECT_HIERARCHY_PREFIX = "project://";
-
         static GONetSpawnSupport_DesignTime()
         {
             EditorApplication.hierarchyChanged += OnHierarchyChanged_EnsureDesignTimeLocationsCurrent_SceneOnly;
@@ -42,7 +39,7 @@ namespace GONet.Editor
                     bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
                     if (isProjectAsset)
                     {
-                        string currentLocation = string.Concat(PROJECT_HIERARCHY_PREFIX, projectPath);
+                        string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
                         // this seems unnecessary and problematic for project assets: EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
                         gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
                     }
@@ -63,7 +60,7 @@ namespace GONet.Editor
                     {
                         foreach (var gonetParticipant in rootGO.GetComponentsInChildren<GONetParticipant>())
                         {
-                            string fullUniquePath = string.Concat(SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject));
+                            string fullUniquePath = string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject));
                             if (fullUniquePath != gonetParticipant.designTimeLocation)
                             {
                                 somethingChanged = true;

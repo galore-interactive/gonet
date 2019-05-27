@@ -25,10 +25,7 @@ namespace GONet
 
             GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
 
-            foreach (var gnp in Resources.FindObjectsOfTypeAll<GONetParticipant>()) // TODO put this in gonetmain and store all the design time only stuffsS
-            {
-                Utils.GONetLog.Debug("found GNP resource....name: " + gnp.name + " enabled?: " + gnp.enabled);
-            }
+            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
         }
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)
