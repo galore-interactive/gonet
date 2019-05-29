@@ -1,12 +1,16 @@
 ﻿using GONet.Utils;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace GONet
 {
     public static class GONetSpawnSupport_Runtime
     {
+        public const string GONET_STREAMING_ASSETS_FOLDER = "GONet";
+        public const string DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS = GONET_STREAMING_ASSETS_FOLDER + "/DesignTimeLocations.txt";
+
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
         const string RESOURCES = "Resources/";
@@ -15,24 +19,47 @@ namespace GONet
 
         public static void CacheAllProjectDesignTimeLocations()
         {
-            foreach (var gnp in Resources.FindObjectsOfTypeAll<GONetParticipant>())
+            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+            if (File.Exists(fullPath))
+            {
+                string fileContents = File.ReadAllText(fullPath);
+                foreach (string designTimeLocation in fileContents.Split(Environment.NewLine.ToCharArray()))
+                {
+                    if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                    {
+                        GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
+                        if ((object)template != null)
+                        {
+                            GONetLog.Debug("found template for design time location: " + designTimeLocation);
+                            designTimeLocationToProjectTemplate[designTimeLocation] = template;
+                        }
+                    }
+                }
+            }
+
+            /* does not get all the goodies, because they are not all loaded leaving for ref for now
+            foreach (var gnp in Resources.LoadAll<GONetParticipant>(string.Empty))// FindObjectsOfTypeAll<GONetParticipant>())
+            //foreach (var gnp in Resources.FindObjectsOfTypeAll<GONetParticipant>())
             {
                 if (gnp.designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
                     GONetParticipant template = LookupResourceTemplateFromProjectLocation(gnp.designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
                     if ((object)template != null)
                     {
+                        GONetLog.Debug("found template for design time location: " + gnp.designTimeLocation);
                         designTimeLocationToProjectTemplate[gnp.designTimeLocation] = template;
                     }
                 }
             }
+            */
         }
 
         private static GONetParticipant LookupResourceTemplateFromProjectLocation(string projectLocation)
         {
             if (projectLocation.Contains(RESOURCES))
             {
-                string resourceLocation = projectLocation.Substring(projectLocation.IndexOf(RESOURCES) + RESOURCES.Length);
+                const string PREFAB_EXTENSION = ".prefab";
+                string resourceLocation = projectLocation.Substring(projectLocation.IndexOf(RESOURCES) + RESOURCES.Length).Replace(PREFAB_EXTENSION, string.Empty);
                 GONetParticipant gonetParticipant = Resources.Load<GONetParticipant>(resourceLocation);
                 return gonetParticipant;
             }
@@ -52,6 +79,7 @@ namespace GONet
             }
             else if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
             {
+                GONetLog.Debug("expecting to find template for design time location: " + designTimeLocation);
                 return designTimeLocationToProjectTemplate[designTimeLocation];
             }
 

@@ -7,6 +7,7 @@ public class GONetTestSpawner : MonoBehaviour
     public Simpeesimul GONetClientPREFAB;
 
     public GONetParticipant nonResourcePrefab;
+    public GONetParticipant resourcePrefab;
 
     private bool hasServerSpawned;
 
@@ -34,6 +35,11 @@ public class GONetTestSpawner : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.N))
             {
                 Instantiate(nonResourcePrefab);
+            }
+
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                Instantiate(resourcePrefab);
             }
         }
     }

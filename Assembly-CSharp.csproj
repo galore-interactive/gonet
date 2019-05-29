@@ -176,6 +176,7 @@
     <Compile Include="Assets\Scripts\MessagePack\Unity\UnityResolver.cs" />
     <Compile Include="Assets\Scripts\MessagePack\UnsafeExtensions\UnityBlitResolver.cs" />
     <Compile Include="Assets\Scripts\MessagePack\UnsafeExtensions\UnsafeBlitFormatter.cs" />
+    <None Include="Assets\StreamingAssets\GONet\DesignTimeLocations.txt" />
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>

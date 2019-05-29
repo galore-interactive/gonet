@@ -2,6 +2,7 @@
 using GONet.Utils;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -40,8 +41,11 @@ namespace GONet.Editor
                     if (isProjectAsset)
                     {
                         string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
-                        // this seems unnecessary and problematic for project assets: EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
-                        gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
+
+                        // this seems unnecessary and problematic for project assets: 
+                        EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
+                        
+                        //gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
                     }
                 }
             }
@@ -79,6 +83,11 @@ namespace GONet.Editor
         }
 
         /// <summary>
+        /// TODO make this an ObservableHashSet and only call <see cref="KeepDesignTimeLocationPersistenceUpdated"/> when it changes.
+        /// </summary>
+        static readonly HashSet<string> allDesignTimeLocationsEncountered = new HashSet<string>();
+
+        /// <summary>
         /// Do all proper unity serialization stuff or else a change will NOT stick/save/persist.
         /// </summary>
         private static void EnsureDesignTimeLocationCurrent(GONetParticipant gonetParticipant, string currentLocation)
@@ -87,9 +96,34 @@ namespace GONet.Editor
             SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.designTimeLocation));
             serializedObject.Update();
             serializedProperty.stringValue = currentLocation; // set it this way or else it will NOT work with prefabs!
+            gonetParticipant.designTimeLocation = currentLocation; // doubly sure
             serializedObject.ApplyModifiedProperties();
 
             GONetLog.Debug("set design time location for name: " + gonetParticipant.gameObject.name + " to NEW value: " + gonetParticipant.designTimeLocation);
+
+            allDesignTimeLocationsEncountered.Add(currentLocation);
+            KeepDesignTimeLocationPersistenceUpdated();
+        }
+
+        /// <summary>
+        /// POST: contents of <see cref="allDesignTimeLocationsEncountered"/> persisted.
+        /// </summary>
+        private static void KeepDesignTimeLocationPersistenceUpdated()
+        {
+            StringBuilder fileContents = new StringBuilder(5000);
+            foreach (string designTimeLocation in allDesignTimeLocationsEncountered.OrderBy(x => x))
+            {
+                fileContents.Append(designTimeLocation).Append(Environment.NewLine);
+            }
+
+            string directory = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.GONET_STREAMING_ASSETS_FOLDER);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            string fullPath = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+            File.WriteAllText(fullPath, fileContents.ToString());
         }
     }
 }
