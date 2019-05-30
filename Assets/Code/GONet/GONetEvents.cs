@@ -79,5 +79,16 @@ namespace GONet
         public uint GONetId;
 
         public uint OwnerAuthorityId;
+
+        public InstantiateGONetParticipantEvent() { }
+
+        public InstantiateGONetParticipantEvent(GONetParticipant gonetParticipant)
+        {
+            DesignTimeLocation = gonetParticipant.designTimeLocation;
+            GONetId = gonetParticipant.GONetId;
+            OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+        }
     }
+
+    public class PersistentEvents_Bundle : TransientEvent { }
 }

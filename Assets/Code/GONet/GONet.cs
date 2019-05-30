@@ -685,6 +685,10 @@ namespace GONet
                                     else if (messageType == typeof(InstantiateGONetParticipantEvent))
                                     {
                                         DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                    }
+                                    else if (messageType == typeof(PersistentEvents_Bundle))
+                                    {
+                                        DeserializeBody_PersistentEventsBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
                                     } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
@@ -711,12 +715,11 @@ namespace GONet
             }
         }
 
-        //private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, InstantiateGONetParticipantEvent instantiateEvent)
-        private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, GONetParticipant instantiated)
+        private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, InstantiateGONetParticipantEvent instantiateEvent)
         {
-            bitStream_headerAlreadyWritten.WriteString(instantiated.DesignTimeLocation);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiated.GONetId);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiated.OwnerAuthorityId);
+            bitStream_headerAlreadyWritten.WriteString(instantiateEvent.DesignTimeLocation);
+            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.GONetId);
+            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.OwnerAuthorityId);
         }
 
         private static void DeserializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream, int bytesUsedCount, GONetConnection relatedConnection, long elapsedTicksAtSend)
@@ -729,12 +732,12 @@ namespace GONet
             bitStream.ReadUInt(out instantiateEvent.GONetId);
             bitStream.ReadUInt(out instantiateEvent.OwnerAuthorityId);
 
-            ProcessPersistentEvent(instantiateEvent, relatedConnection);
+            DoRecordKeeping_PersistentEvent(instantiateEvent, relatedConnection);
 
             Instantiate_Remote(instantiateEvent);
         }
 
-        private static void ProcessPersistentEvent(PersistentEvent @event, GONetConnection fromRelatedConnection)
+        private static void DoRecordKeeping_PersistentEvent(PersistentEvent @event, GONetConnection fromRelatedConnection)
         {
             persistentEventsThisSession.Enqueue(@event);
 
@@ -761,8 +764,51 @@ namespace GONet
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
             Server_AssignNewClientAuthorityId(gonetConnection_ServerToClient);
-
+            Server_SendClientPersistentEventsSinceStart(gonetConnection_ServerToClient);
             Server_SendClientCurrentState_AllAutoMagicalSync(gonetConnection_ServerToClient);
+        }
+
+        private static void Server_SendClientPersistentEventsSinceStart(GONetConnection_ServerToClient gonetConnection_ServerToClient)
+        {
+            // TODO need generic message serialization!  This whole implementation here is bulky, one-off and crap...just here to see how it would work for starters
+
+            if (persistentEventsThisSession.Count > 0)
+            {
+                using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+                {
+                    using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
+                    {
+                        { // overall header...just message type/id...well, and now time 
+                            uint messageID = messageTypeToMessageIDMap[typeof(PersistentEvents_Bundle)];
+                            bitStream.WriteUInt(messageID);
+
+                            bitStream.WriteLong(Time.ElapsedTicks);
+                        }
+
+                        // overall body
+                        foreach (PersistentEvent persistentEvent in persistentEventsThisSession) // TODO FIXME remove contradicting/cancelling events like spawn/destroy
+                        {
+                            if (persistentEvent is InstantiateGONetParticipantEvent)
+                            {
+                                // individual body
+                                SerializeBody_InstantiateGONetParticipantEvent(bitStream, (InstantiateGONetParticipantEvent)persistentEvent);
+                            }
+                        }
+
+                        bitStream.WriteCurrentPartialByte();
+
+                        int bytesUsedCount = (int)memoryStream.Length;
+                        byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
+                        Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                        //GONetLog.Debug("about to send time sync to client....");
+
+                        SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytesUsedCount, QosType.Reliable);
+
+                        mainThread_miscSerializationArrayPool.Return(bytes);
+                    }
+                }
+            }
         }
 
         private static void Server_AssignNewClientAuthorityId(GONetConnection_ServerToClient gonetConnection_ServerToClient)
@@ -1179,7 +1225,9 @@ namespace GONet
                     }
 
                     // body
-                    SerializeBody_InstantiateGONetParticipantEvent(bitStream, gonetParticipant);
+                    InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent(gonetParticipant);
+                    SerializeBody_InstantiateGONetParticipantEvent(bitStream, @event);
+                    persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
 
                     bitStream.WriteCurrentPartialByte();
 
@@ -1649,6 +1697,15 @@ namespace GONet
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
 
                 syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
+            }
+        }
+
+        private static void DeserializeBody_PersistentEventsBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        {
+            while (bitStream_headerAlreadyRead.Position < bytesUsedCount) // while more data to read/process
+            {
+                // TODO FIXME we are ASSuming all events in bundle are instantiation events....for now that works, but......
+                DeserializeBody_InstantiateGONetParticipantEvent(bitStream_headerAlreadyRead, bytesUsedCount, sourceOfChangeConnection, elapsedTicksAtSend);
             }
         }
 

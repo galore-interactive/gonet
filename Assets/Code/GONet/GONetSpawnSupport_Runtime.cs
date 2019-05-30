@@ -83,7 +83,7 @@ namespace GONet
                 return designTimeLocationToProjectTemplate[designTimeLocation];
             }
 
-            throw new ArgumentException("Must include supported prefix defined as const herein.", nameof(designTimeLocation));
+            throw new ArgumentException(string.Concat("Must include supported prefix defined as const herein. value received: ", designTimeLocation), nameof(designTimeLocation));
         }
     }
 }
