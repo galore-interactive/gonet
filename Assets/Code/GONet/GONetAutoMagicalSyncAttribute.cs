@@ -52,7 +52,6 @@ namespace GONet
     ///     • Structs containing allowable types.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-    [MessagePackObject]
     public class GONetAutoMagicalSyncAttribute : Attribute
     {
         public override object TypeId => base.TypeId;

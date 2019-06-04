@@ -451,7 +451,6 @@ namespace GONet.Generation
         /// This is ONLY populated when <see cref="GONetParticipant_ComponentsWithAutoSyncMembers.GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant)"/> is used during 
         /// the time leading up to doing a generation call (i.e., <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.DoAllTheGenerationStuffs"/>).
         /// </summary>
-        [IgnoreMember]
         internal GONetParticipant gonetParticipant;
 
         /// <summary>

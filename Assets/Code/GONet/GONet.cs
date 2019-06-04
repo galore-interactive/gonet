@@ -75,7 +75,7 @@ namespace GONet
             }
         }
 
-        static readonly Queue<PersistentEvent> persistentEventsThisSession = new Queue<PersistentEvent>();
+        static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
         /// <summary>
         /// TODO FIXME make this private.....its internal temporary for testing
@@ -341,8 +341,7 @@ namespace GONet
                 client_lastSyncTimeRequestSent = now;
 
                 { // the actual sync request:
-                    RequestMessage timeSync = new RequestMessage();
-                    timeSync.ElapsedTicksAtSend = Time.ElapsedTicks;
+                    RequestMessage timeSync = new RequestMessage(Time.ElapsedTicks);
 
                     client_lastFewTimeSyncsSentByUID[timeSync.UID] = timeSync;
                     if (client_lastFewTimeSyncsSentByUID.Count > CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE)
@@ -358,7 +357,7 @@ namespace GONet
                                 uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
                                 bitStream.WriteUInt(messageID);
 
-                                bitStream.WriteLong(timeSync.ElapsedTicksAtSend);
+                                bitStream.WriteLong(timeSync.OccurredAtElapsedTicks);
                             }
 
                             // body
@@ -420,7 +419,7 @@ namespace GONet
                     client_mostRecentTimeSyncResponseSentTicks = server_elapsedTicksAtSendResponse;
 
                     long responseReceivedTicks_Client = Time.ElapsedTicks;
-                    long requestSentTicks_Client = requestMessage.ElapsedTicksAtSend;
+                    long requestSentTicks_Client = requestMessage.OccurredAtElapsedTicks;
                     long rtt_ticks = responseReceivedTicks_Client - requestSentTicks_Client;
 
                     gonetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
@@ -737,7 +736,7 @@ namespace GONet
             Instantiate_Remote(instantiateEvent);
         }
 
-        private static void DoRecordKeeping_PersistentEvent(PersistentEvent @event, GONetConnection fromRelatedConnection)
+        private static void DoRecordKeeping_PersistentEvent(IPersistentEvent @event, GONetConnection fromRelatedConnection)
         {
             persistentEventsThisSession.Enqueue(@event);
 
@@ -786,7 +785,7 @@ namespace GONet
                         }
 
                         // overall body
-                        foreach (PersistentEvent persistentEvent in persistentEventsThisSession) // TODO FIXME remove contradicting/cancelling events like spawn/destroy
+                        foreach (IPersistentEvent persistentEvent in persistentEventsThisSession) // TODO FIXME remove contradicting/cancelling events like spawn/destroy
                         {
                             if (persistentEvent is InstantiateGONetParticipantEvent)
                             {

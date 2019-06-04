@@ -5,71 +5,70 @@ namespace GONet
 {
     #region base stuffs
 
+    /// <summary>
+    /// This alone does not mean much.  Implement either <see cref="ITransientEvent"/> or <see cref="IPersistentEvent"/>.
+    /// </summary>
     public interface IGONetEvent
     {
-        /// <summary>
-        /// If true, this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
-        /// If false, the term used is persistent.
-        /// </summary>
-        bool IsTransient { get; }
-
         long OccurredAtElapsedTicks { get; }
     }
 
-    public abstract class TransientEvent : IGONetEvent
-    {
-        public bool IsTransient { get; private set; }  = true;
+    /// <summary>
+    /// Implement this to this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
+    /// </summary>
+    public interface ITransientEvent : IGONetEvent { }
 
-        public long OccurredAtElapsedTicks { get; }
-    }
-
-    public abstract class PersistentEvent : IGONetEvent
-    {
-        public bool IsTransient { get; private set; } = false;
-
-        public long OccurredAtElapsedTicks { get; set; }
-    }
+    /// <summary>
+    /// Implement this for persistent events..opposite of extending <see cref="ITransientEvent"/> (see the comments there for more).
+    /// </summary>
+    public interface IPersistentEvent : IGONetEvent { }
 
     #endregion
 
-    public class AutoMagicalSync_AllCurrentValues_Message : TransientEvent { }
-
-    public class AutoMagicalSync_ValueChanges_Message : TransientEvent { }
-
-    public class OwnerAuthorityIdAssignmentEvent : PersistentEvent { }
-
-    public class RequestMessage : TransientEvent // TODO probably not always going to be considered transient
+    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
     {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
+    public struct AutoMagicalSync_ValueChanges_Message : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
+    public struct OwnerAuthorityIdAssignmentEvent : IPersistentEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
+    public struct RequestMessage : ITransientEvent // TODO probably not always going to be considered transient
+    {
+        public long OccurredAtElapsedTicks { get; set; }
         public readonly long UID;
 
-        /// <summary>
-        /// TODO replace this with (new) <see cref="IGONetEvent.OccurredAtElapsedTicks"/>
-        /// </summary>
-        public long ElapsedTicksAtSend { get; internal set; }
-
-        public RequestMessage()
+        public RequestMessage(long occurredAtElapsedTicks)
         {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+
             UID = GUID.Generate().AsInt64();
         }
+    }
 
-        public RequestMessage(long uid)
+    public struct ResponseMessage : ITransientEvent // TODO probably not always going to be considered transient
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+        public readonly long CorrelationRequestUID;
+
+        public ResponseMessage(long occurredAtElapsedTicks, long correlationRequestUID)
         {
-            UID = uid;
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            CorrelationRequestUID = correlationRequestUID;
         }
     }
 
-    public class ResponseMessage : TransientEvent // TODO probably not always going to be considered transient
+    public struct InstantiateGONetParticipantEvent : IPersistentEvent
     {
-        public readonly long RequestUID;
+        public long OccurredAtElapsedTicks { get; set; }
 
-        public ResponseMessage(long requestUID)
-        {
-            RequestUID = requestUID;
-        }
-    }
-
-    public class InstantiateGONetParticipantEvent : PersistentEvent
-    {
         /// <summary>
         /// this is the information necessary to lookup the source <see cref="UnityEngine.GameObject"/> from which to use as the template in order to call <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.
         /// TODO add the persisted int->string lookup table that is updated each time a new design time location is encountered (at design time...duh)..so this can be an int!
@@ -80,15 +79,18 @@ namespace GONet
 
         public uint OwnerAuthorityId;
 
-        public InstantiateGONetParticipantEvent() { }
-
         public InstantiateGONetParticipantEvent(GONetParticipant gonetParticipant)
         {
             DesignTimeLocation = gonetParticipant.designTimeLocation;
             GONetId = gonetParticipant.GONetId;
             OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            OccurredAtElapsedTicks = default;
         }
     }
 
-    public class PersistentEvents_Bundle : TransientEvent { }
+    public struct PersistentEvents_Bundle : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
 }

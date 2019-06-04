@@ -7,7 +7,13 @@ namespace GONet.Utils
     {
         static SerializationUtils()
         {
-            MessagePackSerializer.SetDefaultResolver(ContractlessStandardResolver.Instance);
+            //MessagePackSerializer.SetDefaultResolver();
+
+            CompositeResolver.RegisterAndSetAsDefault(
+                DynamicObjectResolver.Instance,
+                PrimitiveObjectResolver.Instance,
+                StandardResolver.Instance
+            );
         }
 
         /// <summary>
@@ -15,7 +21,7 @@ namespace GONet.Utils
         /// </summary>
         public static byte[] SerializeToBytes<T>(T @object)
         {
-            return MessagePackSerializer.Serialize(@object, ContractlessStandardResolverAllowPrivate.Instance);
+            return MessagePackSerializer.Serialize(@object);
             //return MessagePackSerializer.Serialize(@object, StandardResolverAllowPrivate.Instance);
         }
 
