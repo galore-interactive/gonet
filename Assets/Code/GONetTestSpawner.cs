@@ -28,7 +28,7 @@ public class GONetTestSpawner : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.D))
             {
-                GameObject cubeta = GameObject.Find("Cubeta");
+                GameObject cubeta = GameObject.Find("Cubetas");
                 Instantiate(cubeta);
             }
 

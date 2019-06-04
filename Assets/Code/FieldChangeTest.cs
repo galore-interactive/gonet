@@ -8,6 +8,9 @@ public class FieldChangeTest : MonoBehaviour
 
     public float rottieTotty;
 
+    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
+    public float nada;
+
     Vector3 startPosition;
     Quaternion startRotation;
 

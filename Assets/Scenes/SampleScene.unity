@@ -256,6 +256,11 @@ PrefabInstance:
       propertyPath: designTimeLocation
       value: scene://SampleScene/Cubeta (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
+        type: 3}
+      propertyPath: codeGenerationId
+      value: 2
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8dbb42a00f39ec74c90dbf75f6b019b4, type: 3}
 --- !u!1 &790599122
@@ -435,154 +440,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 37.46, y: 0, z: 0}
---- !u!1001 &1190596015
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 8999699362913574805, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_Name
-      value: Cubeta (2)
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 30.17
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2.3399231
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -70.97
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0.3188416
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.11126923
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0.33804935
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.87845427
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_RootOrder
-      value: 5
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: -39.45
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: -1.49
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 42.63
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: designTimeLocation
-      value: scene://SampleScene/Cubeta (2)
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 8dbb42a00f39ec74c90dbf75f6b019b4, type: 3}
---- !u!1001 &1947328991
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 8999699362913574805, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_Name
-      value: Cubeta (3)
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 30.17
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2.3399231
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -70.97
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0.3188416
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.11126923
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0.33804935
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.87845427
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_RootOrder
-      value: 6
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: -39.45
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: -1.49
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 42.63
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
-        type: 3}
-      propertyPath: designTimeLocation
-      value: scene://SampleScene/Cubeta (3)
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 8dbb42a00f39ec74c90dbf75f6b019b4, type: 3}
 --- !u!1001 &4599183186767257250
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -662,7 +519,7 @@ PrefabInstance:
     - target: {fileID: 8999699362913574805, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
         type: 3}
       propertyPath: m_Name
-      value: Cubeta
+      value: Cubetas
       objectReference: {fileID: 0}
     - target: {fileID: 8999699362913574803, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
         type: 3}
@@ -722,7 +579,12 @@ PrefabInstance:
     - target: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
         type: 3}
       propertyPath: designTimeLocation
-      value: scene://SampleScene/Cubeta
+      value: scene://SampleScene/Cubetas
+      objectReference: {fileID: 0}
+    - target: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
+        type: 3}
+      propertyPath: codeGenerationId
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8dbb42a00f39ec74c90dbf75f6b019b4, type: 3}
