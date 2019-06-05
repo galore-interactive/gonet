@@ -771,44 +771,20 @@ namespace GONet
 
         private static void Server_SendClientPersistentEventsSinceStart(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
-            // TODO need generic message serialization!  This whole implementation here is bulky, one-off and crap...just here to see how it would work for starters
-
             if (persistentEventsThisSession.Count > 0)
             {
-                using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
-                {
-                    using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                    {
-                        { // overall header...just message type/id...well, and now time 
-                            uint messageID = messageTypeToMessageIDMap[typeof(PersistentEvents_Bundle)];
-                            bitStream.WriteUInt(messageID);
+                PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession.Cast<InstantiateGONetParticipantEvent>().ToList());
+                byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
 
-                            bitStream.WriteLong(Time.ElapsedTicks);
-                        }
+                int headerSize = sizeof(uint) + sizeof(long);
+                byte[] todoFIXMEpool = new byte[bytes.Length + headerSize];
 
-                        // overall body
-                        foreach (IPersistentEvent persistentEvent in persistentEventsThisSession) // TODO FIXME remove contradicting/cancelling events like spawn/destroy
-                        {
-                            if (persistentEvent is InstantiateGONetParticipantEvent)
-                            {
-                                // individual body
-                                SerializeBody_InstantiateGONetParticipantEvent(bitStream, (InstantiateGONetParticipantEvent)persistentEvent);
-                            }
-                        }
+                uint header = messageTypeToMessageIDMap[bundle.GetType()];
+                Utils.BitConverter.GetBytes(header, todoFIXMEpool, 0);
+                Utils.BitConverter.GetBytes(Time.ElapsedTicks, todoFIXMEpool, 4);
+                Buffer.BlockCopy(bytes, 0, todoFIXMEpool, headerSize, bytes.Length);
 
-                        bitStream.WriteCurrentPartialByte();
-
-                        int bytesUsedCount = (int)memoryStream.Length;
-                        byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                        Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                        //GONetLog.Debug("about to send time sync to client....");
-
-                        SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytesUsedCount, QosType.Reliable);
-
-                        mainThread_miscSerializationArrayPool.Return(bytes);
-                    }
-                }
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, todoFIXMEpool, todoFIXMEpool.Length, QosType.Reliable);
             }
         }
 
@@ -1226,7 +1202,7 @@ namespace GONet
                     }
 
                     // body
-                    InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent(gonetParticipant);
+                    InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
                     SerializeBody_InstantiateGONetParticipantEvent(bitStream, @event);
                     persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
 
@@ -1703,10 +1679,20 @@ namespace GONet
 
         private static void DeserializeBody_PersistentEventsBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
-            while (bitStream_headerAlreadyRead.Position < bytesUsedCount) // while more data to read/process
+            int remainingSize = bytesUsedCount - (int)bitStream_headerAlreadyRead.Position;
+            byte[] todoFIXMEpool = new byte[remainingSize];
+            bitStream_headerAlreadyRead.Read(todoFIXMEpool, 0, remainingSize);
+            var bundle = SerializationUtils.DeserializeFromBytes<PersistentEvents_Bundle>(todoFIXMEpool);
+
+            foreach (var item in bundle.PersistentEvents)
             {
-                // TODO FIXME we are ASSuming all events in bundle are instantiation events....for now that works, but......
-                DeserializeBody_InstantiateGONetParticipantEvent(bitStream_headerAlreadyRead, bytesUsedCount, sourceOfChangeConnection, elapsedTicksAtSend);
+                DoRecordKeeping_PersistentEvent(item, sourceOfChangeConnection);
+
+                if (item is InstantiateGONetParticipantEvent)
+                {
+                    var instantiateEvent = (InstantiateGONetParticipantEvent)item;
+                    Instantiate_Remote(instantiateEvent);
+                }
             }
         }
 

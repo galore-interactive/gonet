@@ -1,4 +1,5 @@
 ﻿using GONet.Utils;
+using MessagePack;
 using System.Collections.Generic;
 
 namespace GONet
@@ -40,10 +41,14 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    [MessagePackObject]
     public struct RequestMessage : ITransientEvent // TODO probably not always going to be considered transient
     {
+        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
-        public readonly long UID;
+
+        [Key(1)]
+        public long UID;
 
         public RequestMessage(long occurredAtElapsedTicks)
         {
@@ -53,10 +58,14 @@ namespace GONet
         }
     }
 
+    [MessagePackObject]
     public struct ResponseMessage : ITransientEvent // TODO probably not always going to be considered transient
     {
+        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
-        public readonly long CorrelationRequestUID;
+
+        [Key(1)]
+        public long CorrelationRequestUID;
 
         public ResponseMessage(long occurredAtElapsedTicks, long correlationRequestUID)
         {
@@ -65,32 +74,54 @@ namespace GONet
         }
     }
 
+    [MessagePackObject]
     public struct InstantiateGONetParticipantEvent : IPersistentEvent
     {
+        [IgnoreMember]
         public long OccurredAtElapsedTicks { get; set; }
 
         /// <summary>
         /// this is the information necessary to lookup the source <see cref="UnityEngine.GameObject"/> from which to use as the template in order to call <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.
         /// TODO add the persisted int->string lookup table that is updated each time a new design time location is encountered (at design time...duh)..so this can be an int!
         /// </summary>
+        [Key(0)]
         public string DesignTimeLocation;
 
+        [Key(1)]
         public uint GONetId;
 
+        [Key(2)]
         public uint OwnerAuthorityId;
 
-        public InstantiateGONetParticipantEvent(GONetParticipant gonetParticipant)
+        public static InstantiateGONetParticipantEvent Gorbi(GONetParticipant gonetParticipant)
         {
-            DesignTimeLocation = gonetParticipant.designTimeLocation;
-            GONetId = gonetParticipant.GONetId;
-            OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            InstantiateGONetParticipantEvent gorbi = new InstantiateGONetParticipantEvent();
 
-            OccurredAtElapsedTicks = default;
+            gorbi.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            gorbi.GONetId = gonetParticipant.GONetId;
+            gorbi.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            gorbi.OccurredAtElapsedTicks = default;
+
+            return gorbi;
         }
     }
 
+    [MessagePackObject]
     public struct PersistentEvents_Bundle : ITransientEvent
     {
-        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1)]
+        public List<InstantiateGONetParticipantEvent> PersistentEvents;
+        // TODO once interface can work maybe TypelessObjectResolver: public Queue<IPersistentEvent> PersistentEvents;
+
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, List<InstantiateGONetParticipantEvent> persistentEvents) : this()
+        // public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            PersistentEvents = persistentEvents;
+        }
     }
 }

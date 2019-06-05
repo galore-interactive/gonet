@@ -1,5 +1,6 @@
 ﻿using MessagePack;
 using MessagePack.Resolvers;
+using System;
 
 namespace GONet.Utils
 {
@@ -10,6 +11,7 @@ namespace GONet.Utils
             //MessagePackSerializer.SetDefaultResolver();
 
             CompositeResolver.RegisterAndSetAsDefault(
+                // TODO figure out how to get this: TypelessObjectResolver
                 DynamicObjectResolver.Instance,
                 PrimitiveObjectResolver.Instance,
                 StandardResolver.Instance
@@ -29,6 +31,14 @@ namespace GONet.Utils
         /// This is the best general purpose object (de)serializer GONet can provide.
         /// </summary>
         public static T DeserializeFromBytes<T>(byte[] bytes)
+        {
+            return MessagePackSerializer.Deserialize<T>(bytes);
+        }
+
+        /// <summary>
+        /// This is the best general purpose object (de)serializer GONet can provide.
+        /// </summary>
+        public static T DeserializeFromBytes<T>(ArraySegment<byte> bytes)
         {
             return MessagePackSerializer.Deserialize<T>(bytes);
         }
