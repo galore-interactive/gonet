@@ -75,6 +75,8 @@ namespace GONet
             }
         }
 
+        public static bool IsUnityApplicationEditor { get; internal set; }  = false;
+
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
         /// <summary>

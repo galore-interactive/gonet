@@ -29,13 +29,16 @@ namespace GONet.Utils
         const string KeyFatal = "Log:Fatal";
         const string KeyVerbose = "Log:Verbose"; //this isn't really implemented the way we want yet
 
-        const string SPACE = " ";
         const char NewLine = '\n';
+        const string SPACE = " ";
+        private const string FORMAT = "[{0}] ({1:dd MMM yyyy H:mm:ss.fff}) {2}";
 
         private static string lastLog;
         public static string LastLog { get { return lastLog; } }
         public delegate void LogDel(string logStr);
         public static event LogDel OnLog;
+
+        private static ILog _fileLogger;
 
         static GONetLog()
         {
@@ -43,59 +46,65 @@ namespace GONet.Utils
             string configPath = Application.isEditor ? "../configs/log_config.xml" : "configs/log_config.xml";
             FileInfo info = new FileInfo(Path.Combine(Application.dataPath, configPath));
             log4net.Config.XmlConfigurator.Configure(info);
-            //manual stack traces instead of this because this results in no stack trace for non debug builds!
-            //Application.logMessageReceivedThreaded += Log.OnLogMessageReceived;
         }
 
         [Conditional("LOG_INFO")]
         public static void Info(string message)
         {
-            string formattedMessage = FormatMessage(KeyInfo, message);
-            UnityEngine.Debug.Log(formattedMessage);
-            StackTrace trace = new StackTrace(1, true);
-            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Log);
+            LogInternal(message, KeyInfo, LogType.Log);
         }
 
         [Conditional("LOG_DEBUG")]
         public static void Debug(string message)
         {
-            string formattedMessage = FormatMessage(KeyDebug, message);
-            UnityEngine.Debug.Log(formattedMessage);
-            StackTrace trace = new StackTrace(1, true);
-            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Log);
+            LogInternal(message, KeyDebug, LogType.Log);
         }
 
         [Conditional("LOG_WARNING")]
         public static void Warning(string message)
         {
-            string formattedMessage = FormatMessage(KeyWarning, message);
-            UnityEngine.Debug.LogWarning(formattedMessage);
-            StackTrace trace = new StackTrace(1, true);
-            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Warning);
+            LogInternal(message, KeyWarning, LogType.Warning);
         }
 
         [Conditional("LOG_ERROR")]
         public static void Error(string message)
         {
-            string formattedMessage = FormatMessage(KeyError, message);
-            UnityEngine.Debug.LogError(formattedMessage);
-            StackTrace trace = new StackTrace(1, true);
-            OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Error);
+            LogInternal(message, KeyError, LogType.Error);
         }
 
         [Conditional("LOG_FATAL")]
         public static void Fatal(string message)
         {
-            string formattedMessage = FormatMessage(KeyFatal, message);
-            UnityEngine.Debug.LogError(formattedMessage);
-            StackTrace trace = new StackTrace(1, true);
-            GONetLog.OnLogMessageReceived(formattedMessage, trace.ToString(), LogType.Error);
+            LogInternal(message, KeyFatal, LogType.Error);
         }
 
-        private static string FormatMessage(string level, string message)
+        private static void LogInternal(string message, string keyXxx, LogType logType)
         {
-            const string FORMAT = "[{0}] (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{3}s) {4}";
-            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message);
+            if (GONetMain.IsUnityApplicationEditor)
+            {
+                string formattedMessage = FormatMessage(keyXxx, message);
+                switch (logType)
+                {
+                    case LogType.Assert:
+                    case LogType.Log:
+                        UnityEngine.Debug.Log(formattedMessage);
+                        break;
+
+                    case LogType.Warning:
+                        UnityEngine.Debug.LogWarning(formattedMessage);
+                        break;
+
+                    case LogType.Exception:
+                    case LogType.Error:
+                        UnityEngine.Debug.LogError(formattedMessage);
+                        break;
+                }
+            }
+            else
+            {
+                StackTrace trace = new StackTrace(1, true);
+                ProcessMessageViaLogger(string.Concat(keyXxx, SPACE, message), trace.ToString(), logType);
+            }
         }
 
         [Conditional("LOG_VERBOSE")]
@@ -104,76 +113,67 @@ namespace GONet.Utils
             UnityEngine.Debug.Log(FormatMessage(KeyVerbose, message));
         }
 
+        private static string FormatMessage(string level, string message)
+        {
+            const string FORMAT = "[{0}] (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{3}s) {4}";
+            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message);
+        }
 
-        private static ILog _fileLogger;
-        //enum LogType { Info, Debug, Warning, Error, Fatal, Verbose};
-        public static void OnLogMessageReceived(string logString, string stackTrace, UnityEngine.LogType type)
-        {           
-            if(!string.IsNullOrEmpty(stackTrace))
+        private static void ProcessMessageViaLogger(string logString, string stackTrace, LogType type)
+        {
+            if (string.IsNullOrEmpty(stackTrace))
             {
-                string[] stackLines = stackTrace.Split(NewLine);
-                //string logLine = stackLines[1];
-                //int startIndex = stackLines[0].Length + logLine.Length + 2;
-                //get all
-                //string callLines = stackTrace.Substring(startIndex, stackTrace.Length - startIndex - 1);
-                ////string callLine = stackLines[2]; //this will print out only the calling line
+                switch (type)
+                {
+                    case LogType.Log:
+                        _fileLogger.Debug(logString);
+                        break;
 
-                string callLine = stackTrace;
-                string logLine = logString;
-                if (logLine.Contains(GONetLog.KeyInfo))
-                {
-                    _fileLogger.Info(string.Concat(logString, NewLine, callLine, NewLine));
-                }
-                else if (logLine.Contains(GONetLog.KeyDebug))
-                {
-                    _fileLogger.Debug(string.Concat(logString, NewLine, callLine, NewLine));
-                }
-                else if (logLine.Contains(GONetLog.KeyWarning))
-                {
-                    _fileLogger.Warn(string.Concat(logString, NewLine, callLine, NewLine));
-                }
-                else if (logLine.Contains(GONetLog.KeyError))
-                {
-                    _fileLogger.Error(string.Concat(logString, NewLine, callLine, NewLine));
-                }
-                else if (logLine.Contains(GONetLog.KeyFatal))
-                {
-                    _fileLogger.Fatal(string.Concat(logString, NewLine, callLine, NewLine));
-                }
-                else if (logLine.Contains(GONetLog.KeyVerbose))
-                {
-                    _fileLogger.Info(string.Concat(logString, NewLine, callLine, NewLine));
+                    case LogType.Warning:
+                        _fileLogger.Warn(logString);
+                        break;
+
+                    case LogType.Error:
+                        _fileLogger.Error(logString);
+                        break;
+
+                    case LogType.Exception:
+                        _fileLogger.Fatal(logString);
+                        break;
+
+                    default:
+                        _fileLogger.Info(logString);
+                        break;
                 }
             }
             else
             {
-                switch(type)
+                string callLine = stackTrace;
+                string logLine = logString;
+                string concattedMessage = string.Concat(logString, NewLine, callLine, NewLine);
+                if (logLine.Contains(KeyInfo))
                 {
-                    case LogType.Log:
-                        {
-                            _fileLogger.Debug(logString);
-                        }
-                        break;
-                    case LogType.Warning:
-                        {
-                            _fileLogger.Warn(logString);
-                        }
-                        break;
-                    case LogType.Error:
-                        {
-                            _fileLogger.Error(logString);
-                        }
-                        break;
-                    case LogType.Exception:
-                        {
-                            _fileLogger.Fatal(logString);
-                        }
-                        break;
-                    default:
-                        {
-                            _fileLogger.Info(logString);
-                        }
-                        break;
+                    _fileLogger.Info(concattedMessage);
+                }
+                else if (logLine.Contains(KeyDebug))
+                {
+                    _fileLogger.Debug(concattedMessage);
+                }
+                else if (logLine.Contains(KeyWarning))
+                {
+                    _fileLogger.Warn(concattedMessage);
+                }
+                else if (logLine.Contains(KeyError))
+                {
+                    _fileLogger.Error(concattedMessage);
+                }
+                else if (logLine.Contains(KeyFatal))
+                {
+                    _fileLogger.Fatal(concattedMessage);
+                }
+                else if (logLine.Contains(KeyVerbose))
+                {
+                    _fileLogger.Info(concattedMessage);
                 }
             }
             lastLog = logString;

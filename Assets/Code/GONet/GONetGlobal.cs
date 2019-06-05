@@ -23,6 +23,7 @@ namespace GONet
         {
             SceneManager.sceneLoaded += OnSceneLoaded;
 
+            GONetMain.IsUnityApplicationEditor = Application.isEditor;
             GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
 
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
