@@ -3,7 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using GONet.Utils;
 using NetcodeIO.NET;
-using ReliableNetcode;
+
+using GONetChannelId = System.Byte;
 
 namespace GONet
 {
@@ -83,12 +84,13 @@ namespace GONet
             ProcessNewClientConnections_MainUnityThread();
         }
 
-        public void SendBytesToAllClients(byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
+        public void SendBytesToAllClients(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
         {
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
                 GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
-                gONetConnection_ServerToClient.SendMessage(bytes, bytesUsedCount, qualityOfService);
+
+                gONetConnection_ServerToClient.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
             }
         }
 

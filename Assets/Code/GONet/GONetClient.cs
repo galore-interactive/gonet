@@ -1,7 +1,7 @@
-﻿using GONet.Utils;
-using NetcodeIO.NET;
-using ReliableNetcode;
+﻿using NetcodeIO.NET;
 using System;
+
+using GONetChannelId = System.Byte;
 
 namespace GONet
 {
@@ -29,9 +29,9 @@ namespace GONet
             connectionToServer.Connect(serverIP, serverPort);
         }
 
-        public void SendBytesToServer(byte[] bytes, int bytesUsedCount, QosType qualityOfService = QosType.Reliable)
+        public void SendBytesToServer(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
         {
-            connectionToServer.SendMessage(bytes, bytesUsedCount, qualityOfService);
+            connectionToServer.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
         }
 
         /// <summary>

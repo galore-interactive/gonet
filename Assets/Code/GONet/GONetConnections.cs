@@ -3,6 +3,8 @@ using NetcodeIO.NET;
 using ReliableNetcode;
 using System.Net;
 
+using GONetChannelId = System.Byte;
+
 namespace GONet
 {
     public abstract class GONetConnection : ReliableEndpoint
@@ -67,9 +69,23 @@ namespace GONet
             ReceiveCallback = OnReceiveCallback;
         }
 
+        /// <summary>
+        /// IMPORTANT: You must use this method instead of <see cref="ReliableEndpoint.SendMessage(GONetChannelId[], int, QosType)"/> in order for the channel stuff to work properly!
+        /// </summary>
+        public void SendMessageOverChannel(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId)
+        {
+            GONetChannel channel = GONetChannel.ById(channelId);
+            // TODO FIXME need to prefix bytes with channelId!!!  So the receiving end will always read off the first byte as the channelId
+
+            SendMessage(messageBytes, bytesUsedCount, channel.QualityOfService);
+        }
+
         private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
         {
-            GONetMain.ProcessIncomingBytes(this, messageBytes, bytesUsedCount);
+            // TODO FIXME need to read off the prefix bytes, which is channelId!!!  IMPORTANT, the byte[] passed into GONetMain.ProcessIncomingBytes below should not contain channelId
+            GONetChannelId TODO_FIXME = GONetChannelId.MaxValue;
+
+            GONetMain.ProcessIncomingBytes(this, messageBytes, bytesUsedCount, TODO_FIXME);
         }
     }
 

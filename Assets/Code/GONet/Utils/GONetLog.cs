@@ -5,7 +5,7 @@ using log4net;
 using System;
 using System.Threading;
 
-namespace GONet.Utils
+namespace GONet
 {
     /// <summary>
     /// A nice log4net based logging utility that can/should replace <see cref="UnityEngine.Debug"/> LogXxx methods usage.
