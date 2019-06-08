@@ -19,6 +19,54 @@ using System.Text;
 using UnityEngine;
 using GONet;
 
+namespace GONet
+{
+
+<#
+	int iPersistentEvents = 0;
+	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
+				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+    {
+        foreach (var type in types)
+        {
+	#>
+	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=type.FullName#>))]
+	<#
+        }
+    }
+#>	public partial interface IGONetEvent { }
+
+
+<#
+	iPersistentEvents = 0;
+	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
+				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(ITransientEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+    {
+        foreach (var type in types)
+        {
+	#>
+	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=type.FullName#>))]
+	<#
+        }
+    }
+#>	public partial interface ITransientEvent : IGONetEvent { }
+
+
+<#
+	iPersistentEvents = 0;
+	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
+				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IPersistentEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+    {
+        foreach (var type in types)
+        {
+	#>
+	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=type.FullName#>))]
+	<#
+        }
+    }
+#>	public partial interface IPersistentEvent : IGONetEvent { }
+}
+
 namespace GONet.Generation
 {
 	public partial class BobWad

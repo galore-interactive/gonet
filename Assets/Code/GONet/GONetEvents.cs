@@ -9,7 +9,7 @@ namespace GONet
     /// <summary>
     /// This alone does not mean much.  Implement either <see cref="ITransientEvent"/> or <see cref="IPersistentEvent"/>.
     /// </summary>
-    public interface IGONetEvent
+    public partial interface IGONetEvent
     {
         long OccurredAtElapsedTicks { get; }
     }
@@ -17,12 +17,12 @@ namespace GONet
     /// <summary>
     /// Implement this to this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
     /// </summary>
-    public interface ITransientEvent : IGONetEvent { }
+    public partial interface ITransientEvent : IGONetEvent { }
 
     /// <summary>
     /// Implement this for persistent events..opposite of extending <see cref="ITransientEvent"/> (see the comments there for more).
     /// </summary>
-    public interface IPersistentEvent : IGONetEvent { }
+    public partial interface IPersistentEvent : IGONetEvent { }
 
     #endregion
 
@@ -114,11 +114,9 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public List<InstantiateGONetParticipantEvent> PersistentEvents;
-        // TODO once interface can work maybe TypelessObjectResolver: public Queue<IPersistentEvent> PersistentEvents;
+        public Queue<IPersistentEvent> PersistentEvents;
 
-        public PersistentEvents_Bundle(long occurredAtElapsedTicks, List<InstantiateGONetParticipantEvent> persistentEvents) : this()
-        // public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             PersistentEvents = persistentEvents;

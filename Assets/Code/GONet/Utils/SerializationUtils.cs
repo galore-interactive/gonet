@@ -1,4 +1,5 @@
 ﻿using MessagePack;
+using MessagePack.Formatters;
 using MessagePack.Resolvers;
 using System;
 
@@ -14,9 +15,20 @@ namespace GONet.Utils
                 // TODO figure out how to get this: TypelessObjectResolver
                 DynamicObjectResolver.Instance,
                 PrimitiveObjectResolver.Instance,
-                StandardResolver.Instance
+                StandardResolver.Instance,
+                ContractlessStandardResolver.Instance
             );
         }
+
+        /*
+        public class IPersistentEventResolver : IFormatterResolver
+        {
+            public IMessagePackFormatter<T> GetFormatter<T>()
+            {
+                return StandardResolver.Instance;
+            }
+        }
+        */
 
         /// <summary>
         /// This is the best general purpose object serializer GONet can provide.

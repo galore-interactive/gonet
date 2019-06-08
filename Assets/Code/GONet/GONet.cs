@@ -145,6 +145,12 @@ namespace GONet
             SendBytesToRemoteConnection(null, bytes, bytesUsedCount, channelId); // passing null will result in sending to all remote connections
         }
 
+        public static void SendEventToRemoteConnections(IGONetEvent @event, bool shouldSendRelilably = true)
+        {
+            byte[] bytes = SerializationUtils.SerializeToBytes(@event);
+            SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+        }
+
         /// <summary>
         /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
         /// </summary>
@@ -637,6 +643,10 @@ namespace GONet
                         {
                             DeserializeBody_PersistentEventsBundle(networkData.messageBytes, networkData.relatedConnection);
                         }
+                        else if (networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
+                        {
+                            DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
+                        }
                         else
                         {
                             using (var memoryStream = new MemoryStream(networkData.messageBytes))
@@ -690,10 +700,6 @@ namespace GONet
                                         else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
                                         {
                                             DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                        }
-                                        else if (messageType == typeof(InstantiateGONetParticipantEvent))
-                                        {
-                                            DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
                                         } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                     }
                                 }
@@ -721,26 +727,19 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, InstantiateGONetParticipantEvent instantiateEvent)
+        private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
-            bitStream_headerAlreadyWritten.WriteString(instantiateEvent.DesignTimeLocation);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.GONetId);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.OwnerAuthorityId);
-        }
+            IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
 
-        private static void DeserializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream, int bytesUsedCount, GONetConnection relatedConnection, long elapsedTicksAtSend)
-        {
-            InstantiateGONetParticipantEvent instantiateEvent = new InstantiateGONetParticipantEvent();
+            if (@event is IPersistentEvent)
+            {
+                DoRecordKeeping_PersistentEvent((IPersistentEvent)@event, relatedConnection);
 
-            instantiateEvent.OccurredAtElapsedTicks = elapsedTicksAtSend;
-
-            bitStream.ReadString(out instantiateEvent.DesignTimeLocation);
-            bitStream.ReadUInt(out instantiateEvent.GONetId);
-            bitStream.ReadUInt(out instantiateEvent.OwnerAuthorityId);
-
-            DoRecordKeeping_PersistentEvent(instantiateEvent, relatedConnection);
-
-            Instantiate_Remote(instantiateEvent);
+                if (@event is InstantiateGONetParticipantEvent) // TODO this should really be done some other way through event pub/sub
+                {
+                    Instantiate_Remote((InstantiateGONetParticipantEvent)@event);
+                }
+            }
         }
 
         private static void DoRecordKeeping_PersistentEvent(IPersistentEvent @event, GONetConnection fromRelatedConnection)
@@ -778,7 +777,7 @@ namespace GONet
         {
             if (persistentEventsThisSession.Count > 0)
             {
-                PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession.Cast<InstantiateGONetParticipantEvent>().ToList());
+                PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
                 SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.PersistentEventsBundle_Reliable);
             }
@@ -807,7 +806,7 @@ namespace GONet
 
                     bitStream.WriteCurrentPartialByte();
 
-                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, GONetChannel.GeneralPurpose_Reliable);
+                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, GONetChannel.CustomSerialization_Reliable);
                 }
             }
         }
@@ -1186,35 +1185,10 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
-            {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(InstantiateGONetParticipantEvent)];
-                        bitStream.WriteUInt(messageID);
+            InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
+            persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
 
-                        bitStream.WriteLong(Time.ElapsedTicks);
-                    }
-
-                    // body
-                    InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
-                    SerializeBody_InstantiateGONetParticipantEvent(bitStream, @event);
-                    persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    int bytesUsedCount = (int)memoryStream.Length;
-                    byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                    //GONetLog.Debug("about to send time sync to client....");
-
-                    SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.GeneralPurpose_Reliable);
-
-                    mainThread_miscSerializationArrayPool.Return(bytes);
-                }
-            }
+            SendEventToRemoteConnections(@event);
         }
 
         private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)
@@ -1301,7 +1275,7 @@ namespace GONet
                     byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
                     Array.Copy(memoryStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
                     
-                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.GeneralPurpose_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
+                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
                     mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
                 }
             }
@@ -1760,8 +1734,14 @@ namespace GONet
         public static readonly GONetChannel TimeSync_Unreliable;
         public static readonly GONetChannel AutoMagicalSync_Reliable;
         public static readonly GONetChannel AutoMagicalSync_Unreliable;
-        public static readonly GONetChannel GeneralPurpose_Reliable;
-        public static readonly GONetChannel GeneralPurpose_Unreliable;
+        public static readonly GONetChannel CustomSerialization_Reliable;
+        public static readonly GONetChannel CustomSerialization_Unreliable;
+        public static readonly GONetChannel EventSingles_Reliable;
+        /// <summary>
+        /// <para>Using this probably only makes sense when the event implements <see cref="ITransientEvent"/>.</para>
+        /// <para>If it implements <see cref="IPersistentEvent"/>, then it likely makes more sense to use <see cref="EventSingles_Reliable"/> instead.</para>
+        /// </summary>
+        public static readonly GONetChannel EventSingles_Unreliable;
         public static readonly GONetChannel PersistentEventsBundle_Reliable;
 
         public GONetChannelId Id { get; private set; }
@@ -1773,8 +1753,10 @@ namespace GONet
             TimeSync_Unreliable = new GONetChannel(QosType.Unreliable);
             AutoMagicalSync_Reliable = new GONetChannel(QosType.Reliable);
             AutoMagicalSync_Unreliable = new GONetChannel(QosType.Unreliable);
-            GeneralPurpose_Reliable = new GONetChannel(QosType.Reliable);
-            GeneralPurpose_Unreliable = new GONetChannel(QosType.Unreliable);
+            CustomSerialization_Reliable = new GONetChannel(QosType.Reliable);
+            CustomSerialization_Unreliable = new GONetChannel(QosType.Unreliable);
+            EventSingles_Reliable = new GONetChannel(QosType.Reliable);
+            EventSingles_Unreliable = new GONetChannel(QosType.Unreliable);
             PersistentEventsBundle_Reliable = new GONetChannel(QosType.Reliable);
         }
 
