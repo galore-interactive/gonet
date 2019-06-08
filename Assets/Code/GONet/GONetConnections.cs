@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using GONetChannelId = System.Byte;
 
@@ -13,6 +14,7 @@ namespace GONet
     public abstract class GONetConnection : ReliableEndpoint
     {
         public const int MTU = 1400;
+        private const int MTU_X2 = MTU << 1;
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> messageByteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
@@ -132,12 +134,13 @@ namespace GONet
         /// Ensure you subsequently call <see cref=""/>
         /// </summary>
         /// <returns>byte array of size 8</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static byte[] BorrowByteArray(int minimumSize)
         {
             ArrayPool<byte> arrayPool;
             if (!messageByteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
             {
-                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU << 1);
+                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU_X2);
                 messageByteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
             }
             return arrayPool.Borrow(minimumSize);
@@ -146,6 +149,7 @@ namespace GONet
         /// <summary>
         /// PRE: Required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ReturnByteArray(byte[] borrowed)
         {
             messageByteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);

@@ -633,66 +633,69 @@ namespace GONet
                 {
                     try
                     {
-                        using (var memoryStream = new MemoryStream(networkData.messageBytes))
+                        if (networkData.channelId == GONetChannel.PersistentEventsBundle_Reliable)
                         {
-                            using (var bitStream = new Utils.BitStream(memoryStream))
+                            DeserializeBody_PersistentEventsBundle(networkData.messageBytes, networkData.relatedConnection);
+                        }
+                        else
+                        {
+                            using (var memoryStream = new MemoryStream(networkData.messageBytes))
                             {
-                                Type messageType;
-                                ////////////////////////////////////////////////////////////////////////////
-                                // header...just message type/id...well, now it is send time too
-                                uint messageID;
-                                bitStream.ReadUInt(out messageID);
-                                messageType = messageTypeByMessageIDMap[messageID];
+                                using (var bitStream = new Utils.BitStream(memoryStream))
+                                {
+                                    Type messageType;
+                                    ////////////////////////////////////////////////////////////////////////////
+                                    // header...just message type/id...well, now it is send time too
+                                    uint messageID;
+                                    bitStream.ReadUInt(out messageID);
+                                    messageType = messageTypeByMessageIDMap[messageID];
 
-                                long elapsedTicksAtSend;
-                                bitStream.ReadLong(out elapsedTicksAtSend);
-                                ////////////////////////////////////////////////////////////////////////////
+                                    long elapsedTicksAtSend;
+                                    bitStream.ReadLong(out elapsedTicksAtSend);
+                                    ////////////////////////////////////////////////////////////////////////////
 
-                                //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+                                    //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
-                                // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
+                                    // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
 
-                                {  // body:
-                                    if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
-                                    {
-                                        DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(RequestMessage))
-                                    {
-                                        long requestUID;
-                                        bitStream.ReadLong(out requestUID);
-
-                                        Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
-                                    }
-                                    else if (messageType == typeof(ResponseMessage))
-                                    {
-                                        long requestUID;
-                                        bitStream.ReadLong(out requestUID);
-
-                                        Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
-                                    {
-                                        uint ownerAuthorityId;
-                                        bitStream.ReadUInt(out ownerAuthorityId);
-
-                                        if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                    {  // body:
+                                        if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                                         {
-                                            MyAuthorityId = ownerAuthorityId;
-                                        } // else log warning?
+                                            DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
+                                        }
+                                        else if (messageType == typeof(RequestMessage))
+                                        {
+                                            long requestUID;
+                                            bitStream.ReadLong(out requestUID);
+
+                                            Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
+                                        }
+                                        else if (messageType == typeof(ResponseMessage))
+                                        {
+                                            long requestUID;
+                                            bitStream.ReadLong(out requestUID);
+
+                                            Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
+                                        }
+                                        else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
+                                        {
+                                            uint ownerAuthorityId;
+                                            bitStream.ReadUInt(out ownerAuthorityId);
+
+                                            if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                            {
+                                                MyAuthorityId = ownerAuthorityId;
+                                            } // else log warning?
+                                        }
+                                        else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
+                                        {
+                                            DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                        }
+                                        else if (messageType == typeof(InstantiateGONetParticipantEvent))
+                                        {
+                                            DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                        } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                     }
-                                    else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
-                                    {
-                                        DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(InstantiateGONetParticipantEvent))
-                                    {
-                                        DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(PersistentEvents_Bundle))
-                                    {
-                                        DeserializeBody_PersistentEventsBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
                         }
@@ -777,16 +780,7 @@ namespace GONet
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession.Cast<InstantiateGONetParticipantEvent>().ToList());
                 byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
-
-                int headerSize = sizeof(uint) + sizeof(long);
-                byte[] todoFIXMEpool = new byte[bytes.Length + headerSize];
-
-                uint header = messageTypeToMessageIDMap[bundle.GetType()];
-                Utils.BitConverter.GetBytes(header, todoFIXMEpool, 0);
-                Utils.BitConverter.GetBytes(Time.ElapsedTicks, todoFIXMEpool, 4);
-                Buffer.BlockCopy(bytes, 0, todoFIXMEpool, headerSize, bytes.Length);
-
-                SendBytesToRemoteConnection(gonetConnection_ServerToClient, todoFIXMEpool, todoFIXMEpool.Length, GONetChannel.GeneralPurpose_Reliable);
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.PersistentEventsBundle_Reliable);
             }
         }
 
@@ -1681,12 +1675,9 @@ namespace GONet
             }
         }
 
-        private static void DeserializeBody_PersistentEventsBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        private static void DeserializeBody_PersistentEventsBundle(byte[] bytes, GONetConnection sourceOfChangeConnection)
         {
-            int remainingSize = bytesUsedCount - (int)bitStream_headerAlreadyRead.Position;
-            byte[] todoFIXMEpool = new byte[remainingSize];
-            bitStream_headerAlreadyRead.Read(todoFIXMEpool, 0, remainingSize);
-            var bundle = SerializationUtils.DeserializeFromBytes<PersistentEvents_Bundle>(todoFIXMEpool);
+            var bundle = SerializationUtils.DeserializeFromBytes<PersistentEvents_Bundle>(bytes);
 
             foreach (var item in bundle.PersistentEvents)
             {
@@ -1771,6 +1762,7 @@ namespace GONet
         public static readonly GONetChannel AutoMagicalSync_Unreliable;
         public static readonly GONetChannel GeneralPurpose_Reliable;
         public static readonly GONetChannel GeneralPurpose_Unreliable;
+        public static readonly GONetChannel PersistentEventsBundle_Reliable;
 
         public GONetChannelId Id { get; private set; }
 
@@ -1783,6 +1775,7 @@ namespace GONet
             AutoMagicalSync_Unreliable = new GONetChannel(QosType.Unreliable);
             GeneralPurpose_Reliable = new GONetChannel(QosType.Reliable);
             GeneralPurpose_Unreliable = new GONetChannel(QosType.Unreliable);
+            PersistentEventsBundle_Reliable = new GONetChannel(QosType.Reliable);
         }
 
         internal GONetChannel(QosType qualityOfService)
