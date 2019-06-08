@@ -36,29 +36,4 @@ public class Simpeesimul : MonoBehaviour
             GONetLog.Debug("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + bytesUsedCount);
         }
     }
-
-    public const int SERVER_MAX_CONNECTIONS = 10;
-    uint[] server_messagesSentCount = new uint[SERVER_MAX_CONNECTIONS];
-
-    private void ______Update()
-    {
-        if (isServer)
-        {
-            const int MSG_SIZE = 1024;
-            byte[] testPacket = new byte[MSG_SIZE];
-
-            for (int iConnection = 0; iConnection < GONetMain.gonetServer.numConnections; ++iConnection)
-            {
-                for (int iMessage = 0; iMessage < 1; ++iMessage)
-                {
-                    using (var testPacketWriter = ByteArrayReaderWriter.Get(testPacket))
-                    {
-                        testPacketWriter.Write(++server_messagesSentCount[iConnection]);
-                    }
-
-                    GONetMain.gonetServer.remoteClients[iConnection].SendMessage(testPacket, MSG_SIZE, QosType.Reliable);
-                }
-            }
-        }
-    }
 }

@@ -1,6 +1,8 @@
 ﻿using GONet.Utils;
 using NetcodeIO.NET;
 using ReliableNetcode;
+using System;
+using System.IO;
 using System.Net;
 
 using GONetChannelId = System.Byte;
@@ -58,6 +60,7 @@ namespace GONet
         public float RTT_RecentAverage { get; private set; }
 
         private const int RTT_HISTORY_COUNT = 5;
+        private const string DO_NOT_USE = "Do not use this method.  Use SendMessageOverChannel(byte[], int, GONetChannelId) instead.";
         bool hasBeenSetOnce_rtt_latest = false;
         int iLast_rtt_recent = -1;
         readonly float[] rtt_recent = new float[RTT_HISTORY_COUNT];
@@ -69,23 +72,50 @@ namespace GONet
             ReceiveCallback = OnReceiveCallback;
         }
 
+        [Obsolete(DO_NOT_USE, true)]
+        public new void SendMessage(byte[] messageBytes, int bytesUsedCount, QosType qualityOfService)
+        {
+            throw new NotImplementedException(DO_NOT_USE);
+        }
+
         /// <summary>
-        /// IMPORTANT: You must use this method instead of <see cref="ReliableEndpoint.SendMessage(GONetChannelId[], int, QosType)"/> in order for the channel stuff to work properly!
+        /// IMPORTANT: You must use this method instead of <see cref="ReliableEndpoint.SendMessage(byte[], int, QosType)"/> in order for the channel stuff to work properly!
         /// </summary>
         public void SendMessageOverChannel(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId)
         {
-            GONetChannel channel = GONetChannel.ById(channelId);
-            // TODO FIXME need to prefix bytes with channelId!!!  So the receiving end will always read off the first byte as the channelId
+            int headerSize = sizeof(GONetChannelId) + sizeof(int);
+            int bodySize_withHeader = bytesUsedCount + headerSize;
+            byte[] todoFIXMEpool = new byte[bodySize_withHeader]; // TODO FIXME use byte[] pool!
 
-            SendMessage(messageBytes, bytesUsedCount, channel.QualityOfService);
+            Utils.BitConverter.GetBytes(channelId, todoFIXMEpool, 0);
+            Utils.BitConverter.GetBytes(bytesUsedCount, todoFIXMEpool, sizeof(GONetChannelId));
+            Buffer.BlockCopy(messageBytes, 0, todoFIXMEpool, headerSize, bytesUsedCount);
+
+            GONetChannel channel = GONetChannel.ById(channelId);
+            base.SendMessage(todoFIXMEpool, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
         }
 
         private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
         {
-            // TODO FIXME need to read off the prefix bytes, which is channelId!!!  IMPORTANT, the byte[] passed into GONetMain.ProcessIncomingBytes below should not contain channelId
-            GONetChannelId TODO_FIXME = GONetChannelId.MaxValue;
+            int headerSize = sizeof(GONetChannelId) + sizeof(int);
+            int bodySize_expected = bytesUsedCount - headerSize;
 
-            GONetMain.ProcessIncomingBytes(this, messageBytes, bytesUsedCount, TODO_FIXME);
+            uint bodySize_readFromMessage;
+            GONetChannelId channelId_readFromMessage;
+
+            byte[] todoFIXMEpool = new byte[bodySize_expected]; // TODO FIXME use byte[] pool!
+            Buffer.BlockCopy(messageBytes, headerSize, todoFIXMEpool, 0, bodySize_expected);
+
+            using (var memoryStream = new MemoryStream(messageBytes))
+            {
+                using (var bitStream = new Utils.BitStream(memoryStream))
+                {
+                    channelId_readFromMessage = (GONetChannelId)bitStream.ReadByte();
+                    bitStream.ReadUInt(out bodySize_readFromMessage);
+                }
+            }
+
+            GONetMain.ProcessIncomingBytes(this, todoFIXMEpool, (int)bodySize_readFromMessage, channelId_readFromMessage);
         }
     }
 
