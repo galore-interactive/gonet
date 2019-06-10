@@ -70,6 +70,7 @@
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\Code\GONet\GONetClient.cs" />
     <Compile Include="Assets\Code\GONet\GONetConnections.cs" />
+    <Compile Include="Assets\Code\GONet\GONetEventBus.cs" />
     <Compile Include="Assets\Code\GONet\GONetEvents.cs" />
     <Compile Include="Assets\Code\GONet\GONetGlobal.cs" />
     <Compile Include="Assets\Code\GONet\GONetParticipant.cs" />

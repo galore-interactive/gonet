@@ -76,6 +76,8 @@ namespace GONet
             }
         }
 
+        public static GONetEventBus Events => GONetEventBus.Instance;
+
         public static bool IsUnityApplicationEditor { get; internal set; }  = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
@@ -113,6 +115,19 @@ namespace GONet
 
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
+
+            Events.Subscribe<IGONetEvent>(OnAnyEvent);
+            Events.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent);
+        }
+
+        private static void OnAnyEvent(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
+        {
+            GONetLog.Debug("hey....the pub/sub worked!  generically speaking too!!");
+        }
+
+        private static void OnInstantiationEvent(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
+        {
+            GONetLog.Debug("hey....the pub/sub worked!");
         }
 
         private static void InitShouldSkipSyncSupport()
@@ -149,6 +164,7 @@ namespace GONet
         {
             byte[] bytes = SerializationUtils.SerializeToBytes(@event);
             SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+            Events.Publish(@event);
         }
 
         /// <summary>
@@ -780,6 +796,7 @@ namespace GONet
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
                 SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.PersistentEventsBundle_Reliable);
+                Events.Publish(bundle);
             }
         }
 
