@@ -26,7 +26,7 @@ namespace GONet
     {
         public uint SourceAuthorityId { get; set; }
 
-        public bool IsSourceRemote => SourceAuthorityId == GONetMain.MyAuthorityId;
+        public bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
 
         public IGONetEvent Event { get; set; }
     }
@@ -35,7 +35,7 @@ namespace GONet
     {
         public uint SourceAuthorityId { get; set; }
 
-        public bool IsSourceRemote => SourceAuthorityId == GONetMain.MyAuthorityId;
+        public bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
 
         IGONetEvent IGONetEventEnvelope.Event { get => Event; set => Event = (T)value; }
 
@@ -64,13 +64,14 @@ namespace GONet
 
         private GONetEventBus() { }
 
-        public void Publish<T>(T @event) where T : IGONetEvent
+        public void Publish<T>(T @event, uint? remoteSourceAuthorityId = default) where T : IGONetEvent
         {
             List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
             if (handlersForType != null)
             {
                 int handlerCount = handlersForType.Count;
-                IGONetEventEnvelope<IGONetEvent> envelope = new GONetEventEnvelope<IGONetEvent>() { Event = @event, SourceAuthorityId = GONetMain.MyAuthorityId };
+                uint sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
+                IGONetEventEnvelope<IGONetEvent> envelope = new GONetEventEnvelope<IGONetEvent>() { Event = @event, SourceAuthorityId = sourceAuthorityId };
                 for (int i = 0; i < handlerCount; ++i) // TODO since/if this class supports multithreading, need to handle the case where some subscriber unsubscribes during this iteration
                 {
                     EventHandlerAndFilterer handlerForType = handlersForType[i];
@@ -246,6 +247,22 @@ namespace GONet
                         return handlers;
                     }
                     eventTypeCurrent = eventTypeCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
+                }
+
+                Type eventInterfaceCurrent;
+                var topInterfaces = eventType.GetInterfaces();
+                int topInterfaceCount = topInterfaces.Length;
+                for (int i = 0; i < topInterfaceCount; ++i)
+                {
+                    eventInterfaceCurrent = topInterfaces[i];
+                    while (eventInterfaceCurrent != null)
+                    {
+                        if (handlersByEventType_IncludingChildren.TryGetValue(eventInterfaceCurrent, out handlers))
+                        {
+                            return handlers;
+                        }
+                        eventInterfaceCurrent = eventInterfaceCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
+                    }
                 }
             }
             else

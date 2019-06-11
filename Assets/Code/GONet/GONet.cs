@@ -115,19 +115,87 @@ namespace GONet
 
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
+            InitEventSubscriptions();
+        }
 
-            Events.Subscribe<IGONetEvent>(OnAnyEvent);
-            Events.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent);
+        private static void InitEventSubscriptions()
+        {
+            Events.Subscribe<IGONetEvent>(OnAnyEvent_RelayToRemoteConnections_IfAppropriate);
+            Events.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
+            Events.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
+            Events.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
+
+            { // tests:
+                Events.Subscribe<IGONetEvent>(OnAnyEvent);
+                Events.Subscribe<ITransientEvent>(OnTransientEvent);
+            }
+        }
+
+        private static void OnPersistentEventsBundle_ProcessAll_Remote(IGONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
+        {
+            foreach (var item in eventEnvelope.Event.PersistentEvents)
+            {
+                persistentEventsThisSession.Enqueue(item);
+
+                if (item is InstantiateGONetParticipantEvent)
+                {
+                    Instantiate_Remote((InstantiateGONetParticipantEvent)item);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Definition of "if appropriate":
+        ///     -The server will always send to remote connections....clients only send to remote connections (i.e., just to server) when locally sourced!
+        /// </summary>
+        private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
+        {
+            if (IsServer || !eventEnvelope.IsSourceRemote)
+            {
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
+                bool shouldSendRelilably = true; // TODO support unreliable events?
+                SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+            }
+            else if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
+            {
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+
+                uint count = _gonetServer.numConnections;// remoteClients.Length;
+                for (uint i = 0; i < count; ++i)
+                {
+                    var remoteClient = _gonetServer.remoteClients[i];
+                    if (remoteClient.OwnerAuthorityId != eventEnvelope.SourceAuthorityId)
+                    {
+                        GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
+                        SendBytesToRemoteConnection(remoteClient, bytes, bytes.Length, channelId);
+                    }
+                }
+            }
+
+        }
+
+        private static void OnTransientEvent(IGONetEventEnvelope<ITransientEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub Transient");
+        }
+
+        private static void OnPersistentEvent_KeepTrack(IGONetEventEnvelope<IPersistentEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub Persistent");
+
+            persistentEventsThisSession.Enqueue(eventEnvelope.Event);
         }
 
         private static void OnAnyEvent(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
-            GONetLog.Debug("hey....the pub/sub worked!  generically speaking too!!");
+            GONetLog.Debug("pub/sub ANY");
         }
 
-        private static void OnInstantiationEvent(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
+        private static void OnInstantiationEvent_Remote(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
         {
-            GONetLog.Debug("hey....the pub/sub worked!");
+            GONetLog.Debug("pub/sub Instantiate REMOTE");
+
+            Instantiate_Remote(eventEnvelope.Event);
         }
 
         private static void InitShouldSkipSyncSupport()
@@ -158,13 +226,6 @@ namespace GONet
         public static void SendBytesToRemoteConnections(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
         {
             SendBytesToRemoteConnection(null, bytes, bytesUsedCount, channelId); // passing null will result in sending to all remote connections
-        }
-
-        public static void SendEventToRemoteConnections(IGONetEvent @event, bool shouldSendRelilably = true)
-        {
-            byte[] bytes = SerializationUtils.SerializeToBytes(@event);
-            SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
-            Events.Publish(@event);
         }
 
         /// <summary>
@@ -655,11 +716,7 @@ namespace GONet
                 {
                     try
                     {
-                        if (networkData.channelId == GONetChannel.PersistentEventsBundle_Reliable)
-                        {
-                            DeserializeBody_PersistentEventsBundle(networkData.messageBytes, networkData.relatedConnection);
-                        }
-                        else if (networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
+                        if (networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
                         {
                             DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
                         }
@@ -746,26 +803,7 @@ namespace GONet
         private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
             IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
-
-            if (@event is IPersistentEvent)
-            {
-                DoRecordKeeping_PersistentEvent((IPersistentEvent)@event, relatedConnection);
-
-                if (@event is InstantiateGONetParticipantEvent) // TODO this should really be done some other way through event pub/sub
-                {
-                    Instantiate_Remote((InstantiateGONetParticipantEvent)@event);
-                }
-            }
-        }
-
-        private static void DoRecordKeeping_PersistentEvent(IPersistentEvent @event, GONetConnection fromRelatedConnection)
-        {
-            persistentEventsThisSession.Enqueue(@event);
-
-            if (IsServer)
-            {
-                // TODO FIXME send to all other clients than fromRelatedConnection
-            }
+            Events.Publish(@event, relatedConnection.OwnerAuthorityId);
         }
 
         /// <summary>
@@ -794,8 +832,6 @@ namespace GONet
             if (persistentEventsThisSession.Count > 0)
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
-                byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
-                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.PersistentEventsBundle_Reliable);
                 Events.Publish(bundle);
             }
         }
@@ -1203,9 +1239,7 @@ namespace GONet
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
-            persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
-
-            SendEventToRemoteConnections(@event);
+            Events.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
         private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)
@@ -1666,22 +1700,6 @@ namespace GONet
             }
         }
 
-        private static void DeserializeBody_PersistentEventsBundle(byte[] bytes, GONetConnection sourceOfChangeConnection)
-        {
-            var bundle = SerializationUtils.DeserializeFromBytes<PersistentEvents_Bundle>(bytes);
-
-            foreach (var item in bundle.PersistentEvents)
-            {
-                DoRecordKeeping_PersistentEvent(item, sourceOfChangeConnection);
-
-                if (item is InstantiateGONetParticipantEvent)
-                {
-                    var instantiateEvent = (InstantiateGONetParticipantEvent)item;
-                    Instantiate_Remote(instantiateEvent);
-                }
-            }
-        }
-
         private static void DeserializeBody_ChangesBundle(Utils.BitStream bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
             ushort count;
@@ -1759,7 +1777,6 @@ namespace GONet
         /// <para>If it implements <see cref="IPersistentEvent"/>, then it likely makes more sense to use <see cref="EventSingles_Reliable"/> instead.</para>
         /// </summary>
         public static readonly GONetChannel EventSingles_Unreliable;
-        public static readonly GONetChannel PersistentEventsBundle_Reliable;
 
         public GONetChannelId Id { get; private set; }
 
@@ -1774,7 +1791,6 @@ namespace GONet
             CustomSerialization_Unreliable = new GONetChannel(QosType.Unreliable);
             EventSingles_Reliable = new GONetChannel(QosType.Reliable);
             EventSingles_Unreliable = new GONetChannel(QosType.Unreliable);
-            PersistentEventsBundle_Reliable = new GONetChannel(QosType.Reliable);
         }
 
         internal GONetChannel(QosType qualityOfService)
