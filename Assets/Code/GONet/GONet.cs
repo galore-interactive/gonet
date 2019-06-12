@@ -150,13 +150,7 @@ namespace GONet
         /// </summary>
         private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
-            if (IsServer || !eventEnvelope.IsSourceRemote)
-            {
-                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
-                bool shouldSendRelilably = true; // TODO support unreliable events?
-                SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
-            }
-            else if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
+            if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
             {
                 byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
 
@@ -171,7 +165,12 @@ namespace GONet
                     }
                 }
             }
-
+            else if (IsServer || !eventEnvelope.IsSourceRemote)
+            {
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
+                bool shouldSendRelilably = true; // TODO support unreliable events?
+                SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+            }
         }
 
         private static void OnTransientEvent(IGONetEventEnvelope<ITransientEvent> eventEnvelope)
@@ -832,7 +831,8 @@ namespace GONet
             if (persistentEventsThisSession.Count > 0)
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
-                Events.Publish(bundle);
+                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.EventSingles_Reliable);
             }
         }
 
