@@ -30,6 +30,7 @@ namespace GONet
         };
 
         private static GONetSessionContext globalSessionContext;
+
         public static GONetSessionContext GlobalSessionContext
         {
             get { return globalSessionContext; }
@@ -96,6 +97,11 @@ namespace GONet
         /// Only used/applicable if <see cref="IsServer"/> is true.
         /// </summary>
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
+
+        public static bool DoIHaveAuthorityOver(GameObject gameObject)
+        {
+            return gameObject.GetComponent<GONetParticipant>()?.OwnerAuthorityId == MyAuthorityId; // TODO cache instead of lookup/get each time!
+        }
 
         /// <summary>
         /// NOTE: The time maintained within is only updated once per main thread frame tick (i.e., call to <see cref="Update"/>).
@@ -814,8 +820,15 @@ namespace GONet
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template);
             GONetLog.Debug("Instantiate_Remote, Instantiate complete....instanceID: " + instance.GetInstanceID());
-            instance.GONetId = instantiateEvent.GONetId;
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
+            if (IsServer && instantiateEvent.GONetId == OwnerAuthorityId_Unset)
+            {
+                instance.GONetId = ++lastAssignedGONetId;
+            }
+            else
+            {
+                instance.GONetId = instantiateEvent.GONetId;
+            }
             remoteSpawns_avoidAutoPropogateSupport.Add(instance);
         }
 
@@ -1226,6 +1239,8 @@ namespace GONet
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropogateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
+                    gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+
                     AutoPropogateInitialInstantiation(gonetParticipant);
                 }
                 else
@@ -1238,7 +1253,7 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
+            InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
             Events.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
@@ -1267,16 +1282,6 @@ namespace GONet
             if (IsServer)
             {
                 gonetParticipant.GONetId = ++lastAssignedGONetId;
-            }
-
-            // TODO move this to OnInstantiated type deal:  becasue this is not every doing anything right now anyway..just leaving in so find all references sees it!!
-            else
-            {
-                bool didIInstantiate = false; // TODO FIXME have to figure out if this is happening as a result of a spawn/instantiate or the related GO is in the scene.
-                if (didIInstantiate)
-                {
-                    gonetParticipant.OwnerAuthorityId = MyAuthorityId;
-                } // else the server will do the assigning once it processes this in the scene load up and the value will propogate to clients via the auto-magical sync
             }
         }
 
@@ -1672,6 +1677,10 @@ namespace GONet
                 }
                 else
                 {
+                    if (change.syncCompanion.gonetParticipant.GONetId == GONetParticipant.GONetId_Unset)
+                    {
+                        GONetLog.Error("Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): " + ShouldSendChange(change, filterUsingOwnerAuthorityId) + " filterUsingOwnerAuthorityId: " + filterUsingOwnerAuthorityId);
+                    }
                     bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
                     bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                     change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
@@ -1682,9 +1691,12 @@ namespace GONet
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, uint filterUsingOwnerAuthorityId)
         {
-            return IsServer 
-                    ? change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // the server should send every change exception for changes back to the owner itself
-                    : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId; // clients should only send out changes it owns
+            return
+                change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
+                (IsServer
+                    ? (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change exception for changes back to the owner itself
+                       || change.index == GONetParticipant.ASSumed_GONetId_INDEX) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
+                    : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)

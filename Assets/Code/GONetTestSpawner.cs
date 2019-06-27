@@ -24,8 +24,8 @@ public class GONetTestSpawner : MonoBehaviour
             hasServerSpawned = true;
         }
 
-        if (GONetMain.IsServer)
-        {
+        //if (GONetMain.IsServer)
+        //{
             if (Input.GetKeyDown(KeyCode.D))
             {
                 GameObject cubeta = GameObject.Find("Cubetas");
@@ -41,6 +41,6 @@ public class GONetTestSpawner : MonoBehaviour
             {
                 Instantiate(resourcePrefab);
             }
-        }
+        //}
     }
 }

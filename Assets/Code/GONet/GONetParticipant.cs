@@ -66,7 +66,8 @@ namespace GONet
         [GONetAutoMagicalSync(
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue, 
-            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer))]
+            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
+            MustRunOnUnityMainThread = true)]
         public uint GONetId
         {
             get { return gonetId; }

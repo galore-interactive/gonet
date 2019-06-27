@@ -26,7 +26,7 @@ public class FieldChangeTest : MonoBehaviour
     private void Update()
     {
         /* test with an ever-changing field value: */
-        if (GONetMain.IsServer)
+        if (GONetMain.DoIHaveAuthorityOver(gameObject))
         {
             someCoolGuyFloat += moveAmount * Time.deltaTime;
             if (someCoolGuyFloat >= 6 || someCoolGuyFloat <= -6)

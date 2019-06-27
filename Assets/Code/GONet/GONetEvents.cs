@@ -93,17 +93,17 @@ namespace GONet
         [Key(2)]
         public uint OwnerAuthorityId;
 
-        public static InstantiateGONetParticipantEvent Gorbi(GONetParticipant gonetParticipant)
+        public static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
-            InstantiateGONetParticipantEvent gorbi = new InstantiateGONetParticipantEvent();
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
-            gorbi.DesignTimeLocation = gonetParticipant.designTimeLocation;
-            gorbi.GONetId = gonetParticipant.GONetId;
-            gorbi.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
 
-            gorbi.OccurredAtElapsedTicks = default;
+            @event.OccurredAtElapsedTicks = default;
 
-            return gorbi;
+            return @event;
         }
     }
 
