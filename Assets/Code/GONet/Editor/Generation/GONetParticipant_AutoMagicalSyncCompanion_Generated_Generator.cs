@@ -399,6 +399,19 @@ namespace GONet.Generation
             Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
             MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
             attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+
+            bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
+            if (isSpecialCaseThatRequiresManualAttributeConstruction)
+            {
+                Type memberType = syncMember.MemberType == MemberTypes.Property
+                                    ? ((PropertyInfo)syncMember).PropertyType
+                                    : ((FieldInfo)syncMember).FieldType;
+
+                if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, memberType), out attribute))
+                {
+                    GONetLog.Error("This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: " + memberOwnerType.FullName + " memberType.FullName: " + memberType.FullName);
+                }
+            }
         }
     }
 
@@ -468,10 +481,41 @@ namespace GONet.Generation
         /// </summary>
         internal GONetParticipant gonetParticipant;
 
+    //    static ()
+    //        {
+    //        intrinsicAttributeByMemberTypeMap
+    //}
+
         /// <summary>
         /// IMPORTANT: Do NOT use this.  Being public is required to work with deserialize/load from persistence:
         /// </summary>
         public GONetParticipant_ComponentsWithAutoSyncMembers() { }
+
+        static readonly GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute()
+        {
+            Reliability = AutoMagicalSyncReliability.Unreliable,
+            SyncChangesEverySeconds = 1f / 10f,
+            CustomSerialize_Type = typeof(QuaternionSerializer),
+            MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+            ShouldBlendBetweenValuesReceived = true,
+            ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd
+        };
+
+        static readonly GONetAutoMagicalSyncAttribute attribute_position = new GONetAutoMagicalSyncAttribute()
+        {
+            Reliability = AutoMagicalSyncReliability.Unreliable,
+            SyncChangesEverySeconds = 1f / 10f,
+            CustomSerialize_Type = typeof(Vector3Serializer),
+            MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+            ShouldBlendBetweenValuesReceived = true,
+            ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd
+        };
+
+        internal static readonly Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute> intrinsicAttributeByMemberTypeMap = new Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute>(2)
+        {
+            { ValueTuple.Create(typeof(Transform), typeof(Vector3)), attribute_position },
+            { ValueTuple.Create(typeof(Transform), typeof(Quaternion)), attribute_rotation },
+        };
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant gonetParticipant)
         {
@@ -525,26 +569,9 @@ namespace GONet.Generation
                 var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[2];
 
                 MemberInfo transform_rotation = typeof(Transform).GetMember(nameof(Transform.rotation), BindingFlags.Public | BindingFlags.Instance)[0];
-                GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute() {
-                    Reliability = AutoMagicalSyncReliability.Unreliable,
-                    SyncChangesEverySeconds = 1f / 10f,
-                    CustomSerialize_Type = typeof(QuaternionSerializer),
-                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true,
-                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd
-                };
                 component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
 
                 MemberInfo transform_position = typeof(Transform).GetMember(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)[0];
-                GONetAutoMagicalSyncAttribute attribute_position = new GONetAutoMagicalSyncAttribute()
-                {
-                    Reliability = AutoMagicalSyncReliability.Unreliable,
-                    SyncChangesEverySeconds = 1f / 10f,
-                    CustomSerialize_Type = typeof(Vector3Serializer),
-                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true,
-                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd
-                };
                 component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position, attribute_position);
 
                 var newSingle_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.transform, component_autoSyncMembers_transform);
