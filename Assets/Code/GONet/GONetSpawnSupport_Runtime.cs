@@ -32,22 +32,31 @@ namespace GONet
 
         private static readonly Dictionary<string, GONetParticipant> designTimeLocationToProjectTemplate = new Dictionary<string, GONetParticipant>(100);
 
-        public static void CacheAllProjectDesignTimeLocations()
+        private static readonly string[] EmptyStringArray = new string[0];
+
+        public static IEnumerable<string> LoadDesignTimeLocationsFromPersistence()
         {
             string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
             if (File.Exists(fullPath))
             {
                 string fileContents = File.ReadAllText(fullPath);
-                foreach (string designTimeLocation in fileContents.Split(Environment.NewLine.ToCharArray()))
+                return fileContents.Split(Environment.NewLine.ToCharArray());
+            }
+
+            return EmptyStringArray;
+        }
+
+        public static void CacheAllProjectDesignTimeLocations()
+        {
+            foreach (string designTimeLocation in LoadDesignTimeLocationsFromPersistence())
+            {
+                if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
-                    if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
+                    if ((object)template != null)
                     {
-                        GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
-                        if ((object)template != null)
-                        {
-                            GONetLog.Debug("found template for design time location: " + designTimeLocation);
-                            designTimeLocationToProjectTemplate[designTimeLocation] = template;
-                        }
+                        GONetLog.Debug("found template for design time location: " + designTimeLocation);
+                        designTimeLocationToProjectTemplate[designTimeLocation] = template;
                     }
                 }
             }
