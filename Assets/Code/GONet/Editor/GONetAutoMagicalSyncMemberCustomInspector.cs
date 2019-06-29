@@ -28,6 +28,9 @@ namespace GONet.Editor
     public class GONetAutoMagicalSyncMemberCustomInspector : UnityEditor.Editor
     {
         GONetParticipant targetGONetParticipant;
+        bool isMyScriptSectionUnfolded = true;
+
+        const string SCR = " (Script)";
 
         private void OnEnable()
         {
@@ -36,26 +39,34 @@ namespace GONet.Editor
 
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
-
             DrawGONetParticipantSpecifics(targetGONetParticipant);
+
+            EditorGUI.indentLevel++;
+            isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, string.Concat(typeof(GONetParticipant).Name, SCR));
+            if (isMyScriptSectionUnfolded)
+            {
+                EditorGUI.indentLevel++;
+                DrawDefaultInspector();
+                EditorGUI.indentLevel--;
+            }
+            EditorGUI.indentLevel--;
         }
 
+        bool isSyncAttrSectionFolded = true;
         Dictionary<string, bool> isFoldedByTypeMemberNameMap = new Dictionary<string, bool>(); // TODO this needs to be persistable data the unity way
 
         private void DrawGONetParticipantSpecifics(GONetParticipant targetGONetParticipant)
         {
+            bool guiEnabledPrevious = GUI.enabled;
+            GUI.enabled = false;
+
             const string NOT_SET = "<not set>";
 
             {
                 EditorGUILayout.BeginHorizontal();
                 const string DESIGN = "Design Time Location";
                 EditorGUILayout.LabelField(DESIGN);
-                bool guiEnabledPrevious = GUI.enabled;
-                GUI.enabled = false;
                 EditorGUILayout.TextField(targetGONetParticipant.DesignTimeLocation);
-
-                GUI.enabled = guiEnabledPrevious;
                 EditorGUILayout.EndHorizontal();
             }
 
@@ -63,13 +74,8 @@ namespace GONet.Editor
                 EditorGUILayout.BeginHorizontal();
                 const string CODE_GEN_ID = "Code Generation Id";
                 EditorGUILayout.LabelField(CODE_GEN_ID);
-                bool guiEnabledPrevious = GUI.enabled;
-                GUI.enabled = false;
-
                 string value = targetGONetParticipant.codeGenerationId == GONetParticipant.CodeGenerationId_Unset ? NOT_SET : targetGONetParticipant.codeGenerationId.ToString();
                 EditorGUILayout.TextField(value);
-
-                GUI.enabled = guiEnabledPrevious;
                 EditorGUILayout.EndHorizontal();
             }
 
@@ -79,10 +85,7 @@ namespace GONet.Editor
                     EditorGUILayout.BeginHorizontal();
                     const string INSTANTI = "Was Instantiated?";
                     EditorGUILayout.LabelField(INSTANTI);
-                    bool guiEnabledPrevious = GUI.enabled;
-                    GUI.enabled = false;
                     EditorGUILayout.Toggle(targetGONetParticipant.WasInstantiated);
-                    GUI.enabled = guiEnabledPrevious;
                     EditorGUILayout.EndHorizontal();
                 }
 
@@ -90,13 +93,8 @@ namespace GONet.Editor
                     EditorGUILayout.BeginHorizontal();
                     const string GONET_ID = "GONetId";
                     EditorGUILayout.LabelField(GONET_ID);
-                    bool guiEnabledPrevious = GUI.enabled;
-                    GUI.enabled = false;
-
                     string value = targetGONetParticipant.GONetId == GONetParticipant.GONetId_Unset ? NOT_SET : targetGONetParticipant.GONetId.ToString();
                     EditorGUILayout.TextField(value);
-
-                    GUI.enabled = guiEnabledPrevious;
                     EditorGUILayout.EndHorizontal();
                 }
 
@@ -104,24 +102,23 @@ namespace GONet.Editor
                     EditorGUILayout.BeginHorizontal();
                     const string OWNER_AUTHORITY_ID = "OwnerAuthorityId";
                     EditorGUILayout.LabelField(OWNER_AUTHORITY_ID);
-                    bool guiEnabledPrevious = GUI.enabled;
-                    GUI.enabled = false;
-
                     const string GONET_SERVER = "<GONet server>";
                     string value = targetGONetParticipant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Server
                         ? GONET_SERVER
                         : (targetGONetParticipant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset ? NOT_SET : targetGONetParticipant.OwnerAuthorityId.ToString());
                     EditorGUILayout.TextField(value);
-
-                    GUI.enabled = guiEnabledPrevious;
                     EditorGUILayout.EndHorizontal();
                 }
             }
 
-            { // Handle/draw all [GONetAutoMagicalSync] members
-                bool guiEnabledPrevious = GUI.enabled;
-                GUI.enabled = false;
+            GUI.enabled = guiEnabledPrevious;
 
+            const string ATTR = "[GONetAutoMagicalSync] Items to Sync";
+            isSyncAttrSectionFolded = EditorGUILayout.Foldout(isSyncAttrSectionFolded, ATTR);
+            if (isSyncAttrSectionFolded)
+            { // Handle/draw all [GONetAutoMagicalSync] members
+
+                EditorGUI.indentLevel++;
                 foreach (var siblingMonoBehaviour in targetGONetParticipant.GetComponents<MonoBehaviour>())
                 {
                     if (!(siblingMonoBehaviour is GONetParticipant))
@@ -135,14 +132,23 @@ namespace GONet.Editor
 
                         if (autoSyncMembersInSibling.Count() > 0)
                         {
+                            bool guiEnabledPrevious_inner = GUI.enabled;
+                            GUI.enabled = false;
+
                             bool isfoldie;
                             isFoldedByTypeMemberNameMap.TryGetValue(siblingMonoBehaviour.GetType().Name, out isfoldie);
-                            const string SCR = " (Script)";
-                            const string ATTR = "[GONetAutoMagicalSync] - ";
-                            isFoldedByTypeMemberNameMap[siblingMonoBehaviour.GetType().Name] = EditorGUILayout.Foldout(isfoldie, string.Concat(ATTR, siblingMonoBehaviour.GetType().Name, SCR));
+                            string ScriptName = siblingMonoBehaviour.GetType().Name;
+                            isFoldedByTypeMemberNameMap[siblingMonoBehaviour.GetType().Name] = EditorGUILayout.Foldout(isfoldie, string.Concat(ScriptName, SCR));
                             if (isFoldedByTypeMemberNameMap[siblingMonoBehaviour.GetType().Name])
                             {
                                 EditorGUI.indentLevel++;
+
+                                EditorGUILayout.BeginHorizontal();
+                                const string ScriptLabel = "Script";
+                                EditorGUILayout.LabelField(ScriptLabel);
+                                EditorGUILayout.TextField(ScriptName);
+                                EditorGUILayout.EndHorizontal();
+
                                 foreach (var autoSyncMember in autoSyncMembersInSibling)
                                 {
                                     EditorGUILayout.BeginHorizontal();
@@ -152,11 +158,12 @@ namespace GONet.Editor
                                 }
                                 EditorGUI.indentLevel--;
                             }
+
+                            GUI.enabled = guiEnabledPrevious_inner;
                         }
                     }
                 }
-
-                GUI.enabled = guiEnabledPrevious;
+                EditorGUI.indentLevel--;
             }
         }
     }
