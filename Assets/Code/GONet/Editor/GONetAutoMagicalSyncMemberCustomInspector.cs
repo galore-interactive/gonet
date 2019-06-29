@@ -42,7 +42,8 @@ namespace GONet.Editor
             DrawGONetParticipantSpecifics(targetGONetParticipant);
 
             EditorGUI.indentLevel++;
-            isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, string.Concat(typeof(GONetParticipant).Name, SCR));
+            const string GOIntrinsics = "GameObject (Instrinsics)";
+            isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, GOIntrinsics);// string.Concat(typeof(GONetParticipant).Name, SCR));
             if (isMyScriptSectionUnfolded)
             {
                 EditorGUI.indentLevel++;
