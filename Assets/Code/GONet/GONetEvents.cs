@@ -108,11 +108,30 @@ namespace GONet
         [Key(2)]
         public uint OwnerAuthorityId;
 
-        public static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
+        [Key(3)]
+        public string InstanceName;
+
+        internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
+            @event.InstanceName = gonetParticipant.gameObject.name;
             @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            @event.OccurredAtElapsedTicks = default;
+
+            return @event;
+        }
+
+        internal static InstantiateGONetParticipantEvent Create_WithNonAuthorityInfo(GONetParticipant gonetParticipant, string nonAuthorityAlternate_designTimeLocation)
+        {
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
+
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = nonAuthorityAlternate_designTimeLocation;
+
             @event.GONetId = gonetParticipant.GONetId;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
 

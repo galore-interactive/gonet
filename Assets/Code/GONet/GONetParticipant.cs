@@ -192,6 +192,7 @@ namespace GONet
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
+                GONetLog.Debug("deserialize.....full unique path: " + fullUniquePath + " null? " + ((object)gonetParticipantGO == null) + " unity null? " + (gonetParticipantGO == null));
                 GONetParticipant gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
 
                 uint GONetId = default;

@@ -94,7 +94,7 @@ namespace GONet
             }
         }
 
-        public static GONetParticipant LookupFromDesignTimeLocation(string designTimeLocation)
+        public static GONetParticipant LookupTemplateFromDesignTimeLocation(string designTimeLocation)
         {
             if (designTimeLocation.StartsWith(SCENE_HIERARCHY_PREFIX))
             {
@@ -108,6 +108,39 @@ namespace GONet
             }
 
             throw new ArgumentException(string.Concat("Must include supported prefix defined as const herein. value received: ", designTimeLocation), nameof(designTimeLocation));
+        }
+
+        /// <summary>
+        /// The public API for this is <see cref="GONetMain.Instantiate_WithNonAuthorityAlternate(GONetParticipant, GONetParticipant)"/>.
+        /// </summary>
+        internal static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal)
+        {
+            // take note of nonAuthorityAlternateOriginal to make use of this during auto
+
+            GONetParticipant authorityInstance = UnityEngine.Object.Instantiate(authorityOriginal);
+            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.designTimeLocation;
+            return authorityInstance;
+        }
+
+
+        /// <summary>
+        /// The public API for this is <see cref="GONetMain.Instantiate_WithNonAuthorityAlternate(GONetParticipant, GONetParticipant, Vector3, Quaternion)"/>.
+        /// </summary>
+        internal static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal, Vector3 position, Quaternion rotation)
+        {
+            // take note of nonAuthorityAlternateOriginal to make use of this during auto
+
+            GONetParticipant authorityInstance = UnityEngine.Object.Instantiate(authorityOriginal, position, rotation);
+            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.designTimeLocation;
+            return authorityInstance;
+        }
+
+        static readonly Dictionary<GONetParticipant, string> nonAuthorityDesignTimeLocationByAuthorityInstanceMap = new Dictionary<GONetParticipant, string>(100);
+
+        internal static bool TryGetNonAuthorityDesignTimeLocation(GONetParticipant authorityInstance, out string nonAuthorityDesignTimeLocation)
+        {
+            // TODO consider removing authorityInstance as it will only serve its purpose for one call here (at least at time of writing)...cost of keeping around even after it is dead?
+            return nonAuthorityDesignTimeLocationByAuthorityInstanceMap.TryGetValue(authorityInstance, out nonAuthorityDesignTimeLocation);
         }
     }
 }

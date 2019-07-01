@@ -21,41 +21,40 @@ public class GONetTestSpawner : MonoBehaviour
     public Simpeesimul GONetServerPREFAB;
     public Simpeesimul GONetClientPREFAB;
 
-    public GONetParticipant nonResourcePrefab;
-    public GONetParticipant resourcePrefab;
+    public GONetParticipant authorityPrefab;
+    public GONetParticipant nonAuthorityPrefab;
 
     private bool hasServerSpawned;
 
+    /* auto spawn...but ok prior to server being created?
+    private void Start()
+    {
+        GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
+    }
+    */
+
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.C))
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
             Instantiate(GONetClientPREFAB);
         }
 
-        if (Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
         {
             Instantiate(GONetServerPREFAB);
             hasServerSpawned = true;
         }
 
-        //if (GONetMain.IsServer)
-        //{
-            if (Input.GetKeyDown(KeyCode.D))
-            {
-                GameObject cubeta = GameObject.Find("Cubetas");
-                Instantiate(cubeta);
-            }
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.D))
+        {
+            GameObject cubeta = GameObject.Find("Cubetas");
+            Instantiate(cubeta);
+        }
 
-            if (Input.GetKeyDown(KeyCode.N))
-            {
-                Instantiate(nonResourcePrefab);
-            }
-
-            if (Input.GetKeyDown(KeyCode.R))
-            {
-                Instantiate(resourcePrefab);
-            }
-        //}
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.R))
+        {
+            GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
+        }
     }
 }

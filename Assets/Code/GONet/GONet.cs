@@ -240,6 +240,42 @@ namespace GONet
 
         #region public methods
 
+        #region instantiate special support
+
+        /// <summary>
+        /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
+        /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
+        /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
+        /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
+        /// </summary>
+        /// <param name="authorityOriginal"></param>
+        /// <param name="nonAuthorityAlternateOriginal"></param>
+        /// <returns></returns>
+        public static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal)
+        {
+            return GONetSpawnSupport_Runtime.Instantiate_WithNonAuthorityAlternate(authorityOriginal, nonAuthorityAlternateOriginal);
+        }
+
+        /// <summary>
+        /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
+        /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
+        /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
+        /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
+        /// </summary>
+        /// <param name="authorityOriginal"></param>
+        /// <param name="nonAuthorityAlternateOriginal"></param>
+        /// <returns></returns>
+        public static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal, Vector3 position, Quaternion rotation)
+        {
+            return GONetSpawnSupport_Runtime.Instantiate_WithNonAuthorityAlternate(authorityOriginal, nonAuthorityAlternateOriginal, position, rotation);
+        }
+
+        #endregion
+
         /// <summary>
         /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
         /// </summary>
@@ -832,17 +868,14 @@ namespace GONet
         /// <param name="instantiateEvent"></param>
         private static void Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
         {
-            GONetParticipant template = GONetSpawnSupport_Runtime.LookupFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
+            GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template);
+            instance.gameObject.name = instantiateEvent.InstanceName;
             GONetLog.Debug("Instantiate_Remote, Instantiate complete....instanceID: " + instance.GetInstanceID());
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
-            if (IsServer && instantiateEvent.GONetId == OwnerAuthorityId_Unset)
+            if (!IsServer || instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
             {
-                instance.GONetId = ++lastAssignedGONetId;
-            }
-            else
-            {
-                instance.GONetId = instantiateEvent.GONetId;
+                instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
             }
             remoteSpawns_avoidAutoPropogateSupport.Add(instance);
         }
@@ -1268,7 +1301,18 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
+            InstantiateGONetParticipantEvent @event;
+
+            string nonAuthorityDesignTimeLocation;
+            if (GONetSpawnSupport_Runtime.TryGetNonAuthorityDesignTimeLocation(gonetParticipant, out nonAuthorityDesignTimeLocation))
+            {
+                @event = InstantiateGONetParticipantEvent.Create_WithNonAuthorityInfo(gonetParticipant, nonAuthorityDesignTimeLocation);
+            }
+            else
+            {
+                @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
+            }
+
             Events.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
@@ -1294,7 +1338,7 @@ namespace GONet
 
         private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            if (IsServer)
+            if (IsServer && gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
             {
                 gonetParticipant.GONetId = ++lastAssignedGONetId;
             }
