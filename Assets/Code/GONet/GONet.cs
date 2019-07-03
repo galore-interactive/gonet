@@ -870,7 +870,12 @@ namespace GONet
         {
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template);
-            instance.gameObject.name = instantiateEvent.InstanceName;
+
+            if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
+            {
+                instance.gameObject.name = instantiateEvent.InstanceName;
+            }
+
             GONetLog.Debug("Instantiate_Remote, Instantiate complete....instanceID: " + instance.GetInstanceID());
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
             if (!IsServer || instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)

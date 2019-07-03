@@ -35,7 +35,7 @@ public class GONetTestSpawner : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
         {
             Instantiate(GONetClientPREFAB);
         }
@@ -52,7 +52,7 @@ public class GONetTestSpawner : MonoBehaviour
             Instantiate(cubeta);
         }
 
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.R))
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
             GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
         }

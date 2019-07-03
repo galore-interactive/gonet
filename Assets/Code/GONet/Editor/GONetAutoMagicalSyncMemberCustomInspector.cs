@@ -20,6 +20,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace GONet.Editor
@@ -42,7 +43,7 @@ namespace GONet.Editor
             DrawGONetParticipantSpecifics(targetGONetParticipant);
 
             EditorGUI.indentLevel++;
-            const string GOIntrinsics = "GameObject (Instrinsics)";
+            const string GOIntrinsics = "Transform (Instrinsics)";
             isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, GOIntrinsics);// string.Concat(typeof(GONetParticipant).Name, SCR));
             if (isMyScriptSectionUnfolded)
             {
@@ -120,6 +121,7 @@ namespace GONet.Editor
             { // Handle/draw all [GONetAutoMagicalSync] members
 
                 EditorGUI.indentLevel++;
+
                 foreach (var siblingMonoBehaviour in targetGONetParticipant.GetComponents<MonoBehaviour>())
                 {
                     if (!(siblingMonoBehaviour is GONetParticipant))
@@ -164,6 +166,88 @@ namespace GONet.Editor
                         }
                     }
                 }
+
+
+                serializedObject.Update();
+                EditorGUI.BeginChangeCheck();
+                serializedObject.UpdateIfRequiredOrScript();
+
+                foreach (var animator in targetGONetParticipant.GetComponentsInChildren<Animator>())
+                {
+                    if (animator.parameterCount > 0)
+                    {
+                        if (targetGONetParticipant.animatorSyncSupport == null)
+                        {
+                            targetGONetParticipant.animatorSyncSupport = new GONetParticipant.StringToStringToBoolDictionaryDictionary();
+                        }
+
+                        bool isfoldie;
+                        string animatorSyncSupport_key = animator.runtimeAnimatorController.name;
+                        isFoldedByTypeMemberNameMap.TryGetValue(animatorSyncSupport_key, out isfoldie);
+                        const string ANIMATOR_INTRINSICS = "Animator (Intrinsics)";
+                        isFoldedByTypeMemberNameMap[animatorSyncSupport_key] = EditorGUILayout.Foldout(isfoldie, ANIMATOR_INTRINSICS);
+                        if (isFoldedByTypeMemberNameMap[animatorSyncSupport_key])
+                        {
+                            GONetParticipant.StringToBoolDictionary parameterSyncMap;
+                            if (!targetGONetParticipant.animatorSyncSupport.TryGetValue(animatorSyncSupport_key, out parameterSyncMap))
+                            {
+                                parameterSyncMap = new GONetParticipant.StringToBoolDictionary();
+                                targetGONetParticipant.animatorSyncSupport[animatorSyncSupport_key] = parameterSyncMap;
+                            }
+                            int animatorSyncSupport_keyIndex = targetGONetParticipant.animatorSyncSupport.GetCustomKeyIndex(animatorSyncSupport_key);
+
+                            EditorGUI.indentLevel++;
+
+                            bool guiEnabledPrevious_inner = GUI.enabled;
+                            GUI.enabled = false;
+
+                            EditorGUILayout.BeginHorizontal();
+                            const string ControllerLabel = "Controller";
+                            EditorGUILayout.LabelField(ControllerLabel);
+                            EditorGUILayout.TextField(animatorSyncSupport_key);
+                            EditorGUILayout.EndHorizontal();
+
+                            GUI.enabled = guiEnabledPrevious_inner;
+
+                            for (int i = 0; i < animator.parameterCount; ++i)
+                            {
+                                string parameterSyncMap_key = animator.parameters[i].name;
+                                if (!parameterSyncMap.ContainsKey(parameterSyncMap_key))
+                                {
+                                    parameterSyncMap[parameterSyncMap_key] = false;
+                                }
+                                int parameterSyncMap_keyIndex = parameterSyncMap.GetCustomKeyIndex(parameterSyncMap_key);
+
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.LabelField(string.Concat("Is Syncd: ", parameterSyncMap_key));
+                                SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"animatorSyncSupport.values.Array.data[{animatorSyncSupport_keyIndex}].values.Array.data[{parameterSyncMap_keyIndex}]");
+                                EditorGUILayout.PropertyField(specificInnerMapValue_serializedProperty, GUIContent.none, false); // IMPORTANT: without this, editing prefabs would never save/persist changes!
+                                EditorGUILayout.EndHorizontal();
+
+                            }
+
+                            EditorGUI.indentLevel--;
+                        }
+                    }
+                }
+
+                serializedObject.ApplyModifiedProperties();
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    EditorUtility.SetDirty(targetGONetParticipant);
+                    EditorUtility.SetDirty(targetGONetParticipant.gameObject);
+
+                    bool isPrefab = targetGONetParticipant.designTimeLocation.EndsWith(".prefab");
+                    if (!isPrefab)
+                    {
+                        EditorUtility.SetDirty(targetGONetParticipant);
+                        EditorUtility.SetDirty(targetGONetParticipant.gameObject);
+                        EditorSceneManager.MarkAllScenesDirty();
+                    }
+                }
+
+
                 EditorGUI.indentLevel--;
             }
         }

@@ -14,6 +14,8 @@
  */
 
 using System;
+using System.Collections.Generic;
+using GONet.Serializables;
 using GONet.Utils;
 using UnityEngine;
 
@@ -51,6 +53,15 @@ namespace GONet
 
         public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
         public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;
+
+        [Serializable]
+        public class StringToBoolDictionary : SerializableDictionary<string, bool> { }
+
+        [Serializable]
+        public class StringToStringToBoolDictionaryDictionary : SerializableDictionary<string, StringToBoolDictionary> { }
+
+        [SerializeField, HideInInspector]
+        public StringToStringToBoolDictionaryDictionary animatorSyncSupport;
 
         uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
@@ -192,7 +203,6 @@ namespace GONet
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
-                GONetLog.Debug("deserialize.....full unique path: " + fullUniquePath + " null? " + ((object)gonetParticipantGO == null) + " unity null? " + (gonetParticipantGO == null));
                 GONetParticipant gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
 
                 uint GONetId = default;

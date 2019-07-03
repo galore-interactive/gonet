@@ -17,6 +17,8 @@ using MessagePack;
 using MessagePack.Formatters;
 using MessagePack.Resolvers;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace GONet.Utils
 {
@@ -68,6 +70,51 @@ namespace GONet.Utils
         public static T DeserializeFromBytes<T>(ArraySegment<byte> bytes)
         {
             return MessagePackSerializer.Deserialize<T>(bytes);
+        }
+    }
+}
+
+namespace GONet.Serializables
+{
+    [Serializable]
+    public abstract class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, ISerializationCallbackReceiver
+    {
+        [SerializeField]
+        private List<TKey> keys = new List<TKey>();
+
+        [SerializeField]
+        private List<TValue> values = new List<TValue>();
+
+        public int GetCustomKeyIndex(TKey key)
+        {
+            return keys.IndexOf(key);
+        }
+
+        public void OnBeforeSerialize()
+        {
+            keys.Clear();
+            values.Clear();
+            foreach (KeyValuePair<TKey, TValue> pair in this)
+            {
+                keys.Add(pair.Key);
+                values.Add(pair.Value);
+            }
+        }
+
+        public void OnAfterDeserialize()
+        {
+            Clear();
+
+            int keyCount = keys.Count;
+            if (keys.Count != values.Count)
+            {
+                throw new Exception($"There are {keys.Count} keys and {values.Count} values after deserialization. Make sure that both key and value types are serializable.");
+            }
+
+            for (int i = 0; i < keyCount; ++i)
+            {
+                Add(keys[i], values[i]);
+            }
         }
     }
 }

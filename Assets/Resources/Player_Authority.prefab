@@ -1577,6 +1577,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   codeGenerationId: 1
+  animatorSyncSupport:
+    keys:
+    - CharacterController
+    values:
+    - keys:
+      - Speed
+      - Jump
+      - Fly
+      - Aim
+      - H
+      - V
+      - Grounded
+      values: 01010100010101
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/Resources/Player_Authority.prefab
