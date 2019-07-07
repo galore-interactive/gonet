@@ -1257,6 +1257,18 @@ namespace GONet
                         }
                     }
 
+                    if (gonetParticipant.animatorSyncSupport != null)
+                    { // auto-sync stuffs, but this time for animation controller parameters
+                        var animatorSyncSupportEnum = gonetParticipant.animatorSyncSupport.GetEnumerator();
+                        while (animatorSyncSupportEnum.MoveNext())
+                        {
+                            string parameterName = animatorSyncSupportEnum.Current.Key;
+                            GONetParticipant.AnimatorControllerParameter parameter = animatorSyncSupportEnum.Current.Value;
+
+                            GONetLog.Debug(string.Concat("animator parameter....name: ", parameterName, " type: ", parameter.valueType, " isSyncd: ", parameter.isSyncd));
+                        }
+                    }
+
                     foreach (SyncBundleUniqueGrouping uniqueSyncGrouping in uniqueSyncGroupings)
                     {
                         if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))

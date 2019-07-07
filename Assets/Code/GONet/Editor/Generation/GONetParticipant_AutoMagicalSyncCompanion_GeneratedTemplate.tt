@@ -125,7 +125,11 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 				case <#=iOverall++#>:
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)value;
+				<# } else { #>
+					<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, (<#=singleMember.animatorControllerParameterTypeFullName#>)value);
+				<# } #>
 					return;
 <#		}
 	}
@@ -149,7 +153,11 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 				case <#=iOverall++#>:
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					return <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+				<# } else { #>
+					return <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
+				<# } #>
 <#		}
 	}
 #>
@@ -192,13 +200,17 @@ namespace GONet.Generation
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
 				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#              }
-				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				bitStream_appendTo.WriteBit(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+				bitStream_appendTo.WriteBit(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 <#
 				}
-				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
 				{
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
@@ -209,7 +221,11 @@ namespace GONet.Generation
 					else
                     {
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+				bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 <#
                     }
 				}
@@ -244,12 +260,16 @@ namespace GONet.Generation
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
-				 || singleMember_memberTypeFullName == typeof(int).FullName
+				 || singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName
 				 || singleMember_memberTypeFullName == typeof(sbyte).FullName
 				 || singleMember_memberTypeFullName == typeof(double).FullName)
 				{
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				byte[] bytes = BitConverter.GetBytes(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+				byte[] bytes = BitConverter.GetBytes(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 				int count = bytes.Length;
 				for (int i = 0; i < count; ++i)
 				{
@@ -291,13 +311,17 @@ namespace GONet.Generation
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#              }
-				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					bitStream_appendTo.WriteBit(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+					bitStream_appendTo.WriteBit(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 <#
 				}
-				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
 				{
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
@@ -308,7 +332,11 @@ namespace GONet.Generation
 					else
                     {
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+					bitStream_appendTo.WriteFloat(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 <#
                     }
 				}
@@ -343,12 +371,16 @@ namespace GONet.Generation
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
-				 || singleMember_memberTypeFullName == typeof(int).FullName
+				 || singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName
 				 || singleMember_memberTypeFullName == typeof(sbyte).FullName
 				 || singleMember_memberTypeFullName == typeof(double).FullName)
 				{
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					byte[] bytes = BitConverter.GetBytes(<#=single.componentTypeName#>.<#=singleMember.memberName#>);
+				<# } else { #>
+					byte[] bytes = BitConverter.GetBytes(<#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>));
+				<# } #>
 					int count = bytes.Length;
 					for (int i = 0; i < count; ++i)
 					{
@@ -401,15 +433,19 @@ namespace GONet.Generation
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)customSerializer.Deserialize(bitStream_readFrom);
 <#              }
-				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
 #>
 				bool value;
                 bitStream_readFrom.ReadBit(out value);
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+				<# } else { #>
+				<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, value);
+				<# } #>
 <#
 				}
-				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
 				{
 #>
 				float value;
@@ -427,7 +463,11 @@ namespace GONet.Generation
 <#
                     }
 #>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
+				<# } else { #>
+				<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, value);
+				<# } #>
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
@@ -481,7 +521,7 @@ namespace GONet.Generation
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt16(bytes, 0);
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(int).FullName)
+                else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
 				{
 #>
 				int count = 4;
@@ -491,7 +531,11 @@ namespace GONet.Generation
 					byte b = (byte)bitStream_readFrom.ReadByte();
 					bytes[i] = b;
 				}
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToInt32(bytes, 0);
+				<# } else { #>
+				<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, BitConverter.ToInt32(bytes, 0));
+				<# } #>
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
@@ -551,14 +595,14 @@ namespace GONet.Generation
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
 					var value = (<#=singleMember.memberTypeFullName#>)customSerializer.Deserialize(bitStream_readFrom);
 <#              }
-				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
 #>
 					bool value;
 					bitStream_readFrom.ReadBit(out value);
 <#
 				}
-				else if (singleMember_memberTypeFullName == typeof(float).FullName)
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
 				{
 #>
 					float value;
@@ -623,7 +667,7 @@ namespace GONet.Generation
 					var value = BitConverter.ToInt16(bytes, 0);
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(int).FullName)
+                else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
 				{
 #>
 					int count = 4;
@@ -656,14 +700,19 @@ namespace GONet.Generation
 <#
 				}
 			}#>
-<#				if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
-				{#>
+
+<#			if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
+			{#>
 					valuesChangesSupport[<#=iOverall#>].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
-<#				}
-				else
-				{#>
+<#			}
+			else
+			{#>
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value;
-<#				}#>
+				<# } else { #>
+					<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, (<#=singleMember.animatorControllerParameterTypeFullName#>)value);
+				<# } #>
+<#			}#>
 				}
 				break;
 
@@ -692,7 +741,11 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport<#=iOverall#>, <#=iOverall#>)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport<#=iOverall#>.lastKnownValue_previous = valuesChangesSupport<#=iOverall#>.lastKnownValue;
+				<# if (singleMember.animatorControllerParameterId == 0) { #>
 					valuesChangesSupport<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+				<# } else { #>
+					valuesChangesSupport<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
+				<# } #>
 				}
 
 <#		

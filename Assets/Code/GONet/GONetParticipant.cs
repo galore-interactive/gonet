@@ -54,14 +54,29 @@ namespace GONet
         public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
         public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;
 
-        [Serializable]
-        public class StringToBoolDictionary : SerializableDictionary<string, bool> { }
+        
 
         [Serializable]
-        public class StringToStringToBoolDictionaryDictionary : SerializableDictionary<string, StringToBoolDictionary> { }
+        public class AnimatorControllerParameter
+        {
+            [SerializeField, HideInInspector]
+            public AnimatorControllerParameterType valueType;
 
+            [SerializeField]
+            public bool isSyncd;
+        }
+
+        /// <summary>
+        /// the key is the parameter name, the value is the other available info for that parameter
+        /// </summary>
+        [Serializable]
+        public class AnimatorControllerParameterMap : SerializableDictionary<string, AnimatorControllerParameter> { }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT touch this.  It is GONet internal.
+        /// </summary>
         [SerializeField, HideInInspector]
-        public StringToStringToBoolDictionaryDictionary animatorSyncSupport;
+        public AnimatorControllerParameterMap animatorSyncSupport;
 
         uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
@@ -124,7 +139,6 @@ namespace GONet
         internal long runtimeUID = GUID.UNSET_VALUE;
 
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
-
 
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
