@@ -535,10 +535,9 @@ namespace GONet.Generation
         static readonly GONetAutoMagicalSyncAttribute attribute_animator_parameters = new GONetAutoMagicalSyncAttribute()
         {
             Reliability = AutoMagicalSyncReliability.Unreliable,
-            SyncChangesEverySeconds = 1f / 10f,
-            //CustomSerialize_Type = typeof(AnimatorParametersSerializer),
+            SyncChangesEverySeconds = 1f / 4f,
             MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read anim/ctrl/params from another thread and NOT change it!!!
-            ShouldBlendBetweenValuesReceived = false // TODO revisit this...floats should be blendable!
+            ShouldBlendBetweenValuesReceived = true // well, floats will be blendable and nothing else as of now...perhaps integers too one day
         };
 
         internal static readonly Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute> intrinsicAttributeByMemberTypeMap = new Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute>(2)

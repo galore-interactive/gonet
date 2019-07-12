@@ -489,17 +489,4 @@ namespace GONet
             bitStream_appendTo.WriteUInt(SmallestC, bitsPerSmallestThreeItem);
         }
     }
-
-    public class AnimatorParametersSerializer : IGONetAutoMagicalSync_CustomSerializer
-    {
-        public object Deserialize(Utils.BitStream bitStream_readFrom)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
-        {
-            throw new NotImplementedException();
-        }
-    }
 }
