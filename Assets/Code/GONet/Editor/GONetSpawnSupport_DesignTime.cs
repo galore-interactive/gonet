@@ -1,4 +1,19 @@
-﻿using GONet.Generation;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using GONet.Generation;
 using GONet.Utils;
 using System;
 using System.Collections.Generic;
@@ -32,6 +47,8 @@ namespace GONet.Editor
 
         private static void OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly()
         {
+            RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX); // clear it now as it will be built back up below
+
             foreach (var gonetParticipant in Resources.FindObjectsOfTypeAll<GONetParticipant>())
             {
                 if (gonetParticipant != null)
@@ -60,6 +77,11 @@ namespace GONet.Editor
                 for (int i = 0; i < count; ++i)
                 {
                     Scene loadedScene = EditorSceneManager.GetSceneAt(i);
+
+                    const string SLASHY_LITTLE_WALLACE_PREVENTS_DELETING_SIMILARLY_NAMED_SCENES = "/";
+                    string scenePrefix = string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, loadedScene.name, SLASHY_LITTLE_WALLACE_PREVENTS_DELETING_SIMILARLY_NAMED_SCENES);
+                    RemoveFromPersistence_WherePrefixMatches(scenePrefix); // clear anything already present from these scene now as it will be built back up below
+
                     foreach (var rootGO in loadedScene.GetRootGameObjects())
                     {
                         foreach (var gonetParticipant in rootGO.GetComponentsInChildren<GONetParticipant>())
@@ -69,6 +91,10 @@ namespace GONet.Editor
                             {
                                 somethingChanged = true;
                                 EnsureDesignTimeLocationCurrent(gonetParticipant, fullUniquePath); // have to do proper unity serialization stuff for this to stick!
+                            }
+                            else
+                            {
+                                EnsureExistsInPersistence(fullUniquePath); // although this is also called inside EnsureDesignTimeLocationCurrent, we need to call it here too in case the generated file this information goes into is manually deleted on the filesystem and the information was lost...this is a failsafe method to ensure it is populated!
                             }
                         }
                     }
@@ -82,16 +108,36 @@ namespace GONet.Editor
             }
         }
 
-        /// <summary>
-        /// TODO make this an ObservableHashSet and only call <see cref="KeepDesignTimeLocationPersistenceUpdated"/> when it changes.
-        /// </summary>
-        static readonly HashSet<string> allDesignTimeLocationsEncountered = new HashSet<string>();
+        static void EnsureExistsInPersistence(string designTimeLocation)
+        {
+            IEnumerable<string> all = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
+
+            if (!all.Contains(designTimeLocation))
+            {
+                var newAll = new List<string>(all);
+
+                newAll.Add(designTimeLocation);
+
+                OverwritePersistenceWith(newAll);
+            }
+        }
+
+        static void RemoveFromPersistence_WherePrefixMatches(string prefixToMatch)
+        {
+            IEnumerable<string> all = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
+
+            all = all.Where(x => !x.StartsWith(prefixToMatch));
+
+            OverwritePersistenceWith(all);
+        }
 
         /// <summary>
         /// Do all proper unity serialization stuff or else a change will NOT stick/save/persist.
         /// </summary>
         private static void EnsureDesignTimeLocationCurrent(GONetParticipant gonetParticipant, string currentLocation)
         {
+            string goName = gonetParticipant.gameObject.name; // IMPORTANT: after a call to serializedObject.ApplyModifiedProperties(), gonetParticipant is unity "null" and this line MUst come before that!
+
             SerializedObject serializedObject = new SerializedObject(gonetParticipant); // use the damned unity serializtion stuff or be doomed to fail on saving stuff to scene as you hope/expect!!!
             SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.designTimeLocation));
             serializedObject.Update();
@@ -99,21 +145,23 @@ namespace GONet.Editor
             gonetParticipant.designTimeLocation = currentLocation; // doubly sure
             serializedObject.ApplyModifiedProperties();
 
-            GONetLog.Debug("set design time location for name: " + gonetParticipant.gameObject.name + " to NEW value: " + gonetParticipant.designTimeLocation);
+            GONetLog.Debug("set design time location for name: " + goName + " to NEW value: " + currentLocation);
 
-            allDesignTimeLocationsEncountered.Add(currentLocation);
-            KeepDesignTimeLocationPersistenceUpdated();
+            EnsureExistsInPersistence(currentLocation);
         }
 
         /// <summary>
         /// POST: contents of <see cref="allDesignTimeLocationsEncountered"/> persisted.
         /// </summary>
-        private static void KeepDesignTimeLocationPersistenceUpdated()
+        private static void OverwritePersistenceWith(IEnumerable<string> newCompleteDesignTimeLocations)
         {
             StringBuilder fileContents = new StringBuilder(5000);
-            foreach (string designTimeLocation in allDesignTimeLocationsEncountered.OrderBy(x => x))
+            foreach (string designTimeLocation in newCompleteDesignTimeLocations.OrderBy(x => x))
             {
-                fileContents.Append(designTimeLocation).Append(Environment.NewLine);
+                if (!string.IsNullOrWhiteSpace(designTimeLocation))
+                {
+                    fileContents.Append(designTimeLocation).Append(Environment.NewLine);
+                }
             }
 
             string directory = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.GONET_STREAMING_ASSETS_FOLDER);

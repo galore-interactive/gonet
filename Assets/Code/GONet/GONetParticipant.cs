@@ -1,4 +1,21 @@
-﻿using System;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using System;
+using System.Collections.Generic;
+using GONet.Serializables;
 using GONet.Utils;
 using UnityEngine;
 
@@ -37,6 +54,30 @@ namespace GONet
         public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
         public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;
 
+        
+
+        [Serializable]
+        public class AnimatorControllerParameter
+        {
+            [SerializeField, HideInInspector]
+            public AnimatorControllerParameterType valueType;
+
+            [SerializeField]
+            public bool isSyncd;
+        }
+
+        /// <summary>
+        /// the key is the parameter name, the value is the other available info for that parameter
+        /// </summary>
+        [Serializable]
+        public class AnimatorControllerParameterMap : SerializableDictionary<string, AnimatorControllerParameter> { }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT touch this.  It is GONet internal.
+        /// </summary>
+        [SerializeField, HideInInspector]
+        public AnimatorControllerParameterMap animatorSyncSupport;
+
         uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
         /// This is set to a value that represents which machine in the game spawned this instance.
@@ -66,7 +107,8 @@ namespace GONet
         [GONetAutoMagicalSync(
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue, 
-            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer))]
+            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
+            MustRunOnUnityMainThread = true)]
         public uint GONetId
         {
             get { return gonetId; }
@@ -97,7 +139,6 @@ namespace GONet
         internal long runtimeUID = GUID.UNSET_VALUE;
 
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
-
 
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again

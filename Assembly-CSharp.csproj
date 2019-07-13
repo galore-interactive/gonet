@@ -60,16 +60,27 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\ControlsTutorial.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\HintManagement.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\ThirdPersonOrbitCamBasic.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\AimBehaviourBasic.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\BasicBehaviour.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\FlyBehaviour.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\MoveBehaviour.cs" />
     <Compile Include="Assets\Code\AnotherFieldTesterino.cs" />
     <Compile Include="Assets\Code\FieldChangeTest.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_3.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_4.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_5.cs" />
     <Compile Include="Assets\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\Code\GONet\GONet.cs" />
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\Code\GONet\GONetClient.cs" />
     <Compile Include="Assets\Code\GONet\GONetConnections.cs" />
+    <Compile Include="Assets\Code\GONet\GONetEventBus.cs" />
     <Compile Include="Assets\Code\GONet\GONetEvents.cs" />
     <Compile Include="Assets\Code\GONet\GONetGlobal.cs" />
     <Compile Include="Assets\Code\GONet\GONetParticipant.cs" />

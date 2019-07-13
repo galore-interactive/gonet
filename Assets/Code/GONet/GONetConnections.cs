@@ -1,16 +1,38 @@
-﻿using GONet.Utils;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using GONet.Utils;
 using NetcodeIO.NET;
 using ReliableNetcode;
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
-
+using System.Runtime.CompilerServices;
+using System.Threading;
 using GONetChannelId = System.Byte;
 
 namespace GONet
 {
     public abstract class GONetConnection : ReliableEndpoint
     {
+        public const int MTU = 1400;
+        private const int MTU_X2 = MTU << 1;
+
+        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> messageByteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
+
         public uint OwnerAuthorityId { get; internal set; }
 
         #region round trip time stuffs (RTT)
@@ -85,14 +107,16 @@ namespace GONet
         {
             int headerSize = sizeof(GONetChannelId) + sizeof(int);
             int bodySize_withHeader = bytesUsedCount + headerSize;
-            byte[] todoFIXMEpool = new byte[bodySize_withHeader]; // TODO FIXME use byte[] pool!
+            byte[] messageBytes_withHeader = BorrowByteArray(bodySize_withHeader);
 
-            Utils.BitConverter.GetBytes(channelId, todoFIXMEpool, 0);
-            Utils.BitConverter.GetBytes(bytesUsedCount, todoFIXMEpool, sizeof(GONetChannelId));
-            Buffer.BlockCopy(messageBytes, 0, todoFIXMEpool, headerSize, bytesUsedCount);
+            Utils.BitConverter.GetBytes(channelId, messageBytes_withHeader, 0);
+            Utils.BitConverter.GetBytes(bytesUsedCount, messageBytes_withHeader, sizeof(GONetChannelId));
+            Buffer.BlockCopy(messageBytes, 0, messageBytes_withHeader, headerSize, bytesUsedCount);
 
             GONetChannel channel = GONetChannel.ById(channelId);
-            base.SendMessage(todoFIXMEpool, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
+            base.SendMessage(messageBytes_withHeader, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
+
+            ReturnByteArray(messageBytes_withHeader);
         }
 
         private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
@@ -103,8 +127,8 @@ namespace GONet
             uint bodySize_readFromMessage;
             GONetChannelId channelId_readFromMessage;
 
-            byte[] todoFIXMEpool = new byte[bodySize_expected]; // TODO FIXME use byte[] pool!
-            Buffer.BlockCopy(messageBytes, headerSize, todoFIXMEpool, 0, bodySize_expected);
+            byte[] messageBytes_withoutHeader = BorrowByteArray(bodySize_expected);
+            Buffer.BlockCopy(messageBytes, headerSize, messageBytes_withoutHeader, 0, bodySize_expected);
 
             using (var memoryStream = new MemoryStream(messageBytes))
             {
@@ -115,7 +139,35 @@ namespace GONet
                 }
             }
 
-            GONetMain.ProcessIncomingBytes(this, todoFIXMEpool, (int)bodySize_readFromMessage, channelId_readFromMessage);
+            GONetMain.ProcessIncomingBytes(this, messageBytes_withoutHeader, (int)bodySize_readFromMessage, channelId_readFromMessage);
+
+            ReturnByteArray(messageBytes_withoutHeader);
+        }
+
+        /// <summary>
+        /// Use this to borrow byte arrays as needed for the GetBytes calls.
+        /// Ensure you subsequently call <see cref=""/>
+        /// </summary>
+        /// <returns>byte array of size 8</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static byte[] BorrowByteArray(int minimumSize)
+        {
+            ArrayPool<byte> arrayPool;
+            if (!messageByteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
+            {
+                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU_X2);
+                messageByteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
+            }
+            return arrayPool.Borrow(minimumSize);
+        }
+
+        /// <summary>
+        /// PRE: Required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ReturnByteArray(byte[] borrowed)
+        {
+            messageByteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);
         }
     }
 

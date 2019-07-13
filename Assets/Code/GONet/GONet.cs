@@ -1,4 +1,19 @@
-﻿using GONet.Generation;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using GONet.Generation;
 using GONet.Utils;
 using Microsoft.IO;
 using ReliableNetcode;
@@ -30,6 +45,7 @@ namespace GONet
         };
 
         private static GONetSessionContext globalSessionContext;
+
         public static GONetSessionContext GlobalSessionContext
         {
             get { return globalSessionContext; }
@@ -76,6 +92,8 @@ namespace GONet
             }
         }
 
+        public static GONetEventBus Events => GONetEventBus.Instance;
+
         public static bool IsUnityApplicationEditor { get; internal set; }  = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
@@ -95,6 +113,11 @@ namespace GONet
         /// </summary>
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
+        public static bool DoIHaveAuthorityOver(GameObject gameObject)
+        {
+            return gameObject.GetComponent<GONetParticipant>()?.OwnerAuthorityId == MyAuthorityId; // TODO cache instead of lookup/get each time!
+        }
+
         /// <summary>
         /// NOTE: The time maintained within is only updated once per main thread frame tick (i.e., call to <see cref="Update"/>).
         /// </summary>
@@ -113,6 +136,86 @@ namespace GONet
 
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
+            InitEventSubscriptions();
+        }
+
+        private static void InitEventSubscriptions()
+        {
+            Events.Subscribe<IGONetEvent>(OnAnyEvent_RelayToRemoteConnections_IfAppropriate);
+            Events.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
+            Events.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
+            Events.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
+
+            { // tests:
+                Events.Subscribe<IGONetEvent>(OnAnyEvent);
+                Events.Subscribe<ITransientEvent>(OnTransientEvent);
+            }
+        }
+
+        private static void OnPersistentEventsBundle_ProcessAll_Remote(IGONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
+        {
+            foreach (var item in eventEnvelope.Event.PersistentEvents)
+            {
+                persistentEventsThisSession.Enqueue(item);
+
+                if (item is InstantiateGONetParticipantEvent)
+                {
+                    Instantiate_Remote((InstantiateGONetParticipantEvent)item);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Definition of "if appropriate":
+        ///     -The server will always send to remote connections....clients only send to remote connections (i.e., just to server) when locally sourced!
+        /// </summary>
+        private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
+        {
+            if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
+            {
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+
+                uint count = _gonetServer.numConnections;// remoteClients.Length;
+                for (uint i = 0; i < count; ++i)
+                {
+                    var remoteClient = _gonetServer.remoteClients[i];
+                    if (remoteClient.OwnerAuthorityId != eventEnvelope.SourceAuthorityId)
+                    {
+                        GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
+                        SendBytesToRemoteConnection(remoteClient, bytes, bytes.Length, channelId);
+                    }
+                }
+            }
+            else if (IsServer || !eventEnvelope.IsSourceRemote)
+            {
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
+                bool shouldSendRelilably = true; // TODO support unreliable events?
+                SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+            }
+        }
+
+        private static void OnTransientEvent(IGONetEventEnvelope<ITransientEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub Transient");
+        }
+
+        private static void OnPersistentEvent_KeepTrack(IGONetEventEnvelope<IPersistentEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub Persistent");
+
+            persistentEventsThisSession.Enqueue(eventEnvelope.Event);
+        }
+
+        private static void OnAnyEvent(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub ANY");
+        }
+
+        private static void OnInstantiationEvent_Remote(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
+        {
+            GONetLog.Debug("pub/sub Instantiate REMOTE");
+
+            Instantiate_Remote(eventEnvelope.Event);
         }
 
         private static void InitShouldSkipSyncSupport()
@@ -136,6 +239,42 @@ namespace GONet
         }
 
         #region public methods
+
+        #region instantiate special support
+
+        /// <summary>
+        /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
+        /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
+        /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
+        /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
+        /// </summary>
+        /// <param name="authorityOriginal"></param>
+        /// <param name="nonAuthorityAlternateOriginal"></param>
+        /// <returns></returns>
+        public static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal)
+        {
+            return GONetSpawnSupport_Runtime.Instantiate_WithNonAuthorityAlternate(authorityOriginal, nonAuthorityAlternateOriginal);
+        }
+
+        /// <summary>
+        /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
+        /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
+        /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
+        /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
+        /// </summary>
+        /// <param name="authorityOriginal"></param>
+        /// <param name="nonAuthorityAlternateOriginal"></param>
+        /// <returns></returns>
+        public static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal, Vector3 position, Quaternion rotation)
+        {
+            return GONetSpawnSupport_Runtime.Instantiate_WithNonAuthorityAlternate(authorityOriginal, nonAuthorityAlternateOriginal, position, rotation);
+        }
+
+        #endregion
 
         /// <summary>
         /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
@@ -322,13 +461,14 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
-        internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
         static readonly Dictionary<long, RequestMessage> client_lastFewTimeSyncsSentByUID = new Dictionary<long, RequestMessage>(CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE);
         static long client_mostRecentTimeSyncResponseSentTicks;
+
+        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.25f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
+        internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
 
         /// <summary>
         /// "IfAppropriate" is to indicate this runs on a schedule....if it is not the right time, this will do nothing.
@@ -373,6 +513,8 @@ namespace GONet
                             Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
 
                             SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
+
+                            //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
 
                             mainThread_miscSerializationArrayPool.Return(bytes);
                         }
@@ -633,66 +775,65 @@ namespace GONet
                 {
                     try
                     {
-                        using (var memoryStream = new MemoryStream(networkData.messageBytes))
+                        if (networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
                         {
-                            using (var bitStream = new Utils.BitStream(memoryStream))
+                            DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
+                        }
+                        else
+                        {
+                            using (var memoryStream = new MemoryStream(networkData.messageBytes))
                             {
-                                Type messageType;
-                                ////////////////////////////////////////////////////////////////////////////
-                                // header...just message type/id...well, now it is send time too
-                                uint messageID;
-                                bitStream.ReadUInt(out messageID);
-                                messageType = messageTypeByMessageIDMap[messageID];
+                                using (var bitStream = new Utils.BitStream(memoryStream))
+                                {
+                                    Type messageType;
+                                    ////////////////////////////////////////////////////////////////////////////
+                                    // header...just message type/id...well, now it is send time too
+                                    uint messageID;
+                                    bitStream.ReadUInt(out messageID);
+                                    messageType = messageTypeByMessageIDMap[messageID];
 
-                                long elapsedTicksAtSend;
-                                bitStream.ReadLong(out elapsedTicksAtSend);
-                                ////////////////////////////////////////////////////////////////////////////
+                                    long elapsedTicksAtSend;
+                                    bitStream.ReadLong(out elapsedTicksAtSend);
+                                    ////////////////////////////////////////////////////////////////////////////
 
-                                //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+                                    //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
-                                // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
+                                    // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
 
-                                {  // body:
-                                    if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
-                                    {
-                                        DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(RequestMessage))
-                                    {
-                                        long requestUID;
-                                        bitStream.ReadLong(out requestUID);
-
-                                        Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
-                                    }
-                                    else if (messageType == typeof(ResponseMessage))
-                                    {
-                                        long requestUID;
-                                        bitStream.ReadLong(out requestUID);
-
-                                        Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
-                                    {
-                                        uint ownerAuthorityId;
-                                        bitStream.ReadUInt(out ownerAuthorityId);
-
-                                        if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                    {  // body:
+                                        if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                                         {
-                                            MyAuthorityId = ownerAuthorityId;
-                                        } // else log warning?
+                                            DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
+                                        }
+                                        else if (messageType == typeof(RequestMessage))
+                                        {
+                                            long requestUID;
+                                            bitStream.ReadLong(out requestUID);
+
+                                            Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
+                                        }
+                                        else if (messageType == typeof(ResponseMessage))
+                                        {
+                                            long requestUID;
+                                            bitStream.ReadLong(out requestUID);
+
+                                            Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
+                                        }
+                                        else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
+                                        {
+                                            uint ownerAuthorityId;
+                                            bitStream.ReadUInt(out ownerAuthorityId);
+
+                                            if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                            {
+                                                MyAuthorityId = ownerAuthorityId;
+                                            } // else log warning?
+                                        }
+                                        else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
+                                        {
+                                            DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                        } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                     }
-                                    else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
-                                    {
-                                        DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(InstantiateGONetParticipantEvent))
-                                    {
-                                        DeserializeBody_InstantiateGONetParticipantEvent(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    }
-                                    else if (messageType == typeof(PersistentEvents_Bundle))
-                                    {
-                                        DeserializeBody_PersistentEventsBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                    } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
                         }
@@ -718,36 +859,10 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream_headerAlreadyWritten, InstantiateGONetParticipantEvent instantiateEvent)
+        private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
-            bitStream_headerAlreadyWritten.WriteString(instantiateEvent.DesignTimeLocation);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.GONetId);
-            bitStream_headerAlreadyWritten.WriteUInt(instantiateEvent.OwnerAuthorityId);
-        }
-
-        private static void DeserializeBody_InstantiateGONetParticipantEvent(Utils.BitStream bitStream, int bytesUsedCount, GONetConnection relatedConnection, long elapsedTicksAtSend)
-        {
-            InstantiateGONetParticipantEvent instantiateEvent = new InstantiateGONetParticipantEvent();
-
-            instantiateEvent.OccurredAtElapsedTicks = elapsedTicksAtSend;
-
-            bitStream.ReadString(out instantiateEvent.DesignTimeLocation);
-            bitStream.ReadUInt(out instantiateEvent.GONetId);
-            bitStream.ReadUInt(out instantiateEvent.OwnerAuthorityId);
-
-            DoRecordKeeping_PersistentEvent(instantiateEvent, relatedConnection);
-
-            Instantiate_Remote(instantiateEvent);
-        }
-
-        private static void DoRecordKeeping_PersistentEvent(IPersistentEvent @event, GONetConnection fromRelatedConnection)
-        {
-            persistentEventsThisSession.Enqueue(@event);
-
-            if (IsServer)
-            {
-                // TODO FIXME send to all other clients than fromRelatedConnection
-            }
+            IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
+            Events.Publish(@event, relatedConnection.OwnerAuthorityId);
         }
 
         /// <summary>
@@ -756,11 +871,20 @@ namespace GONet
         /// <param name="instantiateEvent"></param>
         private static void Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
         {
-            GONetParticipant template = GONetSpawnSupport_Runtime.LookupFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
+            GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template);
+
+            if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
+            {
+                instance.gameObject.name = instantiateEvent.InstanceName;
+            }
+
             GONetLog.Debug("Instantiate_Remote, Instantiate complete....instanceID: " + instance.GetInstanceID());
-            instance.GONetId = instantiateEvent.GONetId;
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
+            if (!IsServer || instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
+            {
+                instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
+            }
             remoteSpawns_avoidAutoPropogateSupport.Add(instance);
         }
 
@@ -775,18 +899,9 @@ namespace GONet
         {
             if (persistentEventsThisSession.Count > 0)
             {
-                PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession.Cast<InstantiateGONetParticipantEvent>().ToList());
-                byte[] bytes = SerializationUtils.SerializeToBytes(bundle);
-
-                int headerSize = sizeof(uint) + sizeof(long);
-                byte[] todoFIXMEpool = new byte[bytes.Length + headerSize];
-
-                uint header = messageTypeToMessageIDMap[bundle.GetType()];
-                Utils.BitConverter.GetBytes(header, todoFIXMEpool, 0);
-                Utils.BitConverter.GetBytes(Time.ElapsedTicks, todoFIXMEpool, 4);
-                Buffer.BlockCopy(bytes, 0, todoFIXMEpool, headerSize, bytes.Length);
-
-                SendBytesToRemoteConnection(gonetConnection_ServerToClient, todoFIXMEpool, todoFIXMEpool.Length, GONetChannel.GeneralPurpose_Reliable);
+                PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
+                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.EventSingles_Reliable);
             }
         }
 
@@ -813,7 +928,7 @@ namespace GONet
 
                     bitStream.WriteCurrentPartialByte();
 
-                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, GONetChannel.GeneralPurpose_Reliable);
+                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, GONetChannel.CustomSerialization_Reliable);
                 }
             }
         }
@@ -1145,6 +1260,18 @@ namespace GONet
                         }
                     }
 
+                    if (gonetParticipant.animatorSyncSupport != null)
+                    { // auto-sync stuffs, but this time for animation controller parameters
+                        var animatorSyncSupportEnum = gonetParticipant.animatorSyncSupport.GetEnumerator();
+                        while (animatorSyncSupportEnum.MoveNext())
+                        {
+                            string parameterName = animatorSyncSupportEnum.Current.Key;
+                            GONetParticipant.AnimatorControllerParameter parameter = animatorSyncSupportEnum.Current.Value;
+
+                            GONetLog.Debug(string.Concat("animator parameter....name: ", parameterName, " type: ", parameter.valueType, " isSyncd: ", parameter.isSyncd));
+                        }
+                    }
+
                     foreach (SyncBundleUniqueGrouping uniqueSyncGrouping in uniqueSyncGroupings)
                     {
                         if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))
@@ -1180,6 +1307,8 @@ namespace GONet
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropogateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
+                    gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+
                     AutoPropogateInitialInstantiation(gonetParticipant);
                 }
                 else
@@ -1192,35 +1321,19 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+            InstantiateGONetParticipantEvent @event;
+
+            string nonAuthorityDesignTimeLocation;
+            if (GONetSpawnSupport_Runtime.TryGetNonAuthorityDesignTimeLocation(gonetParticipant, out nonAuthorityDesignTimeLocation))
             {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(InstantiateGONetParticipantEvent)];
-                        bitStream.WriteUInt(messageID);
-
-                        bitStream.WriteLong(Time.ElapsedTicks);
-                    }
-
-                    // body
-                    InstantiateGONetParticipantEvent @event = InstantiateGONetParticipantEvent.Gorbi(gonetParticipant);
-                    SerializeBody_InstantiateGONetParticipantEvent(bitStream, @event);
-                    persistentEventsThisSession.Enqueue(@event); // TODO this should not be here, but we need to get the event pub/sub going!
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    int bytesUsedCount = (int)memoryStream.Length;
-                    byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                    //GONetLog.Debug("about to send time sync to client....");
-
-                    SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.GeneralPurpose_Reliable);
-
-                    mainThread_miscSerializationArrayPool.Return(bytes);
-                }
+                @event = InstantiateGONetParticipantEvent.Create_WithNonAuthorityInfo(gonetParticipant, nonAuthorityDesignTimeLocation);
             }
+            else
+            {
+                @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
+            }
+
+            Events.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
         private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)
@@ -1245,19 +1358,9 @@ namespace GONet
 
         private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            if (IsServer)
+            if (IsServer && gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
             {
                 gonetParticipant.GONetId = ++lastAssignedGONetId;
-            }
-
-            // TODO move this to OnInstantiated type deal:  becasue this is not every doing anything right now anyway..just leaving in so find all references sees it!!
-            else
-            {
-                bool didIInstantiate = false; // TODO FIXME have to figure out if this is happening as a result of a spawn/instantiate or the related GO is in the scene.
-                if (didIInstantiate)
-                {
-                    gonetParticipant.OwnerAuthorityId = MyAuthorityId;
-                } // else the server will do the assigning once it processes this in the scene load up and the value will propogate to clients via the auto-magical sync
             }
         }
 
@@ -1307,7 +1410,7 @@ namespace GONet
                     byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
                     Array.Copy(memoryStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
                     
-                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.GeneralPurpose_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
+                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
                     mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
                 }
             }
@@ -1653,6 +1756,10 @@ namespace GONet
                 }
                 else
                 {
+                    if (change.syncCompanion.gonetParticipant.GONetId == GONetParticipant.GONetId_Unset)
+                    {
+                        GONetLog.Error("Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): " + ShouldSendChange(change, filterUsingOwnerAuthorityId) + " filterUsingOwnerAuthorityId: " + filterUsingOwnerAuthorityId);
+                    }
                     bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
                     bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                     change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
@@ -1663,9 +1770,12 @@ namespace GONet
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, uint filterUsingOwnerAuthorityId)
         {
-            return IsServer 
-                    ? change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // the server should send every change exception for changes back to the owner itself
-                    : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId; // clients should only send out changes it owns
+            return
+                change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
+                (IsServer
+                    ? (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change exception for changes back to the owner itself
+                       || change.index == GONetParticipant.ASSumed_GONetId_INDEX) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
+                    : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
@@ -1678,25 +1788,6 @@ namespace GONet
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
 
                 syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
-            }
-        }
-
-        private static void DeserializeBody_PersistentEventsBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
-        {
-            int remainingSize = bytesUsedCount - (int)bitStream_headerAlreadyRead.Position;
-            byte[] todoFIXMEpool = new byte[remainingSize];
-            bitStream_headerAlreadyRead.Read(todoFIXMEpool, 0, remainingSize);
-            var bundle = SerializationUtils.DeserializeFromBytes<PersistentEvents_Bundle>(todoFIXMEpool);
-
-            foreach (var item in bundle.PersistentEvents)
-            {
-                DoRecordKeeping_PersistentEvent(item, sourceOfChangeConnection);
-
-                if (item is InstantiateGONetParticipantEvent)
-                {
-                    var instantiateEvent = (InstantiateGONetParticipantEvent)item;
-                    Instantiate_Remote(instantiateEvent);
-                }
             }
         }
 
@@ -1769,8 +1860,14 @@ namespace GONet
         public static readonly GONetChannel TimeSync_Unreliable;
         public static readonly GONetChannel AutoMagicalSync_Reliable;
         public static readonly GONetChannel AutoMagicalSync_Unreliable;
-        public static readonly GONetChannel GeneralPurpose_Reliable;
-        public static readonly GONetChannel GeneralPurpose_Unreliable;
+        public static readonly GONetChannel CustomSerialization_Reliable;
+        public static readonly GONetChannel CustomSerialization_Unreliable;
+        public static readonly GONetChannel EventSingles_Reliable;
+        /// <summary>
+        /// <para>Using this probably only makes sense when the event implements <see cref="ITransientEvent"/>.</para>
+        /// <para>If it implements <see cref="IPersistentEvent"/>, then it likely makes more sense to use <see cref="EventSingles_Reliable"/> instead.</para>
+        /// </summary>
+        public static readonly GONetChannel EventSingles_Unreliable;
 
         public GONetChannelId Id { get; private set; }
 
@@ -1781,8 +1878,10 @@ namespace GONet
             TimeSync_Unreliable = new GONetChannel(QosType.Unreliable);
             AutoMagicalSync_Reliable = new GONetChannel(QosType.Reliable);
             AutoMagicalSync_Unreliable = new GONetChannel(QosType.Unreliable);
-            GeneralPurpose_Reliable = new GONetChannel(QosType.Reliable);
-            GeneralPurpose_Unreliable = new GONetChannel(QosType.Unreliable);
+            CustomSerialization_Reliable = new GONetChannel(QosType.Reliable);
+            CustomSerialization_Unreliable = new GONetChannel(QosType.Unreliable);
+            EventSingles_Reliable = new GONetChannel(QosType.Reliable);
+            EventSingles_Unreliable = new GONetChannel(QosType.Unreliable);
         }
 
         internal GONetChannel(QosType qualityOfService)

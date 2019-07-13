@@ -1,4 +1,19 @@
-﻿using GONet.Utils;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using GONet.Utils;
 using MessagePack;
 using System.Collections.Generic;
 
@@ -9,7 +24,7 @@ namespace GONet
     /// <summary>
     /// This alone does not mean much.  Implement either <see cref="ITransientEvent"/> or <see cref="IPersistentEvent"/>.
     /// </summary>
-    public interface IGONetEvent
+    public partial interface IGONetEvent
     {
         long OccurredAtElapsedTicks { get; }
     }
@@ -17,12 +32,12 @@ namespace GONet
     /// <summary>
     /// Implement this to this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
     /// </summary>
-    public interface ITransientEvent : IGONetEvent { }
+    public partial interface ITransientEvent : IGONetEvent { }
 
     /// <summary>
     /// Implement this for persistent events..opposite of extending <see cref="ITransientEvent"/> (see the comments there for more).
     /// </summary>
-    public interface IPersistentEvent : IGONetEvent { }
+    public partial interface IPersistentEvent : IGONetEvent { }
 
     #endregion
 
@@ -93,17 +108,36 @@ namespace GONet
         [Key(2)]
         public uint OwnerAuthorityId;
 
-        public static InstantiateGONetParticipantEvent Gorbi(GONetParticipant gonetParticipant)
+        [Key(3)]
+        public string InstanceName;
+
+        internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
-            InstantiateGONetParticipantEvent gorbi = new InstantiateGONetParticipantEvent();
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
-            gorbi.DesignTimeLocation = gonetParticipant.designTimeLocation;
-            gorbi.GONetId = gonetParticipant.GONetId;
-            gorbi.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
 
-            gorbi.OccurredAtElapsedTicks = default;
+            @event.OccurredAtElapsedTicks = default;
 
-            return gorbi;
+            return @event;
+        }
+
+        internal static InstantiateGONetParticipantEvent Create_WithNonAuthorityInfo(GONetParticipant gonetParticipant, string nonAuthorityAlternate_designTimeLocation)
+        {
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
+
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = nonAuthorityAlternate_designTimeLocation;
+
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            @event.OccurredAtElapsedTicks = default;
+
+            return @event;
         }
     }
 
@@ -114,11 +148,9 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public List<InstantiateGONetParticipantEvent> PersistentEvents;
-        // TODO once interface can work maybe TypelessObjectResolver: public Queue<IPersistentEvent> PersistentEvents;
+        public Queue<IPersistentEvent> PersistentEvents;
 
-        public PersistentEvents_Bundle(long occurredAtElapsedTicks, List<InstantiateGONetParticipantEvent> persistentEvents) : this()
-        // public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             PersistentEvents = persistentEvents;

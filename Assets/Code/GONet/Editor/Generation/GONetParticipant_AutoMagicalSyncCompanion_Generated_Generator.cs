@@ -1,4 +1,20 @@
-﻿using Assets.Code.GONet.Editor.Generation;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using Assets.Code.GONet.Editor.Generation;
+using GONet.Editor;
 using GONet.Utils;
 using MessagePack;
 using System;
@@ -355,8 +371,21 @@ namespace GONet.Generation
         [Key(2)]
         public string memberName;
 
+        /// <summary>
+        /// A value of 0 indicates this single member does NOT represent an animator controller parameter id
+        /// </summary>
+        [Key(3)]
+        public int animatorControllerParameterId = 0;
+        [Key(4)]
+        public string animatorControllerParameterMethodSuffix;
+        [Key(5)]
+        public string animatorControllerParameterTypeFullName;
+
         [IgnoreMember]
         public GONetAutoMagicalSyncAttribute attribute;
+        private int nameHash;
+        private string methodSuffix;
+        private string typeFullName;
 
         /// <summary>
         /// IMPORTANT: do NOT use.  This is for deserialize/load from persistence:
@@ -379,11 +408,31 @@ namespace GONet.Generation
             this.attribute = attribute;
         }
 
+        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember, GONetAutoMagicalSyncAttribute attribute, int animatorControllerParameterId, string animatorControllerParameterMethodSuffix, string animatorControllerParameterTypeFullName) : this(syncMember, attribute)
+        {
+            this.animatorControllerParameterId = animatorControllerParameterId;
+            this.animatorControllerParameterMethodSuffix = animatorControllerParameterMethodSuffix;
+            this.animatorControllerParameterTypeFullName = animatorControllerParameterTypeFullName;
+        }
+
         internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
         {
             Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
             MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
             attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+
+            bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
+            if (isSpecialCaseThatRequiresManualAttributeConstruction)
+            {
+                Type memberType = syncMember.MemberType == MemberTypes.Property
+                                    ? ((PropertyInfo)syncMember).PropertyType
+                                    : ((FieldInfo)syncMember).FieldType;
+
+                if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, memberType), out attribute))
+                {
+                    GONetLog.Error("This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: " + memberOwnerType.FullName + " memberType.FullName: " + memberType.FullName);
+                }
+            }
         }
     }
 
@@ -453,10 +502,50 @@ namespace GONet.Generation
         /// </summary>
         internal GONetParticipant gonetParticipant;
 
+    //    static ()
+    //        {
+    //        intrinsicAttributeByMemberTypeMap
+    //}
+
         /// <summary>
         /// IMPORTANT: Do NOT use this.  Being public is required to work with deserialize/load from persistence:
         /// </summary>
         public GONetParticipant_ComponentsWithAutoSyncMembers() { }
+
+        static readonly GONetAutoMagicalSyncAttribute attribute_transform_rotation = new GONetAutoMagicalSyncAttribute()
+        {
+            Reliability = AutoMagicalSyncReliability.Unreliable,
+            SyncChangesEverySeconds = 1f / 30f,
+            CustomSerialize_Type = typeof(QuaternionSerializer),
+            MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
+            ShouldBlendBetweenValuesReceived = true,
+            ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd
+        };
+
+        static readonly GONetAutoMagicalSyncAttribute attribute_transform_position = new GONetAutoMagicalSyncAttribute()
+        {
+            Reliability = AutoMagicalSyncReliability.Unreliable,
+            SyncChangesEverySeconds = 1f / 30f,
+            CustomSerialize_Type = typeof(Vector3Serializer),
+            MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read position from another thread and NOT change it!!!
+            ShouldBlendBetweenValuesReceived = true,
+            ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd
+        };
+
+        static readonly GONetAutoMagicalSyncAttribute attribute_animator_parameters = new GONetAutoMagicalSyncAttribute()
+        {
+            Reliability = AutoMagicalSyncReliability.Unreliable,
+            SyncChangesEverySeconds = 1f / 20f,
+            MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read anim/ctrl/params from another thread and NOT change it!!!
+            ShouldBlendBetweenValuesReceived = true // well, floats will be blendable and nothing else as of now...perhaps integers too one day
+        };
+
+        internal static readonly Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute> intrinsicAttributeByMemberTypeMap = new Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute>(2)
+        {
+            { ValueTuple.Create(typeof(Transform), typeof(Vector3)), attribute_transform_position },
+            { ValueTuple.Create(typeof(Transform), typeof(Quaternion)), attribute_transform_rotation },
+            { ValueTuple.Create(typeof(Animator), typeof(AnimatorControllerParameter[])), attribute_animator_parameters },
+        };
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant gonetParticipant)
         {
@@ -506,34 +595,62 @@ namespace GONet.Generation
                 }
             }
 
-            { // intrinsic properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
+            { // intrinsic Transform properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
                 var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[2];
 
                 MemberInfo transform_rotation = typeof(Transform).GetMember(nameof(Transform.rotation), BindingFlags.Public | BindingFlags.Instance)[0];
-                GONetAutoMagicalSyncAttribute attribute_rotation = new GONetAutoMagicalSyncAttribute() {
-                    Reliability = AutoMagicalSyncReliability.Unreliable,
-                    SyncChangesEverySeconds = 1f / 10f,
-                    CustomSerialize_Type = typeof(QuaternionSerializer),
-                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true,
-                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd
-                };
-                component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_rotation);
+                component_autoSyncMembers_transform[0] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_rotation, attribute_transform_rotation);
 
                 MemberInfo transform_position = typeof(Transform).GetMember(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)[0];
-                GONetAutoMagicalSyncAttribute attribute_position = new GONetAutoMagicalSyncAttribute()
-                {
-                    Reliability = AutoMagicalSyncReliability.Unreliable,
-                    SyncChangesEverySeconds = 1f / 10f,
-                    CustomSerialize_Type = typeof(Vector3Serializer),
-                    MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
-                    ShouldBlendBetweenValuesReceived = true,
-                    ShouldSkipSync_RegistrationId = (int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd
-                };
-                component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position, attribute_position);
+                component_autoSyncMembers_transform[1] = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(transform_position, attribute_transform_position);
 
                 var newSingle_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.transform, component_autoSyncMembers_transform);
                 componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle_transform);
+            }
+
+            Animator animator = gonetParticipant.GetComponent<Animator>();
+            if (animator != null && animator.runtimeAnimatorController != null) // IMPORTANT: in editor, looks like animator.parameterCount is [sometimes!...figured out when...it is only when the Animator window is open and its controller is selected...editor tries to do tricky stuff that whacks this all out for some reason] 0 even when shit is there....hence the usage of animator.runtimeAnimatorController.parameters instead of animator.parameters
+            { // intrinsic Animator properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
+                var parameters = (AnimatorControllerParameter[])animator.runtimeAnimatorController.GetType().GetProperty(nameof(Animator.parameters), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(animator.runtimeAnimatorController);
+                if (parameters != null && parameters.Length > 0)
+                {
+                    var component_autoSyncMembers_animator_parameter = new List<GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember>();
+
+                    for (int i = 0; i < parameters.Length; ++i)
+                    {
+                        MemberInfo animator_parameters = typeof(Animator).GetMember(nameof(Animator.parameters), BindingFlags.Public | BindingFlags.Instance)[0];
+                        AnimatorControllerParameter animatorControllerParameter = parameters[i];
+
+                        string methodSuffix;
+                        string typeFullName;
+                        switch (animatorControllerParameter.type)
+                        {
+                            case AnimatorControllerParameterType.Bool:
+                                methodSuffix = "Bool";
+                                typeFullName = typeof(bool).FullName;
+                                break;
+                            case AnimatorControllerParameterType.Float:
+                                methodSuffix = "Float";
+                                typeFullName = typeof(float).FullName;
+                                break;
+                            case AnimatorControllerParameterType.Int:
+                                methodSuffix = "Integer";
+                                typeFullName = typeof(int).FullName;
+                                break;
+
+                            case AnimatorControllerParameterType.Trigger:
+                            default:
+                                methodSuffix = "Trigger";
+                                typeFullName = typeof(bool).FullName;
+                                break;
+                        }
+
+                        component_autoSyncMembers_animator_parameter.Add(new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(animator_parameters, attribute_animator_parameters, animatorControllerParameter.nameHash, methodSuffix, typeFullName));
+                    }
+
+                    var newSingle_animator = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.GetComponent<Animator>(), component_autoSyncMembers_animator_parameter.ToArray());
+                    componentMemberNames_By_ComponentTypeFullName.AddLast(newSingle_animator);
+                }
             }
 
             ComponentMemberNames_By_ComponentTypeFullName = componentMemberNames_By_ComponentTypeFullName.ToArray();
