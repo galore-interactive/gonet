@@ -64,10 +64,7 @@
     <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
     <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
     <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </Compile>
+    <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
     <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
     <Compile Include="Assets\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />

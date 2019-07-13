@@ -83,8 +83,13 @@ namespace GONet.Generation
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
 			var support<#=iOverall#> = valuesChangesSupport[<#=iOverall#>] = valueChangeSupportArrayPool.Borrow();
+		<# if (singleMember.animatorControllerParameterId == 0) { #>
             support<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support<#=iOverall#>.lastKnownValue_previous = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+		<# } else { #>
+            support<#=iOverall#>.lastKnownValue = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support<#=iOverall#>.lastKnownValue_previous = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+		<# } #>
 			support<#=iOverall#>.syncCompanion = this;
 			support<#=iOverall#>.index = <#=iOverall#>;
 			support<#=iOverall#>.syncAttribute_MustRunOnUnityMainThread = <#=singleMember.attribute.MustRunOnUnityMainThread ? "true" : "false"#>;
