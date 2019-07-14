@@ -384,8 +384,8 @@ namespace GONet
 
         #region internal methods
 
-        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Reliable, false);
-        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS, AutoMagicalSyncReliability.Unreliable, false);
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Reliable, false);
+        static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Unreliable, false);
 
         static Thread endOfLineSendThread;
 
@@ -461,20 +461,21 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
-        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.25f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
-        internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         static bool client_hasSentSyncTimeRequest;
         static DateTime client_lastSyncTimeRequestSent;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
         static readonly Dictionary<long, RequestMessage> client_lastFewTimeSyncsSentByUID = new Dictionary<long, RequestMessage>(CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE);
         static long client_mostRecentTimeSyncResponseSentTicks;
 
+        internal static readonly float BLENDING_BUFFER_LEAD_SECONDS = 0.25f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
+        internal static readonly long BLENDING_BUFFER_LEAD_TICKS = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS).Ticks; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
+
         /// <summary>
         /// "IfAppropriate" is to indicate this runs on a schedule....if it is not the right time, this will do nothing.
         /// </summary>
         private static void Client_SyncTimeWithServer_Initiate_IfAppropriate()
         {
-            DateTime now = DateTime.Now;
+            DateTime now = DateTime.UtcNow;
             long syncEveryTicks = client_hasClosedTimeSyncGapWithServer ? CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED : CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
             bool isAppropriate = !client_hasSentSyncTimeRequest || (now - client_lastSyncTimeRequestSent).Duration().Ticks > syncEveryTicks;
             if (isAppropriate)
@@ -512,6 +513,8 @@ namespace GONet
                             Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
 
                             SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
+
+                            //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
 
                             mainThread_miscSerializationArrayPool.Return(bytes);
                         }
@@ -1151,9 +1154,9 @@ namespace GONet
 
             private void LogBufferContentsIfAppropriate()
             {
-                if (mostRecentChanges_usedSize == mostRecentChanges_capacitySize && (TimeSpan.FromTicks(DateTime.Now.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
+                if (mostRecentChanges_usedSize == mostRecentChanges_capacitySize && (TimeSpan.FromTicks(DateTime.UtcNow.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
                 {
-                    lastLogBufferContentsTicks = DateTime.Now.Ticks;
+                    lastLogBufferContentsTicks = DateTime.UtcNow.Ticks;
                     GONetLog.Debug("==============================================================================================");
                     for (int k = 0; k < mostRecentChanges_usedSize; ++k)
                     {
@@ -1434,7 +1437,7 @@ namespace GONet
             volatile bool shouldProcessInSeparateThreadASAP = false;
             long lastProcessCompleteTicks;
 
-            static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS).Ticks;
+            static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS).Ticks;
 
             SyncBundleUniqueGrouping uniqueGrouping;
             long scheduleFrequencyTicks;
@@ -1511,7 +1514,7 @@ namespace GONet
                         if (!doesRequireManualProcessInitiation)
                         { // (auto sync) frequency control:
                             long nextProcessStartTicks = lastProcessCompleteTicks + scheduleFrequencyTicks;
-                            long nowTicks = DateTime.Now.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
+                            long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
                             lastProcessCompleteTicks = nowTicks;
                             long ticksToSleep = nextProcessStartTicks - nowTicks;
                             if (ticksToSleep > 0)
@@ -1587,13 +1590,13 @@ namespace GONet
                 }
                 else
                 {
-                    if (scheduleFrequencyTicks == AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS)
+                    if (scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS)
                     {
                         Process();
                     }
                     else
                     {
-                        long nowTicks = DateTime.Now.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
+                        long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
                         bool isASAPNow = (nowTicks - lastProcessCompleteTicks) > scheduleFrequencyTicks;
                         if (isASAPNow)
                         {
@@ -1729,12 +1732,31 @@ namespace GONet
         private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitStream bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
         {
             int countTotal = changes.Count;
-            int countFiltered = changes.Count(change => ShouldSendChange(change, filterUsingOwnerAuthorityId));
+            int countMinus1 = countTotal - 1;
+
+            int countFiltered = 0;
+            for (int iSort = 0; iSort < countMinus1; ++iSort) // manual sort to avoid GC
+            {
+                var changeA = changes[iSort];
+                var changeB = changes[iSort + 1];
+                if (AutoMagicalSyncChangePriorityComparer.Instance.Compare(changeA, changeB) > 0)
+                {
+                    changes[iSort + 1] = changeA;
+                    changes[iSort] = changeB;
+                }
+
+                if (ShouldSendChange(changes[iSort], filterUsingOwnerAuthorityId)) // use this manual check to avoid Linq.Count(....) GC/perf hit
+                {
+                    ++countFiltered;
+                }
+            }
+            if (ShouldSendChange(changes[countMinus1], filterUsingOwnerAuthorityId)) // use this manual check to avoid Linq.Count(....) GC/perf hit
+            {
+                ++countFiltered;
+            }
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
             //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
-
-            changes.Sort(AutoMagicalSyncChangePriorityComparer.Instance);
 
             for (int i = 0; i < countTotal; ++i)
             {

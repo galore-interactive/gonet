@@ -550,7 +550,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(byte value)
         {
-            return Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return value;
         }
 
         /// <summary>
@@ -561,7 +572,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(sbyte value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -572,7 +594,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(ushort value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -583,7 +616,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(short value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -594,7 +638,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(uint value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -605,7 +660,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(int value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -616,7 +682,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(ulong value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -627,7 +704,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(long value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -638,7 +726,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(float value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -649,7 +748,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(double value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -660,7 +770,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(decimal value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

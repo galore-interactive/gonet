@@ -515,7 +515,7 @@ namespace GONet.Generation
         static readonly GONetAutoMagicalSyncAttribute attribute_transform_rotation = new GONetAutoMagicalSyncAttribute()
         {
             Reliability = AutoMagicalSyncReliability.Unreliable,
-            SyncChangesEverySeconds = 1f / 10f,
+            SyncChangesEverySeconds = 1f / 30f,
             CustomSerialize_Type = typeof(QuaternionSerializer),
             MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read rotation from another thread and NOT change it!!!
             ShouldBlendBetweenValuesReceived = true,
@@ -525,7 +525,7 @@ namespace GONet.Generation
         static readonly GONetAutoMagicalSyncAttribute attribute_transform_position = new GONetAutoMagicalSyncAttribute()
         {
             Reliability = AutoMagicalSyncReliability.Unreliable,
-            SyncChangesEverySeconds = 1f / 10f,
+            SyncChangesEverySeconds = 1f / 30f,
             CustomSerialize_Type = typeof(Vector3Serializer),
             MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read position from another thread and NOT change it!!!
             ShouldBlendBetweenValuesReceived = true,
@@ -535,7 +535,7 @@ namespace GONet.Generation
         static readonly GONetAutoMagicalSyncAttribute attribute_animator_parameters = new GONetAutoMagicalSyncAttribute()
         {
             Reliability = AutoMagicalSyncReliability.Unreliable,
-            SyncChangesEverySeconds = 1f / 4f,
+            SyncChangesEverySeconds = 1f / 20f,
             MustRunOnUnityMainThread = true, // oh yes, this is special....thanks Unity for not really supporting the people who are only going to read anim/ctrl/params from another thread and NOT change it!!!
             ShouldBlendBetweenValuesReceived = true // well, floats will be blendable and nothing else as of now...perhaps integers too one day
         };

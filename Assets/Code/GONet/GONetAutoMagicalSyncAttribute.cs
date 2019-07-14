@@ -27,11 +27,11 @@ namespace GONet
     public static class AutoMagicalSyncFrequencies
     {
         /// <summary>
-        /// Use this if tevery chang should be processed at the end of the game update frame in which the change occurred.
+        /// Use this if every change should be processed at the end of the game update frame in which the change occurred.
         /// This is the fastest GONet can deliver results. 
         /// Try not to use this for everything or else the network performance will be negatively affected with what is likely traffic that is not all vital.
         /// </summary>
-        public const float END_OF_FRAME_IN_WHICH_CHANGE_OCCURS = 0f;
+        public const float END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS = 0f;
 
         /// <summary>
         /// This is a great default value for most data items that is not considered absolutely vital to arrive ASAP.
