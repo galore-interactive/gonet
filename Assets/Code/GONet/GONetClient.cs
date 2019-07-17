@@ -20,8 +20,41 @@ using GONetChannelId = System.Byte;
 
 namespace GONet
 {
+    [Flags]
+    public enum ClientTypeFlags : byte
+    {
+        None = 0,
+
+        Player_Standard = 1 << 0,
+
+        /// <summary>
+        /// This would be set for (a) client-server topology with a client host (i.e., no dedigated server) or (b) peer to peer client host
+        /// </summary>
+        ServerHost = 1 << 1,
+
+        /* this likely does not belong here,...but a thought nonetheless:
+        Replay_Recorder =       1 << 2,
+        */
+    }
+
     public class GONetClient
     {
+        private ClientTypeFlags _clientTypeFlags = ClientTypeFlags.Player_Standard;
+        internal ClientTypeFlags ClientTypeFlags
+        {
+            get => _clientTypeFlags;
+
+            set
+            {
+                var previous = _clientTypeFlags;
+                _clientTypeFlags = value;
+                if (value != previous)
+                {
+                    GONetMain.EventBus.Publish(new ClientTypeFlagsChangedEvent(GONetMain.Time.ElapsedTicks, GONetMain.MyAuthorityId, previous, value));
+                }
+            }
+        }
+
         public bool IsConnectedToServer => ConnectionState == ClientState.Connected;
 
         public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;

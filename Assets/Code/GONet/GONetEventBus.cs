@@ -65,7 +65,7 @@ namespace GONet
     #endregion
 
     /// <summary>
-    /// For convenience, you can get access to the/an instance of this class (i.e., <see cref="GONetEventBus.Instance"/>) via <see cref="GONetMain.Events"/>.
+    /// For convenience, you can get access to the/an instance of this class (i.e., <see cref="GONetEventBus.Instance"/>) via <see cref="GONetMain.EventBus"/>.
     /// </summary>
     public sealed class GONetEventBus
     {

@@ -29,6 +29,9 @@ using UnityEngine;
 
 using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
+using GONet.Database.Sqlite;
+using GONet.Database;
+using MessagePack;
 
 namespace GONet
 {
@@ -75,7 +78,28 @@ namespace GONet
         public static uint MyAuthorityId { get; private set; }
 
         internal static bool isServerOverride = NetworkUtils.IsIPAddressOnLocalMachine(Simpeesimul.serverIP) && !NetworkUtils.IsLocalPortListening(Simpeesimul.serverPort); // TODO FIXME gotta iron out good startup process..this is quite temporary
+        /// <summary>
+        /// IMPORTANT: This can be true even when <see cref="IsClient"/> is also true.
+        ///            At time of writing, the case for that would be when <see cref="clientTypeFlags"/> has <see cref="ClientTypeFlags.ServerHost"/> set.
+        /// </summary>
         public static bool IsServer => isServerOverride || MyAuthorityId == OwnerAuthorityId_Server; // TODO cache this since it will not change and too much processing to get now
+
+        /// <summary>
+        /// IMPORTANT: This can return true even when <see cref="IsServer"/> is also true.
+        ///            At time of writing, the case for that would be when <see cref="clientTypeFlags"/> has <see cref="ClientTypeFlags.ServerHost"/> set.
+        /// </summary>
+        public static bool IsClientType(ClientTypeFlags requiredFlags)
+        {
+            return (MyClientTypeFlags & requiredFlags) == requiredFlags;
+        }
+
+        public static ClientTypeFlags MyClientTypeFlags => _gonetClient == null ? ClientTypeFlags.None : _gonetClient.ClientTypeFlags;
+
+        /// <summary>
+        /// IMPORTANT: This can be true even when <see cref="IsServer"/> is also true.
+        ///            At time of writing, the case for that would be when <see cref="clientTypeFlags"/> has <see cref="ClientTypeFlags.ServerHost"/> set.
+        /// </summary>
+        public static bool IsClient => _gonetClient == null ? false : _gonetClient.ClientTypeFlags != ClientTypeFlags.None;
 
         private static GONetServer _gonetServer; // TODO remove this once we make gonetServer private again!
         /// <summary>
@@ -92,16 +116,34 @@ namespace GONet
             }
         }
 
-        public static GONetEventBus Events => GONetEventBus.Instance;
+        public static GONetEventBus EventBus => GONetEventBus.Instance;
 
         public static bool IsUnityApplicationEditor { get; internal set; }  = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
+        internal static GONetClient _gonetClient;
         /// <summary>
         /// TODO FIXME make this private.....its internal temporary for testing
         /// </summary>
-        internal static GONetClient gonetClient;
+        internal static GONetClient GONetClient
+        {
+            get => _gonetClient;
+
+            set
+            {
+                ClientTypeFlags flagsPrevious = MyClientTypeFlags;
+
+                _gonetClient = value;
+
+                ClientTypeFlags flagsNow = MyClientTypeFlags;
+
+                if (flagsNow != flagsPrevious)
+                {
+                    EventBus.Publish(new ClientTypeFlagsChangedEvent(Time.ElapsedTicks, MyAuthorityId, flagsPrevious, flagsNow));
+                }
+            }
+        }
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
 
@@ -129,6 +171,8 @@ namespace GONet
         /// </summary>
         static readonly List<GONetParticipant> remoteSpawns_avoidAutoPropogateSupport = new List<GONetParticipant>(1000);
 
+        static readonly AutoMagicalSqliteDatabase sqlite = new AutoMagicalSqliteDatabase();
+
         static GONetMain()
         {
             //Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
@@ -137,18 +181,25 @@ namespace GONet
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
             InitEventSubscriptions();
+
+            const string DATABASE_PATH_RELATIVE = AutoMagicalSqliteDatabase.CONNECTION_STRING_FILE_URI_PREFIX + "database/";
+            const string DATA_SOURCE_SOLO = "Data Source=";
+            const string DATA_SOURCE = DATA_SOURCE_SOLO + DATABASE_PATH_RELATIVE;
+            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
+            const string DB_EXT = ".db";
+            sqlite.ConnectionString = string.Concat(DATA_SOURCE, DateTime.Now.ToString(DATE_FORMAT), DB_EXT); // setup for new database to save into
         }
 
         private static void InitEventSubscriptions()
         {
-            Events.Subscribe<IGONetEvent>(OnAnyEvent_RelayToRemoteConnections_IfAppropriate);
-            Events.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
-            Events.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
-            Events.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
+            EventBus.Subscribe<IGONetEvent>(OnAnyEvent_RelayToRemoteConnections_IfAppropriate);
+            EventBus.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
+            EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
+            EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
 
             { // tests:
-                Events.Subscribe<IGONetEvent>(OnAnyEvent);
-                Events.Subscribe<ITransientEvent>(OnTransientEvent);
+                EventBus.Subscribe<IGONetEvent>(OnAnyEvent);
+                EventBus.Subscribe<ITransientEvent>(OnTransientEvent);
             }
         }
 
@@ -350,26 +401,30 @@ namespace GONet
                             {
                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
                                 gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+
+                                sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds));
                             }
                         }
                         else
                         {
-                            if (gonetClient != null)
+                            if (GONetClient != null)
                             {
-                                while (!gonetClient.IsConnectedToServer)
+                                while (!GONetClient.IsConnectedToServer)
                                 {
                                     GONetLog.Info("SLEEP!  So I can send this stuff....not yet connected...that's why.");
                                     Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
                                 }
 
                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
-                                gonetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                             }
                         }
                     }
                     else
                     {
                         networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+
+                        sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds, networkData.relatedConnection.OwnerAuthorityId));
                     }
 
                     { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
@@ -443,7 +498,7 @@ namespace GONet
             else
             {
                 Client_SyncTimeWithServer_Initiate_IfAppropriate();
-                gonetClient?.Update();
+                GONetClient?.Update();
             }
         }
 
@@ -567,7 +622,7 @@ namespace GONet
                     long requestSentTicks_Client = requestMessage.OccurredAtElapsedTicks;
                     long rtt_ticks = responseReceivedTicks_Client - requestSentTicks_Client;
 
-                    gonetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
+                    GONetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
                     //GONetLog.Debug("RTT_Latest: " + gonetClient.connectionToServer.RTT_Latest + " RTT_RecentAverage: " + gonetClient.connectionToServer.RTT_RecentAverage + " their.rtt: " + gonetClient.connectionToServer.RTT);
 
                     long assumedNetworkDelayTicks = rtt_ticks >> 1; // divide by 2
@@ -604,7 +659,7 @@ namespace GONet
             }
             else
             {
-                gonetClient?.Disconnect();
+                GONetClient?.Disconnect();
             }
 
             var enumeratorThread = autoSyncProcessingSupportByFrequencyMap.GetEnumerator();
@@ -614,7 +669,7 @@ namespace GONet
             }
         }
 
-        struct NetworkData
+        internal struct NetworkData
         {
             public GONetConnection relatedConnection;
             public ArrayPool<byte> messageBytesBorrowedFromPool;
@@ -622,6 +677,43 @@ namespace GONet
             public byte[] messageBytes;
             public int bytesUsedCount;
             public GONetChannelId channelId;
+        }
+
+        [MessagePackObject]
+        public class SavedNetworkData : IDatabaseRow
+        {
+            [Key(0)]
+            public long UID { get; set; }
+
+            [Key(1)]
+            public byte[] Bytes { get; set; }
+
+            [Key(2)]
+            [FilterableBy]
+            public int BytesUsedCount { get; set; }
+
+            [Key(3)]
+            [FilterableBy(true)]
+            public GONetChannelId ChannelId { get; set; }
+
+            [Key(4)]
+            [FilterableBy(true)]
+            public double ElapasedSeconds { get; set; }
+
+            [Key(5)]
+            [FilterableBy(true)]
+            public uint SentToConnection_OwnerAuthorityId { get; set; }
+
+            public SavedNetworkData() { }
+
+            internal SavedNetworkData(NetworkData source, double elapsedSeconds, uint sentToConnection_OwnerAuthorityId = GONetMain.OwnerAuthorityId_Unset)
+            {
+                Bytes = source.messageBytes;
+                BytesUsedCount = source.bytesUsedCount;
+                ChannelId = source.channelId;
+                ElapasedSeconds = elapsedSeconds;
+                SentToConnection_OwnerAuthorityId = sentToConnection_OwnerAuthorityId;
+            }
         }
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_incomingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
@@ -862,7 +954,7 @@ namespace GONet
         private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
             IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
-            Events.Publish(@event, relatedConnection.OwnerAuthorityId);
+            EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
         }
 
         /// <summary>
@@ -1333,7 +1425,7 @@ namespace GONet
                 @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
             }
 
-            Events.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
+            EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
         private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)

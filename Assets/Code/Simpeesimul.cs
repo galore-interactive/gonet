@@ -36,9 +36,9 @@ public class Simpeesimul : MonoBehaviour
         }
         else
         {
-            GONetMain.gonetClient = new GONetClient(new Client());
+            GONetMain.GONetClient = new GONetClient(new Client());
             //GONetMain.gonetClient.MessageReceived += Client_OnMessageReceived; // TODO replace this with an EventBus subscription to a certain message type!
-            GONetMain.gonetClient.ConnectToServer(serverIP, serverPort);
+            GONetMain.GONetClient.ConnectToServer(serverIP, serverPort);
         }
     }
 

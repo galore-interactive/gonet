@@ -156,4 +156,28 @@ namespace GONet
             PersistentEvents = persistentEvents;
         }
     }
+
+    [MessagePackObject]
+    public struct ClientTypeFlagsChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1)]
+        public uint ClientAuthorityId { get; set; }
+
+        [Key(2)]
+        public ClientTypeFlags FlagsPrevious { get; set; }
+
+        [Key(3)]
+        public ClientTypeFlags FlagsNow { get; set; }
+
+        public ClientTypeFlagsChangedEvent(long occurredAtElapsedTicks, uint myAuthorityId, ClientTypeFlags flagsPrevious, ClientTypeFlags flagsNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            ClientAuthorityId = myAuthorityId;
+            FlagsPrevious = flagsPrevious;
+            FlagsNow = flagsNow;
+        }
+    }
 }

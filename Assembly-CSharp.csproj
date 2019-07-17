@@ -69,6 +69,13 @@
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\MoveBehaviour.cs" />
     <Compile Include="Assets\Code\AnotherFieldTesterino.cs" />
     <Compile Include="Assets\Code\FieldChangeTest.cs" />
+    <Compile Include="Assets\Code\GONet\Database\IDatabase.cs" />
+    <Compile Include="Assets\Code\GONet\Database\QueryStringFormatter.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\AutoMagicalSqliteDatabase.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\FilterableByAttribute.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\SQLiteConvert.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\SQLiteQueryFormatter.cs" />
+    <Compile Include="Assets\Code\GONet\Database\TableQueryColumnFilter.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
@@ -419,6 +426,12 @@
     </Reference>
     <Reference Include="log4net">
       <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="Community.CsharpSqlite">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.dll</HintPath>
+    </Reference>
+    <Reference Include="Community.CsharpSqlite.SQLiteClient">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.SQLiteClient.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.Advertisements">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.ads@2.3.1/Runtime/UnityEngine.Advertisements.dll</HintPath>
