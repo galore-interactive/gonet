@@ -402,7 +402,7 @@ namespace GONet
                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
                                 gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
 
-                                sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds));
+                                //sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds));
                             }
                         }
                         else
@@ -424,7 +424,7 @@ namespace GONet
                     {
                         networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
 
-                        sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds, networkData.relatedConnection.OwnerAuthorityId));
+                        //sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds, networkData.relatedConnection.OwnerAuthorityId));
                     }
 
                     { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!

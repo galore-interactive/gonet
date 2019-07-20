@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c72ac148faf249b459357da12c865e3c, type: 3}
+  m_Name: _GONet_Animator_Controller_Parameters
+  m_EditorClassIdentifier: 
+  AttributeCorrelationName: 
+  SyncChangesASAP: 0
+  SyncChangesFrequencyOccurrences: 20
+  SyncChangesFrequencyUnitOfTime: 0
+  SendViaReliability: 1
+  ShouldBlendBetweenValuesReceived: 1
+  QuantizeDownToBitCount: 0
+  QuantizeLowerBound: -1.7014117e+38
+  QuantizeUpperBound: 1.7014117e+38
+  ProcessingPriority: 0
+  MustRunOnUnityMainThread: 1
+  SyncValueTypeSerializerOverrides: []
+  ShouldSkipSyncRegistrationId: 0

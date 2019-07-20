@@ -203,7 +203,7 @@ namespace GONet
             GONetMain.OnDisable_StopMonitoringForAutoMagicalNetworking(this);
         }
 
-        internal class GONetId_InitialAssignment_CustomSerializer : IGONetAutoMagicalSync_CustomSerializer
+        public class GONetId_InitialAssignment_CustomSerializer : IGONetAutoMagicalSync_CustomSerializer
         {
             internal static GONetId_InitialAssignment_CustomSerializer Instance => GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONetId_InitialAssignment_CustomSerializer>();
 

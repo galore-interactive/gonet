@@ -72,6 +72,12 @@ namespace GONet
         public override object TypeId => base.TypeId;
 
         /// <summary>
+        /// This is the main way in which the runtime settings (represented by the placement of this attribute instance on fields for syncing data) are derived/looked up.
+        /// This is the 1-1 direct correlation with <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.AttributeCorrelationName"/>.
+        /// </summary>
+        public string ProfileTemplateName;
+
+        /// <summary>
         /// GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.
         /// Some things just cannot be done outside the main unity thread.
         /// Therefore, if you know for certain that the value to sync being decorated with this attribute cannot

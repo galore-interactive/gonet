@@ -68,6 +68,8 @@
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\FlyBehaviour.cs" />
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\MoveBehaviour.cs" />
     <Compile Include="Assets\Code\AnotherFieldTesterino.cs" />
+    <Compile Include="Assets\Code\ClassTypeReference\ClassTypeConstraintAttribute.cs" />
+    <Compile Include="Assets\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\Code\FieldChangeTest.cs" />
     <Compile Include="Assets\Code\GONet\Database\IDatabase.cs" />
     <Compile Include="Assets\Code\GONet\Database\QueryStringFormatter.cs" />
@@ -85,6 +87,7 @@
     <Compile Include="Assets\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\Code\GONet\GONet.cs" />
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
+    <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncSettings_ProfileTemplate.cs" />
     <Compile Include="Assets\Code\GONet\GONetClient.cs" />
     <Compile Include="Assets\Code\GONet\GONetConnections.cs" />
     <Compile Include="Assets\Code\GONet\GONetEventBus.cs" />
