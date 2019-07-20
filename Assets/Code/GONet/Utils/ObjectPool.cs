@@ -1,5 +1,20 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using System;
+using System.Collections.Generic;
 
 namespace GONet.Utils
 {
@@ -38,7 +53,7 @@ namespace GONet.Utils
         /// <summary>
         /// Helps speed up returns, by a big amount if large enough amount of items, which is the ONLY reason I allow storing extra data.
         /// </summary>
-        protected readonly ConcurrentDictionary<T, int> indexByCheckedOutObjectMap;
+        protected readonly Dictionary<T, int> indexByCheckedOutObjectMap;
 
         /// <summary>
         /// The pooled objects, both available and borrowed (and unused slots also)
@@ -79,7 +94,7 @@ namespace GONet.Utils
         /// <param name="onObjectCreatedHandler">If the caller needs to register to <see cref="ObjectCreated"/> prior to the very first time <see cref="CreateAdditionalInstances(int)"/> is called, pass this is as non-null</param>
         public ObjectPoolBase(int initialSize, int growByCount, Action<T> objectInitializer = null, ObjectCheckoutStatusChangedDelegate onObjectCreatedHandler = null)
         {
-            indexByCheckedOutObjectMap = new ConcurrentDictionary<T, int>(2, initialSize, equalityComparer);
+            indexByCheckedOutObjectMap = new Dictionary<T, int>(initialSize, equalityComparer);
             if (onObjectCreatedHandler != null)
             {
                 ObjectCreated += onObjectCreatedHandler;
@@ -179,8 +194,7 @@ namespace GONet.Utils
 
                 indexByCheckedOutObjectMap[swappie] = currentPoolIndex;
             }
-            int index;
-            if (!indexByCheckedOutObjectMap.TryRemove(@object, out index))
+            if (!indexByCheckedOutObjectMap.Remove(@object))
             {
                 const string NOT = "Not able to remove object from pool.....not sure why.";
                 UnityEngine.Debug.LogError(NOT);

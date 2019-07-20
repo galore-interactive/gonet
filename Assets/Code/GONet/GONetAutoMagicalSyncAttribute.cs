@@ -1,4 +1,19 @@
-﻿using GONet.Utils;
+﻿/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
+using GONet.Utils;
 using MessagePack;
 using System;
 using System.Collections.Generic;
@@ -12,11 +27,11 @@ namespace GONet
     public static class AutoMagicalSyncFrequencies
     {
         /// <summary>
-        /// Use this if tevery chang should be processed at the end of the game update frame in which the change occurred.
+        /// Use this if every change should be processed at the end of the game update frame in which the change occurred.
         /// This is the fastest GONet can deliver results. 
         /// Try not to use this for everything or else the network performance will be negatively affected with what is likely traffic that is not all vital.
         /// </summary>
-        public const float END_OF_FRAME_IN_WHICH_CHANGE_OCCURS = 0f;
+        public const float END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS = 0f;
 
         /// <summary>
         /// This is a great default value for most data items that is not considered absolutely vital to arrive ASAP.
@@ -55,6 +70,12 @@ namespace GONet
     public class GONetAutoMagicalSyncAttribute : Attribute
     {
         public override object TypeId => base.TypeId;
+
+        /// <summary>
+        /// This is the main way in which the runtime settings (represented by the placement of this attribute instance on fields for syncing data) are derived/looked up.
+        /// This is the 1-1 direct correlation with <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.AttributeCorrelationName"/>.
+        /// </summary>
+        public string ProfileTemplateName;
 
         /// <summary>
         /// GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.

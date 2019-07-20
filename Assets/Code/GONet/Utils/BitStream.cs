@@ -1,3 +1,18 @@
+/* Copyright (C) Shaun Curtis Sheppard - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Shaun Sheppard <shasheppard@gmail.com>, June 2019
+ *
+ * Authorized use is explicitly limited to the following:	
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
+ */
+
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -10,7 +25,7 @@ namespace GONet.Utils
     /// Wrapper for <see cref="Stream"/>s that allows bit-level reads and writes.
     /// IMPORTANT: Does NOT call <see cref="Dispose(bool)"/> on the underlying <see cref="MemoryStream"/>.
     /// </summary>
-    public sealed class BitStream : Stream
+    public sealed class BitStream_OLD : Stream
     {
         private readonly Stream stream;
 
@@ -79,7 +94,7 @@ namespace GONet.Utils
         /// Creates a new instance of the <see cref="BitStream"/> class with the given underlaying stream.
         /// </summary>
         /// <param name="underlayingStream">The underlaying stream to work on.</param>
-        public BitStream(Stream underlayingStream)
+        public BitStream_OLD(Stream underlayingStream)
         {
             BitPosition = BitNum.MaxValue;
             stream = underlayingStream;
@@ -477,7 +492,8 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// To ensure all bits are written to the stream prior to calling <see cref="MemoryStream.ToArray"/> (well, if it the <see cref="UnderlayingStream"/> is a <see cref="MemoryStream"/>).
+        /// To ensure all bits are written to the stream prior to calling <see cref="MemoryStream.ToArray"/>, <see cref="MemoryStream.GetBuffer"/> or <see cref="MemoryStream.TryGetBuffer(out ArraySegment{byte})"/>
+        /// (well, if it the <see cref="UnderlayingStream"/> is a <see cref="MemoryStream"/>).
         /// </summary>
         /// <returns>
         /// true if <see cref="BitPosition"/> was greater than 0 and the bits and right padding 0's were written as the final byte to the stream.
@@ -535,7 +551,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(byte value)
         {
-            return Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return value;
         }
 
         /// <summary>
@@ -546,7 +573,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(sbyte value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -557,7 +595,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(ushort value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -568,7 +617,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(short value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -579,7 +639,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(uint value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -590,7 +661,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(int value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -601,7 +683,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(ulong value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -612,7 +705,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(long value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -623,7 +727,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(float value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -634,7 +749,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(double value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         /// <summary>
@@ -645,7 +771,18 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte From(decimal value)
         {
-            return (byte)Math.Min(MaxValue, Math.Max(MinValue, value));
+            if (value < MinValue)
+            {
+                return MinValue;
+            }
+            else
+            {
+                if (value > MaxValue)
+                {
+                    return MaxValue;
+                }
+            }
+            return (byte)value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

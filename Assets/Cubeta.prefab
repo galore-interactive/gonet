@@ -132,6 +132,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   someCoolGuyFloat: 0
   rottieTotty: 0
+  nada: 0
 --- !u!1 &8999699363050880798
 GameObject:
   m_ObjectHideFlags: 0
@@ -257,6 +258,16 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3746084151692794323, guid: 924416a725f4ed048afb9834869def5c,
+        type: 3}
+      propertyPath: designTimeGUID
+      value: -8388337325307217314
+      objectReference: {fileID: 0}
+    - target: {fileID: 3746084151692794323, guid: 924416a725f4ed048afb9834869def5c,
+        type: 3}
+      propertyPath: designTimeLocation
+      value: project://Assets/Cubeta.prefab
+      objectReference: {fileID: 0}
     - target: {fileID: 3746084151692794321, guid: 924416a725f4ed048afb9834869def5c,
         type: 3}
       propertyPath: m_Name
@@ -316,16 +327,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 42.63
-      objectReference: {fileID: 0}
-    - target: {fileID: 3746084151692794323, guid: 924416a725f4ed048afb9834869def5c,
-        type: 3}
-      propertyPath: designTimeGUID
-      value: -8388337325307217314
-      objectReference: {fileID: 0}
-    - target: {fileID: 3746084151692794323, guid: 924416a725f4ed048afb9834869def5c,
-        type: 3}
-      propertyPath: designTimeLocation
-      value: project://Assets/Cubeta.prefab
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 924416a725f4ed048afb9834869def5c, type: 3}

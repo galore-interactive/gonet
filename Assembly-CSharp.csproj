@@ -60,16 +60,37 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\ControlsTutorial.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\HintManagement.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\ThirdPersonOrbitCamBasic.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\AimBehaviourBasic.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\BasicBehaviour.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\FlyBehaviour.cs" />
+    <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\MoveBehaviour.cs" />
     <Compile Include="Assets\Code\AnotherFieldTesterino.cs" />
+    <Compile Include="Assets\Code\ClassTypeReference\ClassTypeConstraintAttribute.cs" />
+    <Compile Include="Assets\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\Code\FieldChangeTest.cs" />
+    <Compile Include="Assets\Code\GONet\Database\IDatabase.cs" />
+    <Compile Include="Assets\Code\GONet\Database\QueryStringFormatter.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\AutoMagicalSqliteDatabase.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\FilterableByAttribute.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\SQLiteConvert.cs" />
+    <Compile Include="Assets\Code\GONet\Database\SQLite\SQLiteQueryFormatter.cs" />
+    <Compile Include="Assets\Code\GONet\Database\TableQueryColumnFilter.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
     <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_3.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_4.cs" />
+    <Compile Include="Assets\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_5.cs" />
     <Compile Include="Assets\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\Code\GONet\GONet.cs" />
     <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
+    <Compile Include="Assets\Code\GONet\GONetAutoMagicalSyncSettings_ProfileTemplate.cs" />
     <Compile Include="Assets\Code\GONet\GONetClient.cs" />
     <Compile Include="Assets\Code\GONet\GONetConnections.cs" />
+    <Compile Include="Assets\Code\GONet\GONetEventBus.cs" />
     <Compile Include="Assets\Code\GONet\GONetEvents.cs" />
     <Compile Include="Assets\Code\GONet\GONetGlobal.cs" />
     <Compile Include="Assets\Code\GONet\GONetParticipant.cs" />
@@ -79,6 +100,7 @@
     <Compile Include="Assets\Code\GONet\Utils\ArrayPool.cs" />
     <Compile Include="Assets\Code\GONet\Utils\BitConverter.cs" />
     <Compile Include="Assets\Code\GONet\Utils\BitStream.cs" />
+    <Compile Include="Assets\Code\GONet\Utils\BitStreamAlternate.cs" />
     <Compile Include="Assets\Code\GONet\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\Code\GONet\Utils\CRC32.cs" />
     <Compile Include="Assets\Code\GONet\Utils\DateTimeUtils.cs" />
@@ -408,6 +430,12 @@
     </Reference>
     <Reference Include="log4net">
       <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="Community.CsharpSqlite">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.dll</HintPath>
+    </Reference>
+    <Reference Include="Community.CsharpSqlite.SQLiteClient">
+      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.SQLiteClient.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.Advertisements">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.ads@2.3.1/Runtime/UnityEngine.Advertisements.dll</HintPath>
