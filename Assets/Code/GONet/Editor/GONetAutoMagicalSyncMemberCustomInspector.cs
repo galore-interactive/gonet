@@ -13,12 +13,9 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -156,7 +153,28 @@ namespace GONet.Editor
                                 {
                                     EditorGUILayout.BeginHorizontal();
                                     EditorGUILayout.LabelField(autoSyncMember.Name);
-                                    EditorGUILayout.TextField(autoSyncMember.MemberType == MemberTypes.Field ? ((FieldInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString() : ((PropertyInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString());
+
+                                    EditorGUILayout.TextField(autoSyncMember.MemberType == MemberTypes.Field ? ((FieldInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString() : ((PropertyInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString(),
+                                        GUILayout.MinWidth(70), GUILayout.ExpandWidth(true));
+
+                                    GONetAutoMagicalSyncAttribute autoSyncMember_SyncAttribute = (GONetAutoMagicalSyncAttribute)autoSyncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+                                    if (!string.IsNullOrWhiteSpace(autoSyncMember_SyncAttribute.SettingsProfileTemplateName))
+                                    {
+                                        bool superInnerPrev = GUI.enabled;
+                                        GUI.enabled = true;
+                                        const string PROFILE = "profile: ";
+                                        const string TOOLTIP = "Click to select the corresponding GONet SyncSettingsProfile asset in Project view.";
+                                        GUIContent buttonTextWithTooltip = new GUIContent(string.Concat(PROFILE, autoSyncMember_SyncAttribute.SettingsProfileTemplateName), TOOLTIP);
+                                        if (GUILayout.Button(buttonTextWithTooltip))
+                                        {
+                                            Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(string.Concat(
+                                                GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH,
+                                                autoSyncMember_SyncAttribute.SettingsProfileTemplateName,
+                                                GONetEditorWindow.ASSET_FILE_EXTENSION));
+                                        }
+                                        GUI.enabled = superInnerPrev;
+                                    }
+
                                     EditorGUILayout.EndHorizontal();
                                 }
                                 EditorGUI.indentLevel--;

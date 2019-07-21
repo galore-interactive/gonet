@@ -417,29 +417,59 @@ namespace GONet.Generation
 
         internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
         {
+            Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
+            MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
+            Type syncMemberType = syncMember.MemberType == MemberTypes.Property
+                                ? ((PropertyInfo)syncMember).PropertyType
+                                : ((FieldInfo)syncMember).FieldType;
+
             { // Stage 1 - get the attribute, either off the field itself or our intrinsic stuff we do
-                Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
-                MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
                 attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
 
                 bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
                 if (isSpecialCaseThatRequiresManualAttributeConstruction)
                 {
-                    Type memberType = syncMember.MemberType == MemberTypes.Property
-                                        ? ((PropertyInfo)syncMember).PropertyType
-                                        : ((FieldInfo)syncMember).FieldType;
-
-                    if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, memberType), out attribute))
+                    if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, syncMemberType), out attribute))
                     {
-                        GONetLog.Error("This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: " + memberOwnerType.FullName + " memberType.FullName: " + memberType.FullName);
+                        GONetLog.Error("This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: " + memberOwnerType.FullName + " memberType.FullName: " + syncMemberType.FullName);
                     }
                 }
             }
 
             { // Stage 2 - update the attribute based on the settings in the referenced profile/template (if applicable)
-                if (!string.IsNullOrWhiteSpace(attribute.ProfileTemplateName))
+                if (!string.IsNullOrWhiteSpace(attribute.SettingsProfileTemplateName))
                 {
-                    GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.ProfileTemplateName).Replace(".asset", string.Empty));
+                    GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.SettingsProfileTemplateName).Replace(".asset", string.Empty));
+
+                    if (profile == null)
+                    {
+                        const string UNABLE = "Unable to locate requested profile/template asset with name: ";
+                        const string DEFAULT = ".  We will use the default profile/template instead (creating it if we have to).";
+                        GONetLog.Warning(string.Concat(UNABLE, attribute.SettingsProfileTemplateName, DEFAULT));
+
+                        var defaultProfile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT).Replace(".asset", string.Empty));
+
+                        if (defaultProfile == null)
+                        {
+                            defaultProfile = GONetEditorWindow.CreateSyncSettingsProfileAsset<GONetAutoMagicalSyncSettings_ProfileTemplate>(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT);
+
+                            defaultProfile.MustRunOnUnityMainThread = false;
+                            defaultProfile.ProcessingPriority = 0;
+                            defaultProfile.QuantizeDownToBitCount = 0;
+                            defaultProfile.SendViaReliability = AutoMagicalSyncReliability.Unreliable;
+                            defaultProfile.ShouldBlendBetweenValuesReceived = true;
+                            defaultProfile.SyncChangesASAP = false;
+                            defaultProfile.SyncChangesFrequencyOccurrences = 24;
+                            defaultProfile.SyncChangesFrequencyUnitOfTime = SyncChangesTimeUOM.TimesPerSecond;
+                            defaultProfile.SyncValueTypeSerializerOverrides = new SyncType_CustomSerializer_Pair[] {
+                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Vector3, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(Vector3Serializer)) },
+                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Quaternion, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(QuaternionSerializer)) },
+                            };
+                        }
+
+                        profile = defaultProfile;
+                    }
+
                     attribute.MustRunOnUnityMainThread = profile.MustRunOnUnityMainThread;
                     attribute.ProcessingPriority = profile.ProcessingPriority;
                     attribute.QuantizeDownToBitCount = profile.QuantizeDownToBitCount;
@@ -474,12 +504,41 @@ namespace GONet.Generation
                     attribute.SyncChangesEverySeconds = profile.SyncChangesASAP ? AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS : syncEverySeconds;
 
                     if (profile.SyncValueTypeSerializerOverrides != null && profile.SyncValueTypeSerializerOverrides.Length > 0)
-                    { // TODO this is not how it should be! this is hardcodey
-                        attribute.CustomSerialize_Type = profile.SyncValueTypeSerializerOverrides[0].CustomSerializerType.Type;
+                    {
+                        GONetSyncTypes gonetSyncType;
+                        if (gonetSyncTypeByRealTypeMap.TryGetValue(syncMemberType, out gonetSyncType))
+                        {
+                            if (profile.SyncValueTypeSerializerOverrides.Any(x => x.ValueType == gonetSyncType))
+                            {
+                                SyncType_CustomSerializer_Pair first = profile.SyncValueTypeSerializerOverrides.First(x => x.ValueType == gonetSyncType);
+                                attribute.CustomSerialize_Type = first.CustomSerializerType.Type;
+
+                                if (attribute.CustomSerialize_Type != null)
+                                {
+                                    GONetLog.Debug("GONet will use the custom serializer type: " + attribute.CustomSerialize_Type.FullName);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncTypes).FullName);
+                        }
                     }
                 }
             }
         }
+
+        static readonly Dictionary<Type, GONetSyncTypes> gonetSyncTypeByRealTypeMap = new Dictionary<Type, GONetSyncTypes>()
+        {
+            { typeof(byte), GONetSyncTypes.Byte },
+            { typeof(float), GONetSyncTypes.Float },
+            { typeof(int), GONetSyncTypes.Integer },
+            { typeof(Quaternion), GONetSyncTypes.Quaternion },
+            { typeof(string), GONetSyncTypes.String },
+            { typeof(ulong), GONetSyncTypes.UInt64 },
+            { typeof(Vector3), GONetSyncTypes.Vector3 },
+            { typeof(bool), GONetSyncTypes.Boolean },
+        };
 
         public const string SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI = "GONet/SyncSettingsProfiles/{0}.asset";
     }
@@ -550,30 +609,9 @@ namespace GONet.Generation
         /// </summary>
         internal GONetParticipant gonetParticipant;
 
-    //    static ()
-    //        {
-    //        intrinsicAttributeByMemberTypeMap
-    //}
-
-        /// <summary>
-        /// IMPORTANT: Do NOT use this.  Being public is required to work with deserialize/load from persistence:
-        /// </summary>
-        public GONetParticipant_ComponentsWithAutoSyncMembers() { }
-
-        static readonly GONetAutoMagicalSyncAttribute attribute_transform_rotation = new GONetAutoMagicalSyncAttribute()
-        {
-            ProfileTemplateName = "_GONet_Transform_Rotation"
-        };
-
-        static readonly GONetAutoMagicalSyncAttribute attribute_transform_position = new GONetAutoMagicalSyncAttribute()
-        {
-            ProfileTemplateName = "_GONet_Transform_Position"
-        };
-
-        static readonly GONetAutoMagicalSyncAttribute attribute_animator_parameters = new GONetAutoMagicalSyncAttribute()
-        {
-            ProfileTemplateName = "_GONet_Animator_Controller_Parameters"
-        };
+        static readonly GONetAutoMagicalSyncAttribute attribute_transform_rotation = new GONetAutoMagicalSyncAttribute(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION);
+        static readonly GONetAutoMagicalSyncAttribute attribute_transform_position = new GONetAutoMagicalSyncAttribute(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION);
+        static readonly GONetAutoMagicalSyncAttribute attribute_animator_parameters = new GONetAutoMagicalSyncAttribute(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS);
 
         internal static readonly Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute> intrinsicAttributeByMemberTypeMap = new Dictionary<ValueTuple<Type, Type>, GONetAutoMagicalSyncAttribute>(2)
         {
@@ -581,6 +619,11 @@ namespace GONet.Generation
             { ValueTuple.Create(typeof(Transform), typeof(Quaternion)), attribute_transform_rotation },
             { ValueTuple.Create(typeof(Animator), typeof(AnimatorControllerParameter[])), attribute_animator_parameters },
         };
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.  Being public is required to work with deserialize/load from persistence:
+        /// </summary>
+        public GONetParticipant_ComponentsWithAutoSyncMembers() { }
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant gonetParticipant)
         {

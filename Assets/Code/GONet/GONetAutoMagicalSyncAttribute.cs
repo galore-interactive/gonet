@@ -71,11 +71,18 @@ namespace GONet
     {
         public override object TypeId => base.TypeId;
 
+        public const string PROFILE_TEMPLATE_NAME___DEFAULT = "__GONet_DEFAULT";
+        public const string PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION = "_GONet_Transform_Rotation";
+        public const string PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION = "_GONet_Transform_Position";
+        public const string PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS = "_GONet_Animator_Controller_Parameters";
+
         /// <summary>
-        /// This is the main way in which the runtime settings (represented by the placement of this attribute instance on fields for syncing data) are derived/looked up.
-        /// This is the 1-1 direct correlation with <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.AttributeCorrelationName"/>.
+        /// <para>This is the main way in which the runtime settings (represented by the placement of an instance of <see cref="GONetAutoMagicalSyncAttribute"/> on <see cref="MonoBehaviour"/> fields for syncing data) are derived/looked up.</para>
+        /// <para>This is the 1-1 direct correlation with the name of one of the <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate"/> asset instances in the "Resources/GONet/SyncSettingsProfiles" directory in your project (without the ".asset" file extension included).</para>
+        /// <para>Check out the public const string definitions on <see cref="GONetAutoMagicalSyncAttribute"/> that start with the prefix "PROFILE_TEMPLATE_NAME___".</para>
+        /// <para>IMPORTANT: If this is provided, the settings defined on the corresponding profile/template will be used and NOT the settings on the attribute!</para>
         /// </summary>
-        public string ProfileTemplateName;
+        public string SettingsProfileTemplateName;
 
         /// <summary>
         /// GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.
@@ -235,6 +242,13 @@ namespace GONet
                 }
             }
             return customSerializer;
+        }
+
+        public GONetAutoMagicalSyncAttribute() { }
+
+        public GONetAutoMagicalSyncAttribute(string profileTemplateName)
+        {
+            SettingsProfileTemplateName = profileTemplateName;
         }
     }
 

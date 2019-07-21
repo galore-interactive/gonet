@@ -18,13 +18,13 @@ using UnityEngine;
 
 public class FieldChangeTest : MonoBehaviour
 {
-    //[GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
     public float someCoolGuyFloat;
-
     public float rottieTotty;
 
-    [GONetAutoMagicalSync(Reliability = AutoMagicalSyncReliability.Unreliable, ShouldBlendBetweenValuesReceived = true, QuantizeDownToBitCount = 20, QuantizeLowerBound = -6.5f, QuantizeUpperBound = 6.5f)]
+    [GONetAutoMagicalSync(SettingsProfileTemplateName = "FloatieMcFloats")]
     public float nada;
+
+    TMPro.TextMeshProUGUI nadaText;
 
     Vector3 startPosition;
     Quaternion startRotation;
@@ -36,6 +36,7 @@ public class FieldChangeTest : MonoBehaviour
     {
         startPosition = transform.position;
         startRotation = transform.rotation;
+        nadaText = GetComponentInChildren<TMPro.TextMeshProUGUI>();
     }
 
     private void Update()
@@ -57,7 +58,11 @@ public class FieldChangeTest : MonoBehaviour
 
             transform.rotation = Quaternion.Euler(startRotation.eulerAngles * rottieTotty);
             transform.position = startPosition + new Vector3(0, 0, someCoolGuyFloat);
+
+            nada += 0.005f * Time.deltaTime;
         }
         /* */
+
+        nadaText.text = nada.ToString();
     }
 }
