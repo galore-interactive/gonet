@@ -467,7 +467,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 3
+  codeGenerationId: 4
   animatorSyncSupport:
     keys:
     - Speed
@@ -481,17 +481,17 @@ MonoBehaviour:
     - valueType: 1
       isSyncd: 1
     - valueType: 4
-      isSyncd: 0
+      isSyncd: 1
     - valueType: 4
-      isSyncd: 0
+      isSyncd: 1
     - valueType: 4
-      isSyncd: 0
-    - valueType: 1
       isSyncd: 1
     - valueType: 1
       isSyncd: 1
+    - valueType: 1
+      isSyncd: 1
     - valueType: 4
-      isSyncd: 0
+      isSyncd: 1
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/Resources/Player_NonAuthority.prefab

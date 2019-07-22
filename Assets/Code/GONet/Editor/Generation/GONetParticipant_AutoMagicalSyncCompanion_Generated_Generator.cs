@@ -65,20 +65,74 @@ namespace GONet.Generation
             EditorSceneManager.sceneSaved += EditorSceneManager_sceneSaved;
         }
 
+        static readonly HashSet<string> existingGONetParticipantAssetPaths = new HashSet<string>();
+        static readonly HashSet<string> existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider = new HashSet<string>();
+
         internal static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
-            foreach (string str in importedAssets)
+
+            IEnumerable<string> designTimeLocations_gonetParticipants = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
+
+            foreach (string importedAsset in importedAssets)
             {
-                Debug.Log("Reimported Asset: " + str);
+                Debug.Log("Reimported Asset: " + importedAsset);
+
+                string possibleDesignTimeAssetLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, importedAsset);
+                if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
+                {
+                    if (existingGONetParticipantAssetPaths.Contains(importedAsset))
+                    {
+                        existingGONetParticipantAssetPaths.Remove(importedAsset); // avoid infinite loop, see IMPORTANT comment at bottom of method!
+                    }
+                    else if (existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Contains(importedAsset))
+                    {
+                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(importedAsset);
+                    }
+                    else
+                    {
+                        existingGONetParticipantAssetPaths.Add(importedAsset);
+                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Add(importedAsset);
+                    }
+                }
             }
-            foreach (string str in deletedAssets)
+
+            foreach (string deletedAsset in deletedAssets)
             {
-                Debug.Log("Deleted Asset: " + str);
+                Debug.Log("Deleted Asset: " + deletedAsset);
+
+                existingGONetParticipantAssetPaths.Remove(deletedAsset); // no matter what, if this was deleted....get this out of here
+                existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(deletedAsset);
             }
 
             for (int i = 0; i < movedAssets.Length; i++)
             {
                 Debug.Log("Moved Asset: " + movedAssets[i] + " from: " + movedFromAssetPaths[i]);
+
+                existingGONetParticipantAssetPaths.Remove(movedFromAssetPaths[i]); // no matter what, if this was moved....get this old one out of here
+
+                string movedAsset = movedAssets[i];
+                string possibleDesignTimeAssetLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, movedAsset);
+                if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
+                {
+                    if (existingGONetParticipantAssetPaths.Contains(movedAsset))
+                    {
+                        existingGONetParticipantAssetPaths.Remove(movedAsset); // avoid infinite loop, see IMPORTANT comment at bottom of method!
+                    }
+                    else if (existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Contains(movedAsset))
+                    {
+                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(movedAsset);
+                    }
+                    else
+                    {
+                        existingGONetParticipantAssetPaths.Add(movedAsset);
+                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Add(movedAsset);
+                    }
+                }
+            }
+
+            if (existingGONetParticipantAssetPaths.Count > 0)
+            {
+                DoAllTheGenerationStuffs(existingGONetParticipantAssetPaths); // IMPORTANT: calling this will end up calling AssetDatabase.SaveAssets() and seemingly this exact method again with those assets....so we need to avoid infinite loop!
             }
         }
 
@@ -174,7 +228,11 @@ namespace GONet.Generation
 
         }
 
-        internal static void DoAllTheGenerationStuffs()
+        /// <summary>
+        /// PRE: <paramref name="ensureToIncludeTheseGONetParticipantAssets_paths"/> is either null OR populated with asset path KNOWN to be <see cref="GONetParticipant"/> prefabs in the project!
+        /// </summary>
+        /// <param name="ensureToIncludeTheseGONetParticipantAssets_paths"></param>
+        internal static void DoAllTheGenerationStuffs(IEnumerable<string> ensureToIncludeTheseGONetParticipantAssets_paths = null)
         {
             /* auto-sync code gen psuedo:
 
@@ -216,6 +274,15 @@ namespace GONet.Generation
             List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleNewUniqueSnaps = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
             gonetParticipantsInOpenScenes.ForEach(gonetParticipant => possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipant)));
             // TODO add in stuff to possibleNewUniqueSnaps from gonetParticipants_prefabsCreatedSinceLastGeneratorRun before clearing it out below
+
+            if (ensureToIncludeTheseGONetParticipantAssets_paths != null)
+            {
+                foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
+                {
+                    GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
+                    possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipantPrefab));
+                }
+            }
 
             byte max_codeGenerationId = allUniqueSnapsForPersistence.Count > 0 ? allUniqueSnapsForPersistence.Max(x => x.codeGenerationId) : GONetParticipant.CodeGenerationId_Unset;
             GONetLog.Debug("max_codeGenerationId: " + max_codeGenerationId);
