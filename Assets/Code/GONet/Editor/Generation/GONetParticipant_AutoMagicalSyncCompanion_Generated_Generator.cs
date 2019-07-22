@@ -673,6 +673,8 @@ namespace GONet.Generation
                 }
             }
 
+            Type gonetParticipant_transformType = gonetParticipant.transform.GetType();
+            if (gonetParticipant_transformType == typeof(Transform) && gonetParticipant_transformType != typeof(RectTransform)) // since GameObject instances can have either Transform or RectTransform, we have to check.....as GONet is currently only working with regular Transform
             { // intrinsic Transform properties that cannot manually have the [GONetAutoMagicalSync] added.... (e.g., transform rotation and position)
                 var component_autoSyncMembers_transform = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[2];
 
@@ -699,31 +701,34 @@ namespace GONet.Generation
                         MemberInfo animator_parameters = typeof(Animator).GetMember(nameof(Animator.parameters), BindingFlags.Public | BindingFlags.Instance)[0];
                         AnimatorControllerParameter animatorControllerParameter = parameters[i];
 
-                        string methodSuffix;
-                        string typeFullName;
-                        switch (animatorControllerParameter.type)
+                        if (gonetParticipant.animatorSyncSupport[animatorControllerParameter.name].isSyncd) // NOTE: doing this check right here is why isSyncd cannot be changed at runtime like IsPositionSyncd and IsRotationSyncd
                         {
-                            case AnimatorControllerParameterType.Bool:
-                                methodSuffix = "Bool";
-                                typeFullName = typeof(bool).FullName;
-                                break;
-                            case AnimatorControllerParameterType.Float:
-                                methodSuffix = "Float";
-                                typeFullName = typeof(float).FullName;
-                                break;
-                            case AnimatorControllerParameterType.Int:
-                                methodSuffix = "Integer";
-                                typeFullName = typeof(int).FullName;
-                                break;
+                            string methodSuffix;
+                            string typeFullName;
+                            switch (animatorControllerParameter.type)
+                            {
+                                case AnimatorControllerParameterType.Bool:
+                                    methodSuffix = "Bool";
+                                    typeFullName = typeof(bool).FullName;
+                                    break;
+                                case AnimatorControllerParameterType.Float:
+                                    methodSuffix = "Float";
+                                    typeFullName = typeof(float).FullName;
+                                    break;
+                                case AnimatorControllerParameterType.Int:
+                                    methodSuffix = "Integer";
+                                    typeFullName = typeof(int).FullName;
+                                    break;
 
-                            case AnimatorControllerParameterType.Trigger:
-                            default:
-                                methodSuffix = "Trigger";
-                                typeFullName = typeof(bool).FullName;
-                                break;
+                                case AnimatorControllerParameterType.Trigger:
+                                default:
+                                    methodSuffix = "Trigger";
+                                    typeFullName = typeof(bool).FullName;
+                                    break;
+                            }
+
+                            component_autoSyncMembers_animator_parameter.Add(new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(animator_parameters, attribute_animator_parameters, animatorControllerParameter.nameHash, methodSuffix, typeFullName));
                         }
-
-                        component_autoSyncMembers_animator_parameter.Add(new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(animator_parameters, attribute_animator_parameters, animatorControllerParameter.nameHash, methodSuffix, typeFullName));
                     }
 
                     var newSingle_animator = new GONetParticipant_ComponentsWithAutoSyncMembers_Single(gonetParticipant.GetComponent<Animator>(), component_autoSyncMembers_animator_parameter.ToArray());

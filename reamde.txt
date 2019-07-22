@@ -45,7 +45,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 - Network topologies:
  \-> Dedicated game server (client-server DGS) *** definitely this one!
  \-> Local ("couch multiplayer"): multiple players/inputs/viewport on same machine *** this means multiple client instances in same process...maybe not this one!
- \-> Local (LAN): location-based entertainment
+ \-> Local (LAN): location-based entertainment (LBE) *** definitely this one..as it is an implementation of DGS!
  \-> Peer-to-Peer (P2P) *** highly motivated to get this one
  \-> Client-Server Host (client-server) - needs host migration impl!
 ??????
@@ -55,3 +55,16 @@ Let GONet take on the most difficult burden you face, so your team can focus on 
 Manual and API Documentation 
 Please discuss GONet in the forum
 Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We will help you from getting off the ground up to taking it to cross the finish line.
+
+
+
+
+
+
+
+
+================
+Code Generation:
+================
+What can happen in order to cause regeneration to occur when saving level or playing in editor?
+1) 

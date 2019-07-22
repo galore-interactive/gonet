@@ -240,7 +240,7 @@ namespace GONet.Editor
 
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField(string.Concat("Is Syncd: ", parameterSyncMap_key));
-                            SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"animatorSyncSupport.values.Array.data[{parameterSyncMap_keyIndex}].isSyncd");
+                            SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.animatorSyncSupport)}.values.Array.data[{parameterSyncMap_keyIndex}].{nameof(GONetParticipant.AnimatorControllerParameter.isSyncd)}");
                             EditorGUILayout.PropertyField(specificInnerMapValue_serializedProperty, GUIContent.none, false); // IMPORTANT: without this, editing prefabs would never save/persist changes!
                             EditorGUILayout.EndHorizontal();
 
