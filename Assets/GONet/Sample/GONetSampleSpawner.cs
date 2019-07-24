@@ -16,7 +16,7 @@
 using GONet;
 using UnityEngine;
 
-public class GONetTestSpawner : MonoBehaviour
+public class GONetSampleSpawner : MonoBehaviour
 {
     public Simpeesimul GONetServerPREFAB;
     public Simpeesimul GONetClientPREFAB;

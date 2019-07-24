@@ -46,14 +46,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5102918c78ec2042a1f15388950a7d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GONetServerPREFAB: {fileID: 114919729767367322, guid: 5df24d966b46ed344931cc630c12fb49,
+  GONetServerPREFAB: {fileID: 114919729767367322, guid: 21cf7d9988e07984caf609c7700b8538,
     type: 3}
-  GONetClientPREFAB: {fileID: 114597615443404838, guid: 41faf6cce70f1584398838c96f319487,
+  GONetClientPREFAB: {fileID: 114597615443404838, guid: 4d70fba7ada04564ca38354a46d4d5f2,
     type: 3}
-  nonResourcePrefab: {fileID: 8999699362913574807, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
+  authorityPrefab: {fileID: 4427451128044106635, guid: cd51da3f44ba1a04f8b94ee6b34bd32f,
     type: 3}
-  resourcePrefab: {fileID: 8999699362913574807, guid: d7d8ae0958a53fc49b97d1b0d0911af4,
-    type: 3}
+  nonAuthorityPrefab: {fileID: 320, guid: 69985f555febbc14da5b579e026d4370, type: 3}
 --- !u!114 &8643402947905904696
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -67,9 +66,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   codeGenerationId: 1
+  animatorSyncSupport:
+    keys: []
+    values: []
   IsPositionSyncd: 0
   IsRotationSyncd: 0
-  designTimeLocation: project://Assets/Resources/GONet_GlobalContext.prefab
+  designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
   runtimeUID: 0
 --- !u!114 &8643402947905904697
 MonoBehaviour:

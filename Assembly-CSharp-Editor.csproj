@@ -60,20 +60,20 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Code\ClassTypeReference\Editor\ClassTypeReferencePropertyDrawer.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\GONetEditorWindow.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
-    <Compile Include="Assets\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
-    <None Include="Assets\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
-    <None Include="Assets\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />
+    <Compile Include="Assets\GONet\Code\ClassTypeReference\Editor\ClassTypeReferencePropertyDrawer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
+    <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
+    <None Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>
@@ -354,28 +354,28 @@
       <HintPath>C:/Program Files (x86)/Microsoft Visual Studio Tools for Unity/15.0/Editor/SyntaxTree.VisualStudio.Unity.Bridge.dll</HintPath>
     </Reference>
     <Reference Include="BCCrypto">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/BCCrypto.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/BCCrypto.dll</HintPath>
     </Reference>
     <Reference Include="Netcode.IO.NET">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/Netcode.IO.NET.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/Netcode.IO.NET.dll</HintPath>
     </Reference>
     <Reference Include="ReliableNetcode">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/ReliableNetcode.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/ReliableNetcode.dll</HintPath>
     </Reference>
     <Reference Include="ConsoleE">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/ConsoleE/Editor/ConsoleE.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/ConsoleE/Editor/ConsoleE.dll</HintPath>
     </Reference>
     <Reference Include="Common.Logging">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/Common.Logging.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/Common.Logging.dll</HintPath>
     </Reference>
     <Reference Include="log4net">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/log4net/log4net.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/log4net.dll</HintPath>
     </Reference>
     <Reference Include="Community.CsharpSqlite">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Community.CsharpSqlite.dll</HintPath>
     </Reference>
     <Reference Include="Community.CsharpSqlite.SQLiteClient">
-      <HintPath>C:/projects/unity/gonet/Assets/Plugins/sqlite/Community.CsharpSqlite.SQLiteClient.dll</HintPath>
+      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Community.CsharpSqlite.SQLiteClient.dll</HintPath>
     </Reference>
     <Reference Include="UnityEditor.Advertisements">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.ads@2.3.1/Editor/UnityEditor.Advertisements.dll</HintPath>

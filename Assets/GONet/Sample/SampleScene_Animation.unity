@@ -1085,38 +1085,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
-        type: 3}
-      propertyPath: resourcePrefab
-      value: 
-      objectReference: {fileID: 1814178333, guid: 6a7106dbba5d00b4a8871b397906f283,
-        type: 3}
-    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
-        type: 3}
-      propertyPath: authorityPrefag
-      value: 
-      objectReference: {fileID: 7784973689633595685, guid: 7eba44976e2926348a62ee2ee598ef8c,
-        type: 3}
-    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
-        type: 3}
-      propertyPath: nonAuthorityPrefab
-      value: 
-      objectReference: {fileID: 320, guid: 69985f555febbc14da5b579e026d4370, type: 3}
-    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
-        type: 3}
-      propertyPath: authorityPrefab
-      value: 
-      objectReference: {fileID: 4427451128044106635, guid: cd51da3f44ba1a04f8b94ee6b34bd32f,
-        type: 3}
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: designTimeLocation
       value: scene://SampleScene_Animation/GONet_GlobalContext
-      objectReference: {fileID: 0}
-    - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
-        type: 3}
-      propertyPath: codeGenerationId
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 56c1b12035c5c034f81a7b4c212a379e, type: 3}
