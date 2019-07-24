@@ -43,7 +43,7 @@ namespace GONet.Generation
         /// The index of the inner item matches to the place in order of that attribute being encountered during discovery/enumeration (has to be deterministic).
         /// </summary>
         static List<List<AutoMagicalSyncAttribute_GenerationSupport>> gonetParticipantCombosEncountered = new List<List<AutoMagicalSyncAttribute_GenerationSupport>>();
-        internal const string GENERATION_FILE_PATH = "Assets/Code/GONet/Generation/";
+        internal const string GENERATION_FILE_PATH = "Assets/GONet/Code/GONet/Generation/";
         internal const string GENERATED_FILE_PATH = GENERATION_FILE_PATH + "Generated/";
         const string FILE_SUFFIX = ".cs";
 
@@ -263,7 +263,7 @@ namespace GONet.Generation
             {
                 Scene scene = SceneManager.GetSceneAt(iOpenScene);
                 GameObject[] rootGOs = scene.GetRootGameObjects();
-                for (int iRootGO = 0 ; iRootGO < rootGOs.Length; ++iRootGO)
+                for (int iRootGO = 0; iRootGO < rootGOs.Length; ++iRootGO)
                 {
                     GONetParticipant[] gonetParticipantsInOpenScene = rootGOs[iRootGO].GetComponentsInChildren<GONetParticipant>();
                     gonetParticipantsInOpenScenes.AddRange(gonetParticipantsInOpenScene);
@@ -302,8 +302,8 @@ namespace GONet.Generation
             { // make sure all GONetParticipants have assigned codeGenerationId, which is vitally important for game play runtime
                 possibleNewUniqueSnaps.ForEach(possibleNew => {
                     var matchFromPersistence = allUniqueSnapsForPersistence.First(unique => SnapComparer.Instance.Equals(possibleNew, unique));
-                    if (possibleNew.codeGenerationId                    != matchFromPersistence.codeGenerationId ||
-                        possibleNew.gonetParticipant.codeGenerationId   != matchFromPersistence.codeGenerationId)
+                    if (possibleNew.codeGenerationId != matchFromPersistence.codeGenerationId ||
+                        possibleNew.gonetParticipant.codeGenerationId != matchFromPersistence.codeGenerationId)
                     {
                         GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
@@ -339,6 +339,7 @@ namespace GONet.Generation
                 for (int i = 0; i < count; ++i)
                 {
                     GONetParticipant_ComponentsWithAutoSyncMembers one = allUniqueSnapsForPersistence[i];
+                    one.ApplyProfileToAttributes_IfAppropriate(); // this needs to be done for everyone prior to generation!
                     GenerateClass(one);
                 }
 
@@ -460,7 +461,7 @@ namespace GONet.Generation
         public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember() { }
 
         internal GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember)
-            : this (syncMember, (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true))
+            : this(syncMember, (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true))
         {
         }
 
@@ -490,7 +491,7 @@ namespace GONet.Generation
                                 ? ((PropertyInfo)syncMember).PropertyType
                                 : ((FieldInfo)syncMember).FieldType;
 
-            { // Stage 1 - get the attribute, either off the field itself or our intrinsic stuff we do
+            { // get the attribute, either off the field itself or our intrinsic stuff we do
                 attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
 
                 bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
@@ -502,94 +503,100 @@ namespace GONet.Generation
                     }
                 }
             }
+        }
 
-            { // Stage 2 - update the attribute based on the settings in the referenced profile/template (if applicable)
-                if (!string.IsNullOrWhiteSpace(attribute.SettingsProfileTemplateName))
+        /// <summary>
+        /// Update the attribute based on the settings in the referenced profile/template (if applicable).
+        /// IMPORTANT: This is required to be called prior to code generation (i.e., <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GenerateClass(GONetParticipant_ComponentsWithAutoSyncMembers)"/>)!
+        /// </summary>
+        /// <param name="syncMemberType"></param>
+        internal void ApplyProfileToAttribute_IfAppropriate(Type syncMemberType)
+        {
+            if (!string.IsNullOrWhiteSpace(attribute.SettingsProfileTemplateName))
+            {
+                GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.SettingsProfileTemplateName).Replace(".asset", string.Empty));
+
+                if (profile == null)
                 {
-                    GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.SettingsProfileTemplateName).Replace(".asset", string.Empty));
+                    const string UNABLE = "Unable to locate requested profile/template asset with name: ";
+                    const string DEFAULT = ".  We will use the default profile/template instead (creating it if we have to).";
+                    GONetLog.Warning(string.Concat(UNABLE, attribute.SettingsProfileTemplateName, DEFAULT));
 
-                    if (profile == null)
+                    var defaultProfile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT).Replace(".asset", string.Empty));
+
+                    if (defaultProfile == null)
                     {
-                        const string UNABLE = "Unable to locate requested profile/template asset with name: ";
-                        const string DEFAULT = ".  We will use the default profile/template instead (creating it if we have to).";
-                        GONetLog.Warning(string.Concat(UNABLE, attribute.SettingsProfileTemplateName, DEFAULT));
+                        defaultProfile = GONetEditorWindow.CreateSyncSettingsProfileAsset<GONetAutoMagicalSyncSettings_ProfileTemplate>(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT);
 
-                        var defaultProfile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT).Replace(".asset", string.Empty));
-
-                        if (defaultProfile == null)
-                        {
-                            defaultProfile = GONetEditorWindow.CreateSyncSettingsProfileAsset<GONetAutoMagicalSyncSettings_ProfileTemplate>(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT);
-
-                            defaultProfile.MustRunOnUnityMainThread = false;
-                            defaultProfile.ProcessingPriority = 0;
-                            defaultProfile.QuantizeDownToBitCount = 0;
-                            defaultProfile.SendViaReliability = AutoMagicalSyncReliability.Unreliable;
-                            defaultProfile.ShouldBlendBetweenValuesReceived = true;
-                            defaultProfile.SyncChangesASAP = false;
-                            defaultProfile.SyncChangesFrequencyOccurrences = 24;
-                            defaultProfile.SyncChangesFrequencyUnitOfTime = SyncChangesTimeUOM.TimesPerSecond;
-                            defaultProfile.SyncValueTypeSerializerOverrides = new SyncType_CustomSerializer_Pair[] {
+                        defaultProfile.MustRunOnUnityMainThread = false;
+                        defaultProfile.ProcessingPriority = 0;
+                        defaultProfile.QuantizeDownToBitCount = 0;
+                        defaultProfile.SendViaReliability = AutoMagicalSyncReliability.Unreliable;
+                        defaultProfile.ShouldBlendBetweenValuesReceived = true;
+                        defaultProfile.SyncChangesASAP = false;
+                        defaultProfile.SyncChangesFrequencyOccurrences = 24;
+                        defaultProfile.SyncChangesFrequencyUnitOfTime = SyncChangesTimeUOM.TimesPerSecond;
+                        defaultProfile.SyncValueTypeSerializerOverrides = new SyncType_CustomSerializer_Pair[] {
                                 new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Vector3, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(Vector3Serializer)) },
                                 new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Quaternion, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(QuaternionSerializer)) },
                             };
-                        }
-
-                        profile = defaultProfile;
                     }
 
-                    attribute.MustRunOnUnityMainThread = profile.MustRunOnUnityMainThread;
-                    attribute.ProcessingPriority = profile.ProcessingPriority;
-                    attribute.QuantizeDownToBitCount = profile.QuantizeDownToBitCount;
-                    attribute.QuantizeLowerBound = profile.QuantizeLowerBound;
-                    attribute.QuantizeUpperBound = profile.QuantizeUpperBound;
-                    attribute.Reliability = profile.SendViaReliability;
-                    attribute.ShouldBlendBetweenValuesReceived = profile.ShouldBlendBetweenValuesReceived;
-                    attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
+                    profile = defaultProfile;
+                }
 
-                    float syncEverySeconds = 0;
-                    if (profile.SyncChangesFrequencyOccurrences > 0)
+                attribute.MustRunOnUnityMainThread = profile.MustRunOnUnityMainThread;
+                attribute.ProcessingPriority = profile.ProcessingPriority;
+                attribute.QuantizeDownToBitCount = profile.QuantizeDownToBitCount;
+                attribute.QuantizeLowerBound = profile.QuantizeLowerBound;
+                attribute.QuantizeUpperBound = profile.QuantizeUpperBound;
+                attribute.Reliability = profile.SendViaReliability;
+                attribute.ShouldBlendBetweenValuesReceived = profile.ShouldBlendBetweenValuesReceived;
+                attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
+
+                float syncEverySeconds = 0;
+                if (profile.SyncChangesFrequencyOccurrences > 0)
+                {
+                    switch (profile.SyncChangesFrequencyUnitOfTime)
                     {
-                        switch (profile.SyncChangesFrequencyUnitOfTime)
-                        {
-                            case SyncChangesTimeUOM.TimesPerSecond:
-                                syncEverySeconds = 1f / profile.SyncChangesFrequencyOccurrences;
-                                break;
+                        case SyncChangesTimeUOM.TimesPerSecond:
+                            syncEverySeconds = 1f / profile.SyncChangesFrequencyOccurrences;
+                            break;
 
-                            case SyncChangesTimeUOM.TimesPerMinute:
-                                syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f;
-                                break;
+                        case SyncChangesTimeUOM.TimesPerMinute:
+                            syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f;
+                            break;
 
-                            case SyncChangesTimeUOM.TimesPerHour:
-                                syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f * 60f;
-                                break;
+                        case SyncChangesTimeUOM.TimesPerHour:
+                            syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f * 60f;
+                            break;
 
-                            case SyncChangesTimeUOM.TimesPerDay:
-                                syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f * 60f * 24f;
-                                break;
-                        }
+                        case SyncChangesTimeUOM.TimesPerDay:
+                            syncEverySeconds = (1f / profile.SyncChangesFrequencyOccurrences) * 60f * 60f * 24f;
+                            break;
                     }
-                    attribute.SyncChangesEverySeconds = profile.SyncChangesASAP ? AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS : syncEverySeconds;
+                }
+                attribute.SyncChangesEverySeconds = profile.SyncChangesASAP ? AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS : syncEverySeconds;
 
-                    if (profile.SyncValueTypeSerializerOverrides != null && profile.SyncValueTypeSerializerOverrides.Length > 0)
+                if (profile.SyncValueTypeSerializerOverrides != null && profile.SyncValueTypeSerializerOverrides.Length > 0)
+                {
+                    GONetSyncTypes gonetSyncType;
+                    if (gonetSyncTypeByRealTypeMap.TryGetValue(syncMemberType, out gonetSyncType))
                     {
-                        GONetSyncTypes gonetSyncType;
-                        if (gonetSyncTypeByRealTypeMap.TryGetValue(syncMemberType, out gonetSyncType))
+                        if (profile.SyncValueTypeSerializerOverrides.Any(x => x.ValueType == gonetSyncType))
                         {
-                            if (profile.SyncValueTypeSerializerOverrides.Any(x => x.ValueType == gonetSyncType))
+                            SyncType_CustomSerializer_Pair first = profile.SyncValueTypeSerializerOverrides.First(x => x.ValueType == gonetSyncType);
+                            attribute.CustomSerialize_Type = first.CustomSerializerType.Type;
+
+                            if (attribute.CustomSerialize_Type != null)
                             {
-                                SyncType_CustomSerializer_Pair first = profile.SyncValueTypeSerializerOverrides.First(x => x.ValueType == gonetSyncType);
-                                attribute.CustomSerialize_Type = first.CustomSerializerType.Type;
-
-                                if (attribute.CustomSerialize_Type != null)
-                                {
-                                    GONetLog.Debug("GONet will use the custom serializer type: " + attribute.CustomSerialize_Type.FullName);
-                                }
+                                GONetLog.Debug("GONet will use the custom serializer type: " + attribute.CustomSerialize_Type.FullName);
                             }
                         }
-                        else
-                        {
-                            GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncTypes).FullName);
-                        }
+                    }
+                    else
+                    {
+                        GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncTypes).FullName);
                     }
                 }
             }
@@ -632,7 +639,7 @@ namespace GONet.Generation
         /// <summary>
         /// IMPORTANT: do NOT use.  This is for deserialize/load from persistence:
         /// </summary>
-        public GONetParticipant_ComponentsWithAutoSyncMembers_Single() {}
+        public GONetParticipant_ComponentsWithAutoSyncMembers_Single() { }
 
         /// <param name="component_autoSyncMembers">in deterministic order!</param>
         internal GONetParticipant_ComponentsWithAutoSyncMembers_Single(Component component, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember[] component_autoSyncMembers)
@@ -821,6 +828,23 @@ namespace GONet.Generation
                     var tmp = gonetParticipantCompnent.autoSyncMembers[0];
                     gonetParticipantCompnent.autoSyncMembers[0] = gonetParticipantCompnent.autoSyncMembers[gonetIdOriginalIndex_singleMember];
                     gonetParticipantCompnent.autoSyncMembers[gonetIdOriginalIndex_singleMember] = tmp;
+                }
+            }
+        }
+
+        internal void ApplyProfileToAttributes_IfAppropriate()
+        {
+            foreach (GONetParticipant_ComponentsWithAutoSyncMembers_Single single in ComponentMemberNames_By_ComponentTypeFullName)
+            {
+                Type memberOwnerType = Type.GetType(single.componentTypeAssemblyQualifiedName);
+                foreach (var singleMember in single.autoSyncMembers)
+                {
+                    MemberInfo syncMember = memberOwnerType.GetMember(singleMember.memberName, BindingFlags.Public | BindingFlags.Instance)[0];
+                    Type syncMemberType = syncMember.MemberType == MemberTypes.Property
+                                        ? ((PropertyInfo)syncMember).PropertyType
+                                        : ((FieldInfo)syncMember).FieldType;
+
+                    singleMember.ApplyProfileToAttribute_IfAppropriate(syncMemberType);
                 }
             }
         }

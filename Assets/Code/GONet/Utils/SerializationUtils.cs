@@ -30,7 +30,11 @@ namespace GONet.Utils
 
             CompositeResolver.RegisterAndSetAsDefault(
                 // TODO figure out how to get this: TypelessObjectResolver
+#if !UNITY_WSA
+#if !NET_STANDARD_2_0
                 DynamicObjectResolver.Instance,
+#endif
+#endif
                 PrimitiveObjectResolver.Instance,
                 StandardResolver.Instance,
                 ContractlessStandardResolver.Instance
