@@ -63,6 +63,9 @@ public class FieldChangeTest : MonoBehaviour
         }
         /* */
 
-        nadaText.text = nada.ToString();
+        if ((object)nadaText != null)
+        {
+            nadaText.text = nada.ToString();
+        }
     }
 }

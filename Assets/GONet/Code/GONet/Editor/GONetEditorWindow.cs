@@ -29,8 +29,12 @@ namespace GONet.Editor
                 CreateSyncSettingsProfileAsset<GONetAutoMagicalSyncSettings_ProfileTemplate>(nameo);
                 nameo = NAMEO_DEFAULT;
             }
+
+            EditorGUILayout.Space();
+
+
         }
-        
+
         internal static T CreateSyncSettingsProfileAsset<T>(string assetName) where T : ScriptableObject
         {
             T asset = ScriptableObject.CreateInstance<T>();

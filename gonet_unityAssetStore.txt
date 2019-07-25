@@ -39,6 +39,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 - <bold>Network Protocols</bold>
  \-> UDP (unreliable)
  \-> RUDP (reliable+ordered UDP)
+ \-> Configurable channels
 
 ??????
 - <bold>Networking goodies:</bold>

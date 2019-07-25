@@ -102,7 +102,7 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 <#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
             {#>		
-            int support<#=iOverall#>_mostRecentChanges_calcdSize = support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.BLENDING_BUFFER_LEAD_SECONDS / support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
+            int support<#=iOverall#>_mostRecentChanges_calcdSize = support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support<#=iOverall#>.mostRecentChanges_capacitySize = Math.Max(support<#=iOverall#>_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
 			support<#=iOverall#>.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support<#=iOverall#>.mostRecentChanges_capacitySize);
 <#			}#>

@@ -543,7 +543,6 @@ GameObject:
   - component: {fileID: 373527471}
   - component: {fileID: 373527472}
   - component: {fileID: 4427451128044106635}
-  - component: {fileID: 7105233983420592875}
   m_Layer: 0
   m_Name: Player_Authority
   m_TagString: Untagged
@@ -664,7 +663,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys:
     - Speed
@@ -693,21 +692,6 @@ MonoBehaviour:
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/GONet/Resources/Player_Authority.prefab
   runtimeUID: 0
---- !u!114 &7105233983420592875
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 373527469}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 074cf8cbc797cdc478c64bde610e0c3a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  someCoolGuyFloat: 0
-  rottieTotty: 0
-  nada: 0
 --- !u!1 &393247807
 GameObject:
   m_ObjectHideFlags: 0

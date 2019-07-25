@@ -64,7 +64,7 @@ namespace GONet.Utils
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            long adjustedTicks = atElapsedTicks - GONetMain.BLENDING_BUFFER_LEAD_TICKS;
+                            long adjustedTicks = atElapsedTicks - GONetMain.valueBlendingBufferLeadTicks;
                             if (adjustedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
                                 bool isEnoughInfoToExtrapolate = valueCount > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
@@ -155,7 +155,7 @@ namespace GONet.Utils
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            long adjustedTicks = atElapsedTicks - GONetMain.BLENDING_BUFFER_LEAD_TICKS;
+                            long adjustedTicks = atElapsedTicks - GONetMain.valueBlendingBufferLeadTicks;
                             if (adjustedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
                                 bool isEnoughInfoToExtrapolate = valueCount > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
@@ -263,7 +263,7 @@ namespace GONet.Utils
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            long adjustedTicks = atElapsedTicks - GONetMain.BLENDING_BUFFER_LEAD_TICKS;
+                            long adjustedTicks = atElapsedTicks - GONetMain.valueBlendingBufferLeadTicks;
                             if (adjustedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
                                 bool isEnoughInfoToExtrapolate = valueCount > 1; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
