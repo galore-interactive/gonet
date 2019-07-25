@@ -18,8 +18,8 @@ using UnityEngine;
 
 public class GONetSampleSpawner : MonoBehaviour
 {
-    public Simpeesimul GONetServerPREFAB;
-    public Simpeesimul GONetClientPREFAB;
+    public GONetSampleClientOrServer GONetServerPREFAB;
+    public GONetSampleClientOrServer GONetClientPREFAB;
 
     public GONetParticipant authorityPrefab;
     public GONetParticipant nonAuthorityPrefab;

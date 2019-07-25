@@ -20,7 +20,7 @@ using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
 using UnityEngine;
 
-public class Simpeesimul : MonoBehaviour
+public class GONetSampleClientOrServer : MonoBehaviour
 {
     public bool isServer = true;
 
