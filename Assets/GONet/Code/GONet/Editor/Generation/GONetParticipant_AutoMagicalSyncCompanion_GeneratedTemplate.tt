@@ -708,7 +708,7 @@ namespace GONet.Generation
 
 <#			if (singleMember.attribute.ShouldBlendBetweenValuesReceived
 				&&
-				(singleMember.animatorControllerParameterId != 0 && singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)) // currently only float animator parameter types can be blended
+				(singleMember.animatorControllerParameterId == 0 || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)) // currently only float animator parameter types can be blended
 			{#>
 					valuesChangesSupport[<#=iOverall#>].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
 <#			}

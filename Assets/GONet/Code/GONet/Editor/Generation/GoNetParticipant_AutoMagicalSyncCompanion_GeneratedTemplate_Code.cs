@@ -20,7 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Assets.Code.GONet.Editor.Generation
+namespace Assets.GONet.Code.GONet.Editor.Generation
 {
     public partial class GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate
     {

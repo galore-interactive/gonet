@@ -14,6 +14,7 @@
  */
 
 using Assets.Code.GONet.Editor.Generation;
+using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
 using GONet.Utils;
 using MessagePack;
