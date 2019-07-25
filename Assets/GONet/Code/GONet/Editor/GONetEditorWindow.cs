@@ -15,7 +15,7 @@ namespace GONet.Editor
             editorWindow.titleContent = titleContent;
         }
 
-        internal const string ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH = "Assets/Resources/GONet/SyncSettingsProfiles/";
+        internal const string ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH = "Assets/GONet/Resources/GONet/SyncSettingsProfiles/";
         internal const string ASSET_FILE_EXTENSION = ".asset";
 
         string NAMEO_DEFAULT = "<Enter Name>";

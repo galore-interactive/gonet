@@ -4,17 +4,17 @@ GONet
 
 GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into all things Unity.  GONet is part of the Networked-by-Default and Performance-by-Default initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, less steps to "get going" and planely mo' betta than UNET!
 
-<bold>*** Instead of runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away if you want. REPLAY support is out of the box!  And the box is not black, as source code is included.</bold>
+<bold>*** Instead of runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation that is runtime debuggable. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away if you want. REPLAY support is out of the box!  And the box is not black, as source code is included.</bold>
 
 - <bold>Auto-magical data sync:</bold>
  \-> Transform - position/localPosition, rotation/localRotation, scale
  \-> Animator Controller parameters
  \-> Any MonoBehaviour fields ([SyncVar] replacement)
- \-> GameObject.Instantiate() auto-magically networked from the owner/instantiator to all interested parties/machines (optionally use a prefab alternate for non-owners)
+ \-> GameObject.Instantiate() is auto-magically networked from the owner/instantiator to all interested parties/machines (optionally use a prefab alternate for non-owners)
  \-> Sync settings applied to groups of data items: default and/or user-defined (via profiles/templates)
  \-> Auto-magically blend between received values for non-owners: default interpolation/extrapolation and/or user-defined implementation
 - <bold>Event Bus:</bold>
- \-> Omni-directional (arbitrary content) communication  ([Command], [ClientRpc] and [TargetRpc] replacement)
+ \-> Publish and subscribe to omni-directional ("arbitrary" content) communication  ([Command], [ClientRpc] and [TargetRpc] replacement)
  \-> Transient events - delivered to clients connected to game session when event occurs
  \-> Persistent events - like Transient event with additional delivery to any clients connecting to the game session after event occurs and will exist in recorded/replay data
  \-> Any user-defined event class - can be either transient or persistent
@@ -35,18 +35,18 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 - <bold>Wide platform/runtime support</bold>
  \-> All managed C#, no native libraries
  \-> Ahead of Time (AOT) compilation support (e.g., iOS)
- \-> IL2CPP
+ \-> IL2CPP (belongs in ?????? category below)
 - <bold>Network Protocols</bold>
  \-> UDP (unreliable)
  \-> RUDP (reliable+ordered UDP)
 
 ??????
-- Networking goodies:
+- <bold>Networking goodies:</bold>
  \-> Lag compensation
  \-> Client-side prediction (i.e., extrapolation? got this up top, if so)
  \-> Interpolation (got this up top)
  \-> Delta compression (can accomplish with recorded send data....need to add recorded received too..share then reconcile?)
-- Network topologies:
+- <bold>Network topologies:</bold>
  \-> Dedicated game server (client-server DGS) *** definitely this one!
  \-> Local ("couch multiplayer"): multiple players/inputs/viewport on same machine *** this means multiple client instances in same process...maybe not this one!
  \-> Local (LAN): location-based entertainment (LBE) *** definitely this one..as it is an implementation of DGS!
@@ -58,7 +58,7 @@ Let GONet take on the most difficult burden you face, so your team can focus on 
 
 Manual and API Documentation 
 Please discuss GONet in the forum
-Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We will help you from getting off the ground up to taking it to cross the finish line.
+Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We will help you from getting off the ground up to crossing the finish line with you.
 
 
 
