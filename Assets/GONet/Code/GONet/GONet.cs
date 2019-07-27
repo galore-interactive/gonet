@@ -15,7 +15,6 @@
 
 using GONet.Generation;
 using GONet.Utils;
-using Microsoft.IO;
 using ReliableNetcode;
 using System;
 using System.Collections.Concurrent;
@@ -164,7 +163,7 @@ namespace GONet
         /// <summary>
         /// NOTE: The time maintained within is only updated once per main thread frame tick (i.e., call to <see cref="Update"/>).
         /// </summary>
-        internal static readonly Temporal Time = new Temporal();
+        internal static readonly SecretaryOfTemporalAffairs Time = new SecretaryOfTemporalAffairs();
 
         /// <summary>
         /// This is used to know which instances were instantiated due to a remote spawn message being received/processed.
@@ -559,32 +558,29 @@ namespace GONet
                         // TODO do not let client_lastFewTimeSyncsSentByUID get larger than TIME_SYNCS_SENT_QUEUE_SIZE.....delete oldest
                     }
 
-                    using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+                    using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
                     {
-                        using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                        {
-                            { // header...just message type/id...well, and now time 
-                                uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
-                                bitStream.WriteUInt(messageID);
+                        { // header...just message type/id...well, and now time 
+                            uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
+                            bitStream.WriteUInt(messageID);
 
-                                bitStream.WriteLong(timeSync.OccurredAtElapsedTicks);
-                            }
-
-                            // body
-                            bitStream.WriteLong(timeSync.UID);
-
-                            bitStream.WriteCurrentPartialByte();
-
-                            int bytesUsedCount = (int)memoryStream.Length;
-                            byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                            Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                            SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
-
-                            //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
-
-                            mainThread_miscSerializationArrayPool.Return(bytes);
+                            bitStream.WriteLong(timeSync.OccurredAtElapsedTicks);
                         }
+
+                        // body
+                        bitStream.WriteLong(timeSync.UID);
+
+                        bitStream.WriteCurrentPartialByte();
+
+                        int bytesUsedCount = bitStream.Length_WrittenBytes;
+                        byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
+                        Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                        SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
+
+                        //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
+
+                        mainThread_miscSerializationArrayPool.Return(bytes);
                     }
                 }
             }
@@ -592,32 +588,29 @@ namespace GONet
 
         private static void Server_SyncTimeWithClient_Respond(long requestUID, GONetConnection connectionToClient)
         {
-            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(ResponseMessage)];
-                        bitStream.WriteUInt(messageID);
+                { // header...just message type/id...well, and now time 
+                    uint messageID = messageTypeToMessageIDMap[typeof(ResponseMessage)];
+                    bitStream.WriteUInt(messageID);
 
-                        bitStream.WriteLong(Time.ElapsedTicks);
-                    }
-
-                    // body
-                    bitStream.WriteLong(requestUID);
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    int bytesUsedCount = (int)memoryStream.Length;
-                    byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                    //GONetLog.Debug("about to send time sync to client....");
-
-                    SendBytesToRemoteConnection(connectionToClient, bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
-
-                    mainThread_miscSerializationArrayPool.Return(bytes);
+                    bitStream.WriteLong(Time.ElapsedTicks);
                 }
+
+                // body
+                bitStream.WriteLong(requestUID);
+
+                bitStream.WriteCurrentPartialByte();
+
+                int bytesUsedCount = bitStream.Length_WrittenBytes;
+                byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
+                Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                //GONetLog.Debug("about to send time sync to client....");
+
+                SendBytesToRemoteConnection(connectionToClient, bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
+
+                mainThread_miscSerializationArrayPool.Return(bytes);
             }
         }
 
@@ -732,7 +725,10 @@ namespace GONet
         static readonly ConcurrentQueue<NetworkData> incomingNetworkData = new ConcurrentQueue<NetworkData>();
         static readonly ConcurrentDictionary<Thread, ConcurrentQueue<NetworkData>> readyToReturnQueue_ThreadMap = new ConcurrentDictionary<Thread, ConcurrentQueue<NetworkData>>();
 
-        public sealed class Temporal
+        /// <summary>
+        /// Lengthy and nerdy way of naming this class "Time" just like <see cref="UnityEngine.Time"/> to avoid conflicts in a memorable way!
+        /// </summary>
+        public sealed class SecretaryOfTemporalAffairs
         {
             public delegate void TimeChangeArgs(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks);
             public event TimeChangeArgs TimeSetFromAuthority;
@@ -885,59 +881,56 @@ namespace GONet
                         }
                         else
                         {
-                            using (var memoryStream = new MemoryStream(networkData.messageBytes))
+                            using (var bitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(networkData.messageBytes, networkData.bytesUsedCount))
                             {
-                                using (var bitStream = new Utils.BitStream(memoryStream))
-                                {
-                                    Type messageType;
-                                    ////////////////////////////////////////////////////////////////////////////
-                                    // header...just message type/id...well, now it is send time too
-                                    uint messageID;
-                                    bitStream.ReadUInt(out messageID);
-                                    messageType = messageTypeByMessageIDMap[messageID];
+                                Type messageType;
+                                ////////////////////////////////////////////////////////////////////////////
+                                // header...just message type/id...well, now it is send time too
+                                uint messageID;
+                                bitStream.ReadUInt(out messageID);
+                                messageType = messageTypeByMessageIDMap[messageID];
 
-                                    long elapsedTicksAtSend;
-                                    bitStream.ReadLong(out elapsedTicksAtSend);
-                                    ////////////////////////////////////////////////////////////////////////////
+                                long elapsedTicksAtSend;
+                                bitStream.ReadLong(out elapsedTicksAtSend);
+                                ////////////////////////////////////////////////////////////////////////////
 
-                                    //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+                                //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
-                                    // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
+                                // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
 
-                                    {  // body:
-                                        if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
-                                        {
-                                            DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
-                                        }
-                                        else if (messageType == typeof(RequestMessage))
-                                        {
-                                            long requestUID;
-                                            bitStream.ReadLong(out requestUID);
-
-                                            Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
-                                        }
-                                        else if (messageType == typeof(ResponseMessage))
-                                        {
-                                            long requestUID;
-                                            bitStream.ReadLong(out requestUID);
-
-                                            Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
-                                        }
-                                        else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
-                                        {
-                                            uint ownerAuthorityId;
-                                            bitStream.ReadUInt(out ownerAuthorityId);
-
-                                            if (!IsServer) // this only applied to clients....should NEVER happen on server
-                                            {
-                                                MyAuthorityId = ownerAuthorityId;
-                                            } // else log warning?
-                                        }
-                                        else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
-                                        {
-                                            DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
-                                        } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
+                                {  // body:
+                                    if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
+                                    {
+                                        DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
                                     }
+                                    else if (messageType == typeof(RequestMessage))
+                                    {
+                                        long requestUID;
+                                        bitStream.ReadLong(out requestUID);
+
+                                        Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
+                                    }
+                                    else if (messageType == typeof(ResponseMessage))
+                                    {
+                                        long requestUID;
+                                        bitStream.ReadLong(out requestUID);
+
+                                        Client_SyncTimeWithServer_ProcessResponse(requestUID, elapsedTicksAtSend);
+                                    }
+                                    else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
+                                    {
+                                        uint ownerAuthorityId;
+                                        bitStream.ReadUInt(out ownerAuthorityId);
+
+                                        if (!IsServer) // this only applied to clients....should NEVER happen on server
+                                        {
+                                            MyAuthorityId = ownerAuthorityId;
+                                        } // else log warning?
+                                    }
+                                    else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
+                                    {
+                                        DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                    } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                                 }
                             }
                         }
@@ -1015,25 +1008,22 @@ namespace GONet
             gonetConnection_ServerToClient.OwnerAuthorityId = ++server_lastAssignedAuthorityId;
 
             // then send the assignment to the client
-            using (var memoryStream = new RecyclableMemoryStream(miscMessagesMemoryStreamManager))
+            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(OwnerAuthorityIdAssignmentEvent)];
-                        bitStream.WriteUInt(messageID);
+                { // header...just message type/id...well, and now time 
+                    uint messageID = messageTypeToMessageIDMap[typeof(OwnerAuthorityIdAssignmentEvent)];
+                    bitStream.WriteUInt(messageID);
 
-                        bitStream.WriteLong(Time.ElapsedTicks);
-                    }
-
-                    { // body
-                        bitStream.WriteUInt(gonetConnection_ServerToClient.OwnerAuthorityId);
-                    }
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, memoryStream.GetBuffer(), (int)memoryStream.Length, GONetChannel.CustomSerialization_Reliable);
+                    bitStream.WriteLong(Time.ElapsedTicks);
                 }
+
+                { // body
+                    bitStream.WriteUInt(gonetConnection_ServerToClient.OwnerAuthorityId);
+                }
+
+                bitStream.WriteCurrentPartialByte();
+
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bitStream.GetBuffer(), bitStream.Length_WrittenBytes, GONetChannel.CustomSerialization_Reliable);
             }
         }
 
@@ -1495,28 +1485,25 @@ namespace GONet
         /// </summary>
         static void Server_SendClientCurrentState_AllAutoMagicalSync(GONetConnection connectionToClient)
         {
-            using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
+            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_AllCurrentValues_Message)];
-                        bitStream.WriteUInt(messageID);
+                { // header...just message type/id...well, and now time 
+                    uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_AllCurrentValues_Message)];
+                    bitStream.WriteUInt(messageID);
 
-                        bitStream.WriteLong(Time.ElapsedTicks);
-                    }
-
-                    SerializeBody_AllCurrentValuesBundle(bitStream); // body
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    int bytesUsedCount = (int)memoryStream.Length;
-                    byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(memoryStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
-                    
-                    SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
-                    mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
+                    bitStream.WriteLong(Time.ElapsedTicks);
                 }
+
+                SerializeBody_AllCurrentValuesBundle(bitStream); // body
+
+                bitStream.WriteCurrentPartialByte();
+
+                int bytesUsedCount = bitStream.Length_WrittenBytes;
+                byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
+                Array.Copy(bitStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
+                    
+                SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
+                mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
             }
         }
 
@@ -1561,7 +1548,7 @@ namespace GONet
 
             readonly ArrayPool<byte> myThread_valueChangeSerializationArrayPool;
 
-            static readonly Temporal myThread_Time = new Temporal();
+            static readonly SecretaryOfTemporalAffairs myThread_Time = new SecretaryOfTemporalAffairs();
 
             /// <summary>
             /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
@@ -1721,9 +1708,6 @@ namespace GONet
             }
         }
 
-        static readonly RecyclableMemoryStreamManager miscMessagesMemoryStreamManager = new RecyclableMemoryStreamManager();
-        static readonly RecyclableMemoryStreamManager valueChangesMemoryStreamManager = new RecyclableMemoryStreamManager();
-
         /// <summary>
         /// this is used as changes are taking place over time....unlike <see cref="mainThread_valueChangeSerializationArrayPool"/>
         /// </summary>
@@ -1774,27 +1758,24 @@ namespace GONet
                 throw new ArgumentOutOfRangeException(nameof(filterUsingOwnerAuthorityId));
             }
 
-            using (var memoryStream = new RecyclableMemoryStream(valueChangesMemoryStreamManager))
+            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                using (Utils.BitStream bitStream = new Utils.BitStream(memoryStream))
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChanges_Message)];
-                        bitStream.WriteUInt(messageID);
+                { // header...just message type/id...well, and now time 
+                    uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_ValueChanges_Message)];
+                    bitStream.WriteUInt(messageID);
 
-                        bitStream.WriteLong(elapsedTicksAtCapture);
-                    }
-
-                    SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    bytesUsedCount = (int)memoryStream.Length;
-                    byte[] bytes = byteArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(memoryStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                    return bytes;
+                    bitStream.WriteLong(elapsedTicksAtCapture);
                 }
+
+                SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
+
+                bitStream.WriteCurrentPartialByte();
+
+                bytesUsedCount = bitStream.Length_WrittenBytes;
+                byte[] bytes = byteArrayPool.Borrow(bytesUsedCount);
+                Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+
+                return bytes;
             }
         }
 
@@ -1813,7 +1794,7 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_AllCurrentValuesBundle(Utils.BitStream bitStream_headerAlreadyWritten)
+        private static void SerializeBody_AllCurrentValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten)
         {
             var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
             while (enumeratorOuter.MoveNext())
@@ -1833,7 +1814,7 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitStream bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
+        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
         {
             int countTotal = changes.Count;
             int countMinus1 = countTotal - 1;
@@ -1901,9 +1882,9 @@ namespace GONet
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
 
-        private static void DeserializeBody_AllValuesBundle(Utils.BitStream bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
-            while (bitStream_headerAlreadyRead.Position < bytesUsedCount) // while more data to read/process
+            while (bitStream_headerAlreadyRead.Position_Bytes < bytesUsedCount) // while more data to read/process
             {
                 uint gonetId = (uint)GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
 
@@ -1914,7 +1895,7 @@ namespace GONet
             }
         }
 
-        private static void DeserializeBody_ChangesBundle(Utils.BitStream bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        private static void DeserializeBody_ChangesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);

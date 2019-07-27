@@ -14,130 +14,112 @@
  */
 
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace GONet.Utils
 {
     /// <summary>
-    /// Wrapper for <see cref="Stream"/>s that allows bit-level reads and writes.
-    /// IMPORTANT: Does NOT call <see cref="Dispose(bool)"/> on the underlying <see cref="MemoryStream"/>.
+    /// Only one of these needed per thread, as it is not thread-safe (otherwise, this would be a static class).
     /// </summary>
-    public sealed class BitStream : Stream
+    public sealed class BitByBitByteArrayBuilder : IDisposable
     {
-        private readonly Stream stream;
+        private static readonly ConcurrentDictionary<Thread, BitByBitByteArrayBuilder> builderByThreadMap = new ConcurrentDictionary<Thread, BitByBitByteArrayBuilder>(5, 5);
+
+        public const int STREAM_BUFFER_MAX_SIZE = 32 * 1024;
+        private readonly byte[] streamBuffer = new byte[STREAM_BUFFER_MAX_SIZE];
 
         private byte currentByte;
 
         /// <summary>
         /// Gets or sets the position inside the byte.
         /// <para/>
-        /// <see cref="BitNum.MaxValue"/> is the last position before the next byte.
+        /// <see cref="InnerByteBitPosition.MaxValue"/> is the last position before the next byte.
         /// </summary>
-        public byte BitPosition;
+        public byte Position_InnerByteBit { get; private set; }
 
-        #region Proxy Properties
+        public int Length_WrittenBytes { get; private set; }
 
-        public override bool CanRead
+        public int Position_Bytes { get; private set; }
+
+        private BitByBitByteArrayBuilder()
         {
-            get { return stream.CanRead; }
+            Reset();
         }
-
-        public override bool CanSeek
-        {
-            get { return stream.CanSeek; }
-        }
-
-        public override bool CanTimeout
-        {
-            get { return stream.CanTimeout; }
-        }
-
-        public override bool CanWrite
-        {
-            get { return stream.CanWrite; }
-        }
-
-        public override long Length
-        {
-            get { return stream.Length; }
-        }
-
-        public override long Position
-        {
-            get { return stream.Position; }
-            set { stream.Position = value; }
-        }
-
-        public override int ReadTimeout
-        {
-            get { return stream.ReadTimeout; }
-            set { stream.ReadTimeout = value; }
-        }
-
-        public Stream UnderlayingStream
-        {
-            get { return stream; }
-        }
-
-        public override int WriteTimeout
-        {
-            get { return stream.WriteTimeout; }
-            set { stream.WriteTimeout = value; }
-        }
-
-        #endregion Proxy Properties
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitStream"/> class with the given underlaying stream.
+        /// Since the suggested use is only one of these instances per thread, this method must be called prior to any new usage for a particular purpose.
         /// </summary>
-        /// <param name="underlayingStream">The underlaying stream to work on.</param>
-        public BitStream(Stream underlayingStream)
+        public BitByBitByteArrayBuilder Reset()
         {
-            BitPosition = BitNum.MaxValue;
-            stream = underlayingStream;
+            Length_WrittenBytes = 0;
+            Position_Bytes = 0;
+            Position_InnerByteBit = InnerByteBitPosition.MaxValue;
+
+            return this;
         }
 
-        #region Proxy Methods
-
-        public override bool Equals(object obj)
+        /// <summary>
+        /// POST: the information inside <paramref name="newData"/> will be copied into internal data structure.
+        /// </summary>
+        public BitByBitByteArrayBuilder Reset_WithNewData(byte[] newData, int newDataBytesSize)
         {
-            return stream.Equals(obj);
+            if (newData == null || newDataBytesSize < 0 || newData.Length < newDataBytesSize || newDataBytesSize > STREAM_BUFFER_MAX_SIZE)
+            {
+                throw new ArgumentOutOfRangeException("Just can't do it captain!  newData == null? " + (newData == null) + " newDataBytesSize: " + newDataBytesSize);
+            }
+
+            Reset();
+
+            Buffer.BlockCopy(newData, 0, streamBuffer, 0, newDataBytesSize);
+            Length_WrittenBytes = newDataBytesSize;
+
+            return this;
         }
 
-        public override void Flush()
+        /// <summary>
+        /// The return value has had <see cref="Reset"/> called on it!
+        /// </summary>
+        /// <returns></returns>
+        public static BitByBitByteArrayBuilder GetBuilder()
         {
-            stream.Flush();
+            BitByBitByteArrayBuilder builder;
+
+            if (builderByThreadMap.TryGetValue(Thread.CurrentThread, out builder))
+            {
+                builder.Reset();
+            }
+            else
+            {
+                builder = new BitByBitByteArrayBuilder();
+                builderByThreadMap[Thread.CurrentThread] = builder;
+            }
+
+            return builder;
         }
 
-        public override int GetHashCode()
+        /// <summary>
+        /// The return value has had <see cref="Reset_WithNewData(byte[], int)"/> called on it (passing in the argument passed herein)!
+        /// </summary>
+        /// <returns></returns>
+        public static BitByBitByteArrayBuilder GetBuilder_WithNewData(byte[] newData, int newDataBytesSize)
         {
-            return stream.GetHashCode();
-        }
+            BitByBitByteArrayBuilder builder;
 
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            return stream.Seek(offset, origin);
-        }
+            if (!builderByThreadMap.TryGetValue(Thread.CurrentThread, out builder))
+            {
+                builder = new BitByBitByteArrayBuilder();
+                builderByThreadMap[Thread.CurrentThread] = builder;
+            }
 
-        public override void SetLength(long value)
-        {
-            stream.SetLength(value);
-        }
+            builder.Reset_WithNewData(newData, newDataBytesSize);
 
-        public override string ToString()
-        {
-            return stream.ToString();
+            return builder;
         }
-
-        protected override void Dispose(bool disposing)
-        {
-            // Do nothing to the stream member, that responsibility is on the caller!
-        }
-
-        #endregion Proxy Methods
 
         #region Read Methods
 
@@ -150,12 +132,12 @@ namespace GONet.Utils
         /// <param name="offset">The offset to start writing into the buffer at.</param>
         /// <param name="count">The number of bytes to read.</param>
         /// <returns>How many bytes were actually read.</returns>
-        public override int Read(byte[] buffer, int offset, int count)
+        public int Read(byte[] buffer, int offset, int count)
         {
-            if (BitPosition == BitNum.MaxValue)
-                return stream.Read(buffer, offset, count);
+            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+                return Stream_Read(buffer, offset, count);
 
-            return (int)(ReadBits(buffer, offset, (uint)count * BitNum.MaxValue) / BitNum.MaxValue);
+            return (int)(ReadBits(buffer, offset, (uint)count * InnerByteBitPosition.MaxValue) / InnerByteBitPosition.MaxValue);
         }
 
         /// <summary>
@@ -166,9 +148,9 @@ namespace GONet.Utils
         /// <returns>Whether the stream could be read from or not.</returns>
         public bool ReadBits(out byte value, byte bits)
         {
-            if (BitPosition == BitNum.MaxValue && bits == BitNum.MaxValue)
+            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue && bits == InnerByteBitPosition.MaxValue)
             {
-                var readByte = stream.ReadByte();
+                byte readByte = Stream_ReadByte();
                 value = (byte)(readByte < 0 ? 0 : readByte);
                 currentByte = value;
                 return !(readByte < 0);
@@ -177,18 +159,20 @@ namespace GONet.Utils
             value = 0;
             for (byte i = 1; i <= bits; ++i)
             {
-                if (BitPosition == BitNum.MaxValue)
+                if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
                 {
-                    var readByte = stream.ReadByte();
+                    byte readByte = Stream_ReadByte();
 
                     if (readByte < 0)
+                    {
                         return i > 1;
+                    }
 
-                    currentByte = (byte)readByte;
+                    currentByte = readByte;
                 }
 
                 AdvanceBitPosition();
-                value |= GetAdjustedValue(currentByte, BitPosition, BitNum.From(i));
+                value |= GetAdjustedValue(currentByte, Position_InnerByteBit, InnerByteBitPosition.From(i));
             }
 
             return true;
@@ -205,14 +189,16 @@ namespace GONet.Utils
         /// <returns>How many bits were actually read.</returns>
         public ulong ReadBits(byte[] buffer, int offset, ulong count)
         {
-            var bitsRead = 0uL;
+            ulong bitsRead = 0uL;
             while (count > 0)
             {
                 byte nextByte;
-                byte bits = BitNum.From(count);
+                byte bits = InnerByteBitPosition.From(count);
 
                 if (!ReadBits(out nextByte, bits))
+                {
                     buffer[offset] = 0;
+                }
                 else
                 {
                     buffer[offset] = nextByte;
@@ -229,7 +215,7 @@ namespace GONet.Utils
         readonly byte[] tmpBuffer64 = new byte[8];
         readonly byte trueByte = 1;
         readonly byte falseByte = 0;
-        readonly static byte oneBit = BitNum.From(1);
+        readonly static byte oneBit = InnerByteBitPosition.From(1);
 
         public bool ReadBit(out bool oBool)
         {
@@ -319,10 +305,10 @@ namespace GONet.Utils
         /// Reads a single byte from the stream and returns its value, or -1 if it could not be read.
         /// </summary>
         /// <returns>The value that was read, or -1 if it could not be read.</returns>
-        public override int ReadByte()
+        public int ReadByte()
         {
             byte buffer;
-            return ReadBits(out buffer, BitNum.MaxValue) ? buffer : -1;
+            return ReadBits(out buffer, InnerByteBitPosition.MaxValue) ? buffer : -1;
         }
 
         static readonly ArrayPool<byte> byteArrayPoolForStrings = new ArrayPool<byte>(100, 1, 100, 1000);
@@ -352,15 +338,15 @@ namespace GONet.Utils
         /// <param name="buffer">The buffer to write from.</param>
         /// <param name="offset">The offet to start reading from at.</param>
         /// <param name="count">The number of bytes to write.</param>
-        public override void Write(byte[] buffer, int offset, int count)
+        public void Write(byte[] buffer, int offset, int count)
         {
-            if (BitPosition == BitNum.MaxValue)
+            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
             {
-                stream.Write(buffer, offset, count);
+                Stream_Write(buffer, offset, count);
                 currentByte = 0;
             }
 
-            WriteBits(buffer, offset, (ulong)count * BitNum.MaxValue);
+            WriteBits(buffer, offset, (ulong)count * InnerByteBitPosition.MaxValue);
         }
 
         /// <summary>
@@ -373,7 +359,7 @@ namespace GONet.Utils
         {
             while (count > 0)
             {
-                byte bits = BitNum.From(count);
+                byte bits = InnerByteBitPosition.From(count);
 
                 WriteBits(buffer[offset], bits);
 
@@ -443,9 +429,9 @@ namespace GONet.Utils
         /// <param name="bits">The number of bits to write.</param>
         public void WriteBits(byte value, byte bits)
         {
-            if (BitPosition == BitNum.MaxValue && bits == BitNum.MaxValue)
+            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue && bits == InnerByteBitPosition.MaxValue)
             {
-                stream.WriteByte(value);
+                Stream_WriteByte(value);
                 currentByte = 0;
                 return;
             }
@@ -453,11 +439,11 @@ namespace GONet.Utils
             for (byte i = 1; i <= bits; ++i)
             {
                 AdvanceBitPosition();
-                currentByte |= GetAdjustedValue(value, BitNum.From(i), BitPosition);
+                currentByte |= GetAdjustedValue(value, InnerByteBitPosition.From(i), Position_InnerByteBit);
 
-                if (BitPosition == BitNum.MaxValue)
+                if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
                 {
-                    stream.WriteByte(currentByte);
+                    Stream_WriteByte(currentByte);
                     currentByte = 0;
                 }
             }
@@ -467,9 +453,9 @@ namespace GONet.Utils
         /// Writes the value.
         /// </summary>
         /// <param name="value">The value to write.</param>
-        public override void WriteByte(byte value)
+        public void WriteByte(byte value)
         {
-            WriteBits(value, BitNum.MaxValue);
+            WriteBits(value, InnerByteBitPosition.MaxValue);
         }
 
         public void WriteString(string value)
@@ -495,17 +481,17 @@ namespace GONet.Utils
         /// To ensure all bits are written to the stream prior to calling <see cref="MemoryStream.ToArray"/> (well, if it the <see cref="UnderlayingStream"/> is a <see cref="MemoryStream"/>).
         /// </summary>
         /// <returns>
-        /// true if <see cref="BitPosition"/> was greater than 0 and the bits and right padding 0's were written as the final byte to the stream.
+        /// true if <see cref="Position_InnerByteBit"/> was greater than 0 and the bits and right padding 0's were written as the final byte to the Stream_
         /// false if there was nothing additional to write to stream
         /// </returns>
         public bool WriteCurrentPartialByte(bool paddingBit = false)
         {
-            if (BitPosition == 0)
+            if (Position_InnerByteBit == 0)
             {
                 return false;
             }
 
-            int paddingBitCount = 8 - BitPosition;
+            int paddingBitCount = 8 - Position_InnerByteBit;
             for (int i = 0; i < paddingBitCount; ++i)
             {
                 WriteBit(paddingBit);
@@ -516,34 +502,116 @@ namespace GONet.Utils
 
         #endregion Write Methods
 
-        private static byte GetAdjustedValue(byte value, byte currentPosition, byte targetPosition)
-        {
-            value &= BitNum.GetBitPos(currentPosition);
+        #region Stream replacements
 
-            if (currentPosition > targetPosition)
-                return (byte)(value >> (currentPosition - targetPosition));
-            else if (currentPosition < targetPosition)
-                return (byte)(value << (targetPosition - currentPosition));
-            else
-                return value;
+        private void Stream_WriteByte(byte value)
+        {
+            if (Length_WrittenBytes == STREAM_BUFFER_MAX_SIZE)
+            {
+                throw new InvalidOperationException("not enough memory available.  entire buffer already used.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE);
+            }
+
+            streamBuffer[Length_WrittenBytes++] = value;
+            ++Position_Bytes;
         }
 
+        private void Stream_Write(byte[] buffer, int offset, int count)
+        {
+            if (Length_WrittenBytes >= (STREAM_BUFFER_MAX_SIZE - count))
+            {
+                throw new InvalidOperationException("not enough memory available.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE);
+            }
+
+            // TODO arg error check for null and index blah!
+
+            for (int i = 0; i < count; ++i)
+            {
+                streamBuffer[Length_WrittenBytes++] = buffer[i + offset];
+            }
+            Position_Bytes += count;
+        }
+
+        private int Stream_Read(byte[] buffer, int offset, int count)
+        {
+            if (Position_Bytes <= (STREAM_BUFFER_MAX_SIZE - count))
+            {
+                throw new InvalidOperationException("not enough memory available.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE + " position: " + Position_Bytes);
+            }
+
+            // TODO arg error check for null and capacity to fit blah!
+
+            Buffer.BlockCopy(streamBuffer, Position_Bytes, buffer, 0, count);
+            Position_Bytes += count;
+
+            return count;
+        }
+
+        private byte Stream_ReadByte()
+        {
+            return streamBuffer[Position_Bytes++];
+        }
+
+        #endregion
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static byte GetAdjustedValue(byte value, byte currentPosition, byte targetPosition)
+        {
+            value &= InnerByteBitPosition.GetBitPos(currentPosition);
+
+            if (currentPosition > targetPosition)
+            {
+                return (byte)(value >> (currentPosition - targetPosition));
+            }
+            else if (currentPosition < targetPosition)
+            {
+                return (byte)(value << (targetPosition - currentPosition));
+            }
+            else
+            {
+                return value;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AdvanceBitPosition()
         {
-            if (BitPosition == BitNum.MaxValue)
-                BitPosition = BitNum.MinValue;
+            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+            {
+                Position_InnerByteBit = InnerByteBitPosition.MinValue;
+            }
             else
-                BitPosition = BitNum.From(BitPosition + 1);
+            {
+                Position_InnerByteBit = InnerByteBitPosition.From(Position_InnerByteBit + 1);
+            }
+        }
+
+        /// <summary>
+        /// This does NOT dispose in the traditional C# <see cref="IDisposable.Dispose"/> sense.
+        /// This is here so C# using statement can be used to auto-reset at end of using scope!
+        /// </summary>
+        public void Dispose()
+        {
+            Reset();
+        }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to NOT modify this (essentially) private data.
+        ///            This method is here for you to get access to the data and make immediate read-only use of it (e.g., COPY it into another byte[]) and forget about it.
+        /// </summary>
+        /// <returns></returns>
+        public byte[] GetBuffer()
+        {
+            return streamBuffer;
         }
     }
 
-    public static class BitNum
+    public static class InnerByteBitPosition
     {
         public static readonly byte MaxValue = 8;
         public static readonly byte MinValue = 1;
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -565,7 +633,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -587,7 +655,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -609,7 +677,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -631,7 +699,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -653,7 +721,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -675,7 +743,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -697,7 +765,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -719,7 +787,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -741,7 +809,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>
@@ -763,7 +831,7 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Creates a new instance of the <see cref="BitNum"/> struct with the given value.
+        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
         /// <para/>
         /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
         /// </summary>

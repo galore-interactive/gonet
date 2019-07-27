@@ -255,9 +255,9 @@ namespace GONet
     public interface IGONetAutoMagicalSync_CustomSerializer
     {
         /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
-        void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value);
+        void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value);
 
-        object Deserialize(Utils.BitStream bitStream_readFrom);
+        object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom);
     }
 
     public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
@@ -277,7 +277,7 @@ namespace GONet
             quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
         }
 
-        public object Deserialize(Utils.BitStream bitStream_readFrom)
+        public object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
             uint x;
             bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
@@ -289,7 +289,7 @@ namespace GONet
             return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
         }
 
-        public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value)
         {
             Vector3 vector3 = (Vector3)value;
 
@@ -319,7 +319,7 @@ namespace GONet
         }
 
         /// <returns>a <see cref="Quaternion"/></returns>
-        public object Deserialize(Utils.BitStream bitStream_readFrom)
+        public object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
             uint LargestIndex;
             bitStream_readFrom.ReadUInt(out LargestIndex, 2);
@@ -388,7 +388,7 @@ namespace GONet
             return new Quaternion(x, y, z, w);
         }
 
-        public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value)
         {
             uint LargestIndex;
             uint SmallestA;

@@ -752,7 +752,7 @@ namespace GONet.Generation
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref=""GONetParticipant.GONetId""/> because that has to be processed first separately in order
         /// to know which <see cref=""GONetParticipant""/> we are working with in order to call this method.
         /// </summary>
-        internal override void SerializeAll(Utils.BitStream bitStream_appendTo)
+        internal override void SerializeAll(Utils.BitByBitByteArrayBuilder bitStream_appendTo)
         {
 ");
             
@@ -1207,8 +1207,9 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("        }\r\n\r\n        internal override void SerializeSingle(Utils.BitStream bitSt" +
-                    "ream_appendTo, byte singleIndex)\r\n        {\r\n\t\t\tswitch (singleIndex)\r\n\t\t\t{\r\n");
+            this.Write("        }\r\n\r\n        internal override void SerializeSingle(Utils.BitByBitByteArr" +
+                    "ayBuilder bitStream_appendTo, byte singleIndex)\r\n        {\r\n\t\t\tswitch (singleInd" +
+                    "ex)\r\n\t\t\t{\r\n");
             
             #line 297 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -1670,7 +1671,7 @@ namespace GONet.Generation
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref=""GONetParticipant.GONetId""/> because that has to be processed first separately in order
         /// to know which <see cref=""GONetParticipant""/> we are working with in order to call this method.
         /// </summary>
-        internal override void DeserializeInitAll(Utils.BitStream bitStream_readFrom, long assumedElapsedTicksAtChange)
+        internal override void DeserializeInitAll(Utils.BitByBitByteArrayBuilder bitStream_readFrom, long assumedElapsedTicksAtChange)
         {
 ");
             
@@ -2236,7 +2237,7 @@ namespace GONet.Generation
         ///  Deserializes a single value (using <paramref name=""singleIndex""/> to know which) from <paramref name=""bitStream_readFrom""/>
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal override void DeserializeInitSingle(Utils.BitStream bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange)
+        internal override void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange)
         {
 			switch (singleIndex)
 			{

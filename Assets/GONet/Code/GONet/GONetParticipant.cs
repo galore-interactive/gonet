@@ -212,7 +212,7 @@ namespace GONet
             /// </summary>
             public GONetId_InitialAssignment_CustomSerializer() { }
 
-            public object Deserialize(Utils.BitStream bitStream_readFrom)
+            public object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
             {
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
@@ -227,7 +227,7 @@ namespace GONet
                 return GONetId;
             }
 
-            public void Serialize(Utils.BitStream bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+            public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value)
             {
                 string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
                 bitStream_appendTo.WriteString(fullUniquePath);

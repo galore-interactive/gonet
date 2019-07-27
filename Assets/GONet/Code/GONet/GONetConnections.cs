@@ -130,13 +130,10 @@ namespace GONet
             byte[] messageBytes_withoutHeader = BorrowByteArray(bodySize_expected);
             Buffer.BlockCopy(messageBytes, headerSize, messageBytes_withoutHeader, 0, bodySize_expected);
 
-            using (var memoryStream = new MemoryStream(messageBytes))
+            using (var bitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(messageBytes, bytesUsedCount))
             {
-                using (var bitStream = new Utils.BitStream(memoryStream))
-                {
-                    channelId_readFromMessage = (GONetChannelId)bitStream.ReadByte();
-                    bitStream.ReadUInt(out bodySize_readFromMessage);
-                }
+                channelId_readFromMessage = (GONetChannelId)bitStream.ReadByte();
+                bitStream.ReadUInt(out bodySize_readFromMessage);
             }
 
             GONetMain.ProcessIncomingBytes(this, messageBytes_withoutHeader, (int)bodySize_readFromMessage, channelId_readFromMessage);

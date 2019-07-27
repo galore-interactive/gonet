@@ -189,10 +189,6 @@
     <Compile Include="Assets\GONet\Code\MessagePack\Unity\UnityResolver.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\UnsafeExtensions\UnityBlitResolver.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\UnsafeExtensions\UnsafeBlitFormatter.cs" />
-    <Compile Include="Assets\GONet\Code\Microsoft\IO\Events.cs" />
-    <Compile Include="Assets\GONet\Code\Microsoft\IO\RecyclableMemoryStream.cs" />
-    <Compile Include="Assets\GONet\Code\Microsoft\IO\RecyclableMemoryStreamManager.cs" />
-    <Compile Include="Assets\GONet\Code\Microsoft\Kernel32.cs" />
     <Compile Include="Assets\GONet\Sample\AnotherFieldTesterino.cs" />
     <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
