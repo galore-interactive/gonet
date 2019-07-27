@@ -95,8 +95,8 @@
     <Compile Include="Assets\GONet\Code\GONet\GONetSessionContext.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSpawnSupport_Runtime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ArrayPool.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\BitByBitByteArrayBuilder.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitConverter.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Utils\BitStream.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\CRC32.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\DateTimeUtils.cs" />
