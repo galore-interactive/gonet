@@ -15,8 +15,10 @@
 
 using GONet.Utils;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using UnityEngine;
 
 namespace GONet.Generation
@@ -52,6 +54,8 @@ namespace GONet.Generation
 
         internal GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue[] valuesChangesSupport;
 
+        protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
+
         internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)
         {
             this.gonetParticipant = gonetParticipant;
@@ -75,6 +79,19 @@ namespace GONet.Generation
 
             }
             valuesChangesSupportArrayPool.Return(valuesChangesSupport);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected byte[] GetMyValueDeserializeByteArray()
+        {
+            byte[] mine;
+            if (!valueDeserializeByteArrayByThreadMap.TryGetValue(Thread.CurrentThread, out mine))
+            {
+                mine = new byte[8];
+                valueDeserializeByteArrayByThreadMap[Thread.CurrentThread] = mine;
+            }
+
+            return mine;
         }
 
         /// <summary>

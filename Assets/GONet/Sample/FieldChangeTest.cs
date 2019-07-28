@@ -24,6 +24,9 @@ public class FieldChangeTest : MonoBehaviour
     [GONetAutoMagicalSync(SettingsProfileTemplateName = "FloatieMcFloats")]
     public float nada;
 
+    [GONetAutoMagicalSync(SettingsProfileTemplateName = "??")] // NOTE: "??" will not be found and default settings profile/template should be used
+    public short shortie;
+
     TMPro.TextMeshProUGUI nadaText;
 
     Vector3 startPosition;
@@ -42,7 +45,7 @@ public class FieldChangeTest : MonoBehaviour
     private void Update()
     {
         /* test with an ever-changing field value: */
-        if (GONetMain.DoIHaveAuthorityOver(gameObject))
+        if (GONetMain.IsMine(gameObject))
         {
             someCoolGuyFloat += moveAmount * Time.deltaTime;
             if (someCoolGuyFloat >= 6 || someCoolGuyFloat <= -6)

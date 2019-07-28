@@ -155,9 +155,23 @@ namespace GONet
         /// </summary>
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
-        public static bool DoIHaveAuthorityOver(GameObject gameObject)
+        /// <summary>
+        /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
+        /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
+        /// <para>If you already have access to the <see cref="GONetParticipant"/> associated with this <paramref name="gameObject"/>, then use the sister method instead: <see cref="IsMine(GONetParticipant)"/></para>
+        /// </summary>
+        public static bool IsMine(GameObject gameObject)
         {
             return gameObject.GetComponent<GONetParticipant>()?.OwnerAuthorityId == MyAuthorityId; // TODO cache instead of lookup/get each time!
+        }
+
+        /// <summary>
+        /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
+        /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
+        /// </summary>
+        public static bool IsMine(GONetParticipant gonetParticipant)
+        {
+            return gonetParticipant.OwnerAuthorityId == MyAuthorityId;
         }
 
         /// <summary>

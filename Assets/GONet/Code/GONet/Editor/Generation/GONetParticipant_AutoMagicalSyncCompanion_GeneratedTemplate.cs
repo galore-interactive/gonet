@@ -2058,15 +2058,9 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tint count = 2;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 520 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
-                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
+            this.Write("\t\t\t\tint count = 2;\r\n\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\tfor" +
+                    " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
+                    "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
             #line 526 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2091,15 +2085,9 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tint count = 4;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 533 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
-                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
+            this.Write("\t\t\t\tint count = 4;\r\n\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\tfor" +
+                    " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
+                    "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
             #line 539 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
@@ -2190,15 +2178,9 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tint count = 8;\r\n\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 556 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFro" +
-                    "m.ReadByte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
+            this.Write("\t\t\t\tint count = 8;\r\n\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\tfor" +
+                    " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
+                    "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
             #line 562 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2423,16 +2405,10 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tint count = 2;\r\n\t\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 666 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_read" +
-                    "From.ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToI" +
-                    "nt16(bytes, 0);\r\n");
+            this.Write("\t\t\t\t\tint count = 2;\r\n\t\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\t\t" +
+                    "for (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_readFrom" +
+                    ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToInt16" +
+                    "(bytes, 0);\r\n");
             
             #line 673 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -2443,16 +2419,10 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tint count = 4;\r\n\t\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 679 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_read" +
-                    "From.ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToI" +
-                    "nt32(bytes, 0);\r\n");
+            this.Write("\t\t\t\t\tint count = 4;\r\n\t\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\t\t" +
+                    "for (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_readFrom" +
+                    ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToInt32" +
+                    "(bytes, 0);\r\n");
             
             #line 686 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -2474,16 +2444,10 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tint count = 8;\r\n\t\t\t\t\tbyte[] bytes = new byte[count];");
-            
-            #line 698 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
- /* TODO: new byte array!!!! no no no, use pool here! */ 
-            
-            #line default
-            #line hidden
-            this.Write("\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_read" +
-                    "From.ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToD" +
-                    "ouble(bytes, 0);\r\n");
+            this.Write("\t\t\t\t\tint count = 8;\r\n\t\t\t\t\tbyte[] bytes = GetMyValueDeserializeByteArray();\r\n\t\t\t\t\t" +
+                    "for (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b = (byte)bitStream_readFrom" +
+                    ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToDoubl" +
+                    "e(bytes, 0);\r\n");
             
             #line 705 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
