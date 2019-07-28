@@ -30,6 +30,9 @@ namespace GONet.Utils
     {
         private static readonly ConcurrentDictionary<Thread, BitByBitByteArrayBuilder> builderByThreadMap = new ConcurrentDictionary<Thread, BitByBitByteArrayBuilder>(5, 5);
 
+        public const byte InnerByteBitPosition_MaxValue = 8;
+        public const byte InnerByteBitPosition_MinValue = 1;
+
         public const int STREAM_BUFFER_MAX_SIZE = 32 * 1024;
         private readonly byte[] streamBuffer = new byte[STREAM_BUFFER_MAX_SIZE];
 
@@ -38,13 +41,16 @@ namespace GONet.Utils
         /// <summary>
         /// Gets or sets the position inside the byte.
         /// <para/>
-        /// <see cref="InnerByteBitPosition.MaxValue"/> is the last position before the next byte.
+        /// <see cref="InnerByteBitPosition_MaxValue"/> is the last position before the next byte.
         /// </summary>
-        public byte Position_InnerByteBit { get; private set; }
+        private byte position_InnerByteBit;
+        public byte Position_InnerByteBit => position_InnerByteBit;
 
-        public int Length_WrittenBytes { get; private set; }
+        private int length_WrittenBytes;
+        public int Length_WrittenBytes => length_WrittenBytes;
 
-        public int Position_Bytes { get; private set; }
+        private int position_Bytes;
+        public int Position_Bytes => position_Bytes;
 
         private BitByBitByteArrayBuilder()
         {
@@ -56,9 +62,9 @@ namespace GONet.Utils
         /// </summary>
         public BitByBitByteArrayBuilder Reset()
         {
-            Length_WrittenBytes = 0;
-            Position_Bytes = 0;
-            Position_InnerByteBit = InnerByteBitPosition.MaxValue;
+            length_WrittenBytes = 0;
+            position_Bytes = 0;
+            position_InnerByteBit = InnerByteBitPosition_MaxValue;
 
             return this;
         }
@@ -76,7 +82,7 @@ namespace GONet.Utils
             Reset();
 
             Buffer.BlockCopy(newData, 0, streamBuffer, 0, newDataBytesSize);
-            Length_WrittenBytes = newDataBytesSize;
+            length_WrittenBytes = newDataBytesSize;
 
             return this;
         }
@@ -134,10 +140,12 @@ namespace GONet.Utils
         /// <returns>How many bytes were actually read.</returns>
         public int Read(byte[] buffer, int offset, int count)
         {
-            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+            if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
+            {
                 return Stream_Read(buffer, offset, count);
+            }
 
-            return (int)(ReadBits(buffer, offset, (uint)count * InnerByteBitPosition.MaxValue) / InnerByteBitPosition.MaxValue);
+            return (int)(ReadBits(buffer, offset, (uint)count * InnerByteBitPosition_MaxValue) / InnerByteBitPosition_MaxValue);
         }
 
         /// <summary>
@@ -148,7 +156,7 @@ namespace GONet.Utils
         /// <returns>Whether the stream could be read from or not.</returns>
         public bool ReadBits(out byte value, byte bits)
         {
-            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue && bits == InnerByteBitPosition.MaxValue)
+            if (position_InnerByteBit == InnerByteBitPosition_MaxValue && bits == InnerByteBitPosition_MaxValue)
             {
                 byte readByte = Stream_ReadByte();
                 value = (byte)(readByte < 0 ? 0 : readByte);
@@ -159,7 +167,7 @@ namespace GONet.Utils
             value = 0;
             for (byte i = 1; i <= bits; ++i)
             {
-                if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+                if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
                 {
                     byte readByte = Stream_ReadByte();
 
@@ -171,8 +179,48 @@ namespace GONet.Utils
                     currentByte = readByte;
                 }
 
-                AdvanceBitPosition();
-                value |= GetAdjustedValue(currentByte, Position_InnerByteBit, InnerByteBitPosition.From(i));
+                //private void AdvanceBitPosition()
+                {
+                    if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
+                    {
+                        position_InnerByteBit = InnerByteBitPosition_MinValue;
+                    }
+                    else
+                    { // InnerByteBitPosition_From(position_InnerByteBit + 1):
+                        int tmpNewPos = position_InnerByteBit + 1;
+                        position_InnerByteBit =
+                            tmpNewPos < InnerByteBitPosition_MinValue
+                                ? InnerByteBitPosition_MinValue
+                                : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                    ? InnerByteBitPosition_MaxValue
+                                    : (byte)tmpNewPos);
+                    }
+                }
+
+                { // InnerByteBitPosition_From(i):
+                    int tmpNewPos = i;
+                    var targetPos =
+                        tmpNewPos < InnerByteBitPosition_MinValue
+                            ? InnerByteBitPosition_MinValue
+                            : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                ? InnerByteBitPosition_MaxValue
+                                : (byte)tmpNewPos);
+
+                    //private static byte GetAdjustedValue(byte v1, byte cp2, byte tp3)
+                    //{
+                    byte v1 = currentByte, cp2 = position_InnerByteBit, tp3 = targetPos;
+                    v1 &= (byte)(1 << (cp2 - 1));
+
+                    byte adjustedValue = cp2 > tp3
+                        ? (byte)(v1 >> (cp2 - tp3))
+                        : (cp2 < tp3
+                            ? (byte)(v1 << (tp3 - cp2))
+                            : v1);
+                    //}
+
+                    value |= adjustedValue; // GetAdjustedValue(currentByte, position_InnerByteBit, targetPos);
+
+                }
             }
 
             return true;
@@ -193,7 +241,16 @@ namespace GONet.Utils
             while (count > 0)
             {
                 byte nextByte;
-                byte bits = InnerByteBitPosition.From(count);
+                byte bits = 0;
+                { // bits = InnerByteBitPosition_From(count):
+                    ulong tmpNewPos = count;
+                    bits =
+                        tmpNewPos < InnerByteBitPosition_MinValue
+                            ? InnerByteBitPosition_MinValue
+                            : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                ? InnerByteBitPosition_MaxValue
+                                : (byte)tmpNewPos);
+                }
 
                 if (!ReadBits(out nextByte, bits))
                 {
@@ -215,7 +272,7 @@ namespace GONet.Utils
         readonly byte[] tmpBuffer64 = new byte[8];
         readonly byte trueByte = 1;
         readonly byte falseByte = 0;
-        readonly static byte oneBit = InnerByteBitPosition.From(1);
+        readonly static byte oneBit = 1;
 
         public bool ReadBit(out bool oBool)
         {
@@ -308,7 +365,7 @@ namespace GONet.Utils
         public int ReadByte()
         {
             byte buffer;
-            return ReadBits(out buffer, InnerByteBitPosition.MaxValue) ? buffer : -1;
+            return ReadBits(out buffer, InnerByteBitPosition_MaxValue) ? buffer : -1;
         }
 
         static readonly ArrayPool<byte> byteArrayPoolForStrings = new ArrayPool<byte>(100, 1, 100, 1000);
@@ -340,13 +397,13 @@ namespace GONet.Utils
         /// <param name="count">The number of bytes to write.</param>
         public void Write(byte[] buffer, int offset, int count)
         {
-            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+            if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
             {
                 Stream_Write(buffer, offset, count);
                 currentByte = 0;
             }
 
-            WriteBits(buffer, offset, (ulong)count * InnerByteBitPosition.MaxValue);
+            WriteBits(buffer, offset, (ulong)count * InnerByteBitPosition_MaxValue);
         }
 
         /// <summary>
@@ -359,7 +416,16 @@ namespace GONet.Utils
         {
             while (count > 0)
             {
-                byte bits = InnerByteBitPosition.From(count);
+                byte bits = 0;
+                { // bits = InnerByteBitPosition_From(count):
+                    ulong tmpNewPos = count;
+                    bits =
+                        tmpNewPos < InnerByteBitPosition_MinValue
+                            ? InnerByteBitPosition_MinValue
+                            : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                ? InnerByteBitPosition_MaxValue
+                                : (byte)tmpNewPos);
+                }
 
                 WriteBits(buffer[offset], bits);
 
@@ -429,7 +495,7 @@ namespace GONet.Utils
         /// <param name="bits">The number of bits to write.</param>
         public void WriteBits(byte value, byte bits)
         {
-            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue && bits == InnerByteBitPosition.MaxValue)
+            if (position_InnerByteBit == InnerByteBitPosition_MaxValue && bits == InnerByteBitPosition_MaxValue)
             {
                 Stream_WriteByte(value);
                 currentByte = 0;
@@ -438,10 +504,50 @@ namespace GONet.Utils
 
             for (byte i = 1; i <= bits; ++i)
             {
-                AdvanceBitPosition();
-                currentByte |= GetAdjustedValue(value, InnerByteBitPosition.From(i), Position_InnerByteBit);
+                //private void AdvanceBitPosition()
+                {
+                    if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
+                    {
+                        position_InnerByteBit = InnerByteBitPosition_MinValue;
+                    }
+                    else
+                    { // InnerByteBitPosition_From(position_InnerByteBit + 1):
+                        int tmpNewPos = position_InnerByteBit + 1;
+                        position_InnerByteBit =
+                            tmpNewPos < InnerByteBitPosition_MinValue
+                                ? InnerByteBitPosition_MinValue
+                                : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                    ? InnerByteBitPosition_MaxValue
+                                    : (byte)tmpNewPos);
+                    }
+                }
 
-                if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
+                { // InnerByteBitPosition_From(i):
+                    int tmpNewPos = i;
+                    var currentPos =
+                        tmpNewPos < InnerByteBitPosition_MinValue
+                            ? InnerByteBitPosition_MinValue
+                            : (tmpNewPos > InnerByteBitPosition_MaxValue
+                                ? InnerByteBitPosition_MaxValue
+                                : (byte)tmpNewPos);
+
+
+                    //private static byte GetAdjustedValue(byte v1, byte cp2, byte tp3)
+                    //{
+                    byte v1 = value, cp2 = currentPos, tp3 = position_InnerByteBit;
+                    v1 &= (byte)(1 << (cp2 - 1));
+
+                    byte adjustedValue = cp2 > tp3
+                        ? (byte)(v1 >> (cp2 - tp3))
+                        : (cp2 < tp3 
+                            ? (byte)(v1 << (tp3 - cp2))
+                            : v1);
+                    //}
+
+                    currentByte |= adjustedValue; // GetAdjustedValue(value, currentPos, position_InnerByteBit);
+                }
+
+                if (position_InnerByteBit == InnerByteBitPosition_MaxValue)
                 {
                     Stream_WriteByte(currentByte);
                     currentByte = 0;
@@ -455,7 +561,7 @@ namespace GONet.Utils
         /// <param name="value">The value to write.</param>
         public void WriteByte(byte value)
         {
-            WriteBits(value, InnerByteBitPosition.MaxValue);
+            WriteBits(value, InnerByteBitPosition_MaxValue);
         }
 
         public void WriteString(string value)
@@ -481,17 +587,17 @@ namespace GONet.Utils
         /// To ensure all bits are written to the stream prior to calling <see cref="MemoryStream.ToArray"/> (well, if it the <see cref="UnderlayingStream"/> is a <see cref="MemoryStream"/>).
         /// </summary>
         /// <returns>
-        /// true if <see cref="Position_InnerByteBit"/> was greater than 0 and the bits and right padding 0's were written as the final byte to the Stream_
+        /// true if <see cref="position_InnerByteBit"/> was greater than 0 and the bits and right padding 0's were written as the final byte to the Stream_
         /// false if there was nothing additional to write to stream
         /// </returns>
         public bool WriteCurrentPartialByte(bool paddingBit = false)
         {
-            if (Position_InnerByteBit == 0)
+            if (position_InnerByteBit == 0)
             {
                 return false;
             }
 
-            int paddingBitCount = 8 - Position_InnerByteBit;
+            int paddingBitCount = 8 - position_InnerByteBit;
             for (int i = 0; i < paddingBitCount; ++i)
             {
                 WriteBit(paddingBit);
@@ -506,18 +612,18 @@ namespace GONet.Utils
 
         private void Stream_WriteByte(byte value)
         {
-            if (Length_WrittenBytes == STREAM_BUFFER_MAX_SIZE)
+            if (length_WrittenBytes == STREAM_BUFFER_MAX_SIZE)
             {
                 throw new InvalidOperationException("not enough memory available.  entire buffer already used.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE);
             }
 
-            streamBuffer[Length_WrittenBytes++] = value;
-            ++Position_Bytes;
+            streamBuffer[length_WrittenBytes++] = value;
+            ++position_Bytes;
         }
 
         private void Stream_Write(byte[] buffer, int offset, int count)
         {
-            if (Length_WrittenBytes >= (STREAM_BUFFER_MAX_SIZE - count))
+            if (length_WrittenBytes >= (STREAM_BUFFER_MAX_SIZE - count))
             {
                 throw new InvalidOperationException("not enough memory available.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE);
             }
@@ -526,64 +632,32 @@ namespace GONet.Utils
 
             for (int i = 0; i < count; ++i)
             {
-                streamBuffer[Length_WrittenBytes++] = buffer[i + offset];
+                streamBuffer[length_WrittenBytes++] = buffer[i + offset];
             }
-            Position_Bytes += count;
+            position_Bytes += count;
         }
 
         private int Stream_Read(byte[] buffer, int offset, int count)
         {
-            if (Position_Bytes <= (STREAM_BUFFER_MAX_SIZE - count))
+            if (position_Bytes <= (STREAM_BUFFER_MAX_SIZE - count))
             {
-                throw new InvalidOperationException("not enough memory available.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE + " position: " + Position_Bytes);
+                throw new InvalidOperationException("not enough memory available.  buffer size (bytes): " + STREAM_BUFFER_MAX_SIZE + " position: " + position_Bytes);
             }
 
             // TODO arg error check for null and capacity to fit blah!
 
-            Buffer.BlockCopy(streamBuffer, Position_Bytes, buffer, 0, count);
-            Position_Bytes += count;
+            Buffer.BlockCopy(streamBuffer, position_Bytes, buffer, 0, count);
+            position_Bytes += count;
 
             return count;
         }
 
         private byte Stream_ReadByte()
         {
-            return streamBuffer[Position_Bytes++];
+            return streamBuffer[position_Bytes++];
         }
 
         #endregion
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static byte GetAdjustedValue(byte value, byte currentPosition, byte targetPosition)
-        {
-            value &= InnerByteBitPosition.GetBitPos(currentPosition);
-
-            if (currentPosition > targetPosition)
-            {
-                return (byte)(value >> (currentPosition - targetPosition));
-            }
-            else if (currentPosition < targetPosition)
-            {
-                return (byte)(value << (targetPosition - currentPosition));
-            }
-            else
-            {
-                return value;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AdvanceBitPosition()
-        {
-            if (Position_InnerByteBit == InnerByteBitPosition.MaxValue)
-            {
-                Position_InnerByteBit = InnerByteBitPosition.MinValue;
-            }
-            else
-            {
-                Position_InnerByteBit = InnerByteBitPosition.From(Position_InnerByteBit + 1);
-            }
-        }
 
         /// <summary>
         /// This does NOT dispose in the traditional C# <see cref="IDisposable.Dispose"/> sense.
@@ -602,260 +676,6 @@ namespace GONet.Utils
         public byte[] GetBuffer()
         {
             return streamBuffer;
-        }
-    }
-
-    public static class InnerByteBitPosition
-    {
-        public static readonly byte MaxValue = 8;
-        public static readonly byte MinValue = 1;
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(byte value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(sbyte value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(ushort value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(short value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(uint value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(int value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(ulong value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(long value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(float value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(double value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the <see cref="InnerByteBitPosition"/> struct with the given value.
-        /// <para/>
-        /// Value will be truncated to the MaxValue if it's larger or rised to the MinValue.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte From(decimal value)
-        {
-            if (value < MinValue)
-            {
-                return MinValue;
-            }
-            else
-            {
-                if (value > MaxValue)
-                {
-                    return MaxValue;
-                }
-            }
-            return (byte)value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte GetBitPos(byte value)
-        {
-            return (byte)(1 << (value - 1));
         }
     }
 }
