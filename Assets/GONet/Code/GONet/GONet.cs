@@ -210,11 +210,6 @@ namespace GONet
             EventBus.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
             EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
             EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
-
-            { // tests:
-                EventBus.Subscribe<IGONetEvent>(OnAnyEvent);
-                EventBus.Subscribe<ITransientEvent>(OnTransientEvent);
-            }
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(IGONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -259,21 +254,11 @@ namespace GONet
             }
         }
 
-        private static void OnTransientEvent(IGONetEventEnvelope<ITransientEvent> eventEnvelope)
-        {
-            GONetLog.Debug("pub/sub Transient");
-        }
-
         private static void OnPersistentEvent_KeepTrack(IGONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
             GONetLog.Debug("pub/sub Persistent");
 
             persistentEventsThisSession.Enqueue(eventEnvelope.Event);
-        }
-
-        private static void OnAnyEvent(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
-        {
-            GONetLog.Debug("pub/sub ANY");
         }
 
         private static void OnInstantiationEvent_Remote(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
