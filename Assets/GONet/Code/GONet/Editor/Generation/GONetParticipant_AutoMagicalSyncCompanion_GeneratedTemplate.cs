@@ -2564,7 +2564,7 @@ namespace GONet.Generation
             #line default
             #line hidden
             this.Write("\t\t\t}\r\n        }\r\n\r\n\t\tinternal override void UpdateLastKnownValues(GONetMain.SyncB" +
-                    "undleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)\r\n\t\t{\r\n");
+                    "undleUniqueGrouping onlyMatchIfUniqueGroupingMatches)\r\n\t\t{\r\n");
             
             #line 735 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 

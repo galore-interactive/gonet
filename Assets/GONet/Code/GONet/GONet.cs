@@ -270,11 +270,19 @@ namespace GONet
 
         private static void InitShouldSkipSyncSupport()
         {
-            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd] =
-                (monitoringSupport, index) => !monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd;
+            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd] = IsRotationNotSyncd;
 
-            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd] =
-                (monitoringSupport, index) => !monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd;
+            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd] = IsPositionNotSyncd;
+        }
+
+        private static bool IsRotationNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
+        {
+            return !monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd;
+        }
+
+        private static bool IsPositionNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
+        {
+            return !monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd;
         }
 
         static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)

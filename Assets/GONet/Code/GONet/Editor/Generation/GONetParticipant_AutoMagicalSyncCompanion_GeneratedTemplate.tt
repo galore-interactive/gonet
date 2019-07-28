@@ -730,7 +730,7 @@ namespace GONet.Generation
 			}
         }
 
-		internal override void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
+		internal override void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
 		{
 <#
 	iOverall = 0;

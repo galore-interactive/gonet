@@ -97,7 +97,7 @@ namespace GONet.Generation
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
         /// </summary>
-        internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
+        internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
             bool hasChange = false;
             for (int i = 0; i < valuesCount; ++i)
@@ -120,20 +120,13 @@ namespace GONet.Generation
             return valueChangeSupport.syncAttribute_ShouldSkipSync != null && valueChangeSupport.syncAttribute_ShouldSkipSync(valueChangeSupport, index);
         }
 
-        internal void OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
+        internal void OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
-            if (!onlyMatchIfUniqueGroupingMatches.HasValue)
+            for (int i = 0; i < valuesCount; ++i)
             {
-                Array.Clear(lastKnownValueChangesSinceLastCheck, 0, valuesCount);
-            }
-            else
-            {
-                for (int i = 0; i < valuesCount; ++i)
+                if (DoesMatchUniqueGrouping(valuesChangesSupport[i], onlyMatchIfUniqueGroupingMatches))
                 {
-                    if (DoesMatchUniqueGrouping(valuesChangesSupport[i], onlyMatchIfUniqueGroupingMatches))
-                    {
-                        lastKnownValueChangesSinceLastCheck[i] = false;
-                    }
+                    lastKnownValueChangesSinceLastCheck[i] = false;
                 }
             }
         }
@@ -182,9 +175,9 @@ namespace GONet.Generation
         /// </summary>
         internal abstract void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
 
-        internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default);
+        internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches);
 
-        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend, GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches = default)
+        internal void AppendListWithChangesSinceLastCheck(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches = default)
         {
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -197,11 +190,11 @@ namespace GONet.Generation
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping? onlyMatchIfUniqueGroupingMatches)
+        internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
-            return !onlyMatchIfUniqueGroupingMatches.HasValue ||
-                (onlyMatchIfUniqueGroupingMatches.Value.scheduleFrequency == valueChangeSupport.syncAttribute_SyncChangesEverySeconds &&
-                 onlyMatchIfUniqueGroupingMatches.Value.reliability == valueChangeSupport.syncAttribute_Reliability);
+            return 
+                onlyMatchIfUniqueGroupingMatches.scheduleFrequency == valueChangeSupport.syncAttribute_SyncChangesEverySeconds &&
+                onlyMatchIfUniqueGroupingMatches.reliability == valueChangeSupport.syncAttribute_Reliability;
         }
 
         internal void AppendListWithAllValues(List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend)
