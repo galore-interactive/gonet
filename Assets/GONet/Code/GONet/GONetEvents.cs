@@ -39,6 +39,11 @@ namespace GONet
     /// </summary>
     public partial interface IPersistentEvent : IGONetEvent { }
 
+    /// <summary>
+    /// Tack this on to any event type to ensure calls to <see cref="GONetEventBus.Publish{T}(T, uint?)"/> only publish locally (i.e., not sent across the network to anyone else)
+    /// </summary>
+    public interface ILocalOnlyPublish { }
+
     #endregion
 
     public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
@@ -180,4 +185,110 @@ namespace GONet
             FlagsNow = flagsNow;
         }
     }
+
+    /// <summary>
+    /// This represents that a sync value change has been processed.  Two major occassions:
+    /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
+    /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
+    /// 
+    /// Be aware, this class has some TODO FIXME object type BOXING GC
+    /// </summary>
+    [MessagePackObject]
+    public struct SyncValueChangeProcessedEvent : ITransientEvent, ILocalOnlyPublish
+    {
+        public enum ProcessedExplanation : byte
+        {
+            OutboundToOthers = 1,
+
+            InboundFromOther,
+
+            BlendingBetweenInboundValuesFromOther,
+        }
+
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1)]
+        public uint RelatedOwnerAuthorityId;
+
+        [Key(2)]
+        public uint GONetId;
+
+        [Key(3)]
+        public byte index;
+
+        /// <summary>
+        /// TODO FIXME object type BOXING GC
+        /// </summary>
+        [Key(4)]
+        public object valuePrevious;
+
+        /// <summary>
+        /// TODO FIXME object type BOXING GC
+        /// </summary>
+        [Key(5)]
+        public object valueNew;
+
+        [Key(6)]
+        public ProcessedExplanation Explanation;
+
+        /// <summary>
+        /// Be aware, this class has some TODO FIXME object type BOXING GC
+        /// </summary>
+        public SyncValueChangeProcessedEvent(ProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte index, object valuePrevious, object valueNew)
+        {
+            Explanation = explanation;
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            GONetId = gonetId;
+
+            this.index = index;
+            this.valuePrevious = valuePrevious;
+            this.valueNew = valueNew;
+        }
+    }
+
+    /*
+    /// <summary>
+    /// TODO probably want to consolidate...well, we did already
+    /// Be aware, this class has some TODO FIXME object type BOXING GC
+    /// </summary>
+    [MessagePackObject]
+    public struct SyncValueChangeProcessedFromOtherEvent : ITransientEvent, ILocalOnlyPublish
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1)]
+        public uint GONetId;
+
+        [Key(2)]
+        public byte index;
+
+        /// <summary>
+        /// TODO FIXME object type BOXING GC
+        /// </summary>
+        [Key(3)]
+        public object valuePrevious;
+
+        /// <summary>
+        /// TODO FIXME object type BOXING GC
+        /// </summary>
+        [Key(4)]
+        public object valueNew;
+
+        /// <summary>
+        /// Be aware, this class has some TODO FIXME object type BOXING GC
+        /// </summary>
+        public SyncValueChangeProcessedFromOtherEvent(long occurredAtElapsedTicks, uint gONetId, byte index, object valuePrevious, object valueNew)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            GONetId = gONetId;
+
+            this.index = index;
+            this.valuePrevious = valuePrevious;
+            this.valueNew = valueNew;
+        }
+    }
+    */
 }

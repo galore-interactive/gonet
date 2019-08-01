@@ -122,6 +122,21 @@ namespace GONet
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
+        /// <summary>
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread
+        /// </summary>
+        static readonly Dictionary<Thread, Queue<SyncValueChangeProcessedEvent>> syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap = new Dictionary<Thread, Queue<SyncValueChangeProcessedEvent>>(12);
+
+        /// <summary>
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
+        /// </summary>
+        static readonly Dictionary<Thread, ConcurrentQueue<SyncValueChangeProcessedEvent>> syncValueChanges_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, ConcurrentQueue<SyncValueChangeProcessedEvent>>(12);
+
+        /// <summary>
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
+        /// </summary>
+        static readonly Queue<SyncValueChangeProcessedEvent> syncValueChanges_ReceivedFromOtherQueue = new Queue<SyncValueChangeProcessedEvent>(100);
+
         internal static GONetClient _gonetClient;
         /// <summary>
         /// TODO FIXME make this private.....its internal temporary for testing
@@ -210,6 +225,12 @@ namespace GONet
             EventBus.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
             EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
             EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
+            EventBus.Subscribe<SyncValueChangeProcessedEvent>(OnSyncValueChangeProcessed_Persist_Local);
+        }
+
+        private static void OnSyncValueChangeProcessed_Persist_Local(IGONetEventEnvelope<SyncValueChangeProcessedEvent> eventEnvelope)
+        {
+            // TODO persist!
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(IGONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -231,6 +252,11 @@ namespace GONet
         /// </summary>
         private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
+            if (eventEnvelope.Event is ILocalOnlyPublish)
+            {
+                return;
+            }
+
             if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
             {
                 byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
@@ -501,6 +527,9 @@ namespace GONet
                 }
             }
 
+            PublishEvents_SyncValueChanges_SentToOthers();
+            PublishEvents_SyncValueChanges_ReceivedFromOthers();
+
             if (endOfLineSendThread == null)
             {
                 isRunning_endOfTheLineSend_Thread = true;
@@ -517,6 +546,49 @@ namespace GONet
             {
                 Client_SyncTimeWithServer_Initiate_IfAppropriate();
                 GONetClient?.Update();
+            }
+        }
+
+        private static void PublishEvents_SyncValueChanges_ReceivedFromOthers()
+        {
+            int count = syncValueChanges_ReceivedFromOtherQueue.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                var @event = syncValueChanges_ReceivedFromOtherQueue.Dequeue();
+                try
+                {
+                    EventBus.Publish(@event);
+                }
+                catch (Exception e)
+                {
+                    GONetLog.Error("Boo.  Publishing this sync value change event failed.  Error.Message: " + e.Message);
+                }
+            }
+        }
+
+        private static void PublishEvents_SyncValueChanges_SentToOthers()
+        {
+            var eventDictionaryEnumerator = syncValueChanges_SendToOthersQueue_ByThreadMap.GetEnumerator();
+            while (eventDictionaryEnumerator.MoveNext())
+            {
+                ConcurrentQueue<SyncValueChangeProcessedEvent> eventQueue = eventDictionaryEnumerator.Current.Value;
+                int count = eventQueue.Count;
+                SyncValueChangeProcessedEvent @event;
+                while (count > 0 && eventQueue.TryDequeue(out @event))
+                {
+                    try
+                    {
+                        EventBus.Publish(@event);
+                    }
+                    catch (Exception e)
+                    {
+                        GONetLog.Error("Boo.  Publishing this sync value change event failed.  Error.Message: " + e.Message);
+                    }
+                    finally
+                    {
+                        --count;
+                    }
+                }
             }
         }
 
@@ -1587,8 +1659,20 @@ namespace GONet
                 if (isSetupToRunInSeparateThread)
                 {
                     thread = new Thread(ContinuallyProcess_NotMainThread);
+
+                    syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<SyncValueChangeProcessedEvent>(100); // we're on main thread, safe to deal with regular dict here
+                    syncValueChanges_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<SyncValueChangeProcessedEvent>(); // we're on main thread, safe to deal with regular dict here
+
                     isThreadRunning = true;
                     thread.Start();
+                }
+                else
+                {
+                    if (!syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
+                    {
+                        syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<SyncValueChangeProcessedEvent>(100); // we're on main thread, safe to deal with regular dict here
+                        syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new ConcurrentQueue<SyncValueChangeProcessedEvent>(); // we're on main thread, safe to deal with regular dict here
+                    }
                 }
             }
 
@@ -1668,8 +1752,11 @@ namespace GONet
                         gonetServer?.ForEachClient((clientConnection) =>
                         {
                             byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId, myTicks);
-                            SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
-                            myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                            if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                            {
+                                SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
+                                myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                            }
                         });
                     }
                     else
@@ -1679,9 +1766,27 @@ namespace GONet
                             throw new Exception("Magoo.....we need this set before doing the following:");
                         }
                         byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
-                        SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, uniqueGrouping_channelId);
-                        myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
+                        if (changesSerialized != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                        {
+                            SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, uniqueGrouping_channelId);
+                            myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
+                        }
                     }
+
+                    PublishEvents_SyncValueChangesSentToOthers_ASAP();
+                }
+            }
+            /// <summary>
+            /// Promote Local Thread Events To Main Thread For Publishing since calling <see cref="GONetEventBus.Publish{T}(T, uint?)"/> is not to be called from multiple threads!
+            /// </summary>
+            private void PublishEvents_SyncValueChangesSentToOthers_ASAP()
+            {
+                Queue<SyncValueChangeProcessedEvent> queueAwaiting = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                ConcurrentQueue<SyncValueChangeProcessedEvent> queueSend = syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                while (queueAwaiting.Count > 0)
+                {
+                    var @event = queueAwaiting.Dequeue();
+                    queueSend.Enqueue(@event);
                 }
             }
 
@@ -1740,6 +1845,8 @@ namespace GONet
         static readonly Dictionary<uint, Type> messageTypeByMessageIDMap = new Dictionary<uint, Type>(4096);
         static uint nextMessageID;
 
+        private static readonly byte[] EMPTY_CHANGES_BUNDLE = null;
+
         private static void InitMessageTypeToMessageIDMap()
         {
             try
@@ -1764,6 +1871,7 @@ namespace GONet
         /// <summary>
         /// PRE: <paramref name="changes"/> size is greater than 0
         /// PRE: <paramref name="filterUsingOwnerAuthorityId"/> is not <see cref="OwnerAuthorityId_Unset"/> otherwise an exception is thrown
+        /// POST: return a serialized packet with only the stuff that excludes <paramref name="filterUsingOwnerAuthorityId"/> as to not send to them (i.e., likely because they are the one who owns this data in the first place and already know this change occurred!)
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <paramref name="byteArrayPool"/>
         /// </summary>
         private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
@@ -1782,15 +1890,22 @@ namespace GONet
                     bitStream.WriteLong(elapsedTicksAtCapture);
                 }
 
-                SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
+                int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
+                if (changesInBundleCount > 0)
+                {
+                    bitStream.WriteCurrentPartialByte();
 
-                bitStream.WriteCurrentPartialByte();
+                    bytesUsedCount = bitStream.Length_WrittenBytes;
+                    byte[] bytes = byteArrayPool.Borrow(bytesUsedCount);
+                    Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
 
-                bytesUsedCount = bitStream.Length_WrittenBytes;
-                byte[] bytes = byteArrayPool.Borrow(bytesUsedCount);
-                Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                return bytes;
+                    return bytes;
+                }
+                else
+                {
+                    bytesUsedCount = 0;
+                    return EMPTY_CHANGES_BUNDLE;
+                }
             }
         }
 
@@ -1829,7 +1944,10 @@ namespace GONet
             }
         }
 
-        private static void SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
+        /// <summary>
+        /// Returns the number of changes actually included in/added to the <paramref name="bitStream_headerAlreadyWritten"/> AFTER any filtering this method does (e.g., checking <paramref name="filterUsingOwnerAuthorityId"/>).
+        /// </summary>
+        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
         {
             int countTotal = changes.Count;
             int countMinus1 = countTotal - 1;
@@ -1855,9 +1973,15 @@ namespace GONet
                 ++countFiltered;
             }
 
+            if (countFiltered == 0)
+            {
+                return 0; // <<<<<<<<<<<============================================================================  bail out early if there is nothing to add to bundle!!!!
+            }
+
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
             //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
+            Queue<SyncValueChangeProcessedEvent> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
             for (int i = 0; i < countTotal; ++i)
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
@@ -1865,6 +1989,8 @@ namespace GONet
                 {
                     continue; // skip this guy (i.e., apply the "filter")
                 }
+
+                syncEventQueue.Enqueue(new SyncValueChangeProcessedEvent(SyncValueChangeProcessedEvent.ProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion.gonetParticipant.GONetId, change.index, change.lastKnownValue_previous, change.lastKnownValue)); // TODO if lastKnownValue is not working, try: change.syncCompanion.GetAutoMagicalSyncValue(change.index));
 
                 bool canASSumeNetId = change.index == GONetParticipant.ASSumed_GONetId_INDEX;
                 bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
@@ -1884,6 +2010,8 @@ namespace GONet
                     change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
                 }
             }
+
+            return countFiltered;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1939,6 +2067,9 @@ namespace GONet
 
                     byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+
+                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(new SyncValueChangeProcessedEvent(SyncValueChangeProcessedEvent.ProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, gonetId, index, changedValue.lastKnownValue_previous, changedValue.lastKnownValue)); // TODO FIXME these value are NOT correct, because those last known values are not updated yet....we need to return the value from syncCompanion.DeserializeInitSingle and we will be fine!
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));

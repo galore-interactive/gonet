@@ -77,10 +77,28 @@ namespace GONet
         readonly ConcurrentDictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_SpecificOnly = new ConcurrentDictionary<Type, List<EventHandlerAndFilterer>>();
         readonly ConcurrentDictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_IncludingChildren = new ConcurrentDictionary<Type, List<EventHandlerAndFilterer>>();
 
+        [Flags]
+        public enum SyncEventValueChangeReasonFlags : byte
+        {
+            Remote_ReceivedFromOwner = 1 << 0,
+
+            Remote_BlendingBetweenValuesReceivedFromOwner = 1 << 1,
+
+            Local_
+        }
+
+        public bool ShouldPublishSyncEvent_NewValueReceivedFromOwner = false;
+        public bool ShouldPublishSyncEvent_ValueBlendingBetweenReceivedValues;
+
         private GONetEventBus() { }
 
+        /// <summary>
+        /// IMPORTANT: Only call this from the main Unity thread!
+        /// </summary>
         public void Publish<T>(T @event, uint? remoteSourceAuthorityId = default) where T : IGONetEvent
         {
+            // TODO since/If this method can only be called and a proper result ensue when on the main unity thread...check/prove here
+
             List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
             if (handlersForType != null)
             {
