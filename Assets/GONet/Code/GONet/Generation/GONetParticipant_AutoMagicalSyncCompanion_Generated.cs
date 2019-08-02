@@ -231,4 +231,22 @@ namespace GONet.Generation
     {
         internal BobWad() { }
     }
+
+    internal static class GONet_SyncValueChangeProcessedEvent_Generated_Factory
+    {
+        internal delegate SyncValueChangeProcessedEvent GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index);
+        internal static GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate theRealness = delegate (SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index)
+        {
+            throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
+        };
+        /// <summary>
+        /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.
+        /// </summary>
+        private static readonly BobWad theBobber = new BobWad();
+
+        internal static SyncValueChangeProcessedEvent CreateInstance(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
+        {
+            return theRealness(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion, syncMemberIndex);
+        }
+    }
 }

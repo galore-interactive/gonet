@@ -194,7 +194,7 @@ namespace GONet
     /// Be aware, this class has some TODO FIXME object type BOXING GC
     /// </summary>
     [MessagePackObject]
-    public struct SyncValueChangeProcessedEvent : ITransientEvent, ILocalOnlyPublish
+    public class SyncValueChangeProcessedEvent : ITransientEvent, ILocalOnlyPublish
     {
         public enum ProcessedExplanation : byte
         {

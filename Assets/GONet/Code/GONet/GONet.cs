@@ -1990,7 +1990,7 @@ namespace GONet
                     continue; // skip this guy (i.e., apply the "filter")
                 }
 
-                syncEventQueue.Enqueue(new SyncValueChangeProcessedEvent(SyncValueChangeProcessedEvent.ProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion.gonetParticipant.GONetId, change.index, change.lastKnownValue_previous, change.lastKnownValue)); // TODO if lastKnownValue is not working, try: change.syncCompanion.GetAutoMagicalSyncValue(change.index));
+                syncEventQueue.Enqueue(GONet_SyncValueChangeProcessedEvent_Generated_Factory.CreateInstance(SyncValueChangeProcessedEvent.ProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
 
                 bool canASSumeNetId = change.index == GONetParticipant.ASSumed_GONetId_INDEX;
                 bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
@@ -2069,7 +2069,8 @@ namespace GONet
                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
                     AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
-                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(new SyncValueChangeProcessedEvent(SyncValueChangeProcessedEvent.ProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, gonetId, index, changedValue.lastKnownValue_previous, changedValue.lastKnownValue)); // TODO FIXME these value are NOT correct, because those last known values are not updated yet....we need to return the value from syncCompanion.DeserializeInitSingle and we will be fine!
+
+                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncValueChangeProcessedEvent_Generated_Factory.CreateInstance(SyncValueChangeProcessedEvent.ProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));

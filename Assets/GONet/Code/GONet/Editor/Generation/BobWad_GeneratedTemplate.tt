@@ -80,6 +80,39 @@ namespace GONet
         }
     }
 #>	public partial interface IPersistentEvent : IGONetEvent { }
+
+<#
+	foreach (var typeKVP in uniqueCombos)
+    {
+		foreach (var memberKVP in typeKVP.Value)
+        {
+			const string UNDIE = "_";
+			const string PER = ".";
+			const string SYNC_EV = "_SyncEvent";
+			string shortType = typeKVP.Key.Contains(PER) ? typeKVP.Key.Substring(typeKVP.Key.LastIndexOf(PER) + 1) : typeKVP.Key;
+			string className = string.Concat(shortType, UNDIE, memberKVP.Key, SYNC_EV);
+#>
+    [MessagePack.MessagePackObject]
+    public class <#=className#> : SyncValueChangeProcessedEvent
+    {
+		[MessagePack.Key(7)]
+		public <#=memberKVP.Value#> valuePrevious2;
+        
+		[MessagePack.Key(8)]
+        public <#=memberKVP.Value#> valueNew2;
+
+		public <#=className#>(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte index, <#=memberKVP.Value#> valuePrevious, <#=memberKVP.Value#> valueNew)
+			: base(explanation, occurredAtElapsedTicks, relatedOwnerAuthorityId, gonetId, index, valuePrevious, valueNew)
+		{
+			this.valuePrevious2 = valuePrevious;
+			this.valueNew2 = valueNew;
+		}
+    }
+
+<#
+        }
+    }
+#>
 }
 
 namespace GONet.Generation
@@ -89,6 +122,7 @@ namespace GONet.Generation
 		static BobWad()
 		{
 			GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness;
+			GONet_SyncValueChangeProcessedEvent_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
 		}
 
 		static internal GONetParticipant_AutoMagicalSyncCompanion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)
@@ -106,5 +140,47 @@ namespace GONet.Generation
 
 			return null;
 		}
+
+		internal static SyncValueChangeProcessedEvent hahaThisIsTrulyTheRealness_Events(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
+        {
+            switch (syncCompanion.gonetParticipant.codeGenerationId)
+            {
+<#
+	for (byte iCodeGenerationId = 1; iCodeGenerationId <= maxCodeGenerationId; ++iCodeGenerationId)
+    {
+#>
+				case <#=iCodeGenerationId#>:
+					{
+						GONetParticipant_AutoMagicalSyncCompanion_Generated_<#=iCodeGenerationId#> companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_<#=iCodeGenerationId#>)syncCompanion;
+                        switch (syncMemberIndex)
+                        {
+
+<#
+							int iOverall = 0;
+							foreach (var uniqueSnap in allUniqueSnapsByCodeGenerationId[iCodeGenerationId])
+                            {
+								foreach (var single in uniqueSnap.autoSyncMembers)
+                                {
+#>
+                            case <#=iOverall#>:
+								{
+									var valueNew = companion.<#=uniqueSnap.componentTypeName#>.<#=single.memberName#>;
+									return new <#=uniqueSnap.componentTypeName#>_<#=single.memberName#>_SyncEvent(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, syncMemberIndex, (<#=single.memberTypeFullName#>)companion.valuesChangesSupport[syncMemberIndex].lastKnownValue, valueNew);
+								}
+<#
+									++iOverall;
+								}
+                            }
+#>
+						
+						}
+					}
+					break;
+
+<#	}#>
+            }
+
+            return default;
+        }
 	}
 }

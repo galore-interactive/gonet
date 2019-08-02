@@ -13,16 +13,17 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
-using Assets.Code.GONet.Editor.Generation;
+using Assets.GONet.Code.GONet.Editor.Generation;
+using System.Collections.Generic;
 using System.IO;
 
 namespace GONet.Generation
 {
     internal static class BobWad_Generated_Generator
     {
-        internal static void GenerateClass(byte maxCodeGenerationId)
+        internal static void GenerateClass(byte maxCodeGenerationId, List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence)
         {
-            var t4Template = new BobWad_GeneratedTemplate(maxCodeGenerationId);
+            var t4Template = new BobWad_GeneratedTemplate(maxCodeGenerationId, allUniqueSnapsForPersistence);
             string generatedClassText = t4Template.TransformText();
 
             if (!Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))

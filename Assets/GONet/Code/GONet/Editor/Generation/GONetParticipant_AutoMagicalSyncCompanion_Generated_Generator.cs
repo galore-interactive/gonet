@@ -13,7 +13,6 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
-using Assets.Code.GONet.Editor.Generation;
 using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
 using GONet.Utils;
@@ -345,7 +344,7 @@ namespace GONet.Generation
                 }
 
                 byte ASSumedMaxCodeGenerationId = (byte)count;
-                BobWad_Generated_Generator.GenerateClass(ASSumedMaxCodeGenerationId);
+                BobWad_Generated_Generator.GenerateClass(ASSumedMaxCodeGenerationId, allUniqueSnapsForPersistence);
 
                 AssetDatabase.SaveAssets(); // since we are generating the class that is the real thing of value here, ensure we also save the asset to match current state
                 AssetDatabase.Refresh(); // get the Unity editor to recognize any new code just added and recompile it
