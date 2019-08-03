@@ -97,3 +97,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 627d57d90dfe8444abe3b2b34dd4e617, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  valueBlendingBufferLeadTimeMilliseconds: 250

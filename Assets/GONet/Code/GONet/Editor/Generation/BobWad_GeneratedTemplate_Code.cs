@@ -14,7 +14,9 @@
  */
 
 using GONet.Generation;
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Assets.GONet.Code.GONet.Editor.Generation
 {
@@ -26,7 +28,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
         /// <summary>
         /// memberOwnerTypeName => [memberName => memberTypeName]
         /// </summary>
-        private readonly Dictionary<string, Dictionary<string, string>> uniqueCombos = new Dictionary<string, Dictionary<string, string>>();
+        private readonly Dictionary<string, Dictionary<string, ValueTuple<string, AnimatorControllerParameterGenerationInfo>>> uniqueCombos = new Dictionary<string, Dictionary<string, ValueTuple<string, AnimatorControllerParameterGenerationInfo>>>();
 
         private readonly Dictionary<byte, GONetParticipant_ComponentsWithAutoSyncMembers_Single[]> allUniqueSnapsByCodeGenerationId = new Dictionary<byte, GONetParticipant_ComponentsWithAutoSyncMembers_Single[]>();
 
@@ -45,19 +47,49 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
                     foreach (var ll in l.ComponentMemberNames_By_ComponentTypeFullName)
                     {
-                        Dictionary<string, string> componentTypeNamesMap;
-                        if (!uniqueCombos.TryGetValue(ll.componentTypeFullName, out componentTypeNamesMap))
+                        Dictionary<string, ValueTuple<string, AnimatorControllerParameterGenerationInfo>> componentTypeNamesMap;
+                        string componentTypeName = ll.componentTypeFullName;
+                        if (ll.componentTypeFullName == typeof(Animator).FullName)
                         {
-                            uniqueCombos[ll.componentTypeFullName] = componentTypeNamesMap = new Dictionary<string, string>();
+                            componentTypeName += ll.autoSyncMembers[0].animatorControllerName; // NOTE: just "randomly" grabbling the first one and ASSuming they are all the same, which is a good assumption at the time of writing!
+                        }
+                        if (!uniqueCombos.TryGetValue(componentTypeName, out componentTypeNamesMap))
+                        {
+                            uniqueCombos[componentTypeName] = componentTypeNamesMap = new Dictionary<string, ValueTuple<string, AnimatorControllerParameterGenerationInfo>>();
                         }
 
                         foreach (var lll in ll.autoSyncMembers)
                         {
-                            componentTypeNamesMap[lll.memberName] = lll.memberTypeFullName;
+                            string memberTypeFullName = lll.animatorControllerParameterId == 0 ? lll.memberTypeFullName : lll.animatorControllerParameterTypeFullName;
+
+                            ValueTuple<string, AnimatorControllerParameterGenerationInfo> memberTuple = 
+                                ValueTuple.Create(
+                                    memberTypeFullName,
+                                    lll.animatorControllerParameterId == 0 ? null : new AnimatorControllerParameterGenerationInfo(lll.animatorControllerName, lll.animatorControllerParameterName));
+
+                            string memberName = lll.memberName;
+                            if (memberTuple.Item2 != null)
+                            {
+                                const string UNDIE = "_";
+                                memberName += string.Concat(UNDIE, memberTuple.Item2.ControllerParameterName);
+                            }
+                            componentTypeNamesMap[memberName] = memberTuple;
                         }
                     }
                 }
             }
+        }
+    }
+
+    public class AnimatorControllerParameterGenerationInfo
+    {
+        public string ControllerName;
+        public string ControllerParameterName;
+
+        public AnimatorControllerParameterGenerationInfo(string controllerName, string controllerParameterName)
+        {
+            ControllerName = controllerName;
+            ControllerParameterName = controllerParameterName;
         }
     }
 }

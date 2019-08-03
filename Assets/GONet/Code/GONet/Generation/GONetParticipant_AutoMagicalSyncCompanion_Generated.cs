@@ -232,10 +232,10 @@ namespace GONet.Generation
         internal BobWad() { }
     }
 
-    internal static class GONet_SyncValueChangeProcessedEvent_Generated_Factory
+    internal static class GONet_SyncEvent_ValueChangeProcessed_Generated_Factory
     {
-        internal delegate SyncValueChangeProcessedEvent GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index);
-        internal static GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate theRealness = delegate (SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index)
+        internal delegate SyncEvent_ValueChangeProcessed GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate(SyncEvent_ValueChangeProcessed.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index);
+        internal static GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate theRealness = delegate (SyncEvent_ValueChangeProcessed.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte index)
         {
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
@@ -244,7 +244,7 @@ namespace GONet.Generation
         /// </summary>
         private static readonly BobWad theBobber = new BobWad();
 
-        internal static SyncValueChangeProcessedEvent CreateInstance(SyncValueChangeProcessedEvent.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
+        internal static SyncEvent_ValueChangeProcessed CreateInstance(SyncEvent_ValueChangeProcessed.ProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
             return theRealness(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion, syncMemberIndex);
         }

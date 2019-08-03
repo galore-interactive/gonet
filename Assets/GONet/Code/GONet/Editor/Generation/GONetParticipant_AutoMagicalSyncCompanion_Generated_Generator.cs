@@ -448,6 +448,10 @@ namespace GONet.Generation
         public string animatorControllerParameterMethodSuffix;
         [Key(5)]
         public string animatorControllerParameterTypeFullName;
+        [Key(6)]
+        public string animatorControllerName;
+        [Key(7)]
+        public string animatorControllerParameterName;
 
         [IgnoreMember]
         public GONetAutoMagicalSyncAttribute attribute;
@@ -476,11 +480,13 @@ namespace GONet.Generation
             this.attribute = attribute;
         }
 
-        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember, GONetAutoMagicalSyncAttribute attribute, int animatorControllerParameterId, string animatorControllerParameterMethodSuffix, string animatorControllerParameterTypeFullName) : this(syncMember, attribute)
+        public GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(MemberInfo syncMember, GONetAutoMagicalSyncAttribute attribute, int animatorControllerParameterId, string animatorControllerParameterMethodSuffix, string animatorControllerParameterTypeFullName, string animatorControllerName, string animatorControllerParameterName) : this(syncMember, attribute)
         {
             this.animatorControllerParameterId = animatorControllerParameterId;
             this.animatorControllerParameterMethodSuffix = animatorControllerParameterMethodSuffix;
             this.animatorControllerParameterTypeFullName = animatorControllerParameterTypeFullName;
+            this.animatorControllerName = animatorControllerName;
+            this.animatorControllerParameterName = animatorControllerParameterName;
         }
 
         internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
@@ -801,7 +807,7 @@ namespace GONet.Generation
                                     break;
                             }
 
-                            component_autoSyncMembers_animator_parameter.Add(new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(animator_parameters, attribute_animator_parameters, animatorControllerParameter.nameHash, methodSuffix, typeFullName));
+                            component_autoSyncMembers_animator_parameter.Add(new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(animator_parameters, attribute_animator_parameters, animatorControllerParameter.nameHash, methodSuffix, typeFullName, animator.runtimeAnimatorController.name, animatorControllerParameter.name));
                         }
                     }
 

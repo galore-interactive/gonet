@@ -194,7 +194,7 @@ namespace GONet
     /// Be aware, this class has some TODO FIXME object type BOXING GC
     /// </summary>
     [MessagePackObject]
-    public class SyncValueChangeProcessedEvent : ITransientEvent, ILocalOnlyPublish
+    public class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish
     {
         public enum ProcessedExplanation : byte
         {
@@ -235,7 +235,7 @@ namespace GONet
         /// <summary>
         /// Be aware, this class has some TODO FIXME object type BOXING GC
         /// </summary>
-        public SyncValueChangeProcessedEvent(ProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte index, object valuePrevious, object valueNew)
+        public SyncEvent_ValueChangeProcessed(ProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte index, object valuePrevious, object valueNew)
         {
             Explanation = explanation;
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
