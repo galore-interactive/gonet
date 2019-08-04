@@ -125,17 +125,17 @@ namespace GONet
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread
         /// </summary>
-        static readonly Dictionary<Thread, Queue<SyncEvent_ValueChangeProcessed>> syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap = new Dictionary<Thread, Queue<SyncEvent_ValueChangeProcessed>>(12);
+        static readonly Dictionary<Thread, Queue<ISyncEvent_ValueChangeProcessed>> syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap = new Dictionary<Thread, Queue<ISyncEvent_ValueChangeProcessed>>(12);
 
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
         /// </summary>
-        static readonly Dictionary<Thread, ConcurrentQueue<SyncEvent_ValueChangeProcessed>> syncValueChanges_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, ConcurrentQueue<SyncEvent_ValueChangeProcessed>>(12);
+        static readonly Dictionary<Thread, ConcurrentQueue<ISyncEvent_ValueChangeProcessed>> syncValueChanges_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, ConcurrentQueue<ISyncEvent_ValueChangeProcessed>>(12);
 
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
         /// </summary>
-        static readonly Queue<SyncEvent_ValueChangeProcessed> syncValueChanges_ReceivedFromOtherQueue = new Queue<SyncEvent_ValueChangeProcessed>(100);
+        static readonly Queue<ISyncEvent_ValueChangeProcessed> syncValueChanges_ReceivedFromOtherQueue = new Queue<ISyncEvent_ValueChangeProcessed>(100);
 
         internal static GONetClient _gonetClient;
         /// <summary>
@@ -225,10 +225,10 @@ namespace GONet
             EventBus.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
             EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
             EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
-            EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
+            EventBus.Subscribe<ISyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
         }
 
-        private static void OnSyncValueChangeProcessed_Persist_Local(IGONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+        private static void OnSyncValueChangeProcessed_Persist_Local(IGONetEventEnvelope<ISyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             // TODO persist!
         }
@@ -571,9 +571,9 @@ namespace GONet
             var eventDictionaryEnumerator = syncValueChanges_SendToOthersQueue_ByThreadMap.GetEnumerator();
             while (eventDictionaryEnumerator.MoveNext())
             {
-                ConcurrentQueue<SyncEvent_ValueChangeProcessed> eventQueue = eventDictionaryEnumerator.Current.Value;
+                ConcurrentQueue<ISyncEvent_ValueChangeProcessed> eventQueue = eventDictionaryEnumerator.Current.Value;
                 int count = eventQueue.Count;
-                SyncEvent_ValueChangeProcessed @event;
+                ISyncEvent_ValueChangeProcessed @event;
                 while (count > 0 && eventQueue.TryDequeue(out @event))
                 {
                     try
@@ -1660,8 +1660,8 @@ namespace GONet
                 {
                     thread = new Thread(ContinuallyProcess_NotMainThread);
 
-                    syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
-                    syncValueChanges_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
+                    syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<ISyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
+                    syncValueChanges_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<ISyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
 
                     isThreadRunning = true;
                     thread.Start();
@@ -1670,8 +1670,8 @@ namespace GONet
                 {
                     if (!syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
                     {
-                        syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
-                        syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
+                        syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<ISyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
+                        syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new ConcurrentQueue<ISyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
                     }
                 }
             }
@@ -1781,8 +1781,8 @@ namespace GONet
             /// </summary>
             private void PublishEvents_SyncValueChangesSentToOthers_ASAP()
             {
-                Queue<SyncEvent_ValueChangeProcessed> queueAwaiting = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
-                ConcurrentQueue<SyncEvent_ValueChangeProcessed> queueSend = syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                Queue<ISyncEvent_ValueChangeProcessed> queueAwaiting = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                ConcurrentQueue<ISyncEvent_ValueChangeProcessed> queueSend = syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
                 while (queueAwaiting.Count > 0)
                 {
                     var @event = queueAwaiting.Dequeue();
@@ -1981,7 +1981,7 @@ namespace GONet
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
             //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
-            Queue<SyncEvent_ValueChangeProcessed> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+            Queue<ISyncEvent_ValueChangeProcessed> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
             for (int i = 0; i < countTotal; ++i)
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
@@ -1990,7 +1990,7 @@ namespace GONet
                     continue; // skip this guy (i.e., apply the "filter")
                 }
 
-                syncEventQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessed.ProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
+                syncEventQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
 
                 bool canASSumeNetId = change.index == GONetParticipant.ASSumed_GONetId_INDEX;
                 bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
@@ -2070,7 +2070,7 @@ namespace GONet
 
                     AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
 
-                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessed.ProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));
