@@ -116,7 +116,7 @@ namespace GONet
             {
                 gonetId = value;
                 GONetMain.gonetParticipantByGONetIdMap[value] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
-                GONetLog.Info("slamile...gonetId: " + gonetId);
+                //GONetLog.Info("slamile...gonetId: " + gonetId);
             }
         }
 
@@ -162,7 +162,7 @@ namespace GONet
         public static event EditorOnlyDelegate EditorOnlyAwake;
         private void Awake()
         {
-            GONetLog.Debug("Awake....instanceID: " + GetInstanceID());
+            //GONetLog.Debug("Awake....instanceID: " + GetInstanceID());
             EditorOnlyAwake?.Invoke(this);
         }
 

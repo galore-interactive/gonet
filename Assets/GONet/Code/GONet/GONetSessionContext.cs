@@ -26,7 +26,7 @@ namespace GONet
     [DisallowMultipleComponent, RequireComponent(typeof(GONetParticipant))]
     public class GONetSessionContext : MonoBehaviour
     {
-        private const string WORKAROUND = "Awake....side effect of getting GONetLog to do static initialization inside the Unity main thread...or else!";
+        private const string WORKAROUND = "GONet logging entry point.  Please do not comment out the log statement using this.  This is a side effect of getting GONetLog to do static initialization inside the Unity main thread...or else!";
 
         private void Awake()
         {

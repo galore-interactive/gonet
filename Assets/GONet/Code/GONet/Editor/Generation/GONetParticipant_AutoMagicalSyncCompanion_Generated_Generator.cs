@@ -141,14 +141,14 @@ namespace GONet.Generation
             bool canASSume_GoingFrom_Editer_To_Play = !EditorApplication.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode; // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
             if (canASSume_GoingFrom_Editer_To_Play)
             {
-                GONetLog.Debug("[DREETS] entering play mode...not there yet, but about to be....about to generate as that needs to happen before playing!");
+                //GONetLog.Debug("[DREETS] entering play mode...not there yet, but about to be....about to generate as that needs to happen before playing!");
                 DoAllTheGenerationStuffs();
             }
         }
 
         private static void EditorSceneManager_sceneSaved(Scene scene)
         {
-            GONetLog.Debug("[DREETS] saved scene: " + scene.name);
+            //GONetLog.Debug("[DREETS] saved scene: " + scene.name);
             DoAllTheGenerationStuffs();
         }
 
@@ -170,13 +170,13 @@ namespace GONet.Generation
 
         private static void OnGONetParticipantPrefabCreated_Editor(GONetParticipant gonetParticipant_onPrefab)
         {
-            GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** created.");
+            //GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** created.");
             gonetParticipants_prefabsCreatedSinceLastGeneratorRun.Add(gonetParticipant_onPrefab);
         }
 
         private static void OnGONetParticipantPrefabDeleted_Editor(GONetParticipant gonetParticipant_onPrefab)
         {
-            GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** deleted.");
+            //GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** deleted.");
         }
 
         private static void GONetParticipant_EditorOnlyDefaultContructor(GONetParticipant gonetParticipant)
@@ -199,22 +199,22 @@ namespace GONet.Generation
         {
             if (IsInstantiationOfPrefab(gonetParticipant))
             {
-                GONetLog.Debug("[DREETS] *********PREFAB*********** GONetParticipant straight been woke!");
+                //GONetLog.Debug("[DREETS] *********PREFAB*********** GONetParticipant straight been woke!");
             }
             else
             {
-                GONetLog.Debug("[DREETS] woke!");
+                //GONetLog.Debug("[DREETS] woke!");
             }
         }
 
         private static void GONetParticipant_EditorOnlyReset(GONetParticipant gonetParticipant)
         {
-            GONetLog.Debug("[DREETS] added GONetParticipant");
+            //GONetLog.Debug("[DREETS] added GONetParticipant");
         }
 
         private static void GONetParticipant_EditorOnlyOnDestroy(GONetParticipant gonetParticipant)
         {
-            GONetLog.Debug("[DREETS] ***DESTROYED*** GONetParticipant....");
+            //GONetLog.Debug("[DREETS] ***DESTROYED*** GONetParticipant....");
         }
 
         [DidReloadScripts]
