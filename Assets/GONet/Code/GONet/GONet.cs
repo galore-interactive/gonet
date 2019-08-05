@@ -51,7 +51,7 @@ namespace GONet
         public static GONetSessionContext GlobalSessionContext
         {
             get { return globalSessionContext; }
-            internal set
+            private set
             {
                 globalSessionContext = value;
                 GlobalSessionContext_Participant = (object)globalSessionContext == null ? null : globalSessionContext.gameObject.GetComponent<GONetParticipant>();
@@ -72,6 +72,15 @@ namespace GONet
 
                 // TODO FIXME need to update the connection associated with OwnerAuthorityId
             }
+        }
+
+        internal static void InitOnUnityMainThread(GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
+        {
+            IsUnityApplicationEditor = Application.isEditor;
+            mainUnityThread = Thread.CurrentThread;
+            GlobalSessionContext = gONetSessionContext;
+            SetValueBlendingBufferLeadTimeFromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
+            InitEventSubscriptions();
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
@@ -118,7 +127,11 @@ namespace GONet
 
         public static GONetEventBus EventBus => GONetEventBus.Instance;
 
-        public static bool IsUnityApplicationEditor { get; internal set; }  = false;
+        public const string REQUIRED_CALL_UNITY_MAIN_THREAD = "Not allowed to call this from any other thread than the main Unity thread.";
+        private static Thread mainUnityThread;
+        public static bool IsUnityMainThread => mainUnityThread == Thread.CurrentThread;
+
+        public static bool IsUnityApplicationEditor { get; private set; }  = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
@@ -209,7 +222,6 @@ namespace GONet
 
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
-            InitEventSubscriptions();
 
             const string DATABASE_PATH_RELATIVE = AutoMagicalSqliteDatabase.CONNECTION_STRING_FILE_URI_PREFIX + "database/";
             const string DATA_SOURCE_SOLO = "Data Source=";
@@ -619,7 +631,7 @@ namespace GONet
         /// <summary>
         /// 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
         /// </summary>
-        internal static void SetValueBlendingBufferLeadTimeFromMilliseconds(int valueBlendingBufferLeadTimeMilliseconds)
+        private static void SetValueBlendingBufferLeadTimeFromMilliseconds(int valueBlendingBufferLeadTimeMilliseconds)
         {
             TimeSpan timeSpan = TimeSpan.FromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
             valueBlendingBufferLeadSeconds = (float)timeSpan.TotalSeconds;

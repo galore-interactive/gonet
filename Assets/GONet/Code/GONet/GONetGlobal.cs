@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -43,9 +44,7 @@ namespace GONet
         {
             SceneManager.sceneLoaded += OnSceneLoaded;
 
-            GONetMain.IsUnityApplicationEditor = Application.isEditor;
-            GONetMain.GlobalSessionContext = gameObject.GetComponent<GONetSessionContext>();
-            GONetMain.SetValueBlendingBufferLeadTimeFromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
+            GONetMain.InitOnUnityMainThread(gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
         }

@@ -15,8 +15,8 @@
 
 using System;
 using System.Linq;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using GONet.Utils;
 
 namespace GONet
@@ -35,15 +35,6 @@ namespace GONet
     public interface IGONetEventEnvelope<T> : IGONetEventEnvelope
     {
         new T Event { get; set; }
-    }
-
-    public struct GONetEventEnvelope : IGONetEventEnvelope
-    {
-        public uint SourceAuthorityId { get; set; }
-
-        public bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
-
-        public IGONetEvent Event { get; set; }
     }
 
     public struct GONetEventEnvelope<T> : IGONetEventEnvelope<T> where T : IGONetEvent
@@ -65,7 +56,9 @@ namespace GONet
     #endregion
 
     /// <summary>
-    /// For convenience, you can get access to the/an instance of this class (i.e., <see cref="GONetEventBus.Instance"/>) via <see cref="GONetMain.EventBus"/>.
+    /// <para>Main class in GONet that provides publish/subscribe model for events (both GONet types and user created custom types).</para>
+    /// <para>The GONet event architecture supports the out-of-the-box feature of Record+Replay.</para>
+    /// <para>For convenience, you can get access to the/an instance of this class (i.e., <see cref="GONetEventBus.Instance"/>) via <see cref="GONetMain.EventBus"/>.</para>
     /// </summary>
     public sealed class GONetEventBus
     {
@@ -74,21 +67,8 @@ namespace GONet
         public delegate void HandleEventDelegate<T>(IGONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
         public delegate bool EventFilterDelegate<T>(IGONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
 
-        readonly ConcurrentDictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_SpecificOnly = new ConcurrentDictionary<Type, List<EventHandlerAndFilterer>>();
-        readonly ConcurrentDictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_IncludingChildren = new ConcurrentDictionary<Type, List<EventHandlerAndFilterer>>();
-
-        [Flags]
-        public enum SyncEventValueChangeReasonFlags : byte
-        {
-            Remote_ReceivedFromOwner = 1 << 0,
-
-            Remote_BlendingBetweenValuesReceivedFromOwner = 1 << 1,
-
-            Local_
-        }
-
-        public bool ShouldPublishSyncEvent_NewValueReceivedFromOwner = false;
-        public bool ShouldPublishSyncEvent_ValueBlendingBetweenReceivedValues;
+        readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_SpecificOnly = new Dictionary<Type, List<EventHandlerAndFilterer>>();
+        readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_IncludingChildren = new Dictionary<Type, List<EventHandlerAndFilterer>>();
 
         private GONetEventBus() { }
 
@@ -97,7 +77,10 @@ namespace GONet
         /// </summary>
         public void Publish<T>(T @event, uint? remoteSourceAuthorityId = default) where T : IGONetEvent
         {
-            // TODO since/If this method can only be called and a proper result ensue when on the main unity thread...check/prove here
+            if (!GONetMain.IsUnityMainThread)
+            {
+                throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
+            }
 
             List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
             if (handlersForType != null)
@@ -105,7 +88,7 @@ namespace GONet
                 int handlerCount = handlersForType.Count;
                 uint sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
                 IGONetEventEnvelope<IGONetEvent> envelope = new GONetEventEnvelope<IGONetEvent>() { Event = @event, SourceAuthorityId = sourceAuthorityId };
-                for (int i = 0; i < handlerCount; ++i) // TODO since/if this class supports multithreading, need to handle the case where some subscriber unsubscribes during this iteration
+                for (int i = 0; i < handlerCount; ++i)
                 {
                     EventHandlerAndFilterer handlerForType = handlersForType[i];
                     if (handlerForType.Filterer == null || handlerForType.Filterer(envelope))
@@ -131,14 +114,21 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// IMPORTANT: Only call this from the main Unity thread!
+        /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
         {
+            if (!GONetMain.IsUnityMainThread)
+            {
+                throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
+            }
+
             if (handler == null)
             {
                 throw new ArgumentNullException(nameof(handler));
             }
 
-            // TODO since/if this class supports multithreading, need to put a locking mechanism here while subscribing/unsubscribing
             List<EventHandlerAndFilterer> handlersForType = GetTypeHandlers_SpecificOnly<T>();
             var handlerAndPredicate = new EventHandlerAndFilterer(
                 new HandlerWrapper<T>(handler).Handle,
@@ -197,9 +187,11 @@ namespace GONet
                     Update_handlersByEventType_IncludingChildren_Deep(eventType.BaseType);
                 }
 
-                foreach (Type @interface in eventType.GetInterfaces())
+                Type[] interfaces = GetInterfaces(eventType);
+                int length = interfaces.Length;
+                for (int i = 0; i < length; ++i)
                 {
-                    Update_handlersByEventType_IncludingChildren_Deep(@interface);
+                    Update_handlersByEventType_IncludingChildren_Deep(interfaces[i]);
                 }
             }
         }
@@ -232,8 +224,16 @@ namespace GONet
             return handlers;
         }
 
+        /// <summary>
+        /// IMPORTANT: Only call this from the main Unity thread!
+        /// </summary>
         internal void SetSubscriptionPriority(EventHandlerAndFilterer subscriber, int priority)
         {
+            if (!GONetMain.IsUnityMainThread)
+            {
+                throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
+            }
+
             subscriber.Priority = priority;
 
             ResortSubscribersByPriority();
@@ -282,19 +282,19 @@ namespace GONet
                     eventTypeCurrent = eventTypeCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
                 }
 
-                Type eventInterfaceCurrent;
-                var topInterfaces = eventType.GetInterfaces();
-                int topInterfaceCount = topInterfaces.Length;
-                for (int i = 0; i < topInterfaceCount; ++i)
+                Type eventInterface;
+                Type[] eventInterfaces = GetInterfaces(eventType);
+                int length = eventInterfaces.Length;
+                for (int i = 0; i < length; ++i)
                 {
-                    eventInterfaceCurrent = topInterfaces[i];
-                    while (eventInterfaceCurrent != null)
+                    eventInterface = eventInterfaces[i];
+                    while (eventInterface != null)
                     {
-                        if (handlersByEventType_IncludingChildren.TryGetValue(eventInterfaceCurrent, out handlers))
+                        if (handlersByEventType_IncludingChildren.TryGetValue(eventInterface, out handlers))
                         {
                             return handlers;
                         }
-                        eventInterfaceCurrent = eventInterfaceCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
+                        eventInterface = eventInterface.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
                     }
                 }
             }
@@ -309,6 +309,19 @@ namespace GONet
             return null;
 
             // since the filterPredicate cannot safely be compared for equality against another, don't cache the observable mapped to it and return a new observable each time // TODO for better storage/lookup efficiency's sake look into a way to compare filters
+        }
+
+        static readonly Dictionary<Type, Type[]> interfacesByType = new Dictionary<Type, Type[]>(100);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Type[] GetInterfaces(Type type)
+        {
+            Type[] interfaces;
+            if (!interfacesByType.TryGetValue(type, out interfaces))
+            {
+                interfacesByType[type] = interfaces = type.GetInterfaces();
+            }
+            return interfaces;
         }
 
         public class EventHandlerAndFilterer : IHasPriority
