@@ -475,22 +475,24 @@ namespace GONet.Generation
             #line default
             #line hidden
             this.Write(" valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.Outboun" +
-                    "dToOthers ? (");
+                    "dToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previ" +
+                    "ous.");
             
             #line 203 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(")companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous : (");
+            this.Write(" : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.");
             
             #line 203 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(@")companion.valuesChangesSupport[syncMemberIndex].lastKnownValue; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return new ");
+            this.Write("; // because of order of operations and state of affairs at the time of publishin" +
+                    "g this event being different for the in/out direction, there is a different valu" +
+                    "e to pull from that represents the previous value\r\n\t\t\t\t\t\t\t\t\treturn new ");
             
             #line 204 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));

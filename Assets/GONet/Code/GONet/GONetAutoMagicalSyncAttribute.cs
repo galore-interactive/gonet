@@ -14,13 +14,134 @@
  */
 
 using GONet.Utils;
-using MessagePack;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace GONet
 {
+    public enum GONetSyncableValueTypes : byte
+    {
+        System_Boolean,
+        System_Byte,
+        System_SByte,
+        System_Int16,
+        System_UInt16,
+        System_Int32,
+        System_UInt32,
+        System_Int64,
+        System_UInt64,
+        System_Single,
+        System_Double,
+        // ?? TODO reference type support: System_String,
+        UnityEngine_Vector2,
+        UnityEngine_Vector3,
+        UnityEngine_Vector4,
+        UnityEngine_Quaternion
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct GONetSyncableValue
+    {
+        [FieldOffset(0)] public GONetSyncableValueTypes GONetSyncType;
+
+        [FieldOffset(1)] bool system_Boolean;
+        public bool System_Boolean { get => system_Boolean; set { system_Boolean = value; GONetSyncType = GONetSyncableValueTypes.System_Boolean; } }
+
+        [FieldOffset(1)] byte system_Byte;
+        public byte System_Byte { get => system_Byte; set { system_Byte = value; GONetSyncType = GONetSyncableValueTypes.System_Byte; } }
+
+        [FieldOffset(1)] sbyte system_SByte;
+        public sbyte System_SByte { get => system_SByte; set { system_SByte = value; GONetSyncType = GONetSyncableValueTypes.System_SByte; } }
+
+        [FieldOffset(1)] short system_Int16;
+        public short System_Int16 { get => system_Int16; set { system_Int16 = value; GONetSyncType = GONetSyncableValueTypes.System_Int16; } }
+
+        [FieldOffset(1)] ushort system_UInt16;
+        public ushort System_UInt16 { get => system_UInt16; set { system_UInt16 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt16; } }
+
+        [FieldOffset(1)] int system_Int32;
+        public int System_Int32 { get => system_Int32; set { system_Int32 = value; GONetSyncType = GONetSyncableValueTypes.System_Int32; } }
+
+        [FieldOffset(1)] uint system_UInt32;
+        public uint System_UInt32 { get => system_UInt32; set { system_UInt32 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt32; } }
+
+        [FieldOffset(1)] long system_Int64;
+        public long System_Int64 { get => system_Int64; set { system_Int64 = value; GONetSyncType = GONetSyncableValueTypes.System_Int64; } }
+
+        [FieldOffset(1)] ulong system_UInt64;
+        public ulong System_UInt64 { get => system_UInt64; set { system_UInt64 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt64; } }
+
+        [FieldOffset(1)] float system_Single;
+        public float System_Single { get => system_Single; set { system_Single = value; GONetSyncType = GONetSyncableValueTypes.System_Single; } }
+
+        [FieldOffset(1)] double system_Double;
+        public double System_Double { get => system_Double; set { system_Double = value; GONetSyncType = GONetSyncableValueTypes.System_Double; } }
+
+        [FieldOffset(1)] Vector2 unityEngine_Vector2;
+        public Vector2 UnityEngine_Vector2 { get => unityEngine_Vector2; set { unityEngine_Vector2 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector2; } }
+
+        [FieldOffset(1)] Vector3 unityEngine_Vector3;
+        public Vector3 UnityEngine_Vector3 { get => unityEngine_Vector3; set { unityEngine_Vector3 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector3; } }
+
+        [FieldOffset(1)] Vector4 unityEngine_Vector4;
+        public Vector4 UnityEngine_Vector4 { get => unityEngine_Vector4; set { unityEngine_Vector4 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector4; } }
+
+        [FieldOffset(1)] Quaternion unityEngine_Quaternion;
+        public Quaternion UnityEngine_Quaternion { get => unityEngine_Quaternion; set { unityEngine_Quaternion = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Quaternion; } }
+
+        public static bool operator ==(GONetSyncableValue left, GONetSyncableValue right)
+        {
+            bool areValuesEqual = false;
+            switch (left.GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Boolean: areValuesEqual = left.system_Boolean == right.system_Boolean; break;
+                case GONetSyncableValueTypes.System_Byte: areValuesEqual = left.system_Byte == right.system_Byte; break;
+                case GONetSyncableValueTypes.System_Double: areValuesEqual = left.system_Double == right.system_Double; break;
+                case GONetSyncableValueTypes.System_Int16: areValuesEqual = left.system_Int16 == right.system_Int16; break;
+                case GONetSyncableValueTypes.System_Int32: areValuesEqual = left.system_Int32 == right.system_Int32; break;
+                case GONetSyncableValueTypes.System_Int64: areValuesEqual = left.system_Int64 == right.system_Int64; break;
+                case GONetSyncableValueTypes.System_SByte: areValuesEqual = left.system_SByte == right.system_SByte; break;
+                case GONetSyncableValueTypes.System_Single: areValuesEqual = left.system_Single == right.system_Single; break;
+                case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
+                case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
+                case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
+            }
+
+            return left.GONetSyncType == right.GONetSyncType && areValuesEqual;
+        }
+
+        public static bool operator !=(GONetSyncableValue left, GONetSyncableValue right)
+        {
+            bool areValuesEqual = false;
+            switch (left.GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Boolean: areValuesEqual = left.system_Boolean == right.system_Boolean; break;
+                case GONetSyncableValueTypes.System_Byte: areValuesEqual = left.system_Byte == right.system_Byte; break;
+                case GONetSyncableValueTypes.System_Double: areValuesEqual = left.system_Double == right.system_Double; break;
+                case GONetSyncableValueTypes.System_Int16: areValuesEqual = left.system_Int16 == right.system_Int16; break;
+                case GONetSyncableValueTypes.System_Int32: areValuesEqual = left.system_Int32 == right.system_Int32; break;
+                case GONetSyncableValueTypes.System_Int64: areValuesEqual = left.system_Int64 == right.system_Int64; break;
+                case GONetSyncableValueTypes.System_SByte: areValuesEqual = left.system_SByte == right.system_SByte; break;
+                case GONetSyncableValueTypes.System_Single: areValuesEqual = left.system_Single == right.system_Single; break;
+                case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
+                case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
+                case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
+                case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
+            }
+
+            return left.GONetSyncType != right.GONetSyncType || !areValuesEqual;
+        }
+    }
+
     /// <summary>
     /// This class only holds constant value fields that can be used as <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/> values.
     /// </summary>

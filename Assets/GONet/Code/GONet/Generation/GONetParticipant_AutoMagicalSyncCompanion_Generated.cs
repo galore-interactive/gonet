@@ -104,7 +104,7 @@ namespace GONet.Generation
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
                 if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
-                    !valueChangeSupport.lastKnownValue.Equals(valueChangeSupport.lastKnownValue_previous) &&
+                    valueChangeSupport.lastKnownValue != valueChangeSupport.lastKnownValue_previous &&
                     !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
                 {
                     lastKnownValueChangesSinceLastCheck[i] = true;

@@ -1178,9 +1178,12 @@ namespace GONet
             internal QuantizerSettingsGroup syncAttribute_QuantizerSettingsGroup;
             #endregion
 
-            internal object lastKnownValue;
-            internal object lastKnownValue_previous;
+            internal GONetSyncableValue lastKnownValue;
+            internal GONetSyncableValue lastKnownValue_previous;
 
+            /// <summary>
+            /// TODO replace this with <see cref="GONetSyncableValue"/>
+            /// </summary>
             [StructLayout(LayoutKind.Explicit)]
             internal struct NumericValueChangeSnapshot
             {

@@ -23,10 +23,10 @@ MonoBehaviour:
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 0
   SyncValueTypeSerializerOverrides:
-  - ValueType: 2
+  - ValueType: 12
     CustomSerializerType:
       _classRef: GONet.Vector3Serializer, Assembly-CSharp
-  - ValueType: 3
+  - ValueType: 14
     CustomSerializerType:
       _classRef: GONet.QuaternionSerializer, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 0

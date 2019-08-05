@@ -200,7 +200,7 @@ namespace GONet.Generation
 										const string PARAM = "parameters_";
 										className += string.Concat(typeof(UnityEngine.Animator).Name, singleMember.animatorControllerName, UNDIE, PARAM, singleMember.animatorControllerParameterName);
 									}
-#>									<#=memberTypeFullName#> valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? (<#=memberTypeFullName#>)companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous : (<#=memberTypeFullName#>)companion.valuesChangesSupport[syncMemberIndex].lastKnownValue; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+#>									<#=memberTypeFullName#> valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.<#=memberTypeFullName.Replace(".", "_")#> : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.<#=memberTypeFullName.Replace(".", "_")#>; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
 									return new <#=className#>(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, syncMemberIndex, valuePrevious, valueNew);
 								}
 <#

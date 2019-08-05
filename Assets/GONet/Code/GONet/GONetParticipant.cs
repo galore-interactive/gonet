@@ -188,13 +188,13 @@ namespace GONet
 
         private void OnEnable()
         {
-            GONetLog.Debug("OnEnable....instanceID: " + GetInstanceID());
+            //GONetLog.Debug("OnEnable....instanceID: " + GetInstanceID());
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
         }
 
         private void Start()
         {
-            GONetLog.Debug("Start....instanceID: " + GetInstanceID());
+            //GONetLog.Debug("Start....instanceID: " + GetInstanceID());
             GONetMain.Start_AutoPropogateInstantiation_IfAppropriate(this);
         }
 

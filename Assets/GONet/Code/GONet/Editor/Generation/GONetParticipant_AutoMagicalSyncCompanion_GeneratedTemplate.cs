@@ -212,7 +212,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue = ");
+            this.Write(".lastKnownValue.");
+            
+            #line 87 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 87 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -235,7 +242,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue_previous = ");
+            this.Write(".lastKnownValue_previous.");
+            
+            #line 88 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 88 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -264,7 +278,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue = ");
+            this.Write(".lastKnownValue.");
+            
+            #line 90 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 90 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -294,7 +315,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue_previous = ");
+            this.Write(".lastKnownValue_previous.");
+            
+            #line 91 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 91 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2647,7 +2675,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue = ");
+            this.Write(".lastKnownValue.");
+            
+            #line 752 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 752 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2675,7 +2710,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(".lastKnownValue = ");
+            this.Write(".lastKnownValue.");
+            
+            #line 754 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
             
             #line 754 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));

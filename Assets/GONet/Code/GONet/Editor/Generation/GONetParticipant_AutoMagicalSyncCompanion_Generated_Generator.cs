@@ -543,8 +543,8 @@ namespace GONet.Generation
                         defaultProfile.SyncChangesFrequencyOccurrences = 24;
                         defaultProfile.SyncChangesFrequencyUnitOfTime = SyncChangesTimeUOM.TimesPerSecond;
                         defaultProfile.SyncValueTypeSerializerOverrides = new SyncType_CustomSerializer_Pair[] {
-                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Vector3, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(Vector3Serializer)) },
-                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncTypes.Quaternion, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(QuaternionSerializer)) },
+                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Vector3, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(Vector3Serializer)) },
+                                new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Quaternion, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(QuaternionSerializer)) },
                             };
                     }
 
@@ -586,7 +586,7 @@ namespace GONet.Generation
 
                 if (profile.SyncValueTypeSerializerOverrides != null && profile.SyncValueTypeSerializerOverrides.Length > 0)
                 {
-                    GONetSyncTypes gonetSyncType;
+                    GONetSyncableValueTypes gonetSyncType;
                     if (gonetSyncTypeByRealTypeMap.TryGetValue(syncMemberType, out gonetSyncType))
                     {
                         if (profile.SyncValueTypeSerializerOverrides.Any(x => x.ValueType == gonetSyncType))
@@ -602,22 +602,22 @@ namespace GONet.Generation
                     }
                     else
                     {
-                        GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncTypes).FullName);
+                        GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncableValueTypes).FullName);
                     }
                 }
             }
         }
 
-        static readonly Dictionary<Type, GONetSyncTypes> gonetSyncTypeByRealTypeMap = new Dictionary<Type, GONetSyncTypes>()
+        static readonly Dictionary<Type, GONetSyncableValueTypes> gonetSyncTypeByRealTypeMap = new Dictionary<Type, GONetSyncableValueTypes>()
         {
-            { typeof(byte), GONetSyncTypes.Byte },
-            { typeof(float), GONetSyncTypes.Float },
-            { typeof(int), GONetSyncTypes.Integer },
-            { typeof(Quaternion), GONetSyncTypes.Quaternion },
-            { typeof(string), GONetSyncTypes.String },
-            { typeof(ulong), GONetSyncTypes.UInt64 },
-            { typeof(Vector3), GONetSyncTypes.Vector3 },
-            { typeof(bool), GONetSyncTypes.Boolean },
+            { typeof(byte), GONetSyncableValueTypes.System_Byte },
+            { typeof(float), GONetSyncableValueTypes.System_Single },
+            { typeof(int), GONetSyncableValueTypes.System_Int32 },
+            { typeof(Quaternion), GONetSyncableValueTypes.UnityEngine_Quaternion },
+            // ?? TODO reference type support: { typeof(string), GONetSyncableValueTypes.System_String },
+            { typeof(ulong), GONetSyncableValueTypes.System_UInt64 },
+            { typeof(Vector3), GONetSyncableValueTypes.UnityEngine_Vector3 },
+            { typeof(bool), GONetSyncableValueTypes.System_Boolean },
         };
 
         public const string SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI = "GONet/SyncSettingsProfiles/{0}.asset";

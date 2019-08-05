@@ -93,22 +93,10 @@ namespace GONet
     [Serializable]
     public struct SyncType_CustomSerializer_Pair
     {
-        public GONetSyncTypes ValueType;
+        public GONetSyncableValueTypes ValueType;
 
         [Tooltip("NOTE: Any selection needs to implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
         [ClassImplements(typeof(IGONetAutoMagicalSync_CustomSerializer))]
         public ClassTypeReference CustomSerializerType;
-    }
-
-    public enum GONetSyncTypes : byte
-    {
-        Float,
-        Integer,
-        Vector3,
-        Quaternion,
-        Byte,
-        String,
-        UInt64,
-        Boolean
     }
 }

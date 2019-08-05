@@ -80,8 +80,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_3.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_4.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_5.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
@@ -190,7 +188,6 @@
     <Compile Include="Assets\GONet\Code\MessagePack\Unity\UnityResolver.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\UnsafeExtensions\UnityBlitResolver.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\UnsafeExtensions\UnsafeBlitFormatter.cs" />
-    <Compile Include="Assets\GONet\Sample\AnotherFieldTesterino.cs" />
     <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
