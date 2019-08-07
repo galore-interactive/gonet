@@ -400,9 +400,9 @@ namespace GONet
     public interface IGONetAutoMagicalSync_CustomSerializer
     {
         /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
-        void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value);
+        void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value);
 
-        object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom);
+        GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom);
     }
 
     public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
@@ -422,7 +422,7 @@ namespace GONet
             quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
         }
 
-        public object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
+        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
             uint x;
             bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
@@ -434,9 +434,9 @@ namespace GONet
             return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
         }
 
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
         {
-            Vector3 vector3 = (Vector3)value;
+            Vector3 vector3 = value.UnityEngine_Vector3;
 
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
@@ -464,7 +464,7 @@ namespace GONet
         }
 
         /// <returns>a <see cref="Quaternion"/></returns>
-        public object Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
+        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
             uint LargestIndex;
             bitStream_readFrom.ReadUInt(out LargestIndex, 2);
@@ -533,14 +533,14 @@ namespace GONet
             return new Quaternion(x, y, z, w);
         }
 
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, object value)
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
         {
             uint LargestIndex;
             uint SmallestA;
             uint SmallestB;
             uint SmallestC;
 
-            Quaternion quattie = (Quaternion)value;
+            Quaternion quattie = value.UnityEngine_Quaternion;
             float x = quattie.x;
             float y = quattie.y;
             float z = quattie.z;

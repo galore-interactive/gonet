@@ -1773,14 +1773,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(" = (");
+            this.Write(" = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 439 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(")customSerializer.Deserialize(bitStream_readFrom);\r\n");
+            this.Write(";\r\n");
             
             #line 440 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
@@ -2310,14 +2310,14 @@ namespace GONet.Generation
             #line default
             #line hidden
             this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = (");
+                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 601 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(")customSerializer.Deserialize(bitStream_readFrom);\r\n");
+            this.Write(";\r\n");
             
             #line 602 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }

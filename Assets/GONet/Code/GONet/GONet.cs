@@ -1719,21 +1719,25 @@ namespace GONet
                     if (IsServer)
                     {
                         // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
-                        gonetServer?.ForEachClient((clientConnection) =>
+                        if (gonetServer != null)
                         {
-                            byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, clientConnection.OwnerAuthorityId, myTicks);
-                            if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                            for (int iConnection = 0; iConnection < gonetServer.numConnections; ++iConnection)
                             {
-                                SendBytesToRemoteConnection(clientConnection, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
-                                myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                                GONetConnection_ServerToClient gONetConnection_ServerToClient = gonetServer.remoteClients[iConnection];
+                                byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, gONetConnection_ServerToClient.OwnerAuthorityId, myTicks);
+                                if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                                {
+                                    SendBytesToRemoteConnection(gONetConnection_ServerToClient, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
+                                    myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                                }
                             }
-                        });
+                        }
                     }
                     else
                     {
                         if (MyAuthorityId == OwnerAuthorityId_Unset)
                         {
-                            throw new Exception("Magoo.....we need this set before doing the following:");
+                            throw new Exception("Magoo.....we need MyAuthorityId set before doing the following:");
                         }
                         byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
                         if (changesSerialized != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
@@ -1999,7 +2003,7 @@ namespace GONet
         {
             while (bitStream_headerAlreadyRead.Position_Bytes < bytesUsedCount) // while more data to read/process
             {
-                uint gonetId = (uint)GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
+                uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
 
                 GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
