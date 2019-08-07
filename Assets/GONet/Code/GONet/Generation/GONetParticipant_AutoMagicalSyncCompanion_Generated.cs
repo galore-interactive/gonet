@@ -131,16 +131,16 @@ namespace GONet.Generation
             }
         }
 
-        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, object value)
+        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, GONetSyncableValue value)
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
-            float valueAsFloat = (float)value;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
+            float valueAsFloat = value.System_Single;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
             uint valueQuantized = Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
 
-        internal object DeserializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        internal GONetSyncableValue DeserializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
         {
             QuantizerSettingsGroup quantizeSettings = valuesChangesSupport[singleIndex].syncAttribute_QuantizerSettingsGroup;
             uint valueQuantized;
@@ -149,9 +149,9 @@ namespace GONet.Generation
             return valueUnquantized;
         }
 
-        internal abstract void SetAutoMagicalSyncValue(byte index, object value);
+        internal abstract void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value);
 
-        internal abstract object GetAutoMagicalSyncValue(byte index);
+        internal abstract GONetSyncableValue GetAutoMagicalSyncValue(byte index);
 
         /// <summary>
         /// Serializes all values of appropriaate member variables internally to <paramref name="bitStream_appendTo"/>.

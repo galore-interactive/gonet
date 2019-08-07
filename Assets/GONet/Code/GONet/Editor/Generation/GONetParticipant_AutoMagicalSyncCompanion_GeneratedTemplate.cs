@@ -577,8 +577,8 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t}\r\n\r\n        internal override void SetAutoMagicalSyncValue(byte index, object " +
-                    "value)\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
+            this.Write("\t\t}\r\n\r\n        internal override void SetAutoMagicalSyncValue(byte index, GONetSy" +
+                    "ncableValue value)\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
             
             #line 121 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -623,14 +623,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(" = (");
+            this.Write(" = value.");
             
             #line 134 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(")value;\r\n\t\t\t\t");
+            this.Write(";\r\n\t\t\t\t");
             
             #line 135 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
@@ -658,14 +658,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write(", (");
+            this.Write(", value.");
             
             #line 136 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
-            this.Write(")value);\r\n\t\t\t\t");
+            this.Write(");\r\n\t\t\t\t");
             
             #line 137 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
@@ -681,8 +681,8 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t}\r\n\t\t}\r\n\r\n        internal override object GetAutoMagicalSyncValue(byte index)" +
-                    "\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
+            this.Write("\t\t\t}\r\n\t\t}\r\n\r\n        internal override GONetSyncableValue GetAutoMagicalSyncValue" +
+                    "(byte index)\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
             
             #line 149 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -772,7 +772,7 @@ namespace GONet.Generation
             #line hidden
             this.Write(@"			}
 
-			return null;
+			return default;
 		}
 
         /// <summary>
@@ -1866,14 +1866,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\tvalue = (float)DeserializeSingleQuantized(bitStream_readFrom, ");
+            this.Write("\t\t\t\tvalue = DeserializeSingleQuantized(bitStream_readFrom, ");
             
             #line 461 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
-            this.Write(");\r\n");
+            this.Write(").System_Single;\r\n");
             
             #line 462 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
@@ -2348,14 +2348,14 @@ namespace GONet.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tvalue = (float)DeserializeSingleQuantized(bitStream_readFrom, ");
+            this.Write("\t\t\t\t\tvalue = DeserializeSingleQuantized(bitStream_readFrom, ");
             
             #line 618 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
-            this.Write(");\r\n");
+            this.Write(").System_Single;\r\n");
             
             #line 619 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 

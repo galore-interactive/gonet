@@ -91,6 +91,8 @@ namespace GONet
         [FieldOffset(1)] Quaternion unityEngine_Quaternion;
         public Quaternion UnityEngine_Quaternion { get => unityEngine_Quaternion; set { unityEngine_Quaternion = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Quaternion; } }
 
+        #region operators == and !=
+
         public static bool operator ==(GONetSyncableValue left, GONetSyncableValue right)
         {
             bool areValuesEqual = false;
@@ -140,6 +142,28 @@ namespace GONet
 
             return left.GONetSyncType != right.GONetSyncType || !areValuesEqual;
         }
+
+        #endregion
+
+        #region implicit conversions from primitive values wrapped herein
+
+        public static implicit operator GONetSyncableValue(bool value) { return new GONetSyncableValue() { System_Boolean = value }; }
+        public static implicit operator GONetSyncableValue(byte value) { return new GONetSyncableValue() { System_Byte = value }; }
+        public static implicit operator GONetSyncableValue(double value) { return new GONetSyncableValue() { System_Double = value }; }
+        public static implicit operator GONetSyncableValue(short value) { return new GONetSyncableValue() { System_Int16 = value }; }
+        public static implicit operator GONetSyncableValue(int value) { return new GONetSyncableValue() { System_Int32 = value }; }
+        public static implicit operator GONetSyncableValue(long value) { return new GONetSyncableValue() { System_Int64 = value }; }
+        public static implicit operator GONetSyncableValue(sbyte value) { return new GONetSyncableValue() { System_SByte = value }; }
+        public static implicit operator GONetSyncableValue(float value) { return new GONetSyncableValue() { System_Single = value }; }
+        public static implicit operator GONetSyncableValue(ushort value) { return new GONetSyncableValue() { System_UInt16 = value }; }
+        public static implicit operator GONetSyncableValue(uint value) { return new GONetSyncableValue() { System_UInt32 = value }; }
+        public static implicit operator GONetSyncableValue(ulong value) { return new GONetSyncableValue() { System_UInt64 = value }; }
+        public static implicit operator GONetSyncableValue(Quaternion value) { return new GONetSyncableValue() { UnityEngine_Quaternion = value }; }
+        public static implicit operator GONetSyncableValue(Vector2 value) { return new GONetSyncableValue() { UnityEngine_Vector2 = value }; }
+        public static implicit operator GONetSyncableValue(Vector3 value) { return new GONetSyncableValue() { UnityEngine_Vector3 = value }; }
+        public static implicit operator GONetSyncableValue(Vector4 value) { return new GONetSyncableValue() { UnityEngine_Vector4 = value }; }
+
+        #endregion
     }
 
     /// <summary>

@@ -21,32 +21,31 @@ namespace GONet.Utils
 {
     internal static class ValueBlendUtils
     {
-        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out object blendedValue)
+        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue)
         {
             if (valueMonitoringSupport.mostRecentChanges_usedSize > 0)
             {
                 GetBlendedValue getBlendedValue;
-                if (getBlendedValues_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].valueType, out getBlendedValue))
+                if (getBlendedValues_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].numericValue.GONetSyncType, out getBlendedValue))
                 {
                     return getBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue);
                 }
             }
 
-            blendedValue = null;
+            blendedValue = default;
             return false;
         }
 
-        static readonly Dictionary<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.GONetBlendyValueType, GetBlendedValue> getBlendedValues_byValueType = 
-            new Dictionary<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.GONetBlendyValueType, GetBlendedValue>(8)
+        static readonly Dictionary<GONetSyncableValueTypes, GetBlendedValue> getBlendedValues_byValueType = new Dictionary<GONetSyncableValueTypes, GetBlendedValue>(8)
         {
-            { GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.GONetBlendyValueType.Float, GetBlendedValue_Float },
-            { GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.GONetBlendyValueType.Quaternion, GetBlendedValue_Quaternion },
-            { GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.GONetBlendyValueType.Vector3, GetBlendedValue_Vector3 }
+            { GONetSyncableValueTypes.System_Single, GetBlendedValue_Float },
+            { GONetSyncableValueTypes.UnityEngine_Quaternion, GetBlendedValue_Quaternion },
+            { GONetSyncableValueTypes.UnityEngine_Vector3, GetBlendedValue_Vector3 }
         };
 
-        delegate bool GetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out object blendedValue);
+        delegate bool GetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue);
 
-        static bool GetBlendedValue_Float(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out object blendedValue)
+        static bool GetBlendedValue_Float(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
         {
             blendedValue = default;
 
@@ -60,7 +59,7 @@ namespace GONet.Utils
                     bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) < GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
                     if (isNewestRecentEnoughToProcess)
                     {
-                        float newestValue = newest.value_float;
+                        float newestValue = newest.numericValue.System_Single;
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
@@ -71,7 +70,7 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    float valueDiffBetweenLastTwo = newestValue - justBeforeNewest.value_float;
+                                    float valueDiffBetweenLastTwo = newestValue - justBeforeNewest.numericValue.System_Single;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
                                     long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
@@ -88,7 +87,7 @@ namespace GONet.Utils
                             }
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
-                                blendedValue = oldest.value_float;
+                                blendedValue = oldest.numericValue.System_Single;
                                 //GONetLog.Debug("went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " mostRecentChanges_capacitySize: " + mostRecentChanges_capacitySize + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
@@ -104,8 +103,8 @@ namespace GONet.Utils
 
                                         float interpolationTime = (adjustedTicks - older.elapsedTicksAtChange) / (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
                                         blendedValue = Mathf.Lerp(
-                                            older.value_float,
-                                            newer.value_float,
+                                            older.numericValue.System_Single,
+                                            newer.numericValue.System_Single,
                                             interpolationTime);
                                         //GONetLog.Debug("we loip'd 'eem");
                                         didWeLoip = true;
@@ -137,7 +136,7 @@ namespace GONet.Utils
             return false;
         }
 
-        static bool GetBlendedValue_Quaternion(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out object blendedValue)
+        static bool GetBlendedValue_Quaternion(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
         {
             blendedValue = default;
 
@@ -151,7 +150,7 @@ namespace GONet.Utils
                     bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) < GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
                     if (isNewestRecentEnoughToProcess)
                     {
-                        Quaternion newestValue = newest.value_Quaternion;
+                        Quaternion newestValue = newest.numericValue.UnityEngine_Quaternion;
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
@@ -167,7 +166,7 @@ namespace GONet.Utils
 
 
                                     /* option 1:
-                                    Quaternion valueDiffBetweenLastTwo = justBeforeNewest.value_Quaternion * Quaternion.Inverse(newestValue);
+                                    Quaternion valueDiffBetweenLastTwo = justBeforeNewest.numericValue.UnityEngine_Quaternion * Quaternion.Inverse(newestValue);
                                     Quaternion extrapolated_ValueNew = newestValue * valueDiffBetweenLastTwo;
                                     float interpolationTime = (adjustedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
                                     blendedValue = Quaternion.Slerp(newestValue, extrapolated_ValueNew, interpolationTime);
@@ -175,14 +174,14 @@ namespace GONet.Utils
 
 
                                     //* option 2:
-                                    var rot = newestValue * Quaternion.Inverse(justBeforeNewest.value_Quaternion); // rot is the rotation from t1 to t2
+                                    var rot = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion); // rot is the rotation from t1 to t2
                                     var dt = (extrapolated_TicksAtSend - justBeforeNewest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange); // dt = extrapolation factor
                                     float ang;
                                     Vector3 axis;
                                     rot.ToAngleAxis(out ang, out axis); // find axis-angle representation
                                     if (ang > 180) ang -= 360;  // assume the shortest path
                                     ang = ang * dt % 360; // multiply angle by the factor
-                                    blendedValue = Quaternion.AngleAxis(ang, axis) * justBeforeNewest.value_Quaternion; // combine with first rotation
+                                    blendedValue = Quaternion.AngleAxis(ang, axis) * justBeforeNewest.numericValue.UnityEngine_Quaternion; // combine with first rotation
                                     //*/
 
 
@@ -196,7 +195,7 @@ namespace GONet.Utils
                             }
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
-                                blendedValue = oldest.value_Quaternion;
+                                blendedValue = oldest.numericValue.UnityEngine_Quaternion;
                                 //GONetLog.Debug("QUAT went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
@@ -212,8 +211,8 @@ namespace GONet.Utils
 
                                         float interpolationTime = (adjustedTicks - older.elapsedTicksAtChange) / (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
                                         blendedValue = Quaternion.Slerp(
-                                            older.value_Quaternion,
-                                            newer.value_Quaternion,
+                                            older.numericValue.UnityEngine_Quaternion,
+                                            newer.numericValue.UnityEngine_Quaternion,
                                             interpolationTime);
                                         //GONetLog.Debug("we loip'd 'eem");
                                         didWeLoip = true;
@@ -245,7 +244,7 @@ namespace GONet.Utils
             return false;
         }
 
-        static bool GetBlendedValue_Vector3(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out object blendedValue)
+        static bool GetBlendedValue_Vector3(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
         {
             blendedValue = default;
 
@@ -259,7 +258,7 @@ namespace GONet.Utils
                     bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) < GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
                     if (isNewestRecentEnoughToProcess)
                     {
-                        Vector3 newestValue = newest.value_Vector3;
+                        Vector3 newestValue = newest.numericValue.UnityEngine_Vector3;
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
@@ -270,7 +269,7 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest.value_Vector3;
+                                    Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest.numericValue.UnityEngine_Vector3;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
                                     long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
@@ -287,7 +286,7 @@ namespace GONet.Utils
                             }
                             else if (adjustedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
-                                blendedValue = oldest.value_Vector3;
+                                blendedValue = oldest.numericValue.UnityEngine_Vector3;
                                 //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
@@ -303,8 +302,8 @@ namespace GONet.Utils
 
                                         float interpolationTime = (adjustedTicks - older.elapsedTicksAtChange) / (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
                                         blendedValue = Vector3.Lerp(
-                                            older.value_Vector3,
-                                            newer.value_Vector3,
+                                            older.numericValue.UnityEngine_Vector3,
+                                            newer.numericValue.UnityEngine_Vector3,
                                             interpolationTime);
                                         //GONetLog.Debug("we loip'd 'eem");
                                         didWeLoip = true;

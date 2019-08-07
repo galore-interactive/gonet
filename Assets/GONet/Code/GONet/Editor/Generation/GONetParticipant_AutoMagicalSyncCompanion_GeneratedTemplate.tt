@@ -114,7 +114,7 @@ namespace GONet.Generation
 #>
 		}
 
-        internal override void SetAutoMagicalSyncValue(byte index, object value)
+        internal override void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value)
 		{
 			switch (index)
 			{
@@ -131,9 +131,9 @@ namespace GONet.Generation
 #>
 				case <#=iOverall++#>:
 				<# if (singleMember.animatorControllerParameterId == 0) { #>
-					<#=single.componentTypeName#>.<#=singleMember.memberName#> = (<#=singleMember.memberTypeFullName#>)value;
+					<#=single.componentTypeName#>.<#=singleMember.memberName#> = value.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 				<# } else { #>
-					<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, (<#=singleMember.animatorControllerParameterTypeFullName#>)value);
+					<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, value.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#>);
 				<# } #>
 					return;
 <#		}
@@ -142,7 +142,7 @@ namespace GONet.Generation
 			}
 		}
 
-        internal override object GetAutoMagicalSyncValue(byte index)
+        internal override GONetSyncableValue GetAutoMagicalSyncValue(byte index)
 		{
 			switch (index)
 			{
@@ -168,7 +168,7 @@ namespace GONet.Generation
 #>
 			}
 
-			return null;
+			return default;
 		}
 
         /// <summary>
@@ -458,7 +458,7 @@ namespace GONet.Generation
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
 #>
-				value = (float)DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>);
+				value = DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>).System_Single;
 <#
                     }
 					else
@@ -615,7 +615,7 @@ namespace GONet.Generation
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
 #>
-					value = (float)DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>);
+					value = DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>).System_Single;
 <#
                     }
 					else

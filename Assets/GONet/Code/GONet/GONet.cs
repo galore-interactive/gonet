@@ -1197,61 +1197,30 @@ namespace GONet
             /// TODO replace this with <see cref="GONetSyncableValue"/>
             /// </summary>
             [StructLayout(LayoutKind.Explicit)]
-            internal struct NumericValueChangeSnapshot
+            internal struct NumericValueChangeSnapshot // TODO : IEquatable<T>
             {
                 [FieldOffset(0)]
                 internal long elapsedTicksAtChange;
 
                 [FieldOffset(8)]
-                internal GONetBlendyValueType valueType;
+                internal GONetSyncableValue numericValue;
 
-                [FieldOffset(9)]
-                internal float value_float;
-                [FieldOffset(9)]
-                internal Quaternion value_Quaternion;
-                [FieldOffset(9)]
-                internal Vector3 value_Vector3;
-
-                internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, object value)
-                {
-                    Type type = value.GetType();
-                    if (type == typeof(float))
-                    {
-                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (float)value);
-                    }
-
-                    if (type == typeof(Quaternion))
-                    {
-                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (Quaternion)value);
-                    }
-
-                    if (type == typeof(Vector3))
-                    {
-                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, (Vector3)value);
-                    }
-
-                    throw new ArgumentException("Type not supported.", nameof(value));
-                }
-
-                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, float value) : this()
+                NumericValueChangeSnapshot(long elapsedTicksAtChange, GONetSyncableValue value) : this()
                 {
                     this.elapsedTicksAtChange = elapsedTicksAtChange;
-                    valueType = GONetBlendyValueType.Float;
-                    value_float = value;
+                    numericValue = value;
                 }
 
-                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, Quaternion value) : this()
+                internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, GONetSyncableValue value)
                 {
-                    this.elapsedTicksAtChange = elapsedTicksAtChange;
-                    valueType = GONetBlendyValueType.Quaternion;
-                    value_Quaternion = value;
-                }
+                    if (value.GONetSyncType == GONetSyncableValueTypes.System_Single || 
+                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 || 
+                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion) // TODO move this to some public static list for folks to reference! e.g. Allowed Blendy Value Types
+                    {
+                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, value);
+                    }
 
-                internal NumericValueChangeSnapshot(long elapsedTicksAtChange, Vector3 value) : this()
-                {
-                    this.elapsedTicksAtChange = elapsedTicksAtChange;
-                    valueType = GONetBlendyValueType.Vector3;
-                    value_Vector3 = value;
+                    throw new ArgumentException("Type not supported.", nameof(value.GONetSyncType));
                 }
 
                 public override bool Equals(object obj)
@@ -1263,30 +1232,16 @@ namespace GONet
 
                     var snapshot = (NumericValueChangeSnapshot)obj;
                     return elapsedTicksAtChange == snapshot.elapsedTicksAtChange &&
-                           valueType == snapshot.valueType &&
-                           value_float == snapshot.value_float &&
-                           value_Quaternion.Equals(snapshot.value_Quaternion) &&
-                           value_Vector3.Equals(snapshot.value_Vector3);
+                           EqualityComparer<GONetSyncableValue>.Default.Equals(numericValue, snapshot.numericValue);
                 }
 
                 public override int GetHashCode()
                 {
-                    var hashCode = -1592683669;
+                    var hashCode = -1529925349;
                     hashCode = hashCode * -1521134295 + elapsedTicksAtChange.GetHashCode();
-                    hashCode = hashCode * -1521134295 + valueType.GetHashCode();
-                    hashCode = hashCode * -1521134295 + value_float.GetHashCode();
-                    hashCode = hashCode * -1521134295 + EqualityComparer<Quaternion>.Default.GetHashCode(value_Quaternion);
-                    hashCode = hashCode * -1521134295 + EqualityComparer<Vector3>.Default.GetHashCode(value_Vector3);
+                    hashCode = hashCode * -1521134295 + EqualityComparer<GONetSyncableValue>.Default.GetHashCode(numericValue);
                     return hashCode;
                 }
-            }
-
-            [Flags]
-            internal enum GONetBlendyValueType : byte
-            {
-                Float =         1 << 0,
-                Quaternion =    1 << 1,
-                Vector3 =       1 << 2,
             }
 
             internal const int MOST_RECENT_CHANGEs_SIZE_MINIMUM = 10;
@@ -1313,7 +1268,7 @@ namespace GONet
             /// This is called in generated code (i.e., sub-classes of <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated"/>) for any
             /// member decorated with <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/> set to true.
             /// </summary>
-            internal void AddToMostRecentChangeQueue_IfAppropriate(long elapsedTicksAtChange, object value)
+            internal void AddToMostRecentChangeQueue_IfAppropriate(long elapsedTicksAtChange, GONetSyncableValue value)
             {
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
@@ -1358,7 +1313,7 @@ namespace GONet
                     GONetLog.Debug("==============================================================================================");
                     for (int k = 0; k < mostRecentChanges_usedSize; ++k)
                     {
-                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].value_float, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalSeconds));
+                        GONetLog.Debug(string.Concat("item: ", k, " value: ", mostRecentChanges[k].numericValue, " changed @ time (seconds): ", TimeSpan.FromTicks(mostRecentChanges[k].elapsedTicksAtChange).TotalSeconds));
                     }
                 }
             }
@@ -1370,7 +1325,7 @@ namespace GONet
             /// </summary>
             internal void ApplyValueBlending_IfAppropriate()
             {
-                object blendedValue;
+                GONetSyncableValue blendedValue;
                 if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks, out blendedValue))
                 {
                     syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
