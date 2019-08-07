@@ -60,7 +60,7 @@ namespace GONet
     /// <para>The GONet event architecture supports the out-of-the-box feature of Record+Replay.</para>
     /// <para>For convenience, you can get access to the/an instance of this class (i.e., <see cref="GONetEventBus.Instance"/>) via <see cref="GONetMain.EventBus"/>.</para>
     /// </summary>
-    public sealed class GONetEventBus
+    public sealed partial class GONetEventBus
     {
         public static readonly GONetEventBus Instance = new GONetEventBus();
 

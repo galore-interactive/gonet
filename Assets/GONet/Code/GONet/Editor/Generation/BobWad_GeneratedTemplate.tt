@@ -101,28 +101,74 @@ namespace GONet
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
     [MessagePack.MessagePackObject]
-    public struct <#=className#> : ISyncEvent_ValueChangeProcessed
+    public sealed class <#=className#> : SyncEvent_ValueChangeProcessed
     {
-        [MessagePack.Key(0)] public long OccurredAtElapsedTicks { get; set; }
-        [MessagePack.Key(1)] public uint RelatedOwnerAuthorityId { get; set; }
-        [MessagePack.Key(2)] public uint GONetId { get; set; }
-        [MessagePack.Key(3)] public byte SyncMemberIndex { get; set; }
-        [MessagePack.Key(4)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
-
 		[MessagePack.Key(5)] public <#=memberKVP.Value.Item1#> valuePrevious;
 		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valueNew;
 
-		public <#=className#>(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
+        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<<#=className#>> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<<#=className#>>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, <#=memberKVP.Value.Item1#>, <#=memberKVP.Value.Item1#>)"/>.
+        /// </summary>
+        public <#=className#>() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(<#=className#>)"/> when no longer needed!
+        /// </summary>
+        public static <#=className#> Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
 		{
-            Explanation = explanation;
-            OccurredAtElapsedTicks = occurredAtElapsedTicks;
-            RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
-            GONetId = gonetId;
-            SyncMemberIndex = syncMemberIndex;
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            <#=className#> autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
             
-			this.valuePrevious = valuePrevious;
-            this.valueNew = valueNew;
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
 		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(<#=className#> borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
     }
 
 <#
@@ -157,7 +203,7 @@ namespace GONet.Generation
 			return null;
 		}
 
-		internal static ISyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
+		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
             switch (syncCompanion.gonetParticipant.codeGenerationId)
             {
@@ -201,7 +247,7 @@ namespace GONet.Generation
 										className += string.Concat(typeof(UnityEngine.Animator).Name, singleMember.animatorControllerName, UNDIE, PARAM, singleMember.animatorControllerParameterName);
 									}
 #>									<#=memberTypeFullName#> valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.<#=memberTypeFullName.Replace(".", "_")#> : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.<#=memberTypeFullName.Replace(".", "_")#>; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return new <#=className#>(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, syncMemberIndex, valuePrevious, valueNew);
+									return <#=className#>.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, syncMemberIndex, valuePrevious, valueNew);
 								}
 <#
 									++iOverall;

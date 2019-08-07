@@ -195,19 +195,25 @@ namespace GONet
         BlendingBetweenInboundValuesFromOther,
     }
 
+    public interface ISelfReturnEvent
+    {
+        void Return();
+    }
+
     /// <summary>
     /// This represents that a sync value change has been processed.  Two major occassions:
     /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
-    public interface ISyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish
+    [MessagePackObject]
+    public abstract class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent
     {
-        uint RelatedOwnerAuthorityId { get; }
+        [Key(0)] public long OccurredAtElapsedTicks { get; set; }
+        [Key(1)] public uint RelatedOwnerAuthorityId { get; set; }
+        [Key(2)] public uint GONetId { get; set; }
+        [Key(3)] public byte SyncMemberIndex { get; set; }
+        [Key(4)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
 
-        uint GONetId { get; }
-
-        byte SyncMemberIndex { get; }
-
-        SyncEvent_ValueChangeProcessedExplanation Explanation { get; }
+        public abstract void Return();
     }
 }
