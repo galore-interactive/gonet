@@ -23,29 +23,50 @@ namespace GONet
 {
     #region support classes
 
-    public interface IGONetEventEnvelope
+    public abstract class GONetEventEnvelope
     {
-        uint SourceAuthorityId { get; set; }
+        public virtual uint SourceAuthorityId { get; set; }
 
-        bool IsSourceRemote { get; }
+        public virtual bool IsSourceRemote { get; }
 
-        IGONetEvent Event { get; set; }
+        internal IGONetEvent EventUntyped { get; set; }
     }
 
-    public interface IGONetEventEnvelope<T> : IGONetEventEnvelope
+    public sealed class GONetEventEnvelope<T> : GONetEventEnvelope where T : IGONetEvent
     {
-        new T Event { get; set; }
-    }
+        static readonly ObjectPool<GONetEventEnvelope<T>> pool = new ObjectPool<GONetEventEnvelope<T>>(50, 5);
 
-    public struct GONetEventEnvelope<T> : IGONetEventEnvelope<T> where T : IGONetEvent
-    {
-        public uint SourceAuthorityId { get; set; }
+        public override uint SourceAuthorityId { get; set; }
 
-        public bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
+        public override bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
 
-        IGONetEvent IGONetEventEnvelope.Event { get => Event; set => Event = (T)value; }
+        T eventTyped;
+        public T Event
+        {
+            get => eventTyped;
+            set => EventUntyped = eventTyped = value;
+        }
 
-        public T Event { get; set; }
+        internal static GONetEventEnvelope<T> Borrow(T eventTyped, uint sourceAuthorityId)
+        {
+            var envelope = pool.Borrow();
+
+            envelope.Event = eventTyped;
+            envelope.SourceAuthorityId = sourceAuthorityId;
+
+            return envelope;
+        }
+
+        internal static void Return(GONetEventEnvelope<T> borrowed)
+        {
+            pool.Return(borrowed);
+        }
+
+        internal void Init(T @event, uint sourceAuthorityId)
+        {
+            Event = @event;
+            SourceAuthorityId = sourceAuthorityId;
+        }
     }
 
     public interface IHasPriority
@@ -64,13 +85,18 @@ namespace GONet
     {
         public static readonly GONetEventBus Instance = new GONetEventBus();
 
-        public delegate void HandleEventDelegate<T>(IGONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
-        public delegate bool EventFilterDelegate<T>(IGONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
+        public delegate void HandleEventDelegate<T>(GONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
+        public delegate bool EventFilterDelegate<T>(GONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
 
         readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_SpecificOnly = new Dictionary<Type, List<EventHandlerAndFilterer>>();
         readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_IncludingChildren = new Dictionary<Type, List<EventHandlerAndFilterer>>();
 
         private GONetEventBus() { }
+
+        /// <summary>
+        /// IMPORTANT: since we only allow calls to <see cref="Publish{T}(T, uint?)"/> from one thread (i.e., <see cref="GONetMain.mainUnityThread"/>), we are sure everything is serial calls and only one of these little temporary pass through guys is needed!  The calls to <see cref="GONetEventEnvelope{T}.Borrow(T, uint)"/> is called in the publish bit for each one individually to get the properly typed instance that is automatically returned to its pool after being processed
+        /// </summary>
+        readonly GONetEventEnvelope<IGONetEvent> genericEnvelope = new GONetEventEnvelope<IGONetEvent>();
 
         /// <summary>
         /// IMPORTANT: Only call this from the main Unity thread!
@@ -87,15 +113,15 @@ namespace GONet
             {
                 int handlerCount = handlersForType.Count;
                 uint sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
-                IGONetEventEnvelope<IGONetEvent> envelope = new GONetEventEnvelope<IGONetEvent>() { Event = @event, SourceAuthorityId = sourceAuthorityId };
+                genericEnvelope.Init(@event, sourceAuthorityId);
                 for (int i = 0; i < handlerCount; ++i)
                 {
                     EventHandlerAndFilterer handlerForType = handlersForType[i];
-                    if (handlerForType.Filterer == null || handlerForType.Filterer(envelope))
+                    if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
                     {
                         try // try-catch to disallow a single handler blowing things up for the rest of them!
                         {
-                            handlerForType.Handler(envelope);
+                            handlerForType.Handler(genericEnvelope);
                         }
                         catch (Exception error)
                         {
@@ -111,6 +137,18 @@ namespace GONet
             {
                 //const string NO_HANDLERS = "Event received, but no handlers to process it.";
                 //GONetLog.Info(NO_HANDLERS);
+            }
+
+            try
+            {
+                if (@event is ISelfReturnEvent)
+                {
+                    ((ISelfReturnEvent)@event).Return();
+                }
+            }
+            catch (Exception e)
+            {
+                GONetLog.Warning(e.Message);
             }
         }
 
@@ -362,15 +400,13 @@ namespace GONet
                 this.wrappedHandler = wrappedHandler ?? throw new ArgumentNullException(nameof(wrappedHandler));
             }
 
-            public void Handle(IGONetEventEnvelope eventEnvelope)
+            public void Handle(GONetEventEnvelope eventEnvelope)
             {
-                IGONetEventEnvelope<T> envelopeTyped = new GONetEventEnvelope<T>()
-                {
-                    Event = (T)eventEnvelope.Event,
-                    SourceAuthorityId = eventEnvelope.SourceAuthorityId
-                };
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId);
 
                 wrappedHandler(envelopeTyped);
+
+                GONetEventEnvelope<T>.Return(envelopeTyped);
             }
         }
 
@@ -386,15 +422,15 @@ namespace GONet
                 this.wrappedFilter = wrappedFilter ?? throw new ArgumentNullException(nameof(wrappedFilter));
             }
 
-            public bool Filter(IGONetEventEnvelope eventEnvelope)
+            public bool Filter(GONetEventEnvelope<IGONetEvent> eventEnvelope)
             {
-                IGONetEventEnvelope<T> envelopeTyped = new GONetEventEnvelope<T>()
-                {
-                    Event = (T)eventEnvelope.Event,
-                    SourceAuthorityId = eventEnvelope.SourceAuthorityId
-                };
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId);
 
-                return wrappedFilter(envelopeTyped);
+                bool filterResult = wrappedFilter(envelopeTyped);
+
+                GONetEventEnvelope<T>.Return(envelopeTyped);
+
+                return filterResult;
             }
         }
     }

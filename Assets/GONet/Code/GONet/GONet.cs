@@ -240,12 +240,12 @@ namespace GONet
             EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
         }
 
-        private static void OnSyncValueChangeProcessed_Persist_Local(IGONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+        private static void OnSyncValueChangeProcessed_Persist_Local(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             // TODO persist!
         }
 
-        private static void OnPersistentEventsBundle_ProcessAll_Remote(IGONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
+        private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
             foreach (var item in eventEnvelope.Event.PersistentEvents)
             {
@@ -262,7 +262,7 @@ namespace GONet
         /// Definition of "if appropriate":
         ///     -The server will always send to remote connections....clients only send to remote connections (i.e., just to server) when locally sourced!
         /// </summary>
-        private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(IGONetEventEnvelope<IGONetEvent> eventEnvelope)
+        private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(GONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
             if (eventEnvelope.Event is ILocalOnlyPublish)
             {
@@ -292,14 +292,14 @@ namespace GONet
             }
         }
 
-        private static void OnPersistentEvent_KeepTrack(IGONetEventEnvelope<IPersistentEvent> eventEnvelope)
+        private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
             GONetLog.Debug("pub/sub Persistent");
 
             persistentEventsThisSession.Enqueue(eventEnvelope.Event);
         }
 
-        private static void OnInstantiationEvent_Remote(IGONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
+        private static void OnInstantiationEvent_Remote(GONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
         {
             GONetLog.Debug("pub/sub Instantiate REMOTE");
 
@@ -575,13 +575,6 @@ namespace GONet
                 {
                     GONetLog.Error("Boo.  Publishing this sync value change event failed.  Error.Message: " + e.Message);
                 }
-                finally
-                {
-                    if (@event is ISelfReturnEvent)
-                    {
-                        ((ISelfReturnEvent)@event).Return();
-                    }
-                }
             }
         }
 
@@ -606,11 +599,6 @@ namespace GONet
                     finally
                     {
                         --count;
-
-                        if (@event is ISelfReturnEvent)
-                        {
-                            ((ISelfReturnEvent)@event).Return();
-                        }
                     }
                 }
             }
