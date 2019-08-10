@@ -1665,13 +1665,7 @@ namespace GONet
                 bool doesRequireManualProcessInitiation = DoesRequireManualProcessInitiation;
                 while (isThreadRunning)
                 {
-                    bool isNotSafeToContinue =
-                        MyAuthorityId == OwnerAuthorityId_Unset ||
-                        Time.UpdateCount == timeUpdateCountUponConstruction || 
-                        !IsClientVsServerStatusKnown || 
-                        (IsClient && !GONetClient.IsConnectedToServer);
-
-                    if (isNotSafeToContinue || (doesRequireManualProcessInitiation && !shouldProcessInSeparateThreadASAP))
+                    if (IsNotSafeToProcess() || (doesRequireManualProcessInitiation && !shouldProcessInSeparateThreadASAP))
                     {
                         Thread.Sleep(1); // TODO come up with appropriate sleep time/value 
                     }
@@ -1695,6 +1689,17 @@ namespace GONet
                 }
             }
 
+            private bool IsNotSafeToProcess()
+            {
+                return MyAuthorityId == OwnerAuthorityId_Unset ||
+                    Time.UpdateCount == timeUpdateCountUponConstruction ||
+                    !IsClientVsServerStatusKnown ||
+                    (IsClient && !GONetClient.IsConnectedToServer);
+            }
+
+            /// <summary>
+            /// Caller is responsible for knowing the value of and dealing with <see cref="IsNotSafeToProcess"/>.
+            /// </summary>
             private void Process()
             {
                 myThread_Time.Update();
@@ -1778,7 +1783,7 @@ namespace GONet
                 {
                     shouldProcessInSeparateThreadASAP = true;
                 }
-                else
+                else if (!IsNotSafeToProcess())
                 {
                     if (scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS)
                     {
