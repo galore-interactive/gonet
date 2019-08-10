@@ -110,6 +110,11 @@ namespace GONet
         /// </summary>
         public static bool IsClient => _gonetClient == null ? false : _gonetClient.ClientTypeFlags != ClientTypeFlags.None;
 
+        /// <summary>
+        /// IMPORTANT: Prior to things being initialized with network connection(s), we may not know if we are a client or a server...in which case, this will return false!
+        /// </summary>
+        public static bool IsClientVsServerStatusKnown => IsServer || IsClient;
+
         private static GONetServer _gonetServer; // TODO remove this once we make gonetServer private again!
         /// <summary>
         /// TODO FIXME make this private.....its internal temporary for testing
@@ -998,8 +1003,6 @@ namespace GONet
 
                                 //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
 
-                                // TODO need to get in generic event/message serialization in .... AND add persistent events into persistentEventsThisSession
-
                                 {  // body:
                                     if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                                     {
@@ -1024,6 +1027,7 @@ namespace GONet
                                         uint ownerAuthorityId;
                                         bitStream.ReadUInt(out ownerAuthorityId);
 
+                                        GONetLog.Debug(" ***************************** received authId: " + ownerAuthorityId + " IsServer: "+  IsServer);
                                         if (!IsServer) // this only applied to clients....should NEVER happen on server
                                         {
                                             MyAuthorityId = ownerAuthorityId;
@@ -1661,7 +1665,12 @@ namespace GONet
                 bool doesRequireManualProcessInitiation = DoesRequireManualProcessInitiation;
                 while (isThreadRunning)
                 {
-                    bool isNotSafeToContinue = Time.UpdateCount == timeUpdateCountUponConstruction;
+                    bool isNotSafeToContinue =
+                        MyAuthorityId == OwnerAuthorityId_Unset ||
+                        Time.UpdateCount == timeUpdateCountUponConstruction || 
+                        !IsClientVsServerStatusKnown || 
+                        (IsClient && !GONetClient.IsConnectedToServer);
+
                     if (isNotSafeToContinue || (doesRequireManualProcessInitiation && !shouldProcessInSeparateThreadASAP))
                     {
                         Thread.Sleep(1); // TODO come up with appropriate sleep time/value 
@@ -1735,10 +1744,6 @@ namespace GONet
                     }
                     else
                     {
-                        if (MyAuthorityId == OwnerAuthorityId_Unset)
-                        {
-                            throw new Exception("Magoo.....we need MyAuthorityId set before doing the following:");
-                        }
                         byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, myTicks);
                         if (changesSerialized != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
                         {

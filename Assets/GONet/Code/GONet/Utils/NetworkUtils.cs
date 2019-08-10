@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -42,21 +43,28 @@ namespace GONet.Utils
         /// </summary>
         public static bool IsLocalPortListening(int port)
         {
-            var endpoint = new IPEndPoint(IPAddress.Parse(LOOPBACK_IP), port);
-            Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-            try
+            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+            List<IPAddress> addressesToCheck = new List<IPAddress>(host.AddressList);
+            addressesToCheck.Add(IPAddress.Parse(LOOPBACK_IP));
+            foreach (var myAddressToCheck in addressesToCheck)
             {
-                socket.Bind(endpoint);
-                return false;
+                var endpoint = new IPEndPoint(myAddressToCheck, port);
+                Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                try
+                {
+                    socket.Bind(endpoint);
+                }
+                catch (SocketException)
+                {
+                    return true;
+                }
+                finally
+                {
+                    socket.Close();
+                }
             }
-            catch (SocketException)
-            {
-                return true;
-            }
-            finally
-            {
-                socket.Close();
-            }
+
+            return false;
         }
     }
 }
