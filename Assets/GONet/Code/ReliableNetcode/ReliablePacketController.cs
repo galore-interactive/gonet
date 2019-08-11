@@ -50,9 +50,9 @@ namespace ReliableNetcode
     {
         public ReliableConfig config;
 
-        public float RTT
+        public float RTTMilliseconds
         {
-            get { return rtt; }
+            get { return rttMilliseconds; }
         }
 
         public float PacketLoss
@@ -75,8 +75,8 @@ namespace ReliableNetcode
             get { return ackedBandwidthKBPS; }
         }
 
-        private double time;
-        private float rtt;
+        private double timeSeconds;
+        private float rttMilliseconds;
         private float packetLoss;
         private float sentBandwidthKBPS;
         private float receivedBandwidthKBPS;
@@ -86,10 +86,10 @@ namespace ReliableNetcode
         private SequenceBuffer<ReceivedPacketData> receivedPackets;
         private SequenceBuffer<FragmentReassemblyData> fragmentReassembly;
 
-        public ReliablePacketController(ReliableConfig config, double time)
+        public ReliablePacketController(ReliableConfig config, double timeSeconds)
         {
             this.config = config;
-            this.time = time;
+            this.timeSeconds = timeSeconds;
 
             this.sentPackets = new SequenceBuffer<SentPacketData>(config.SentPacketBufferSize);
             this.receivedPackets = new SequenceBuffer<ReceivedPacketData>(config.ReceivedPacketBufferSize);
@@ -117,9 +117,9 @@ namespace ReliableNetcode
             fragmentReassembly.Reset();
         }
 
-        public void Update(double newTime)
+        public void Update(double newTimeSeconds)
         {
-            this.time = newTime;
+            this.timeSeconds = newTimeSeconds;
 
             // calculate packet loss
             {
@@ -157,8 +157,8 @@ namespace ReliableNetcode
                     if (sentPacketData == null) continue;
 
                     bytesSent += (int)sentPacketData.packetBytes;
-                    startTime = (startTime < sentPacketData.time) ? startTime : sentPacketData.time; // Math.Min(startTime, sentPacketData.time);
-                    finishTime = (finishTime > sentPacketData.time) ? finishTime : sentPacketData.time; // Math.Max(finishTime, sentPacketData.time);
+                    startTime = (startTime < sentPacketData.timeSeconds) ? startTime : sentPacketData.timeSeconds; // Math.Min(startTime, sentPacketData.time);
+                    finishTime = (finishTime > sentPacketData.timeSeconds) ? finishTime : sentPacketData.timeSeconds; // Math.Max(finishTime, sentPacketData.time);
                 }
 
                 if (startTime != double.MaxValue && finishTime != 0.0) {
@@ -216,8 +216,8 @@ namespace ReliableNetcode
                     if (sentPacketData == null || sentPacketData.acked == false) continue;
 
                     bytesSent += (int)sentPacketData.packetBytes;
-                    startTime = (startTime < sentPacketData.time) ? startTime : sentPacketData.time; // Math.Min(startTime, sentPacketData.time);
-                    finishTime = (finishTime > sentPacketData.time) ? finishTime : sentPacketData.time; // Math.Max(finishTime, sentPacketData.time);
+                    startTime = (startTime < sentPacketData.timeSeconds) ? startTime : sentPacketData.timeSeconds; // Math.Min(startTime, sentPacketData.time);
+                    finishTime = (finishTime > sentPacketData.timeSeconds) ? finishTime : sentPacketData.timeSeconds; // Math.Max(finishTime, sentPacketData.time);
                 }
 
                 if (startTime != double.MaxValue && finishTime != 0.0) {
@@ -261,7 +261,7 @@ namespace ReliableNetcode
                 receivedPackets.GenerateAckBits(out ack, out ackBits);
 
             SentPacketData sentPacketData = sentPackets.Insert(sequence);
-            sentPacketData.time = this.time;
+            sentPacketData.timeSeconds = this.timeSeconds;
             sentPacketData.packetBytes = (uint)(config.PacketHeaderSize + length);
             sentPacketData.acked = false;
 
@@ -378,7 +378,7 @@ namespace ReliableNetcode
                         if (receivedPacketData == null)
                             throw new InvalidOperationException("Failed to insert received packet!");
 
-                        receivedPacketData.time = this.time;
+                        receivedPacketData.time = this.timeSeconds;
                         receivedPacketData.packetBytes = (uint)(config.PacketHeaderSize + bufferLength);
                     }
 
@@ -397,12 +397,12 @@ namespace ReliableNetcode
                                 if (config.AckPacketCallback != null)
                                     config.AckPacketCallback(ack_sequence);
 
-                                float rtt = (float)(this.time - sentPacketData.time) * 1000.0f;
-                                if ((this.rtt == 0f && rtt > 0f) || Math.Abs(this.rtt - rtt) < 0.00001f) {
-                                    this.rtt = rtt;
+                                float rttMilliseconds = (float)(this.timeSeconds - sentPacketData.timeSeconds) * 1000.0f;
+                                if ((this.rttMilliseconds == 0f && rttMilliseconds > 0f) || Math.Abs(this.rttMilliseconds - rttMilliseconds) < 0.00001f) {
+                                    this.rttMilliseconds = rttMilliseconds;
                                 }
                                 else {
-                                    this.rtt += (rtt - this.rtt) * config.RTTSmoothFactor;
+                                    this.rttMilliseconds += (rttMilliseconds - this.rttMilliseconds) * config.RTTSmoothFactor;
                                 }
                             }
                         }

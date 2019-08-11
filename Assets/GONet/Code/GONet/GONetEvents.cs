@@ -251,8 +251,12 @@ namespace GONet
         [Key(6), FilterableBy]  public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember]          public long ElapsedTicks_Previous { get; private set; }
 
-        [Key(7), FilterableBy] public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long ElapsedTicks_New { get; private set; }
+        [Key(7), FilterableBy]  public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember]          public long ElapsedTicks_New { get; private set; }
+
+        [Key(8), FilterableBy]  public double RoundTripSeconds_Latest { get; set; }
+        [Key(9), FilterableBy]  public double RoundTripSeconds_RecentAverage { get; set; }
+        [Key(10), FilterableBy]  public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
 
         static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
         static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();
@@ -268,7 +272,7 @@ namespace GONet
         /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
         ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_Time_ElapsedTicks_SetFromAuthority)"/> when no longer needed!
         /// </summary>
-        public static SyncEvent_Time_ElapsedTicks_SetFromAuthority Borrow(long elapsedTicks_previous, long elapsedTicks_new)
+        public static SyncEvent_Time_ElapsedTicks_SetFromAuthority Borrow(long elapsedTicks_previous, long elapsedTicks_new, float roundTripSeconds_latest, float roundTripSeconds_recentAverage, float roundTripMilliseconds_LowLevelTransportProtocol)
         {
             if (borrowThread == null)
             {
@@ -289,6 +293,10 @@ namespace GONet
             }
 
             var @event = pool.Borrow();
+
+            @event.RoundTripSeconds_Latest = roundTripSeconds_latest;
+            @event.RoundTripSeconds_RecentAverage = roundTripSeconds_recentAverage;
+            @event.RoundTripMilliseconds_LowLevelTransportProtocol = roundTripMilliseconds_LowLevelTransportProtocol;
 
             @event.Explanation = SyncEvent_ValueChangeProcessedExplanation.InboundFromOther;
             @event.OccurredAtElapsedTicks = elapsedTicks_previous;

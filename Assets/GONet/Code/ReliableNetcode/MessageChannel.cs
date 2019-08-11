@@ -59,9 +59,9 @@ namespace ReliableNetcode
             packetController.Reset();
         }
 
-        public override void Update(double newTime)
+        public override void Update(double newTimeSeconds)
         {
-            packetController.Update(newTime);
+            packetController.Update(newTimeSeconds);
         }
 
         public override void ReceivePacket(byte[] buffer, int bufferLength)
@@ -109,9 +109,9 @@ namespace ReliableNetcode
             packetController.Reset();
         }
 
-        public override void Update(double newTime)
+        public override void Update(double newTimeSeconds)
         {
-            packetController.Update(newTime);
+            packetController.Update(newTimeSeconds);
         }
 
         public override void ReceivePacket(byte[] buffer, int bufferLength)
@@ -157,7 +157,7 @@ namespace ReliableNetcode
             }
         }
 
-        public float RTT => packetController.RTT;
+        public float RTTMilliseconds => packetController.RTTMilliseconds;
 
         public float PacketLoss => packetController.PacketLoss;
 
@@ -181,7 +181,7 @@ namespace ReliableNetcode
 
         private double lastBufferFlush;
         private double lastMessageSend;
-        private double time;
+        private double timeSeconds;
 
         private volatile ushort oldestUnacked;
         private volatile ushort sequence;
@@ -200,10 +200,10 @@ namespace ReliableNetcode
             receiveBuffer = new SequenceBuffer<BufferedPacket>(256);
             ackBuffer = new SequenceBuffer<OutgoingPacketSet>(256);
 
-            time = DateTime.UtcNow.GetTotalSeconds();
+            timeSeconds = DateTime.UtcNow.GetTotalSeconds();
             lastBufferFlush = -1.0;
             lastMessageSend = 0.0;
-            this.packetController = new ReliablePacketController(config, time);
+            this.packetController = new ReliablePacketController(config, timeSeconds);
 
             this.congestionDisableInterval = 5.0;
 
@@ -231,11 +231,11 @@ namespace ReliableNetcode
             this.oldestUnacked = 0;
         }
 
-        public override void Update(double newTime)
+        public override void Update(double newTimeSeconds)
         {
-            double dt = newTime - time;
-            time = newTime;
-            this.packetController.Update(time);
+            double dt = newTimeSeconds - timeSeconds;
+            timeSeconds = newTimeSeconds;
+            this.packetController.Update(timeSeconds);
 
             // see if we can pop messages off of the message queue and put them on the send queue
             if (messageQueue.Count > 0) {
@@ -255,19 +255,19 @@ namespace ReliableNetcode
             // update congestion mode
             {
                 // conditions are bad if round-trip-time exceeds 250ms
-                bool conditionsBad = (this.packetController.RTT >= 250f);
+                bool conditionsBad = (this.packetController.RTTMilliseconds >= 250f);
 
                 // if conditions are bad, immediately enable congestion control and reset the congestion timer
                 if (conditionsBad) {
                     if (this.congestionControl == false) {
                         // if we're within 10 seconds of the last time we switched, double the threshold interval
-                        if (time - lastCongestionSwitchTime < 10.0)
+                        if (timeSeconds - lastCongestionSwitchTime < 10.0)
                         {
                             double times2 = congestionDisableInterval * 2;
                             congestionDisableInterval = (times2 < 60.0) ? times2 : 60.0; // Math.Min(congestionDisableInterval * 2, 60.0);
                         }
 
-                        lastCongestionSwitchTime = time;
+                        lastCongestionSwitchTime = timeSeconds;
                     }
 
                     this.congestionControl = true;
@@ -279,7 +279,7 @@ namespace ReliableNetcode
                     this.congestionDisableTimer += dt;
                     if (this.congestionDisableTimer >= this.congestionDisableInterval) {
                         this.congestionControl = false;
-                        lastCongestionSwitchTime = time;
+                        lastCongestionSwitchTime = timeSeconds;
                         congestionDisableTimer = 0.0;
                     }
                 }
@@ -299,8 +299,8 @@ namespace ReliableNetcode
             // otherwise, send 30 times per second
             double flushInterval = congestionControl ? 0.1 : 0.033;
 
-            if (time - lastBufferFlush >= flushInterval) {
-                lastBufferFlush = time;
+            if (timeSeconds - lastBufferFlush >= flushInterval) {
+                lastBufferFlush = timeSeconds;
                 processSendBuffer();
             }
         }
@@ -411,7 +411,7 @@ namespace ReliableNetcode
                 // for any message that hasn't been sent in the last 0.1 seconds and fits in the available space of our message packer, add it
                 var packet = sendBuffer.Find(seq);
                 if (packet != null && !packet.writeLock) {
-                    if (time - packet.time < 0.1)
+                    if (timeSeconds - packet.time < 0.1)
                         continue;
 
                     bool packetFits = false;
@@ -426,7 +426,7 @@ namespace ReliableNetcode
                         flushMessagePacker();
                     }
 
-                    packet.time = time;
+                    packet.time = timeSeconds;
 
                     int ptr = messagePacker.Length;
                     messagePacker.SetSize(messagePacker.Length + packet.buffer.Length);
@@ -434,14 +434,14 @@ namespace ReliableNetcode
 
                     tempList.Add(seq);
 
-                    lastMessageSend = time;
+                    lastMessageSend = timeSeconds;
                 }
             }
 
             // if it has been 0.1 seconds since the last time we sent a message, send an empty message
-            if (time - lastMessageSend >= 0.1) {
+            if (timeSeconds - lastMessageSend >= 0.1) {
                 sendAckPacket();
-                lastMessageSend = time;
+                lastMessageSend = timeSeconds;
             }
 
             // flush any remaining messages in message packer

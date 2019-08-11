@@ -263,21 +263,21 @@ namespace GONet
                 syncEventsToSaveQueueByEventType[eventType] = syncEventsToSaveQueue = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
             }
 
-            SyncEvent_ValueChangeProcessed instanceToEnqueu;
+            SyncEvent_ValueChangeProcessed instanceToEnqueue;
             if (doesRequireCopy)
             {
                 // IMPORTANT: have to make a copy since these are pooled and we are not using the data immediately and GONet will return the event to the pool after this method exits...we need to keep a copy with good data until later on when we actually save
                 SyncEvent_ValueChangeProcessed copy = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateCopy(@event);
-                copy.ProcessedAtElapsedTicks = Time.ElapsedTicks;
-
-                instanceToEnqueu = copy;
+                instanceToEnqueue = copy;
             }
             else
             {
-                instanceToEnqueu = @event;
+                instanceToEnqueue = @event;
             }
 
-            syncEventsToSaveQueue.Enqueue(instanceToEnqueu);
+            instanceToEnqueue.ProcessedAtElapsedTicks = Time.ElapsedTicks;
+
+            syncEventsToSaveQueue.Enqueue(instanceToEnqueue); // NOTE: instanceToEnqueu will get returned to its pool when this queue is processed!
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -797,7 +797,9 @@ namespace GONet
                     long previous = Time.ElapsedTicks;
                     Time.SetFromAuthority(newClientTimeTicks);
 
-                    OnSyncValueChangeProcessed_Persist_Local(SyncEvent_Time_ElapsedTicks_SetFromAuthority.Borrow(previous, newClientTimeTicks), false); // NOTE: false is to indicate no copy needed like normally needed due to processing flow of normal/automatic sync events, which this is not
+                    OnSyncValueChangeProcessed_Persist_Local(
+                        SyncEvent_Time_ElapsedTicks_SetFromAuthority.Borrow(previous, newClientTimeTicks, GONetClient.connectionToServer.RTT_Latest, GONetClient.connectionToServer.RTT_RecentAverage, GONetClient.connectionToServer.RTTMilliseconds_LowLevelTransportProtocol), 
+                        false); // NOTE: false is to indicate no copy needed like normally needed due to processing flow of normal/automatic sync events, which this is not
 
                     if (!client_hasClosedTimeSyncGapWithServer)
                     {

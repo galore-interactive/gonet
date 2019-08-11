@@ -49,9 +49,9 @@ namespace ReliableNetcode
 		public uint Index = uint.MaxValue;
 
 		/// <summary>
-		/// Approximate round-trip-time
+		/// Approximate round-trip-time in milliseconds
 		/// </summary>
-		public float RTT => _reliableChannel.RTT;
+		public float RTTMilliseconds => _reliableChannel.RTTMilliseconds;
 
 		/// <summary>
 		/// Approximate packet loss

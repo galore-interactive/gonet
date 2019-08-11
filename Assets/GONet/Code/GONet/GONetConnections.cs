@@ -37,8 +37,11 @@ namespace GONet
 
         #region round trip time stuffs (RTT)
 
+        public float RTTMilliseconds_LowLevelTransportProtocol => RTTMilliseconds;
+
         private float rtt_latest;
         /// <summary>
+        /// GONet owned data.  If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
         /// Unit of measure is seconds here.
         /// </summary>
         public float RTT_Latest
@@ -74,8 +77,9 @@ namespace GONet
                 }
             }
         }
-        
+
         /// <summary>
+        /// GONet owned data.  If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
         /// This is useful to reference/use instead of <see cref="RTT_Latest"/> in order to account for jitter (i.e., RTT variation) by averaging recent values.
         /// Unit of measure is seconds here.
         /// </summary>

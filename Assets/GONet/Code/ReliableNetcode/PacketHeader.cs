@@ -9,7 +9,7 @@ namespace ReliableNetcode
 {
     internal class SentPacketData
     {
-        public double time;
+        public double timeSeconds;
         public bool acked;
         public uint packetBytes;
     }
