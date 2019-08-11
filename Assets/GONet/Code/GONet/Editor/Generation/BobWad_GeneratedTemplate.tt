@@ -103,10 +103,10 @@ namespace GONet
     [MessagePack.MessagePackObject]
     public sealed class <#=className#> : SyncEvent_ValueChangeProcessed
     {
-		[MessagePack.Key(5)] public <#=memberKVP.Value.Item1#> valuePrevious;
-		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valueNew;
+		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valuePrevious;
+		[MessagePack.Key(7)] public <#=memberKVP.Value.Item1#> valueNew;
 
-        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(50, 5);
+        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
         static readonly System.Collections.Concurrent.ConcurrentQueue<<#=className#>> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<<#=className#>>();
         static System.Threading.Thread borrowThread;
 
@@ -120,7 +120,7 @@ namespace GONet
         /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
         ///            here (i.e., to private object pool) via <see cref="Return(<#=className#>)"/> when no longer needed!
         /// </summary>
-        public static <#=className#> Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
+        public static <#=className#> Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
 		{
             if (borrowThread == null)
             {
@@ -146,6 +146,7 @@ namespace GONet
             @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
             @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
             @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
             @event.SyncMemberIndex = syncMemberIndex;
 			@event.valuePrevious = valuePrevious;
             @event.valueNew = valueNew;
@@ -185,6 +186,7 @@ namespace GONet.Generation
 		{
 			GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness;
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
+			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness_copy = hahaThisIsTrulyTheRealness_Events_Copy;
 		}
 
 		static internal GONetParticipant_AutoMagicalSyncCompanion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)
@@ -247,7 +249,7 @@ namespace GONet.Generation
 										className += string.Concat(typeof(UnityEngine.Animator).Name, singleMember.animatorControllerName, UNDIE, PARAM, singleMember.animatorControllerParameterName);
 									}
 #>									<#=memberTypeFullName#> valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.<#=memberTypeFullName.Replace(".", "_")#> : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.<#=memberTypeFullName.Replace(".", "_")#>; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return <#=className#>.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, syncMemberIndex, valuePrevious, valueNew);
+									return <#=className#>.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, <#=iCodeGenerationId#>, syncMemberIndex, valuePrevious, valueNew);
 								}
 <#
 									++iOverall;
@@ -264,5 +266,61 @@ namespace GONet.Generation
 
             return default;
         }
+
+		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events_Copy(SyncEvent_ValueChangeProcessed original)
+		{
+            switch (original.CodeGenerationId)
+            {
+<#
+	for (byte iCodeGenerationId = 1; iCodeGenerationId <= maxCodeGenerationId; ++iCodeGenerationId)
+    {
+#>
+				case <#=iCodeGenerationId#>:
+					{
+                        switch (original.SyncMemberIndex)
+                        {
+
+<#
+							int iOverall = 0;
+							foreach (var uniqueSnap in allUniqueSnapsByCodeGenerationId[iCodeGenerationId])
+                            {
+								foreach (var singleMember in uniqueSnap.autoSyncMembers)
+                                {
+									string memberTypeFullName = singleMember.animatorControllerParameterId == 0 ? singleMember.memberTypeFullName : singleMember.animatorControllerParameterTypeFullName;
+#>
+                            case <#=iOverall#>:
+								{
+<#
+									const string SYNC_EV = "SyncEvent_";
+									const string UNDIE = "_";
+
+									string className = SYNC_EV;
+									if (singleMember.animatorControllerParameterId == 0)
+                                    {
+										className += string.Concat(uniqueSnap.componentTypeName, UNDIE, singleMember.memberName);
+                                    }
+									else
+									{
+										const string PARAM = "parameters_";
+										className += string.Concat(typeof(UnityEngine.Animator).Name, singleMember.animatorControllerName, UNDIE, PARAM, singleMember.animatorControllerParameterName);
+									}
+#>									<#=className#> originalTyped = (<#=className#>)original;
+									return <#=className#>.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+<#
+									++iOverall;
+								}
+                            }
+#>
+						
+						}
+					}
+					break;
+
+<#	}#>
+			}
+
+			return default;
+		}
 	}
 }

@@ -506,7 +506,7 @@ namespace GONet.Database.Sqlite
         /// <param name="limit">maximum number of items in <paramref name="items"/> to save, if not supplied, all are saved</param>
         public bool Save<T>(IEnumerable<T> items, int limit = int.MaxValue, bool shouldBypassUIDUpdate = true) where T : IDatabaseRow
         {
-            if (items == null)
+            if (items == null || items.Count() == 0)
             {
                 return false;
             }
@@ -524,7 +524,7 @@ namespace GONet.Database.Sqlite
                     OpenConnection(connection);
                     using (SqliteCommand command = (SqliteCommand)connection.CreateCommand())
                     {
-                        Type tableType = typeof(T);
+                        Type tableType = items.ElementAt(0).GetType();
                         string tableName = tableType.Name;
 
                         if (!typesAlreadyCreatedInDatabase.Contains(tableType))

@@ -19,7 +19,6 @@ using ReliableNetcode;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -76,6 +75,8 @@ namespace GONet
 
         internal static void InitOnUnityMainThread(GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
         {
+            GONetLog.Info("Environment.ProcessorCount: " + Environment.ProcessorCount);
+
             IsUnityApplicationEditor = Application.isEditor;
             mainUnityThread = Thread.CurrentThread;
             GlobalSessionContext = gONetSessionContext;
@@ -139,6 +140,9 @@ namespace GONet
         public static bool IsUnityApplicationEditor { get; private set; }  = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
+
+        internal const int SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE = 1000;
+        static readonly Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>> syncEventsToSaveQueueByEventType = new Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>>(100);
 
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread
@@ -247,7 +251,33 @@ namespace GONet
 
         private static void OnSyncValueChangeProcessed_Persist_Local(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
-            // TODO persist!
+            OnSyncValueChangeProcessed_Persist_Local(eventEnvelope.Event);
+        }
+
+        private static void OnSyncValueChangeProcessed_Persist_Local(SyncEvent_ValueChangeProcessed @event, bool doesRequireCopy = true)
+        {
+            Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue;
+            Type eventType = @event.GetType();
+            if (!syncEventsToSaveQueueByEventType.TryGetValue(eventType, out syncEventsToSaveQueue))
+            {
+                syncEventsToSaveQueueByEventType[eventType] = syncEventsToSaveQueue = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            }
+
+            SyncEvent_ValueChangeProcessed instanceToEnqueu;
+            if (doesRequireCopy)
+            {
+                // IMPORTANT: have to make a copy since these are pooled and we are not using the data immediately and GONet will return the event to the pool after this method exits...we need to keep a copy with good data until later on when we actually save
+                SyncEvent_ValueChangeProcessed copy = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateCopy(@event);
+                copy.ProcessedAtElapsedTicks = Time.ElapsedTicks;
+
+                instanceToEnqueu = copy;
+            }
+            else
+            {
+                instanceToEnqueu = @event;
+            }
+
+            syncEventsToSaveQueue.Enqueue(instanceToEnqueu);
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -451,15 +481,13 @@ namespace GONet
                             {
                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
                                 gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
-
-                                //sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds));
                             }
                         }
                         else
                         {
                             if (GONetClient != null)
                             {
-                                while (!GONetClient.IsConnectedToServer)
+                                while (isRunning_endOfTheLineSend_Thread && !GONetClient.IsConnectedToServer)
                                 {
                                     const string SLEEP = "SLEEP!  So I can send this stuff....not yet connected...that's why.";
                                     GONetLog.Info(SLEEP);
@@ -467,16 +495,17 @@ namespace GONet
                                     Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
                                 }
 
-                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
-                                GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                if (isRunning_endOfTheLineSend_Thread)
+                                {
+                                    //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                    GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                }
                             }
                         }
                     }
                     else
                     {
                         networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
-
-                        //sqlite.Save(new SavedNetworkData(networkData, Time.ElapsedSeconds, networkData.relatedConnection.OwnerAuthorityId));
                     }
 
                     { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
@@ -546,6 +575,7 @@ namespace GONet
 
             PublishEvents_SyncValueChanges_SentToOthers();
             PublishEvents_SyncValueChanges_ReceivedFromOthers();
+            SaveEventsInQueue_IfAppropriate();
 
             if (endOfLineSendThread == null)
             {
@@ -563,6 +593,30 @@ namespace GONet
             {
                 Client_SyncTimeWithServer_Initiate_IfAppropriate();
                 GONetClient?.Update();
+            }
+        }
+
+        private static void SaveEventsInQueue_IfAppropriate(bool shouldForAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
+        {
+            var enumerator = syncEventsToSaveQueueByEventType.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue = enumerator.Current.Value;
+                int count = syncEventsToSaveQueue.Count;
+                bool isAppropriate = shouldForAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
+                if (isAppropriate)
+                {
+                    sqlite.Save(syncEventsToSaveQueue); // save in a batch all at once!  This is important for performance!
+
+                    // IMPORTANT: we have to return all these copied we made!
+                    var enumeratorInner = syncEventsToSaveQueue.GetEnumerator();
+                    while (enumeratorInner.MoveNext())
+                    {
+                        enumeratorInner.Current.Return();
+                    }
+
+                    syncEventsToSaveQueue.Clear();
+                }
             }
         }
 
@@ -740,7 +794,10 @@ namespace GONet
                     long assumedNetworkDelayTicks = rtt_ticks >> 1; // divide by 2
                     long newClientTimeTicks = server_elapsedTicksAtSendResponse + assumedNetworkDelayTicks;
 
+                    long previous = Time.ElapsedTicks;
                     Time.SetFromAuthority(newClientTimeTicks);
+
+                    OnSyncValueChangeProcessed_Persist_Local(SyncEvent_Time_ElapsedTicks_SetFromAuthority.Borrow(previous, newClientTimeTicks), false); // NOTE: false is to indicate no copy needed like normally needed due to processing flow of normal/automatic sync events, which this is not
 
                     if (!client_hasClosedTimeSyncGapWithServer)
                     {
@@ -779,6 +836,8 @@ namespace GONet
             {
                 enumeratorThread.Current.Value.Dispose();
             }
+
+            SaveEventsInQueue_IfAppropriate(true);
         }
 
         internal struct NetworkData
@@ -1574,8 +1633,6 @@ namespace GONet
         /// </summary>
         internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable : IDisposable
         {
-            private readonly int timeUpdateCountUponConstruction;
-
             bool isSetupToRunInSeparateThread;
             /// <summary>
             /// Only non-null when <see cref="isSetupToRunInSeparateThread"/> is true
@@ -1626,7 +1683,6 @@ namespace GONet
 
                 this.everythingMap_evenStuffNotOnThisScheduleFrequency = everythingMap_evenStuffNotOnThisScheduleFrequency;
 
-                timeUpdateCountUponConstruction = Time.updateCount;
                 Time.TimeSetFromAuthority += Time_TimeSetFromAuthority;
 
                 isSetupToRunInSeparateThread = !uniqueGrouping.mustRunOnUnityMainThread;
@@ -1692,7 +1748,6 @@ namespace GONet
             private bool IsNotSafeToProcess()
             {
                 return MyAuthorityId == OwnerAuthorityId_Unset ||
-                    Time.UpdateCount == timeUpdateCountUponConstruction ||
                     !IsClientVsServerStatusKnown ||
                     (IsClient && !GONetClient.IsConnectedToServer);
             }
@@ -1711,10 +1766,18 @@ namespace GONet
                 while (enumeratorOuter.MoveNext())
                 {
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                    if (currentMap == null)
+                    {
+                        GONetLog.Error("currentMap == null");
+                    }
                     var enumeratorInner = currentMap.GetEnumerator();
                     while (enumeratorInner.MoveNext())
                     {
                         GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                        if (monitoringSupport == null)
+                        {
+                            GONetLog.Error("monitoringSupport == null");
+                        }
 
                         // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
                         monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match

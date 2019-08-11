@@ -13,8 +13,12 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
+using GONet.Database;
+using GONet.Database.Sqlite;
 using GONet.Utils;
 using MessagePack;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace GONet
@@ -195,9 +199,45 @@ namespace GONet
         BlendingBetweenInboundValuesFromOther,
     }
 
+    /// <summary>
+    /// Once this event is sent through <see cref="GONetEventBus.Publish{T}(T, uint?)"/>, it will automatically have <see cref="Return"/> called on it.
+    /// At time of writing, this is to support (automatic) object pool usage for better memory/garbage/GC performance.
+    /// </summary>
     public interface ISelfReturnEvent
     {
         void Return();
+    }
+
+    /// <summary>
+    /// This represents that a sync value change has been processed locally.  Two major occassions:
+    /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
+    /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
+    /// </summary>
+    [MessagePackObject]
+    public abstract class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent, IDatabaseRow
+    {
+        [IgnoreMember] public long UID { get; set; }
+
+        [Key(0), FilterableBy(true)] public double OccurredAtElapsedSeconds { get => TimeSpan.FromTicks(OccurredAtElapsedTicks).TotalSeconds; set { OccurredAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember] public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1), FilterableBy(true)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember] public long ProcessedAtElapsedTicks { get; set; }
+
+        [Key(2), FilterableBy(true)] public uint RelatedOwnerAuthorityId { get; set; }
+        [Key(3), FilterableBy(true)] public uint GONetId { get; set; }
+
+        [IgnoreMember] public byte CodeGenerationId { get; internal set; }
+
+        [Key(4), FilterableBy(true)] public byte SyncMemberIndex { get; set; }
+        [Key(5), FilterableBy(true)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// </summary>
+        public SyncEvent_ValueChangeProcessed() { }
+
+        public abstract void Return();
     }
 
     /// <summary>
@@ -206,14 +246,81 @@ namespace GONet
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
     [MessagePackObject]
-    public abstract class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent
+    public sealed class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
     {
-        [Key(0)] public long OccurredAtElapsedTicks { get; set; }
-        [Key(1)] public uint RelatedOwnerAuthorityId { get; set; }
-        [Key(2)] public uint GONetId { get; set; }
-        [Key(3)] public byte SyncMemberIndex { get; set; }
-        [Key(4)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
+        [Key(6), FilterableBy]  public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember]          public long ElapsedTicks_Previous { get; private set; }
 
-        public abstract void Return();
+        [Key(7), FilterableBy] public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember] public long ElapsedTicks_New { get; private set; }
+
+        static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
+        static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, long, long)"/>.
+        /// </summary>
+        public SyncEvent_Time_ElapsedTicks_SetFromAuthority() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_Time_ElapsedTicks_SetFromAuthority)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_Time_ElapsedTicks_SetFromAuthority Borrow(long elapsedTicks_previous, long elapsedTicks_new)
+        {
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_Time_ElapsedTicks_SetFromAuthority autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+
+            @event.Explanation = SyncEvent_ValueChangeProcessedExplanation.InboundFromOther;
+            @event.OccurredAtElapsedTicks = elapsedTicks_previous;
+            @event.RelatedOwnerAuthorityId = GONetMain.OwnerAuthorityId_Server;
+
+            { // meaningless for this event:
+                @event.GONetId = GONetParticipant.GONetId_Unset;
+                @event.CodeGenerationId = 0;
+                @event.SyncMemberIndex = 0;
+            }
+
+            @event.ElapsedTicks_Previous = elapsedTicks_previous;
+            @event.ElapsedTicks_New = elapsedTicks_new;
+
+            return @event;
+        }
+
+        public override void Return()
+        {
+            Return(this);
+        }
+
+        public static void Return(SyncEvent_Time_ElapsedTicks_SetFromAuthority borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
     }
 }

@@ -126,9 +126,10 @@ namespace GONet
                         catch (Exception error)
                         {
                             const string EventType = "(GONetEventBus handler error) Event Type: ";
+                            const string GenericEventType = "\n(GONetEventBus handler error) Event Published as generic Type: ";
                             const string Event = "\n(GONetEventBus handler error) Error Event: ";
                             const string StackTrace = "\n(GONetEventBus handler error)  Error Stack Trace: ";
-                            GONetLog.Error(string.Concat(EventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
+                            GONetLog.Error(string.Concat(EventType, @event.GetType().FullName, GenericEventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
                         }
                     }
                 }

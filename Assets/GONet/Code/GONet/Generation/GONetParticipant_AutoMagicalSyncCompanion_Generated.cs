@@ -56,6 +56,8 @@ namespace GONet.Generation
 
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
+        internal abstract byte CodeGenerationId { get; }
+
         internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)
         {
             this.gonetParticipant = gonetParticipant;
@@ -239,6 +241,13 @@ namespace GONet.Generation
         {
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
+
+        internal delegate SyncEvent_ValueChangeProcessed GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate_Copy(SyncEvent_ValueChangeProcessed original);
+        internal static GONet_SyncValueChangeProcessedEvent_Generated_FactoryDelegate_Copy theRealness_copy = delegate (SyncEvent_ValueChangeProcessed original)
+        {
+            throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
+        };
+
         /// <summary>
         /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.
         /// </summary>
@@ -246,7 +255,16 @@ namespace GONet.Generation
 
         internal static SyncEvent_ValueChangeProcessed CreateInstance(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
-            return theRealness(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion, syncMemberIndex);
+            var instance = theRealness(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion, syncMemberIndex);
+            instance.ProcessedAtElapsedTicks = 0;
+            return instance;
+        }
+
+        internal static SyncEvent_ValueChangeProcessed CreateCopy(SyncEvent_ValueChangeProcessed original)
+        {
+            var copy = theRealness_copy(original);
+            copy.ProcessedAtElapsedTicks = original.ProcessedAtElapsedTicks;
+            return copy;
         }
     }
 }

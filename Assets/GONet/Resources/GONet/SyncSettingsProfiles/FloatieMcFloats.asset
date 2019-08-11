@@ -21,6 +21,6 @@ MonoBehaviour:
   QuantizeLowerBound: -10
   QuantizeUpperBound: 10
   ProcessingPriority: 0
-  MustRunOnUnityMainThread: 0
+  MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides: []
   ShouldSkipSyncRegistrationId: 0

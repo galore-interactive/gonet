@@ -62,6 +62,8 @@ namespace GONet.Generation
 
 <#	}#>
 
+        internal override byte CodeGenerationId => <#=uniqueEntry.codeGenerationId#>;
+
         internal <#=ClassName#>(GONetParticipant gonetParticipant) : base(gonetParticipant)
 		{
 			valuesCount = <#=overallCount#>;

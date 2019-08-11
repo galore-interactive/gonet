@@ -84,7 +84,7 @@ namespace GONet
         /// If the corresponding <see cref="GameObject"/> is included in the/a Unity scene, the owner will be considered the server
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1)]
+        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, MustRunOnUnityMainThread = true)]
         public uint OwnerAuthorityId
         {
             get { return ownerAuthorityId; }
@@ -120,10 +120,10 @@ namespace GONet
             }
         }
 
-        [GONetAutoMagicalSync]
+        [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT)]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
-        [GONetAutoMagicalSync]
+        [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT)]
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
         /// <summary>
