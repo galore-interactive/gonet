@@ -672,8 +672,8 @@ namespace GONet
         /// </summary>
         static readonly long CLIENT_SYNC_TIME_GAP_TICKS = TimeSpan.FromSeconds(1f / 60f).Ticks;
         static bool client_hasClosedTimeSyncGapWithServer;
-        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED = TimeSpan.FromSeconds(1f / 4f).Ticks;
-        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED = TimeSpan.FromSeconds(30f).Ticks;
+        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED = TimeSpan.FromSeconds(1f / 5f).Ticks;
+        static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED = TimeSpan.FromSeconds(5f).Ticks;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED;
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
@@ -791,7 +791,7 @@ namespace GONet
                     GONetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
                     //GONetLog.Debug("RTT_Latest: " + gonetClient.connectionToServer.RTT_Latest + " RTT_RecentAverage: " + gonetClient.connectionToServer.RTT_RecentAverage + " their.rtt: " + gonetClient.connectionToServer.RTT);
 
-                    long assumedNetworkDelayTicks = rtt_ticks >> 1; // divide by 2
+                    long assumedNetworkDelayTicks = TimeSpan.FromSeconds(GONetClient.connectionToServer.RTT_RecentAverage).Ticks >> 1; // divide by 2
                     long newClientTimeTicks = server_elapsedTicksAtSendResponse + assumedNetworkDelayTicks;
 
                     long previous = Time.ElapsedTicks;
@@ -963,16 +963,24 @@ namespace GONet
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private long GetTicksToSubtractForSetFromAuthorityEasing()
             {
-                bool shouldNotEase = lastSetFromAuthorityDiffTicks > DIFF_TICKS_TOO_BIG_FOR_EASING;
-                if (!shouldNotEase && lastSetFromAuthorityDiffTicks != 0)
+                bool shouldEase = Math.Abs(lastSetFromAuthorityDiffTicks) < DIFF_TICKS_TOO_BIG_FOR_EASING;
+                if (shouldEase)
                 { // IMPORTANT: This code eases the adjustment (i.e., diff) back to resync time over the entire period between resyncs to avoid a possibly dramatic jump in time just after a resync!
-                    long ticksSinceLastSetFromAuthority = HighResolutionTimeUtils.Now.Ticks - lastSetFromAuthorityAtTicks;
-                    float syncEveryTicks = client_hasClosedTimeSyncGapWithServer ? CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED : CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED;
-                    float inverseLerpBetweenSyncs = ticksSinceLastSetFromAuthority / syncEveryTicks;
-                    if (inverseLerpBetweenSyncs < 1f) // if 1 or greater there will be nothing to add based on calculations
+                    if (lastSetFromAuthorityDiffTicks != 0)
                     {
-                        return (long)(lastSetFromAuthorityDiffTicks * (1f - inverseLerpBetweenSyncs));
+                        long ticksSinceLastSetFromAuthority = HighResolutionTimeUtils.Now.Ticks - lastSetFromAuthorityAtTicks;
+                        float syncEveryTicks = client_hasClosedTimeSyncGapWithServer ? CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED : CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__UNTIL_GAP_CLOSED;
+                        float inverseLerpBetweenSyncs = ticksSinceLastSetFromAuthority / syncEveryTicks;
+                        if (inverseLerpBetweenSyncs < 1f) // if 1 or greater there will be nothing to add based on calculations
+                        {
+                            return (long)(lastSetFromAuthorityDiffTicks * (1f - inverseLerpBetweenSyncs));
+                        }
                     }
+                }
+                else
+                {
+                    const string SENSE = "Does not make sense to apply time sync from this client to the server time using an easing over time due to the large gap between what this client has as the time and what the server says in the time.  Diff (seconds): ";
+                    GONetLog.Info(string.Concat(SENSE, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalSeconds));
                 }
 
                 return 0;
