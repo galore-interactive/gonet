@@ -27,9 +27,8 @@ using UnityEngine;
 
 using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
-using GONet.Database.Sqlite;
-using GONet.Database;
 using MessagePack;
+using System.IO;
 
 namespace GONet
 {
@@ -75,13 +74,25 @@ namespace GONet
 
         internal static void InitOnUnityMainThread(GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
         {
-            GONetLog.Info("Environment.ProcessorCount: " + Environment.ProcessorCount);
+            const string ENV = "Environment.ProcessorCount: ";
+            GONetLog.Info(ENV + Environment.ProcessorCount);
 
             IsUnityApplicationEditor = Application.isEditor;
             mainUnityThread = Thread.CurrentThread;
             GlobalSessionContext = gONetSessionContext;
             SetValueBlendingBufferLeadTimeFromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
             InitEventSubscriptions();
+            InitPersistence();
+        }
+
+        private static string persistenceFilePath;
+        private static void InitPersistence()
+        {
+            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
+            const string DB_EXT = ".mpb";
+            const string DATABASE_PATH_RELATIVE = "database/";
+
+            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
@@ -222,8 +233,6 @@ namespace GONet
         /// </summary>
         static readonly List<GONetParticipant> remoteSpawns_avoidAutoPropogateSupport = new List<GONetParticipant>(1000);
 
-        static readonly AutoMagicalSqliteDatabase sqlite = new AutoMagicalSqliteDatabase();
-
         static GONetMain()
         {
             //Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
@@ -231,13 +240,6 @@ namespace GONet
 
             InitMessageTypeToMessageIDMap();
             InitShouldSkipSyncSupport();
-
-            const string DATABASE_PATH_RELATIVE = AutoMagicalSqliteDatabase.CONNECTION_STRING_FILE_URI_PREFIX + "database/";
-            const string DATA_SOURCE_SOLO = "Data Source=";
-            const string DATA_SOURCE = DATA_SOURCE_SOLO + DATABASE_PATH_RELATIVE;
-            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
-            const string DB_EXT = ".db";
-            sqlite.ConnectionString = string.Concat(DATA_SOURCE, DateTime.Now.ToString(DATE_FORMAT), DB_EXT); // setup for new database to save into
         }
 
         private static void InitEventSubscriptions()
@@ -606,7 +608,14 @@ namespace GONet
                 bool isAppropriate = shouldForAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
                 if (isAppropriate)
                 {
-                    sqlite.Save(syncEventsToSaveQueue); // save in a batch all at once!  This is important for performance!
+                    {
+                        // OPTION A:
+                        AppendToDatabaseFile(syncEventsToSaveQueue);
+
+                        // OPTION B:
+                        // sqlite.Save(syncEventsToSaveQueue); // save in a batch all at once!  This is important for performance!
+                    }
+
 
                     // IMPORTANT: we have to return all these copied we made!
                     var enumeratorInner = syncEventsToSaveQueue.GetEnumerator();
@@ -618,6 +627,30 @@ namespace GONet
                     syncEventsToSaveQueue.Clear();
                 }
             }
+        }
+
+        private static void AppendToDatabaseFile(Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
+        {
+            SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue;
+            byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance);
+
+            using (var stream = new FileStream(persistenceFilePath, FileMode.Append))
+            {
+                stream.Write(bytes, 0, bytes.Length);
+            }
+
+            //GONetLog.Debug("WROTE DB!!!! ++++++++++++++++++++++++++++++");
+
+            /*{ // example of reading from file:
+                byte[] allBytes = File.ReadAllBytes(persistenceFilePath);
+                int bytesRead = 0;
+                while (bytesRead < allBytes.Length)
+                {
+                    int bytesReadInner;
+                    SyncEvent_PersistenceBundle bundle = SerializationUtils.DeserializeFromBytes<SyncEvent_PersistenceBundle>(allBytes, bytesRead, out bytesReadInner);
+                    bytesRead += bytesReadInner;
+                }
+            }*/
         }
 
         private static void PublishEvents_SyncValueChanges_ReceivedFromOthers()
@@ -850,43 +883,6 @@ namespace GONet
             public byte[] messageBytes;
             public int bytesUsedCount;
             public GONetChannelId channelId;
-        }
-
-        [MessagePackObject]
-        public class SavedNetworkData : IDatabaseRow
-        {
-            [Key(0)]
-            public long UID { get; set; }
-
-            [Key(1)]
-            public byte[] Bytes { get; set; }
-
-            [Key(2)]
-            [FilterableBy]
-            public int BytesUsedCount { get; set; }
-
-            [Key(3)]
-            [FilterableBy(true)]
-            public GONetChannelId ChannelId { get; set; }
-
-            [Key(4)]
-            [FilterableBy(true)]
-            public double ElapasedSeconds { get; set; }
-
-            [Key(5)]
-            [FilterableBy(true)]
-            public uint SentToConnection_OwnerAuthorityId { get; set; }
-
-            public SavedNetworkData() { }
-
-            internal SavedNetworkData(NetworkData source, double elapsedSeconds, uint sentToConnection_OwnerAuthorityId = GONetMain.OwnerAuthorityId_Unset)
-            {
-                Bytes = source.messageBytes;
-                BytesUsedCount = source.bytesUsedCount;
-                ChannelId = source.channelId;
-                ElapasedSeconds = elapsedSeconds;
-                SentToConnection_OwnerAuthorityId = sentToConnection_OwnerAuthorityId;
-            }
         }
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_incomingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();

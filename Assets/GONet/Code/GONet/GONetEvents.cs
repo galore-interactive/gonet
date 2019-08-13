@@ -13,8 +13,6 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
-using GONet.Database;
-using GONet.Database.Sqlite;
 using GONet.Utils;
 using MessagePack;
 using System;
@@ -214,23 +212,21 @@ namespace GONet
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
     [MessagePackObject]
-    public abstract class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent, IDatabaseRow
+    public abstract partial class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent
     {
-        [IgnoreMember] public long UID { get; set; }
-
-        [Key(0), FilterableBy(true)] public double OccurredAtElapsedSeconds { get => TimeSpan.FromTicks(OccurredAtElapsedTicks).TotalSeconds; set { OccurredAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [Key(0)] public double OccurredAtElapsedSeconds { get => TimeSpan.FromTicks(OccurredAtElapsedTicks).TotalSeconds; set { OccurredAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember] public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1), FilterableBy(true)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [Key(1)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember] public long ProcessedAtElapsedTicks { get; set; }
 
-        [Key(2), FilterableBy(true)] public uint RelatedOwnerAuthorityId { get; set; }
-        [Key(3), FilterableBy(true)] public uint GONetId { get; set; }
+        [Key(2)] public uint RelatedOwnerAuthorityId { get; set; }
+        [Key(3)] public uint GONetId { get; set; }
 
         [IgnoreMember] public byte CodeGenerationId { get; internal set; }
 
-        [Key(4), FilterableBy(true)] public byte SyncMemberIndex { get; set; }
-        [Key(5), FilterableBy(true)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
+        [Key(4)] public byte SyncMemberIndex { get; set; }
+        [Key(5)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
 
         /// <summary>
         /// Do NOT use!  This is for object pooling and MessagePack only.
@@ -238,6 +234,14 @@ namespace GONet
         public SyncEvent_ValueChangeProcessed() { }
 
         public abstract void Return();
+    }
+
+    [MessagePackObject]
+    public class SyncEvent_PersistenceBundle
+    {
+        [Key(0)] public Queue<SyncEvent_ValueChangeProcessed> bundle;
+
+        public static readonly SyncEvent_PersistenceBundle Instance = new SyncEvent_PersistenceBundle();
     }
 
     /// <summary>
@@ -248,15 +252,15 @@ namespace GONet
     [MessagePackObject]
     public sealed class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
     {
-        [Key(6), FilterableBy]  public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
+        [Key(6)]  public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember]          public long ElapsedTicks_Previous { get; private set; }
 
-        [Key(7), FilterableBy]  public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [Key(7)]  public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember]          public long ElapsedTicks_New { get; private set; }
 
-        [Key(8), FilterableBy]  public double RoundTripSeconds_Latest { get; set; }
-        [Key(9), FilterableBy]  public double RoundTripSeconds_RecentAverage { get; set; }
-        [Key(10), FilterableBy]  public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
+        [Key(8)]  public double RoundTripSeconds_Latest { get; set; }
+        [Key(9)]  public double RoundTripSeconds_RecentAverage { get; set; }
+        [Key(10)]  public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
 
         static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
         static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();

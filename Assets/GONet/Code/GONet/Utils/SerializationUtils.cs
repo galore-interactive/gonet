@@ -68,6 +68,11 @@ namespace GONet.Utils
             return MessagePackSerializer.Deserialize<T>(bytes);
         }
 
+        public static T DeserializeFromBytes<T>(byte[] bytes, int offset, out int bytesRead)
+        {
+            return MessagePackSerializer.Deserialize<T>(bytes, offset, MessagePackSerializer.DefaultResolver, out bytesRead);
+        }
+
         /// <summary>
         /// This is the best general purpose object (de)serializer GONet can provide.
         /// </summary>
