@@ -218,15 +218,15 @@ namespace GONet
         [IgnoreMember] public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long ProcessedAtElapsedTicks { get; set; }
+        [IgnoreMember] public long ProcessedAtElapsedTicks;
 
-        [Key(2)] public uint RelatedOwnerAuthorityId { get; set; }
-        [Key(3)] public uint GONetId { get; set; }
+        [Key(2)] public uint RelatedOwnerAuthorityId;
+        [Key(3)] public uint GONetId;
 
-        [IgnoreMember] public byte CodeGenerationId { get; internal set; }
+        [IgnoreMember] public byte CodeGenerationId;
 
-        [Key(4)] public byte SyncMemberIndex { get; set; }
-        [Key(5)] public SyncEvent_ValueChangeProcessedExplanation Explanation { get; set; }
+        [Key(4)] public byte SyncMemberIndex;
+        [Key(5)] public SyncEvent_ValueChangeProcessedExplanation Explanation;
 
         /// <summary>
         /// Do NOT use!  This is for object pooling and MessagePack only.
