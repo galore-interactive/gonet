@@ -1,7 +1,7 @@
 1. import package into project (Unity 2018.3+)
 2. ensure usafe code allowed: Edit => Project Settings => Player => Allow 'unsafe' Code
 3. ensure .NET API version: Edit => Project Settings => Player => Api Compatibility Level* => .NET 4.x
-4. ensure logging configured: Edit => Project Settings => Player => Scripting Define Symbols (contains at least: "LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL") IMPORTANT: NOW there are a lot more and we need all captured in unity package player settings file!  now that we include all source!
+4. ensure logging configured: Edit => Project Settings => Player => Scripting Define Symbols (contains at least: "LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL") 
 4a. manually copy the unzipped contents of gonet_logConfig.zip into the root of the project folder
 5. drag Resources/GONet_GlobalContext into your start-up scene (optionally => open Assets/GONet/Sample/GONetSampleScene.unity that already has it instead of using your scene)
 6 click Run/Play in Unity editor to play the scene (code generation will occur and scene should play....no errors/exceptions...if all is well)

@@ -252,15 +252,15 @@ namespace GONet
     [MessagePackObject]
     public sealed class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
     {
-        [Key(6)]  public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember]          public long ElapsedTicks_Previous { get; private set; }
+        [Key(6)]        public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember]  public long ElapsedTicks_Previous { get; private set; }
 
-        [Key(7)]  public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember]          public long ElapsedTicks_New { get; private set; }
+        [Key(7)]        public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember]  public long ElapsedTicks_New { get; private set; }
 
-        [Key(8)]  public double RoundTripSeconds_Latest { get; set; }
-        [Key(9)]  public double RoundTripSeconds_RecentAverage { get; set; }
-        [Key(10)]  public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
+        [Key(8)]        public double RoundTripSeconds_Latest { get; set; }
+        [Key(9)]        public double RoundTripSeconds_RecentAverage { get; set; }
+        [Key(10)]       public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
 
         static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
         static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();
