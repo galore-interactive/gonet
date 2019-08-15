@@ -53,6 +53,11 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    public struct ServerSaysClientInitializationCompletion : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new NotImplementedException();
+    }
+
     public struct AutoMagicalSync_ValueChanges_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();

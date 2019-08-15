@@ -140,7 +140,7 @@ namespace GONet
                 bitStream.ReadUInt(out bodySize_readFromMessage);
             }
 
-            GONetMain.ProcessIncomingBytes(this, messageBytes_withoutHeader, (int)bodySize_readFromMessage, channelId_readFromMessage);
+            GONetMain.ProcessIncomingBytes_TriageFromAnyThread(this, messageBytes_withoutHeader, (int)bodySize_readFromMessage, channelId_readFromMessage);
 
             ReturnByteArray(messageBytes_withoutHeader);
         }

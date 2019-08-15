@@ -15,7 +15,7 @@
 
 using NetcodeIO.NET;
 using System;
-
+using System.Collections.Generic;
 using GONetChannelId = System.Byte;
 
 namespace GONet
@@ -58,6 +58,28 @@ namespace GONet
         public bool IsConnectedToServer => ConnectionState == ClientState.Connected;
 
         public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;
+
+        internal readonly Queue<GONetMain.NetworkData> incomingNetworkData_mustProcessAfterClientInitialized = new Queue<GONetMain.NetworkData>(100);
+
+        bool isInitializedWithServer;
+        public bool IsInitializedWithServer
+        {
+            get => IsConnectedToServer && isInitializedWithServer;
+            internal set
+            {
+                bool before = IsInitializedWithServer;
+
+                isInitializedWithServer = value;
+
+                if (!before && IsInitializedWithServer)
+                {
+                    InitializedWithServer?.Invoke(this);
+                }
+            }
+        }
+
+        public delegate void InitializedWithServerDelegate(GONetClient client);
+        public event InitializedWithServerDelegate InitializedWithServer;
 
         internal GONetConnection_ClientToServer connectionToServer;
 
@@ -104,5 +126,36 @@ namespace GONet
             GONetLog.Debug("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
         }
 
+    }
+
+    public class GONetRemoteClient
+    {
+        public RemoteClient RemoteClient { get; private set; }
+
+        public GONetConnection_ServerToClient ConnectionToClient { get; private set; }
+
+        bool isInitializedWithServer;
+        public bool IsInitializedWithServer
+        {
+            get => isInitializedWithServer;
+            internal set
+            {
+                bool before = isInitializedWithServer;
+                isInitializedWithServer = value;
+                if (before != value && value)
+                {
+                    InitializedWithServer?.Invoke(this);
+                }
+            }
+        }
+
+        public delegate void InitializedWithServerDelegate(GONetRemoteClient remoteClient);
+        public event InitializedWithServerDelegate InitializedWithServer;
+
+        public GONetRemoteClient(RemoteClient remoteClient, GONetConnection_ServerToClient connectionToClient)
+        {
+            RemoteClient = remoteClient;
+            ConnectionToClient = connectionToClient;
+        }
     }
 }

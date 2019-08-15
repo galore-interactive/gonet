@@ -54,7 +54,7 @@ GONet mantra:
  \-> Configurable channels (optional)
 - <bold>Logging:</bold>
  \-> Built atop the robust, well-known log4net api/library
- \-> Writes to Console in editor and to "logs/mri.log" file in builds
+ \-> Writes to Console in editor and to "logs/gonet.log" file in builds
  \-> Outputs the realworld time, current frame time, thread # and logging level with every log statement (if you have ever performed troubleshooting on a networked game, you know this is one of those "save your bacon" features)
  \-> Used in GONet code and fully available to use wherever you like
 

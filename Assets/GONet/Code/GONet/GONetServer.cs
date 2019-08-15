@@ -14,6 +14,7 @@
  */
 
 using System;
+using System.Linq;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using GONet.Utils;
@@ -29,8 +30,8 @@ namespace GONet
 
         Server server;
         public uint numConnections = 0;
-        public GONetConnection_ServerToClient[] remoteClients;
-        Dictionary<RemoteClient, GONetConnection_ServerToClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetConnection_ServerToClient>(10);
+        public GONetRemoteClient[] remoteClients;
+        Dictionary<RemoteClient, GONetRemoteClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetRemoteClient>(10);
         ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
 
         public delegate void ClientActionDelegate(GONetConnection_ServerToClient gonetConnection_ServerToClient);
@@ -45,7 +46,7 @@ namespace GONet
 
             server = new Server(maxSlots, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
-            remoteClients = new GONetConnection_ServerToClient[maxSlots];
+            remoteClients = new GONetRemoteClient[maxSlots];
 
             server.LogLevel = NetcodeLogLevel.Debug;
 
@@ -92,7 +93,7 @@ namespace GONet
         {
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
-                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
                 gONetConnection_ServerToClient.Update(); // have to do this in order for anything to really be processed, in or out.
             }
 
@@ -103,7 +104,7 @@ namespace GONet
         {
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
-                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
 
                 gONetConnection_ServerToClient.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
             }
@@ -113,7 +114,7 @@ namespace GONet
         {
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
-                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection];
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
                 doThis(gONetConnection_ServerToClient);
             }
         }
@@ -123,10 +124,10 @@ namespace GONet
         /// </summary>
         private void OnClientMessageReceived(RemoteClient sender, byte[] payload, int payloadSize)
         {
-            GONetConnection_ServerToClient serverToClientConnection;
-            if (remoteClientToGONetConnectionMap.TryGetValue(sender, out serverToClientConnection))
+            GONetRemoteClient remoteClient;
+            if (remoteClientToGONetConnectionMap.TryGetValue(sender, out remoteClient))
             {
-                serverToClientConnection.ReceivePacket(payload, payloadSize);
+                remoteClient.ConnectionToClient.ReceivePacket(payload, payloadSize);
             }
             else // we will ASSume the first time through is the connection message and OnClientConnected will not have been called yet and we will just go straight to process
             {
@@ -170,8 +171,9 @@ namespace GONet
             if (numConnections < MaxSlots)
             {
                 GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client);
-                remoteClients[numConnections++] = gonetConnection_ServerToClient;
-                remoteClientToGONetConnectionMap[client] = gonetConnection_ServerToClient;
+                GONetRemoteClient remoteClient = new GONetRemoteClient(client, gonetConnection_ServerToClient);
+                remoteClients[numConnections++] = remoteClient;
+                remoteClientToGONetConnectionMap[client] = remoteClient;
 
                 ClientConnected?.Invoke(gonetConnection_ServerToClient);
             }
@@ -180,6 +182,11 @@ namespace GONet
         public void Stop()
         {
             server.Stop();
+        }
+
+        public GONetRemoteClient GetRemoteClientByConnection(GONetConnection_ServerToClient connectionToClient)
+        {
+            return remoteClients.FirstOrDefault(x => x.ConnectionToClient == connectionToClient);
         }
     }
 }

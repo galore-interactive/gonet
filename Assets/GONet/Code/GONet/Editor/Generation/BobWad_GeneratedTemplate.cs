@@ -133,7 +133,7 @@ namespace GONet
     {
         foreach (var type in types)
         {
-			syncEventTypeFullNames.Add(type.FullName);
+			tmpTypeFullNames.Add(type.FullName);
         }
     }
 
@@ -171,13 +171,13 @@ namespace GONet
             
             #line 100 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
-	tmpTypeFullNames = new HashSet<string>(syncEventTypeFullNames);
+	tmpTypeFullNames = new HashSet<string>();
 	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
 				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IPersistentEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
     {
         foreach (var type in types)
         {
-			syncEventTypeFullNames.Add(type.FullName);
+			tmpTypeFullNames.Add(type.FullName);
         }
     }
 
