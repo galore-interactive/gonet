@@ -58,7 +58,7 @@ namespace GONet
         static GONetLog()
         {
             _fileLogger = LogManager.GetLogger(typeof(GONetLog));
-            string configPath = Application.isEditor ? "../configs/log_config.xml" : "configs/log_config.xml";
+            string configPath = Path.Combine(Application.streamingAssetsPath, "GONet", "log_config.xml");
             FileInfo info = new FileInfo(Path.Combine(Application.dataPath, configPath));
             log4net.Config.XmlConfigurator.Configure(info);
         }

@@ -1692,11 +1692,9 @@
     <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
-    <None Include="Assets\GONet\Plugins\sqlite\Microsoft.JScript.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Properties.cginc" />
-    <None Include="Assets\GONet\Plugins\sqlite\System.Management.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap-Custom-Atlas.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\TextMesh Pro\Sprites\EmojiOne Attribution.txt" />
@@ -1705,15 +1703,14 @@
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF Overlay.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Surface.cginc" />
-    <None Include="Assets\GONet\Plugins\sqlite\System.Configuration.Install.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Mobile Overlay.shader" />
+    <None Include="Assets\StreamingAssets\GONet\log_config.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro.cginc" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\GONet\Plugins\log4net\log4net.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Sprite.shader" />
-    <None Include="Assets\GONet\Plugins\sqlite\Microsoft.Vsa.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface.shader" />
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
@@ -1936,18 +1933,6 @@
     </Reference>
     <Reference Include="log4net">
       <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/log4net.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.JScript">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Microsoft.JScript.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Vsa">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Microsoft.Vsa.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Configuration.Install">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/System.Configuration.Install.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Management">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/System.Management.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.Advertisements">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.ads@2.3.1/Runtime/UnityEngine.Advertisements.dll</HintPath>

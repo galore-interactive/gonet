@@ -332,18 +332,6 @@
     <Reference Include="log4net">
       <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/log4net.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.JScript">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Microsoft.JScript.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Vsa">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/Microsoft.Vsa.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Configuration.Install">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/System.Configuration.Install.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Management">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/sqlite/System.Management.dll</HintPath>
-    </Reference>
     <Reference Include="UnityEditor.Advertisements">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.ads@2.3.1/Editor/UnityEditor.Advertisements.dll</HintPath>
     </Reference>
