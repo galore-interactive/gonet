@@ -10,7 +10,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>-high performance and low resource utilization are kept at the forefront of design, development, decision making and implementation details
 <br>-there is much more to a great networked multi-player game than syncing transforms, GONet helps take you the rest of the way with features and implementation experts to <em>"save your bacon"</em>
 <br>-there is no "asset fairy" to auto-magically <em>multi-playerify</em> your entire game; <strong>BUT</strong> a robust toolset is a must - enter GONet
-<br>-TCP has no place here (AAA studio grade solutions are UDP-only when any near-realtime needs exist - GONet is UDP-only)
+<br>-TCP has no place here (AAA studio grade solutions are UDP-only when any competitive and/or near-realtime gameplay needs exist - GONet is UDP-only)
 <br><br>
 <strong>NOTE:</strong> Instead of slow runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation that is runtime debuggable. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away as needed. <strong>REPLAY support is out of the box</strong> (PRO Only)!  And the box is not black, as <strong><em>source code is included</em></strong>.
 <br><br>
