@@ -1,84 +1,99 @@
 GONet
+<br><br>
+<strong>NOTE: Unity GONet package is now available since UNET is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be supported.</strong>
+<br><br>
+GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  If you need to network something and a GameObject is involved, GONet is the answer.  GONet aligns well with the <em>Networked-by-Default</em> and <em>Performance-by-Default</em> initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, requires less steps to <em>"get going"</em> and is our preferred solution over UNET!
+<br><br>
+<strong>GONet mantra:</strong>
+<br>-doing the easy/common stuff should be dead simple (no programming)
+<br>-doing the (<em>seemingly</em>) hard stuff should first be possible and second be approachable
+<br>-high performance and low resource utilization are kept at the forefront of design, development, decision making and implementation details
+<br>-there is much more to a great networked multi-player game than syncing transforms, GONet helps take you the rest of the way with features and implementation experts to <em>"save your bacon"</em>
+<br>-there is no "asset fairy" to auto-magically <em>multi-playerify</em> your entire game; <strong>BUT</strong> a robust toolset is a must - enter GONet
+<br>-TCP has no place here (AAA studio grade solutions are UDP-only when any near-realtime needs exist - GONet is UDP-only)
+<br><br>
+<strong>NOTE:</strong> Instead of slow runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation that is runtime debuggable. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away as needed. <strong>REPLAY support is out of the box</strong> (PRO Only)!  And the box is not black, as <strong><em>source code is included</em></strong>.
+<br><br>
+<strong>FEATURES:</strong>
+<br><strong>Auto-magical data sync:</strong>
+<br>*Transform - position/localPosition, rotation/localRotation, scale
+<br>*Animator Controller parameters
+<br>*Any MonoBehaviour fields ([SyncVar] replacement)
+<br>*Omni-directional from owner to non-owners (server and clients alike)
+<br>*GameObject.Instantiate() is auto-magically networked from the owner/instantiator to all interested parties/machines (optionally use a prefab alternate for non-owners)
+<br>*You control sync settings applied to groups of data items: default and/or user-defined (via profiles/templates, for when you want/need more control)
+<br>*Auto-magically blend smoothly between received values for non-owners: default interpolation/extrapolation and/or user-defined implementation (great for dealing with unreliable <em>"streams"</em>)
+<br><br><strong>Event Bus:</strong>
+<br>*Publish and subscribe to your own omni-directional (<em>arbitrary</em> content between server <-> clients) communication  ([Command], [ClientRpc] and [TargetRpc] replacement)
+<br>*Auto-magically sync'd changes also (automatically) publish events to which you can subscribe (e.g., energy dropped below 10 => change avatar material)
+<br>*Transient events - delivered to clients connected to game session when event occurs
+<br>*Persistent events - like Transient event with additional delivery to any clients connecting to the game session after event occurs and will exist in recorded/replay data
+<br>*Any user-defined event class - can be either transient or persistent
+<br>*Promotes industry proven event-driven game architecture and facilitates GONet Record+Replay
+<br><br><strong>Serialization options:</strong>
+<br>*Default Auto-magical data sync:  custom bit packing (with LZ4 compression)
+<br>*Default Event Bus traffic: MessagePack (with LZ4 compression)
+<br>*User-defined custom overrides: if you have special cases or feel you can do it better, by all means, a mechanism to do so is provided
+<br>*Configurable value quantization: choose # bits to occupy and auto-magically quantizes/compresses to fit (great for LOD, <em>see below</em>)
+<br><br><strong>(PRO Only) Record+Replay GONet sessions:</strong>
+<br>*(PRO Only) Everything GONet sends is recorded
+<br>*(PRO Only) Replay is great for: (eSports) In-game instant replay, Location Based Entertainment takeaway not to mention development troubleshooting and bug reproduction (i.e., a <em>"save your bacon"</em> feature)
+<br>*(PRO Only) Recorded session data feeds into time series, statistics-based graphs for analysis during development and perhaps more importantly after game is released
+<br><br><strong>(PRO Only) Level of Detail (LOD) management:</strong>
+<br>*(PRO Only) Control the Who/What/When/Where/Why/How of data detail
+<br>*(PRO Only) Default implementation uses distance to client's main player controlled GameObject (closer = high data resolution, further = lower data resolution...down to excluded entirely)
+<br>*(PRO Only) User-defined custom overrides: decide what causes changes to a GameObject's data LOD, when it should be applied, how much it affects LOD, etc...
+<br>*(PRO Only) Facilitates large worlds and/or large numbers of networked GameObjects and sync'd values (e.g., MMO)
+<br><br><strong>Wide platform/runtime support:</strong>
+<br>*All managed C#, no native libraries
+<br>*(PRO Only) Ahead of Time (AOT) compilation support (e.g., iOS)
+<br>*(PRO Only) IL2CPP
+<br><br><strong>Network Transport:</strong>
+<br>*High level (just add GONetParticipant to GameObjects for transform/animation and [GONetAutoMagicalSync] to MonoBehaviour fields/properties and you are <em>in business</em>)
+<br>*Mid level (create/publish/subscribe custom events and also fine tune available network settings to meet particular needs)
+<br>*Low level (send/receive/manage data however you need to, but you probably will never need this)
+<br>*UDP (unreliable+unordered) and RUDP (reliable+ordered UDP)
+<br>*Encryption (Bouncy Castle Crypto API)
+<br>*Configurable channels (optional)
+<br><br><strong>Network topologies:</strong>
+<br>*Dedicated game server (client-server DGS)
+<br>*Local (LAN): good for location-based entertainment (LBE)
+<br>*(PRO Only) Peer-to-Peer (P2P): NAT punchthrough etc...
+<br><br><strong>Support:</strong>
+<br>*Basic forum/email back and forth as time/resources permit
+<br>*(PRO Only) Fixes to unique and/or uncommon bugs/issues
+<br>*(PRO Only) Screen sharing collaboration sessions and more in-depth responses at front of email support line
+<br>*(PRO Only) Access to extensive example projects with detailed documentation
+<br>*(DELUXE Studio Only) GONet support team working directly with your team with off-site and on-site options
+<br>*(DELUXE Studio Only) GONet custom feature requests
+<br><br><strong>Logging:</strong>
+<br>*Built atop the robust, well-known log4net api/library
+<br>*Writes to Console in editor and to "logs/gonet.log" file in builds
+<br>*Outputs the realworld time, current frame time, thread # and logging level with every log statement (if you have ever performed troubleshooting on a networked game, you know this is one of those <em>"save your bacon"</em> features)
+<br>*Used in GONet code and fully available to use wherever you like
 
-<bold>NOTE: Unity GONet package is now available since UNET is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be supported.</bold>
 
-GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  GONet aligns well with the Networked-by-Default and Performance-by-Default initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, less steps to "get going" and planely mo' betta than UNET!
 
-GONet mantra:
--doing the easy/common stuff should be dead simple (no programming)
--doing the hard stuff should first be possible and second be approachable
--there is much more to a great networked multi-player game than syncing transforms, GONet helps take you the rest of the way with features and implementation experts that will "save your bacon"
--there is no magic asset fairy to auto-magically network and multi-playerify your entire game; BUT a robust toolset is a must - enter GONet
--TCP has no place here (experienced pros choose UDP-only solutions when any near realtime needs exist - GONet is UDP-only)
-
-<bold>*** Instead of slow runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation that is runtime debuggable. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away as needed. REPLAY support is out of the box!  And the box is not black, as source code is included.</bold>
-
-<bold>FEATURES:</bold>
-- <bold>Auto-magical data sync:</bold>
- \-> Transform - position/localPosition, rotation/localRotation, scale
- \-> Animator Controller parameters
- \-> Any MonoBehaviour fields ([SyncVar] replacement)
- \-> GameObject.Instantiate() is auto-magically networked from the owner/instantiator to all interested parties/machines (optionally use a prefab alternate for non-owners)
- \-> Sync settings applied to groups of data items: default and/or user-defined (via profiles/templates, for when you want/need more control)
- \-> Auto-magically blend smoothly between received values for non-owners: default interpolation/extrapolation and/or user-defined implementation (great for dealing with unreliable "streams")
-- <bold>Event Bus:</bold>
- \-> Auto-magically sync'd changes also automatically publish events to which you can subscribe
- \-> Publish and subscribe to your own omni-directional ("arbitrary" content) communication  ([Command], [ClientRpc] and [TargetRpc] replacement)
- \-> Transient events - delivered to clients connected to game session when event occurs
- \-> Persistent events - like Transient event with additional delivery to any clients connecting to the game session after event occurs and will exist in recorded/replay data
- \-> Any user-defined event class - can be either transient or persistent
- \-> Promotes industry proven event-driven game architecture and facilitates GONet Record+Replay
-- <bold>Serialization options:</bold>
- \-> Default Auto-magical data sync:  custom bit packing (with LZ4 compression)
- \-> Default Event Bus traffic: MessagePack (with LZ4 compression)
- \-> User-defined custom overrides: if you have special cases or feel you can do it better, by all means, we provide a mechanism to do so
- \-> Configurable value quantization: choose # bits to occupy and auto-magically quantizes/compresses to fit (great for LOD)
-- <bold>Record+Replay GONet sessions:</bold>
- \-> Everything GONet sends is recorded
- \-> Replay is great for: development troubleshooting, (eSports) instant replay, Location Based Entertainment takeaway
- \-> Recorded session data feeds into time series, statistics-based graphs for analysis during development and perhaps more importantly after game is released
-- <bold>Level of Detail (LOD) management:</bold>
- \-> Control the Who/What/When/Where/Why/How of data detail
- \-> Default implementation uses distance to client's main player controlled GameObject (closer = high data resolution, further = lower data resolution...down to excluded entirely)
- \-> User-defined custom overrides: decide what causes changes to a GameObject's data LOD, when it should be applied, how much it affects LOD, etc...
-- <bold>Wide platform/runtime support</bold>
- \-> All managed C#, no native libraries
- \-> Ahead of Time (AOT) compilation support (e.g., iOS)
- \-> IL2CPP (belongs in ?????? category below)
-- <bold>Network Transport</bold>
- \-> High level (just add GONetParticipant to GameObjects and [GONetAutoMagicalSync] to MonoBehaviour fields/properties and you are in business)
- \-> Mid level (create/publish/subscribe custom events and also fine tune available network settings to meet particular needs)
- \-> Low level (send/receive/manage data however you need to, but you probably will never need this)
- \-> UDP (unreliable+unordered) and RUDP (reliable+ordered UDP)
- \-> Encryption (Bouncy Castle Crypto API)
- \-> Configurable channels (optional)
-- <bold>Logging:</bold>
- \-> Built atop the robust, well-known log4net api/library
- \-> Writes to Console in editor and to "logs/gonet.log" file in builds
- \-> Outputs the realworld time, current frame time, thread # and logging level with every log statement (if you have ever performed troubleshooting on a networked game, you know this is one of those "save your bacon" features)
- \-> Used in GONet code and fully available to use wherever you like
-
+<br><br>
 ??????
-- <bold>Networking goodies:</bold>
- \-> Lag compensation
- \-> Client-side prediction (i.e., extrapolation? got this up top, if so)
- \-> Interpolation (got this up top)
- \-> Delta compression (can accomplish with recorded send data....need to add recorded received too..share then reconcile?)
-- <bold>Network topologies:</bold>
- \-> Dedicated game server (client-server DGS) *** definitely this one!
- \-> Local ("couch multiplayer"): multiple players/inputs/viewport on same machine *** this means multiple client instances in same process...maybe not this one!
- \-> Local (LAN): location-based entertainment (LBE) *** definitely this one..as it is an implementation of DGS!
- \-> Peer-to-Peer (P2P) *** highly motivated to get this one
- \-> Client-Server Host (client-server) - needs host migration impl!
+<br><strong>Network topologies:</strong>
+<br>*Local ("couch multiplayer"): multiple players/inputs/viewport on same machine *** this means multiple client instances in same process...maybe not this one!
+<br>*Client-Server Host (client-server) - needs host migration impl!
+<br><strong>Networking goodies:</strong>
+<br>*Lag compensation
+<br><br>*Client-side prediction (i.e., extrapolation? got this up top, if so)
+<br>*Interpolation (got this up top)
+<br>*Delta compression (can accomplish with recorded send data....need to add recorded received too..share then reconcile?)
 ??????
 
-GONet was 
+<br><br>
 Let GONet take on the most difficult burden you face, so your team can focus on interesting creative matters.  GONet integrates nicely into existing game project code bases and effortlessly for those lucky to be in green field development.
-
+<br><br>
 Manual and API Documentation 
 Please discuss GONet in the forum
 Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We have a multi-tiered support structure to suit your needs, from trivial to highly involved.  Our implementation experts will help you from getting off the ground up to crossing the finish line with you.
-
+<br><br>
+<br>We are certain a <strong>TL;DR</strong> should be up there somewhere.  Well, sorry about that and thanks for making all the way!  When it comes to getting your game networked and multi-player capable, you need to know what you are getting yourself into.  GONet is the real deal.
 
 
 
