@@ -255,7 +255,7 @@ namespace GONet.Editor
 
                         { // IsPositionSyncd:
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Position Syncd:"), GUILayout.MaxWidth(150));
+                            EditorGUILayout.LabelField(string.Concat("Is Position Syncd"), GUILayout.MaxWidth(150));
                             SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsPositionSyncd)}");
                             EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
                             DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION);
@@ -263,7 +263,7 @@ namespace GONet.Editor
                         }
                         { // IsRotationSyncd:
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Rotation Syncd:"), GUILayout.MaxWidth(150));
+                            EditorGUILayout.LabelField(string.Concat("Is Rotation Syncd"), GUILayout.MaxWidth(150));
                             SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsRotationSyncd)}");
                             EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
                             DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION);
@@ -310,10 +310,21 @@ namespace GONet.Editor
                 GUIContent buttonTextWithTooltip = new GUIContent(string.Concat(PROFILE, settingsProfileTemplateName), TOOLTIP);
                 if (GUILayout.Button(buttonTextWithTooltip))
                 {
-                    Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(string.Concat(
+                    Object mainAsset = AssetDatabase.LoadMainAssetAtPath(string.Concat(
                         GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH,
                         settingsProfileTemplateName,
                         GONetEditorWindow.ASSET_FILE_EXTENSION));
+                    if (mainAsset != null)
+                    {
+                        Selection.activeObject = mainAsset;
+                    }
+                    else
+                    {
+                        const string OOPS = "Oops.  The profile/template name used here (i.e., \"";
+                        const string NAME = "\") does NOT match with any of the available entries in the folder: ";
+                        const string INSTEAD = ".\nAt runtime, the following profile/template will be used instead: ";
+                        Debug.LogWarning(string.Concat(OOPS, settingsProfileTemplateName ?? string.Empty, NAME, GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH, INSTEAD, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT));
+                    }
                 }
                 GUI.enabled = superInnerPrev;
             }

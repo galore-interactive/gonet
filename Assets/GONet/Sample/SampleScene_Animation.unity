@@ -1322,6 +1322,5 @@ MonoBehaviour:
     keys: []
     values: []
   IsPositionSyncd: 1
-  IsRotationSyncd: 0
+  IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCube
-  runtimeUID: 0
