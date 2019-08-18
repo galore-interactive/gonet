@@ -80,9 +80,12 @@ namespace GONet
 
         uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
-        /// This is set to a value that represents which machine in the game spawned this instance.
+        /// <para>This is set to a value that represents which machine in the game spawned this instance.</para>
+        /// <para>IMPORTANT: Up until some time during <see cref="Start"/>, this value will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown.  Once the owner is known, this value will change and the <see cref="OwnerAuthorityIdChanged"/> event will fire.</para>
+        /// <para>
         /// If the corresponding <see cref="GameObject"/> is included in the/a Unity scene, the owner will be considered the server
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
+        /// </para>
         /// </summary>
         [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, MustRunOnUnityMainThread = true)]
         public uint OwnerAuthorityId
@@ -135,9 +138,6 @@ namespace GONet
         public string designTimeLocation;
         public string DesignTimeLocation => designTimeLocation;
         
-        [SerializeField, HideInInspector]
-        internal long runtimeUID = GUID.UNSET_VALUE;
-
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
 
         /// <summary>

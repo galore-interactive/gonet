@@ -53,7 +53,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*Mid level (create/publish/subscribe custom events and also fine tune available network settings to meet particular needs)
 <br>*Low level (send/receive/manage data however you need to, but you probably will never need this)
 <br>*UDP (unreliable+unordered) and RUDP (reliable+ordered UDP)
-<br>*Encryption (Bouncy Castle Crypto API)
+<br>*Encryption (customized version of Bouncy Castle Crypto API)
 <br>*Configurable channels (optional)
 <br><br><strong>Network topologies:</strong>
 <br>*Dedicated game server (client-server DGS)

@@ -142,9 +142,10 @@ namespace GONet
     
 	
     /// <summary>
-    /// This represents that a sync value change has been processed.  Two major occassions:
-    /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
-    /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
     /// </summary>
     [MessagePack.MessagePackObject]
     public sealed class <#=className#> : SyncEvent_ValueChangeProcessed

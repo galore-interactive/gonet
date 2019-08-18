@@ -222,6 +222,7 @@ namespace GONet
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
         /// <summary>
+        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="GONetParticipant.OwnerAuthorityIdChanged"/> event will fire.</para>
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
         /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
         /// <para>If you already have access to the <see cref="GONetParticipant"/> associated with this <paramref name="gameObject"/>, then use the sister method instead: <see cref="IsMine(GONetParticipant)"/></para>
@@ -232,6 +233,7 @@ namespace GONet
         }
 
         /// <summary>
+        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="GONetParticipant.OwnerAuthorityIdChanged"/> event will fire.</para>
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
         /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
         /// </summary>
@@ -651,6 +653,11 @@ namespace GONet
         {
             SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue;
             byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance);
+
+            if (!File.Exists(persistenceFilePath))
+            {
+                File.Create(persistenceFilePath);
+            }
 
             using (var stream = new FileStream(persistenceFilePath, FileMode.Append))
             {

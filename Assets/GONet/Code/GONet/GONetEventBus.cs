@@ -154,7 +154,8 @@ namespace GONet
         }
 
         /// <summary>
-        /// IMPORTANT: Only call this from the main Unity thread!
+        /// <para>IMPORTANT: It is vitally important that <paramref name="handler"/> code does NOT keep a reference to the envelope or the event inside the envelope.  These items are managed by an object pool for performance reasons.  If for some reason the handler needs to do operations against data inside the envelope or event after that method call is complete (e.g., in a method later on or in a coroutine or another thread) you have to make a copy and if you do that it is your responsibility to return it to the proper pool afterward.  TODO FIXME: add more info as to location of proper pools!</para>
+        /// <para>IMPORTANT: Only call this from the main Unity thread!</para>
         /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
         {

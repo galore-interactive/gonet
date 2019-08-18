@@ -266,42 +266,43 @@ namespace GONet
             this.Write(@"    
 	
     /// <summary>
-    /// This represents that a sync value change has been processed.  Two major occassions:
-    /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
-    /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref=""SyncEvent_ValueChangeProcessed.Explanation""/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
     /// </summary>
     [MessagePack.MessagePackObject]
     public sealed class ");
             
-            #line 150 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 151 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
             #line hidden
             this.Write(" : SyncEvent_ValueChangeProcessed\r\n    {\r\n\t\t[MessagePack.Key(6)] public ");
             
-            #line 152 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 153 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
             #line hidden
             this.Write(" valuePrevious;\r\n\t\t[MessagePack.Key(7)] public ");
             
-            #line 153 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 154 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
             #line hidden
             this.Write(" valueNew;\r\n\r\n        static readonly Utils.ObjectPool<");
             
-            #line 155 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 156 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
             #line hidden
             this.Write("> pool = new Utils.ObjectPool<");
             
-            #line 155 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 156 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -309,7 +310,7 @@ namespace GONet
             this.Write(">(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);\r\n        static readon" +
                     "ly System.Collections.Concurrent.ConcurrentQueue<");
             
-            #line 156 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 157 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -317,7 +318,7 @@ namespace GONet
             this.Write("> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQu" +
                     "eue<");
             
-            #line 156 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 157 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -329,21 +330,21 @@ namespace GONet
         /// Do NOT use!  This is for object pooling and MessagePack only.
         /// Instead, call <see cref=""Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, ");
             
-            #line 161 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 162 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 161 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 162 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
             #line hidden
             this.Write(")\"/>.\r\n        /// </summary>\r\n        public ");
             
-            #line 163 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 164 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -353,14 +354,14 @@ namespace GONet
                     "\n        ///            here (i.e., to private object pool) via <see cref=\"Retur" +
                     "n(");
             
-            #line 167 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 168 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
             #line hidden
             this.Write(")\"/> when no longer needed!\r\n        /// </summary>\r\n        public static ");
             
-            #line 169 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 170 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -369,14 +370,14 @@ namespace GONet
                     "psedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, by" +
                     "te syncMemberIndex, ");
             
-            #line 169 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 170 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
             #line hidden
             this.Write(" valuePrevious, ");
             
-            #line 169 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 170 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
             
             #line default
@@ -396,7 +397,7 @@ namespace GONet
             int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
             ");
             
-            #line 182 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 183 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -429,7 +430,7 @@ namespace GONet
 
         public static void Return(");
             
-            #line 208 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 209 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -449,7 +450,7 @@ namespace GONet
 
 ");
             
-            #line 221 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 222 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
         }
     }
@@ -476,7 +477,7 @@ namespace GONet.Generation
 			{
 ");
             
-            #line 242 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 243 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 	for (int iCodeGenerationId = 1; iCodeGenerationId <= (int)maxCodeGenerationId; ++iCodeGenerationId)
     {
@@ -486,21 +487,21 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 246 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 247 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t\treturn new GONetParticipant_AutoMagicalSyncCompanion_Generated_");
             
-            #line 247 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 248 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
             #line hidden
             this.Write("(gonetParticipant);\r\n");
             
-            #line 248 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 249 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 	}
             
             #line default
@@ -516,7 +517,7 @@ namespace GONet.Generation
             {
 ");
             
-            #line 258 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 259 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 	for (byte iCodeGenerationId = 1; iCodeGenerationId <= maxCodeGenerationId; ++iCodeGenerationId)
     {
@@ -526,21 +527,21 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 262 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 263 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tGONetParticipant_AutoMagicalSyncCompanion_Generated_");
             
-            #line 264 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 265 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
             #line hidden
             this.Write(" companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_");
             
-            #line 264 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 265 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
@@ -548,7 +549,7 @@ namespace GONet.Generation
             this.Write(")syncCompanion;\r\n                        switch (syncMemberIndex)\r\n              " +
                     "          {\r\n\r\n");
             
-            #line 268 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 269 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 							int iOverall = 0;
 							foreach (var uniqueSnap in allUniqueSnapsByCodeGenerationId[iCodeGenerationId])
@@ -562,76 +563,76 @@ namespace GONet.Generation
             #line hidden
             this.Write("                            case ");
             
-            #line 276 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 277 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t");
             
-            #line 278 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 279 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t\t\t\t\tvar valueNew = companion.");
             
-            #line 279 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 280 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(uniqueSnap.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 279 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 280 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\t\t\t\t\t\t");
             
-            #line 280 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 281 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t\t\t\t\t");
             
-            #line 281 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 282 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName));
             
             #line default
             #line hidden
             this.Write(" valueNew = companion.");
             
-            #line 281 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 282 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(uniqueSnap.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 281 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 282 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 281 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 282 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t\t\t\t\t");
             
-            #line 282 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 283 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 283 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 284 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 									const string SYNC_EV = "SyncEvent_";
 									const string UNDIE = "_";
@@ -652,7 +653,7 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\t\t\t\t\t\t");
             
-            #line 297 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName));
             
             #line default
@@ -661,14 +662,14 @@ namespace GONet.Generation
                     "dToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previ" +
                     "ous.");
             
-            #line 297 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.");
             
-            #line 297 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(memberTypeFullName.Replace(".", "_")));
             
             #line default
@@ -677,7 +678,7 @@ namespace GONet.Generation
                     "g this event being different for the in/out direction, there is a different valu" +
                     "e to pull from that represents the previous value\r\n\t\t\t\t\t\t\t\t\treturn ");
             
-            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 299 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -685,14 +686,14 @@ namespace GONet.Generation
             this.Write(".Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gon" +
                     "etParticipant.GONetId, ");
             
-            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 299 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
             #line hidden
             this.Write(", syncMemberIndex, valuePrevious, valueNew);\r\n\t\t\t\t\t\t\t\t}\r\n");
             
-            #line 300 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 301 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 									++iOverall;
 								}
@@ -703,7 +704,7 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\t\t\t\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\tbreak;\r\n\r\n");
             
-            #line 310 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 311 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 	}
             
             #line default
@@ -719,7 +720,7 @@ namespace GONet.Generation
             {
 ");
             
-            #line 320 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 321 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 	for (byte iCodeGenerationId = 1; iCodeGenerationId <= maxCodeGenerationId; ++iCodeGenerationId)
     {
@@ -729,7 +730,7 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 324 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 325 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iCodeGenerationId));
             
             #line default
@@ -737,7 +738,7 @@ namespace GONet.Generation
             this.Write(":\r\n\t\t\t\t\t{\r\n                        switch (original.SyncMemberIndex)\r\n           " +
                     "             {\r\n\r\n");
             
-            #line 329 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 330 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 							int iOverall = 0;
 							foreach (var uniqueSnap in allUniqueSnapsByCodeGenerationId[iCodeGenerationId])
@@ -751,14 +752,14 @@ namespace GONet.Generation
             #line hidden
             this.Write("                            case ");
             
-            #line 337 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 338 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t\t\t\t\t{\r\n");
             
-            #line 339 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 340 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 									const string SYNC_EV = "SyncEvent_";
 									const string UNDIE = "_";
@@ -779,21 +780,21 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\t\t\t\t\t\t");
             
-            #line 353 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 354 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
             #line hidden
             this.Write(" originalTyped = (");
             
-            #line 353 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 354 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
             #line hidden
             this.Write(")original;\r\n\t\t\t\t\t\t\t\t\treturn ");
             
-            #line 354 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 355 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(className));
             
             #line default
@@ -802,7 +803,7 @@ namespace GONet.Generation
                     "nerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMember" +
                     "Index, originalTyped.valuePrevious, originalTyped.valueNew);\r\n\t\t\t\t\t\t\t\t}\r\n");
             
-            #line 356 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 357 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
 									++iOverall;
 								}
@@ -813,7 +814,7 @@ namespace GONet.Generation
             #line hidden
             this.Write("\t\t\t\t\t\t\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\tbreak;\r\n\r\n");
             
-            #line 366 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
+            #line 367 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 	}
             
             #line default

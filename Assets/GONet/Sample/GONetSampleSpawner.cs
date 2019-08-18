@@ -14,6 +14,7 @@
  */
 
 using GONet;
+using System;
 using UnityEngine;
 
 public class GONetSampleSpawner : MonoBehaviour
@@ -26,12 +27,28 @@ public class GONetSampleSpawner : MonoBehaviour
 
     private bool hasServerSpawned;
 
-    /* auto spawn...but ok prior to server being created?
     private void Start()
     {
-        GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
+        ProcessCmdLine();
     }
-    */
+
+    void ProcessCmdLine()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+
+        foreach (string arg in args)
+        {
+            if (arg == "-server")
+            {
+                Instantiate(GONetServerPREFAB);
+                hasServerSpawned = true;
+            }
+            else if (arg == "-client")
+            {
+                Instantiate(GONetClientPREFAB);
+            }
+        }
+    }
 
     private void Update()
     {
