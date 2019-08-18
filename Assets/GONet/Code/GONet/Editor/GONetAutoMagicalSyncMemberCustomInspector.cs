@@ -38,17 +38,6 @@ namespace GONet.Editor
         public override void OnInspectorGUI()
         {
             DrawGONetParticipantSpecifics(targetGONetParticipant);
-
-            EditorGUI.indentLevel++;
-            const string GOIntrinsics = "Transform (Intrinsics)";
-            isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, GOIntrinsics);// string.Concat(typeof(GONetParticipant).Name, SCR));
-            if (isMyScriptSectionUnfolded)
-            {
-                EditorGUI.indentLevel++;
-                DrawDefaultInspector();
-                EditorGUI.indentLevel--;
-            }
-            EditorGUI.indentLevel--;
         }
 
         bool isSyncAttrSectionFolded = true;
@@ -116,7 +105,6 @@ namespace GONet.Editor
             isSyncAttrSectionFolded = EditorGUILayout.Foldout(isSyncAttrSectionFolded, ATTR);
             if (isSyncAttrSectionFolded)
             { // Handle/draw all [GONetAutoMagicalSync] members
-
                 EditorGUI.indentLevel++;
 
                 foreach (var siblingMonoBehaviour in targetGONetParticipant.GetComponents<MonoBehaviour>())
@@ -152,28 +140,13 @@ namespace GONet.Editor
                                 foreach (var autoSyncMember in autoSyncMembersInSibling)
                                 {
                                     EditorGUILayout.BeginHorizontal();
-                                    EditorGUILayout.LabelField(autoSyncMember.Name);
+                                    EditorGUILayout.LabelField(autoSyncMember.Name, GUILayout.MaxWidth(150));
 
                                     EditorGUILayout.TextField(autoSyncMember.MemberType == MemberTypes.Field ? ((FieldInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString() : ((PropertyInfo)autoSyncMember).GetValue(siblingMonoBehaviour).ToString(),
                                         GUILayout.MinWidth(70), GUILayout.ExpandWidth(true));
 
                                     GONetAutoMagicalSyncAttribute autoSyncMember_SyncAttribute = (GONetAutoMagicalSyncAttribute)autoSyncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
-                                    if (!string.IsNullOrWhiteSpace(autoSyncMember_SyncAttribute.SettingsProfileTemplateName))
-                                    {
-                                        bool superInnerPrev = GUI.enabled;
-                                        GUI.enabled = true;
-                                        const string PROFILE = "profile: ";
-                                        const string TOOLTIP = "Click to select the corresponding GONet SyncSettingsProfile asset in Project view.";
-                                        GUIContent buttonTextWithTooltip = new GUIContent(string.Concat(PROFILE, autoSyncMember_SyncAttribute.SettingsProfileTemplateName), TOOLTIP);
-                                        if (GUILayout.Button(buttonTextWithTooltip))
-                                        {
-                                            Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(string.Concat(
-                                                GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH,
-                                                autoSyncMember_SyncAttribute.SettingsProfileTemplateName,
-                                                GONetEditorWindow.ASSET_FILE_EXTENSION));
-                                        }
-                                        GUI.enabled = superInnerPrev;
-                                    }
+                                    DrawGONetSyncProfileTemplateButton_IfAppropriate(autoSyncMember_SyncAttribute.SettingsProfileTemplateName);
 
                                     EditorGUILayout.EndHorizontal();
                                 }
@@ -201,8 +174,16 @@ namespace GONet.Editor
                     bool isfoldie;
                     string animatorControllerName = animator.runtimeAnimatorController.name;
                     isFoldedByTypeMemberNameMap.TryGetValue(animatorControllerName, out isfoldie);
+
+                    EditorGUILayout.BeginHorizontal();
+
                     const string ANIMATOR_INTRINSICS = "Animator (Intrinsics)";
                     isFoldedByTypeMemberNameMap[animatorControllerName] = EditorGUILayout.Foldout(isfoldie, ANIMATOR_INTRINSICS);
+
+                    DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS);
+
+                    EditorGUILayout.EndHorizontal();
+
                     if (isFoldedByTypeMemberNameMap[animatorControllerName])
                     {
                         EditorGUI.indentLevel++;
@@ -252,6 +233,45 @@ namespace GONet.Editor
                     }
                 }
 
+                { // what used to be DrawDefaultInspector():
+                    const string GOIntrinsics = "Transform (Intrinsics)";
+                    isMyScriptSectionUnfolded = EditorGUILayout.Foldout(isMyScriptSectionUnfolded, GOIntrinsics);// string.Concat(typeof(GONetParticipant).Name, SCR));
+                    if (isMyScriptSectionUnfolded)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        bool guiEnabledPrevious_inner = GUI.enabled;
+                        GUI.enabled = false;
+
+                        EditorGUILayout.BeginHorizontal();
+                        const string ScriptLabel = "Script";
+                        EditorGUILayout.LabelField(ScriptLabel);
+                        EditorGUILayout.TextField(nameof(Transform));
+                        EditorGUILayout.EndHorizontal();
+
+                        GUI.enabled = guiEnabledPrevious_inner;
+
+                        { // IsPositionSyncd:
+                            EditorGUILayout.BeginHorizontal();
+                            EditorGUILayout.LabelField(string.Concat("Is Position Syncd:"), GUILayout.MaxWidth(150));
+                            SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsPositionSyncd)}");
+                            EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
+                            DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION);
+                            EditorGUILayout.EndHorizontal();
+                        }
+                        { // IsRotationSyncd:
+                            EditorGUILayout.BeginHorizontal();
+                            EditorGUILayout.LabelField(string.Concat("Is Rotation Syncd:"), GUILayout.MaxWidth(150));
+                            SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsRotationSyncd)}");
+                            EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
+                            DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION);
+                            EditorGUILayout.EndHorizontal();
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+                }
+
                 serializedObject.ApplyModifiedProperties();
 
                 if (EditorGUI.EndChangeCheck())
@@ -273,6 +293,27 @@ namespace GONet.Editor
 
 
                 EditorGUI.indentLevel--;
+            }
+        }
+
+        private static void DrawGONetSyncProfileTemplateButton_IfAppropriate(string settingsProfileTemplateName)
+        {
+            if (!string.IsNullOrWhiteSpace(settingsProfileTemplateName))
+            {
+                const string PROFILE = "profile: ";
+                const string TOOLTIP = "Click to select the corresponding GONet SyncSettingsProfile asset in Project view.\nOnce selected, you can view/edit the sync settings for this value.";
+
+                bool superInnerPrev = GUI.enabled;
+                GUI.enabled = true;
+                GUIContent buttonTextWithTooltip = new GUIContent(string.Concat(PROFILE, settingsProfileTemplateName), TOOLTIP);
+                if (GUILayout.Button(buttonTextWithTooltip))
+                {
+                    Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(string.Concat(
+                        GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH,
+                        settingsProfileTemplateName,
+                        GONetEditorWindow.ASSET_FILE_EXTENSION));
+                }
+                GUI.enabled = superInnerPrev;
             }
         }
     }

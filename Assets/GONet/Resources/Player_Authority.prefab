@@ -691,7 +691,6 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/GONet/Resources/Player_Authority.prefab
-  runtimeUID: 0
 --- !u!1 &393247807
 GameObject:
   m_ObjectHideFlags: 0
