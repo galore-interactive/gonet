@@ -177,8 +177,10 @@ namespace GONet.Editor
 
                     EditorGUILayout.BeginHorizontal();
 
+                    EditorGUILayout.BeginHorizontal(GUILayout.MinWidth(140));
                     const string ANIMATOR_INTRINSICS = "Animator (Intrinsics)";
                     isFoldedByTypeMemberNameMap[animatorControllerName] = EditorGUILayout.Foldout(isfoldie, ANIMATOR_INTRINSICS);
+                    EditorGUILayout.EndHorizontal();
 
                     DrawGONetSyncProfileTemplateButton_IfAppropriate(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS);
 
