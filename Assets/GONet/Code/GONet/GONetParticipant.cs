@@ -87,7 +87,10 @@ namespace GONet
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
         /// </para>
         /// </summary>
-        [GONetAutoMagicalSync(ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, MustRunOnUnityMainThread = true)]
+        [GONetAutoMagicalSync(
+            SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
+            ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, 
+            MustRunOnUnityMainThread = true)]
         public uint OwnerAuthorityId
         {
             get { return ownerAuthorityId; }
@@ -217,12 +220,23 @@ namespace GONet
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
-                GONetParticipant gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+                GONetParticipant gonetParticipant = null;
+                if ((object)gonetParticipantGO == null)
+                {
+                    GONetLog.Warning("If this is a client "+ (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, but its not and this is the SERVER and you have some worrying to do)") +", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
+                }
+                else
+                {
+                    gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+                }
 
                 uint GONetId = default;
                 bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
 
-                gonetParticipant.GONetId = GONetId;
+                if ((object)gonetParticipant != null)
+                {
+                    gonetParticipant.GONetId = GONetId;
+                }
 
                 return GONetId;
             }

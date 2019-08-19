@@ -338,6 +338,11 @@ namespace GONet
                     {
                         GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
                         SendBytesToRemoteConnection(remoteClientConnection, bytes, bytes.Length, channelId);
+
+                        if (eventEnvelope.Event is InstantiateGONetParticipantEvent)
+                        {
+                            GONetLog.Debug("Sending InstantiateGONetParticipantEvent that started at a client, but this is server and we are sending to all other clients except originator!");
+                        }
                     }
                 }
             }
@@ -346,6 +351,11 @@ namespace GONet
                 byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
                 bool shouldSendRelilably = true; // TODO support unreliable events?
                 SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+
+                if (eventEnvelope.Event is InstantiateGONetParticipantEvent)
+                {
+                    GONetLog.Debug("Sending InstantiateGONetParticipantEvent (to all clients) that started here at the server");
+                }
             }
         }
 
@@ -2140,6 +2150,8 @@ namespace GONet
                 {
                     // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
                     change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
+
+                    GONetLog.Debug("serializing to send momentarily, GONetId");
                 }
                 else
                 {
