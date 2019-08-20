@@ -664,14 +664,19 @@ namespace GONet
             SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue;
             byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance);
 
-            if (!File.Exists(persistenceFilePath))
+            if (File.Exists(persistenceFilePath))
             {
-                File.Create(persistenceFilePath);
+                using (var stream = new FileStream(persistenceFilePath, FileMode.Append))
+                {
+                    stream.Write(bytes, 0, bytes.Length);
+                }
             }
-
-            using (var stream = new FileStream(persistenceFilePath, FileMode.Append))
+            else
             {
-                stream.Write(bytes, 0, bytes.Length);
+                using (var stream = File.Create(persistenceFilePath))
+                {
+                    stream.Write(bytes, 0, bytes.Length);
+                }
             }
 
             //GONetLog.Debug("WROTE DB!!!! ++++++++++++++++++++++++++++++");
