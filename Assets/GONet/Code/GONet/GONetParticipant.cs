@@ -143,6 +143,8 @@ namespace GONet
         
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
 
+        internal bool doWeKnowWTF = false;
+
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
@@ -230,7 +232,7 @@ namespace GONet
                     gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
                 }
 
-                uint GONetId = default;
+                uint GONetId = GONetId_Unset;
                 bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
 
                 if ((object)gonetParticipant != null)

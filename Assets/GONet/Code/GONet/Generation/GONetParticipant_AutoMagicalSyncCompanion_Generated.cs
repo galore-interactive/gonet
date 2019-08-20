@@ -98,21 +98,27 @@ namespace GONet.Generation
 
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
+        /// IMPORTANT: If <see cref="gonetParticipant"/> has a value of false for <see cref="GONetParticipant.doWeKnowWTF"/>, then this will return false no matter what!
         /// </summary>
         internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
             bool hasChange = false;
-            for (int i = 0; i < valuesCount; ++i)
+
+            if (gonetParticipant.doWeKnowWTF)
             {
-                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-                if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
-                    valueChangeSupport.lastKnownValue != valueChangeSupport.lastKnownValue_previous &&
-                    !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
+                for (int i = 0; i < valuesCount; ++i)
                 {
-                    lastKnownValueChangesSinceLastCheck[i] = true;
-                    hasChange = true;
+                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                    if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
+                        valueChangeSupport.lastKnownValue != valueChangeSupport.lastKnownValue_previous &&
+                        !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
+                    {
+                        lastKnownValueChangesSinceLastCheck[i] = true;
+                        hasChange = true;
+                    }
                 }
             }
+
             return hasChange;
         }
 

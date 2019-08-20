@@ -1220,6 +1220,7 @@ namespace GONet
                 instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
             }
             remoteSpawns_avoidAutoPropogateSupport.Add(instance);
+            instance.doWeKnowWTF = true;
         }
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
@@ -1618,6 +1619,8 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
+            gonetParticipant.doWeKnowWTF = true;
+
             InstantiateGONetParticipantEvent @event;
 
             string nonAuthorityDesignTimeLocation;
@@ -2192,6 +2195,8 @@ namespace GONet
             }
         }
 
+        //static readonly HashSet<uint> gonetIdsAwaitingInstantiateRemote = new HashSet<uint>();
+
         private static void DeserializeBody_ChangesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
             ushort count;
@@ -2203,12 +2208,20 @@ namespace GONet
                 bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
                 if (canASSumeNetId)
                 {
-                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
+                    uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
+
+                    //bool canASSumeInstantiateRemoteForthcoming = gonetId == GONetParticipant.GONetId_Unset;
+                    ////if (canASSumeInstantiateRemoteForthcoming)
+                    //{
+                    //    gonetIdsAwaitingInstantiateRemote.Add(gonetId);
+                    //}
                 }
                 else
                 {
                     uint gonetId;
                     bitStream_headerAlreadyRead.ReadUInt(out gonetId);
+
+                    //bool isAwaitingInstantiateRemote = gonetIdsAwaitingInstantiateRemote.Contains(gonetId);
 
                     if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                     {
