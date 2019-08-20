@@ -361,14 +361,13 @@ namespace GONet
 
         private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
-            GONetLog.Debug("pub/sub Persistent");
-
             persistentEventsThisSession.Enqueue(eventEnvelope.Event);
         }
 
         private static void OnInstantiationEvent_Remote(GONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
         {
-            GONetLog.Debug("pub/sub Instantiate REMOTE");
+            const string IR = "pub/sub Instantiate REMOTE about to process...";
+            GONetLog.Debug(IR);
 
             Instantiate_Remote(eventEnvelope.Event);
         }
@@ -1225,7 +1224,7 @@ namespace GONet
                 instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
             }
             remoteSpawns_avoidAutoPropogateSupport.Add(instance);
-            instance.doWeKnowWTF = true;
+            instance.IsOKToStartAutoMagicalProcessing = true;
         }
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
@@ -1624,7 +1623,7 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            gonetParticipant.doWeKnowWTF = true;
+            gonetParticipant.IsOKToStartAutoMagicalProcessing = true;
 
             InstantiateGONetParticipantEvent @event;
 

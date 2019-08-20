@@ -140,10 +140,23 @@ namespace GONet
         [SerializeField, HideInInspector]
         public string designTimeLocation;
         public string DesignTimeLocation => designTimeLocation;
-        
+
+        /// <summary>
+        /// <para>If false, the <see cref="GameObject"/> on which this is "installed" was defined in a scene.</para>
+        /// <para>If true, the <see cref="GameObject"/> on which this is "installed" was added to the game via a call to some flavor of <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.</para>
+        /// <para>IMPORTANT: This will have a value of true for EVERYTHING up until GONet knows for sure if it was defined in a scene or not!</para>
+        /// <para>REASONING: Returning true for things defined in scene.  Well, it will actually change to a value of false by the time the MonoBehaviour lifecycle method Start() is called.  This is due to the timing of Unity's SceneManager.sceneLoaded callback (see https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager-sceneLoaded.html).  It is called between OnEnable() and Start().  This callback is what GONet uses to keep track of what was defined in a scene (i.e., WasInstantiated = false) and what is in the game due to Object.Instantiate() having been called programmatically by code (i.e., WasInstantiated = true)</para>
+        /// </summary>
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
 
-        internal bool doWeKnowWTF = false;
+        /// <summary>
+        /// Before this is set to true, GONet does not know enough about this instance to allow processing of auto magical sync values.
+        /// The main reason behind this is how GONet uses core <see cref="MonoBehaviour"/> magic methods and other Unity methods/flows
+        /// (e.g. <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>) to manage lifecycle here and GONet will not immediately
+        /// (i.e., upon instantiation or call to Awake) know if we need to or even can safely process/send any automagical sync.  GONet
+        /// auto propogate instantiation (across the network) stuff is really what necessitates this safety check.
+        /// </summary>
+        internal bool IsOKToStartAutoMagicalProcessing = false;
 
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
@@ -167,7 +180,6 @@ namespace GONet
         public static event EditorOnlyDelegate EditorOnlyAwake;
         private void Awake()
         {
-            //GONetLog.Debug("Awake....instanceID: " + GetInstanceID());
             EditorOnlyAwake?.Invoke(this);
         }
 
@@ -193,13 +205,20 @@ namespace GONet
 
         private void OnEnable()
         {
-            //GONetLog.Debug("OnEnable....instanceID: " + GetInstanceID());
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
         }
 
         private void Start()
         {
-            //GONetLog.Debug("Start....instanceID: " + GetInstanceID());
+            const string GNPS = "GNP.Start() name: ";
+            const string WAS = " WasInstantiated: ";
+            GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
+
+            if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
+            {
+                IsOKToStartAutoMagicalProcessing = true;
+            }
+
             GONetMain.Start_AutoPropogateInstantiation_IfAppropriate(this);
         }
 

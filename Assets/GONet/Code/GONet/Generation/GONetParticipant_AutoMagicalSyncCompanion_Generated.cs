@@ -98,13 +98,13 @@ namespace GONet.Generation
 
         /// <summary>
         /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
-        /// IMPORTANT: If <see cref="gonetParticipant"/> has a value of false for <see cref="GONetParticipant.doWeKnowWTF"/>, then this will return false no matter what!
+        /// IMPORTANT: If <see cref="gonetParticipant"/> has a value of false for <see cref="GONetParticipant.IsOKToStartAutoMagicalProcessing"/>, then this will return false no matter what!
         /// </summary>
         internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
             bool hasChange = false;
 
-            if (gonetParticipant.doWeKnowWTF)
+            if (gonetParticipant.IsOKToStartAutoMagicalProcessing)
             {
                 for (int i = 0; i < valuesCount; ++i)
                 {
