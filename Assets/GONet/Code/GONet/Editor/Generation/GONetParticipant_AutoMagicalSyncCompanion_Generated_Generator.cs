@@ -51,10 +51,10 @@ namespace GONet.Generation
         {
             EditorApplication.playModeStateChanged += OnEditorPlayModeStateChanged;
 
-            GONetParticipant.EditorOnlyDefaultContructor += GONetParticipant_EditorOnlyDefaultContructor;
-            GONetParticipant.EditorOnlyReset += GONetParticipant_EditorOnlyReset;
-            GONetParticipant.EditorOnlyAwake += GONetParticipant_EditorOnlyAwake;
-            GONetParticipant.EditorOnlyOnDestroy += GONetParticipant_EditorOnlyOnDestroy;
+            GONetParticipant.DefaultConstructorCalled += GONetParticipant_EditorOnlyDefaultContructor;
+            GONetParticipant.ResetCalled += GONetParticipant_EditorOnlyReset;
+            GONetParticipant.AwakeCalled += GONetParticipant_EditorOnlyAwake;
+            GONetParticipant.OnDestroyCalled += GONetParticipant_EditorOnlyOnDestroy;
 
 #if UNITY_2018_1_OR_NEWER
             EditorApplication.projectChanged += OnProjectChanged;

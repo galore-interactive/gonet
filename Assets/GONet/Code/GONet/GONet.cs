@@ -1640,6 +1640,11 @@ namespace GONet
             EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
+        internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gONetParticipant)
+        {
+            throw new NotImplementedException();
+        }
+
         private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)
         {
             bool shouldConsiderBlendingBetweenChangedValues = valueNew != MyAuthorityId && valueNew != OwnerAuthorityId_Unset; // if I do not own it, I might need to keep track of some value changes over time in order to blend between them

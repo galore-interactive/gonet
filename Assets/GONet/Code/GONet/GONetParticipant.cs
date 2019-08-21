@@ -161,46 +161,36 @@ namespace GONet
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
-        public delegate void EditorOnlyDelegate(GONetParticipant gonetParticipant);
+        public delegate void GNPDelegate(GONetParticipant gonetParticipant);
 
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
-        public static event EditorOnlyDelegate EditorOnlyDefaultContructor;
+        public static event GNPDelegate DefaultConstructorCalled;
         public GONetParticipant()
         {
-            EditorOnlyDefaultContructor?.Invoke(this);
+            DefaultConstructorCalled?.Invoke(this);
         }
 
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
-        public static event EditorOnlyDelegate EditorOnlyAwake;
+        public static event GNPDelegate AwakeCalled;
         private void Awake()
         {
-            EditorOnlyAwake?.Invoke(this);
+            AwakeCalled?.Invoke(this);
         }
 
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
-        public static event EditorOnlyDelegate EditorOnlyReset;
+        public static event GNPDelegate ResetCalled;
         private void Reset()
         {
-            EditorOnlyReset?.Invoke(this);
-        }
-
-        /// <summary>
-        /// IMPORTANT: Do NOT use this.
-        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
-        /// </summary>
-        public static event EditorOnlyDelegate EditorOnlyOnDestroy;
-        private void OnDestroy()
-        {
-            EditorOnlyOnDestroy?.Invoke(this);
+            ResetCalled?.Invoke(this);
         }
 
         private void OnEnable()
@@ -225,6 +215,17 @@ namespace GONet
         private void OnDisable()
         {
             GONetMain.OnDisable_StopMonitoringForAutoMagicalNetworking(this);
+        }
+
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// </summary>
+        public static event GNPDelegate OnDestroyCalled;
+        private void OnDestroy()
+        {
+            GONetMain.OnDestroy_AutoPropogateRemoval_IfAppropriate(this);
+            OnDestroyCalled?.Invoke(this);
         }
 
         public class GONetId_InitialAssignment_CustomSerializer : IGONetAutoMagicalSync_CustomSerializer
