@@ -439,6 +439,16 @@ namespace GONet
         #endregion
 
         /// <summary>
+        /// Returns null if not found.
+        /// </summary>
+        public static GONetParticipant GetGONetParticipantById(uint gonetId)
+        {
+            GONetParticipant gonetParticipant = null;
+            gonetParticipantByGONetIdMap.TryGetValue(gonetId, out gonetParticipant);
+            return gonetParticipant;
+        }
+
+        /// <summary>
         /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
         /// </summary>
         public static void SendBytesToRemoteConnections(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)

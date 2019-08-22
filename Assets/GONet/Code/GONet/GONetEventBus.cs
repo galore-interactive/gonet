@@ -30,6 +30,12 @@ namespace GONet
         public virtual bool IsSourceRemote { get; }
 
         internal IGONetEvent EventUntyped { get; set; }
+
+        /// <summary>
+        /// <para>Some event types have a single related <see cref="GONet.GONetParticipant"/> instance.</para>
+        /// <para>In those cases and those cases only, this will not be null (e.g., child classes of <see cref="SyncEvent_ValueChangeProcessed"/>).</para>
+        /// </summary>
+        public GONetParticipant GONetParticipant { get; protected set; }
     }
 
     public sealed class GONetEventEnvelope<T> : GONetEventEnvelope where T : IGONetEvent
@@ -41,18 +47,20 @@ namespace GONet
         public override bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
 
         T eventTyped;
+
         public T Event
         {
             get => eventTyped;
             set => EventUntyped = eventTyped = value;
         }
 
-        internal static GONetEventEnvelope<T> Borrow(T eventTyped, uint sourceAuthorityId)
+        internal static GONetEventEnvelope<T> Borrow(T eventTyped, uint sourceAuthorityId, GONetParticipant gonetParticipant)
         {
             var envelope = pool.Borrow();
 
             envelope.Event = eventTyped;
             envelope.SourceAuthorityId = sourceAuthorityId;
+            envelope.GONetParticipant = gonetParticipant;
 
             return envelope;
         }
@@ -66,6 +74,16 @@ namespace GONet
         {
             Event = @event;
             SourceAuthorityId = sourceAuthorityId;
+
+            SyncEvent_ValueChangeProcessed syncEvent = @event as SyncEvent_ValueChangeProcessed;
+            if (syncEvent == null)
+            {
+                GONetParticipant = null;
+            }
+            else
+            {
+                GONetParticipant = GONetMain.GetGONetParticipantById(syncEvent.GONetId);
+            }
         }
     }
 
@@ -154,7 +172,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// <para>IMPORTANT: It is vitally important that <paramref name="handler"/> code does NOT keep a reference to the envelope or the event inside the envelope.  These items are managed by an object pool for performance reasons.  If for some reason the handler needs to do operations against data inside the envelope or event after that method call is complete (e.g., in a method later on or in a coroutine or another thread) you have to make a copy and if you do that it is your responsibility to return it to the proper pool afterward.  TODO FIXME: add more info as to location of proper pools!</para>
+        /// <para>IMPORTANT: It is vitally important that <paramref name="handler"/> code does NOT keep a reference to the envelope or the event inside the envelope.  These items are managed by an object pool for performance reasons.  If for some reason the handler needs to do operations against data inside the envelope or event after that method call is complete (e.g., in a method later on or in a coroutine or another thread) you have to either (a) copy data off of it into other variables or (b) make a copy and if you do that it is your responsibility to return it to the proper pool afterward.  TODO FIXME: add more info as to location of proper pools!</para>
         /// <para>IMPORTANT: Only call this from the main Unity thread!</para>
         /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
@@ -208,7 +226,7 @@ namespace GONet
             ResortSubscribersByPriority();
 
             var subscription = new Subscription<T>(
-                newHandlerAndPredicate, 
+                newHandlerAndPredicate,
                 existingHandlersForSpecificType,
                 () => Update_handlersByEventType_IncludingChildren_Deep(eventType));
 
@@ -404,7 +422,7 @@ namespace GONet
 
             public void Handle(GONetEventEnvelope eventEnvelope)
             {
-                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId);
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
 
                 wrappedHandler(envelopeTyped);
 
@@ -426,7 +444,7 @@ namespace GONet
 
             public bool Filter(GONetEventEnvelope<IGONetEvent> eventEnvelope)
             {
-                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId);
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
 
                 bool filterResult = wrappedFilter(envelopeTyped);
 
