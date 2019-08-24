@@ -51,11 +51,6 @@ namespace GONet
         [SerializeField, HideInInspector]
         public GONetCodeGenerationId codeGenerationId = CodeGenerationId_Unset;
 
-        public delegate void OwnerAuthorityIdChangedDelegate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew);
-        public event OwnerAuthorityIdChangedDelegate OwnerAuthorityIdChanged;
-
-        
-
         [Serializable]
         public class AnimatorControllerParameter
         {
@@ -78,10 +73,9 @@ namespace GONet
         [SerializeField, HideInInspector]
         public AnimatorControllerParameterMap animatorSyncSupport;
 
-        uint ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
         /// <para>This is set to a value that represents which machine in the game spawned this instance.</para>
-        /// <para>IMPORTANT: Up until some time during <see cref="Start"/>, this value will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown.  Once the owner is known, this value will change and the <see cref="OwnerAuthorityIdChanged"/> event will fire.</para>
+        /// <para>IMPORTANT: Up until some time during <see cref="Start"/>, this value will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown.  Once the owner is known, this value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="GONetMain.EventBus"/>).</para>
         /// <para>
         /// If the corresponding <see cref="GameObject"/> is included in the/a Unity scene, the owner will be considered the server
         /// and a value of <see cref="OwnerAuthorityId_Server"/> will be used.
@@ -91,19 +85,7 @@ namespace GONet
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, 
             MustRunOnUnityMainThread = true)]
-        public uint OwnerAuthorityId
-        {
-            get { return ownerAuthorityId; }
-            internal set
-            {
-                uint previous = ownerAuthorityId;
-                ownerAuthorityId = value;
-                if (previous != ownerAuthorityId)
-                {
-                    OwnerAuthorityIdChanged?.Invoke(this, previous, ownerAuthorityId);
-                }
-            }
-        }
+        public uint OwnerAuthorityId { get; internal set; } = GONetMain.OwnerAuthorityId_Unset;
 
         private uint gonetId = GONetId_Unset;
         /// <summary>
@@ -144,7 +126,7 @@ namespace GONet
         /// <summary>
         /// <para>If false, the <see cref="GameObject"/> on which this is "installed" was defined in a scene.</para>
         /// <para>If true, the <see cref="GameObject"/> on which this is "installed" was added to the game via a call to some flavor of <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.</para>
-        /// <para>IMPORTANT: This will have a value of true for EVERYTHING up until GONet knows for sure if it was defined in a scene or not!</para>
+        /// <para>IMPORTANT: This will have a value of true for EVERYTHING up until GONet knows for sure if it was defined in a scene or not!  If you need to be informed the moment this value is known to be false instead, register to the event <see cref="TODO FIXME add it here once available"/>.</para>
         /// <para>REASONING: Returning true for things defined in scene.  Well, it will actually change to a value of false by the time the MonoBehaviour lifecycle method Start() is called.  This is due to the timing of Unity's SceneManager.sceneLoaded callback (see https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager-sceneLoaded.html).  It is called between OnEnable() and Start().  This callback is what GONet uses to keep track of what was defined in a scene (i.e., WasInstantiated = false) and what is in the game due to Object.Instantiate() having been called programmatically by code (i.e., WasInstantiated = true)</para>
         /// </summary>
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);

@@ -222,7 +222,7 @@ namespace GONet
         private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
         /// <summary>
-        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="GONetParticipant.OwnerAuthorityIdChanged"/> event will fire.</para>
+        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="EventBus"/>)</para>
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
         /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
         /// <para>If you already have access to the <see cref="GONetParticipant"/> associated with this <paramref name="gameObject"/>, then use the sister method instead: <see cref="IsMine(GONetParticipant)"/></para>
@@ -233,7 +233,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="GONetParticipant.OwnerAuthorityIdChanged"/> event will fire.</para>
+        /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="EventBus"/>)</para>
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
         /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
         /// </summary>
@@ -1535,8 +1535,6 @@ namespace GONet
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
-                gonetParticipant.OwnerAuthorityIdChanged += OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate;
-
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
                     if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions))
@@ -1653,26 +1651,6 @@ namespace GONet
         internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gONetParticipant)
         {
             throw new NotImplementedException();
-        }
-
-        private static void OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate(GONetParticipant gonetParticipant, uint valueOld, uint valueNew)
-        {
-            bool shouldConsiderBlendingBetweenChangedValues = valueNew != MyAuthorityId && valueNew != OwnerAuthorityId_Unset; // if I do not own it, I might need to keep track of some value changes over time in order to blend between them
-            if (shouldConsiderBlendingBetweenChangedValues)
-            {
-                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion = autoSyncCompanions[gonetParticipant];
-                for (int i = 0; i < autoSyncCompanion.valuesCount; ++i)
-                {
-                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = autoSyncCompanion.valuesChangesSupport[i];
-                    if (valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived)
-                    {
-                        // TODO FIXME impl
-                    }
-                }
-            }
-
-            gonetParticipant.OwnerAuthorityIdChanged -= OnOwnerAuthorityIdChanged_InitValueBlendSupport_IfAppropriate; // we did what we needed to...done.
         }
 
         private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
