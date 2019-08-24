@@ -14,6 +14,7 @@
  */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using GONet.Serializables;
 using GONet.Utils;
@@ -131,14 +132,28 @@ namespace GONet
         /// </summary>
         public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
 
+        ulong endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = ulong.MaxValue;
+        volatile bool isOKToStartAutoMagicalProcessing = false;
         /// <summary>
-        /// Before this is set to true, GONet does not know enough about this instance to allow processing of auto magical sync values.
+        /// <para>Before this is set to true, GONet does not know enough about this instance to allow processing of auto magical sync values.
         /// The main reason behind this is how GONet uses core <see cref="MonoBehaviour"/> magic methods and other Unity methods/flows
         /// (e.g. <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>) to manage lifecycle here and GONet will not immediately
         /// (i.e., upon instantiation or call to Awake) know if we need to or even can safely process/send any automagical sync.  GONet
-        /// auto propogate instantiation (across the network) stuff is really what necessitates this safety check.
+        /// auto propogate instantiation (across the network) stuff is really what necessitates this safety check.</para>
+        /// <para>WARNING: Setting this value is delayed by one frame to ensure the other threads reading from this are not executed too quickly and any bytes handed over to the reliable transport are processed first!</para>
         /// </summary>
-        internal bool IsOKToStartAutoMagicalProcessing = false;
+        internal bool IsOKToStartAutoMagicalProcessing
+        {
+            get => isOKToStartAutoMagicalProcessing && 
+                (endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing < GONetMain.tickCount_endOfTheLineSend_Thread);
+
+            set
+            {
+                isOKToStartAutoMagicalProcessing = value;
+
+                endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = value ? GONetMain.tickCount_endOfTheLineSend_Thread : uint.MaxValue;
+            }
+        }
 
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again

@@ -98,6 +98,9 @@ namespace GONet
             ReceiveCallback = OnReceiveCallback;
         }
 
+        /// <summary>
+        /// IMPORTANT: You must NOT use this method.  Instead, use <see cref="SendMessageOverChannel(GONetChannelId[], int, GONetChannelId)"/> in order for the channel stuff to work properly!
+        /// </summary>
         [Obsolete(DO_NOT_USE, true)]
         public new void SendMessage(byte[] messageBytes, int bytesUsedCount, QosType qualityOfService)
         {

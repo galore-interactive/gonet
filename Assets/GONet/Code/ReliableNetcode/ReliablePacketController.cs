@@ -26,14 +26,16 @@ namespace ReliableNetcode
         public Action<ushort, byte[], int> ProcessPacketCallback;
         public Action<ushort> AckPacketCallback;
 
+        public const int MTU_STANDARD = 1400;
+
         public static ReliableConfig DefaultConfig()
         {
             var config = new ReliableConfig();
             config.Name = "endpoint";
-            config.MaxPacketSize = 16 * 1024;
-            config.FragmentThreshold = 1024;
+            config.MaxPacketSize = 16 * MTU_STANDARD;
+            config.FragmentThreshold = MTU_STANDARD;
             config.MaxFragments = 16;
-            config.FragmentSize = 1024;
+            config.FragmentSize = MTU_STANDARD;
             config.SentPacketBufferSize = 256;
             config.ReceivedPacketBufferSize = 256;
             config.FragmentReassemblyBufferSize = 64;

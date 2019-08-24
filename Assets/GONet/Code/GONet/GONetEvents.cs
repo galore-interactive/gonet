@@ -18,6 +18,7 @@ using MessagePack;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace GONet
 {
@@ -121,6 +122,12 @@ namespace GONet
         public uint OwnerAuthorityId;
 
         [Key(3)]
+        public Vector3 Position;
+
+        [Key(4)]
+        public Quaternion Rotation;
+
+        [Key(5)]
         public string InstanceName;
 
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
@@ -129,8 +136,12 @@ namespace GONet
 
             @event.InstanceName = gonetParticipant.gameObject.name;
             @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+
             @event.GONetId = gonetParticipant.GONetId;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            @event.Position = gonetParticipant.transform.position;
+            @event.Rotation = gonetParticipant.transform.rotation;
 
             @event.OccurredAtElapsedTicks = default;
 
@@ -146,6 +157,9 @@ namespace GONet
 
             @event.GONetId = gonetParticipant.GONetId;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+
+            @event.Position = gonetParticipant.transform.position;
+            @event.Rotation = gonetParticipant.transform.rotation;
 
             @event.OccurredAtElapsedTicks = default;
 

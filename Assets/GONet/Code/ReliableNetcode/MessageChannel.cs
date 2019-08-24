@@ -295,9 +295,9 @@ namespace ReliableNetcode
                 }
             }
 
-            // if we're in congestion control mode, only send packets 10 times per second.
-            // otherwise, send 30 times per second
-            double flushInterval = congestionControl ? 0.1 : 0.033;
+            const double CONGESTED_SEND_RATE_HZ = 1.0 / 10.0;
+            const double NORMAL_SEND_RATE_HZ = 1.0 / 90.0; // GONet changed from original value of 0.033
+            double flushInterval = congestionControl ? CONGESTED_SEND_RATE_HZ : NORMAL_SEND_RATE_HZ;
 
             if (timeSeconds - lastBufferFlush >= flushInterval) {
                 lastBufferFlush = timeSeconds;

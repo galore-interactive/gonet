@@ -29,6 +29,7 @@ using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
 using MessagePack;
 using System.IO;
+using System.Runtime.Serialization;
 
 namespace GONet
 {
@@ -504,9 +505,12 @@ namespace GONet
         static readonly ConcurrentQueue<NetworkData> endOfTheLineSendQueue = new ConcurrentQueue<NetworkData>();
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_outgoingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
+        internal static ulong tickCount_endOfTheLineSend_Thread;
         private static volatile bool isRunning_endOfTheLineSend_Thread;
         private static void SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread()
         {
+            tickCount_endOfTheLineSend_Thread = 0;
+
             while (isRunning_endOfTheLineSend_Thread)
             {
                 int processedCount = 0;
@@ -554,6 +558,8 @@ namespace GONet
                         readyToReturnQueue.Enqueue(networkData);
                     }
                 }
+
+                ++tickCount_endOfTheLineSend_Thread;
             }
         }
 
@@ -1148,7 +1154,7 @@ namespace GONet
                         {  // body:
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                             {
-                                DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, elapsedTicksAtSend);
+                                DeserializeBody_ChangesBundle(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend);
                             }
                             else if (messageType == typeof(RequestMessage))
                             {
@@ -1631,8 +1637,6 @@ namespace GONet
 
         private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
         {
-            gonetParticipant.IsOKToStartAutoMagicalProcessing = true;
-
             InstantiateGONetParticipantEvent @event;
 
             string nonAuthorityDesignTimeLocation;
@@ -1645,7 +1649,10 @@ namespace GONet
                 @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
             }
 
+            //GONetLog.Debug("Publish InstantiateGONetParticipantEvent now."); /////////////////////////// DREETS!
             EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
+
+            gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
         }
 
         internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gONetParticipant)
@@ -1909,6 +1916,7 @@ namespace GONet
                                 byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, gONetConnection_ServerToClient.OwnerAuthorityId, myTicks);
                                 if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
                                 {
+                                    //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this.");  /////////////////////////// DREETS!
                                     SendBytesToRemoteConnection(gONetConnection_ServerToClient, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
                                     myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                                 }
@@ -2192,9 +2200,7 @@ namespace GONet
             }
         }
 
-        //static readonly HashSet<uint> gonetIdsAwaitingInstantiateRemote = new HashSet<uint>();
-
-        private static void DeserializeBody_ChangesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
+        private static void DeserializeBody_ChangesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend)
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
@@ -2205,24 +2211,27 @@ namespace GONet
                 bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
                 if (canASSumeNetId)
                 {
-                    uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
-
-                    //bool canASSumeInstantiateRemoteForthcoming = gonetId == GONetParticipant.GONetId_Unset;
-                    ////if (canASSumeInstantiateRemoteForthcoming)
-                    //{
-                    //    gonetIdsAwaitingInstantiateRemote.Add(gonetId);
-                    //}
+                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
                 }
                 else
                 {
                     uint gonetId;
                     bitStream_headerAlreadyRead.ReadUInt(out gonetId);
 
-                    //bool isAwaitingInstantiateRemote = gonetIdsAwaitingInstantiateRemote.Contains(gonetId);
-
                     if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                     {
-                        GONetLog.Error("gladousche...NOT FOUND....expect an exception/ERROR to follow.....gonetId: " + gonetId);
+                        QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
+                        if (channelQuality == QosType.Reliable)
+                        {
+                            const string GLAD = "GONetParticipant NOT FOUND by GONetId: ";
+                            throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId));
+                        }
+                        else
+                        {
+                            const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
+                            GONetLog.Warning(NTS);
+                            return;
+                        }
                     }
 
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
@@ -2264,6 +2273,26 @@ namespace GONet
         }
 
         #endregion
+    }
+
+    [Serializable]
+    internal class GONetOutOfOrderHorseDickoryException : Exception
+    {
+        public GONetOutOfOrderHorseDickoryException()
+        {
+        }
+
+        public GONetOutOfOrderHorseDickoryException(string message) : base(message)
+        {
+        }
+
+        public GONetOutOfOrderHorseDickoryException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+
+        protected GONetOutOfOrderHorseDickoryException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
     }
 
     public class GONetChannel
