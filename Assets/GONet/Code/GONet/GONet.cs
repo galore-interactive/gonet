@@ -252,9 +252,9 @@ namespace GONet
 
         /// <summary>
         /// This is used to know which instances were instantiated due to a remote spawn message being received/processed.
-        /// See <see cref="Instantiate_Remote(InstantiateGONetParticipantEvent)"/> and <see cref="Start_AutoPropogateInstantiation_IfAppropriate(GONetParticipant)"/>.
+        /// See <see cref="Instantiate_Remote(InstantiateGONetParticipantEvent)"/> and <see cref="Start_AutoPropagateInstantiation_IfAppropriate(GONetParticipant)"/>.
         /// </summary>
-        static readonly List<GONetParticipant> remoteSpawns_avoidAutoPropogateSupport = new List<GONetParticipant>(1000);
+        static readonly List<GONetParticipant> remoteSpawns_avoidAutoPropagateSupport = new List<GONetParticipant>(1000);
 
         static GONetMain()
         {
@@ -374,7 +374,7 @@ namespace GONet
             GONetParticipant gonetParticipant;
             if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
             {
-                gonetIdsDestroyedViaPropogation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropogateRemoval_IfAppropriate from thinking it is appropriate to propogate more when it is already being propogated
+                gonetIdsDestroyedViaPropogation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
 
                 UnityEngine.Object.Destroy(gonetParticipant.gameObject);
             }
@@ -1251,7 +1251,7 @@ namespace GONet
             {
                 instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
             }
-            remoteSpawns_avoidAutoPropogateSupport.Add(instance);
+            remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
         }
 
@@ -1626,28 +1626,28 @@ namespace GONet
             return definedInSceneParticipantInstanceIDs.Contains(gonetParticipant.GetInstanceID());
         }
 
-        internal static void Start_AutoPropogateInstantiation_IfAppropriate(GONetParticipant gonetParticipant)
+        internal static void Start_AutoPropagateInstantiation_IfAppropriate(GONetParticipant gonetParticipant)
         {
             if (Application.isPlaying && !WasDefinedInScene(gonetParticipant))
             {
                 GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
 
-                bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropogateSupport.Contains(gonetParticipant);
+                bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
                     gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
 
-                    AutoPropogateInitialInstantiation(gonetParticipant);
+                    AutoPropagateInitialInstantiation(gonetParticipant);
                 }
                 else
                 {
-                    // this data item has now served its purpose (i.e., avoid auto propogate since it already came from remote source!), so remove it
-                    remoteSpawns_avoidAutoPropogateSupport.Remove(gonetParticipant);
+                    // this data item has now served its purpose (i.e., avoid auto propagate since it already came from remote source!), so remove it
+                    remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
                 }
             }
         }
 
-        private static void AutoPropogateInitialInstantiation(GONetParticipant gonetParticipant)
+        private static void AutoPropagateInitialInstantiation(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event;
 
@@ -1667,11 +1667,11 @@ namespace GONet
             gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
         }
 
-        internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gonetParticipant)
+        internal static void OnDestroy_AutoPropagateRemoval_IfAppropriate(GONetParticipant gonetParticipant)
         {
             if (Application.isPlaying && IsMine(gonetParticipant))
             {
-                AutoPropogateInitialDestroy(gonetParticipant);
+                AutoPropagateInitialDestroy(gonetParticipant);
             }
             else if (!gonetIdsDestroyedViaPropogation.Contains(gonetParticipant.GONetId))
             {
@@ -1683,11 +1683,11 @@ namespace GONet
         /// <summary>
         /// PRE: <paramref name="gonetParticipant"/> is owned by me.
         /// </summary>
-        private static void AutoPropogateInitialDestroy(GONetParticipant gonetParticipant)
+        private static void AutoPropagateInitialDestroy(GONetParticipant gonetParticipant)
         {
             if (gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // almost impossible for this to be true, but check anyway
             {
-                const string NOID = "GONetParticipant that I own was destroyed by me, but it has not been assigned a GONetId yet, which is highly problematic.  Unable to propogate the destroy to others for that reason.  GameObject.name: ";
+                const string NOID = "GONetParticipant that I own was destroyed by me, but it has not been assigned a GONetId yet, which is highly problematic.  Unable to propagate the destroy to others for that reason.  GameObject.name: ";
                 GONetLog.Error(string.Concat(NOID, gonetParticipant.gameObject.name));
                 return;
             }

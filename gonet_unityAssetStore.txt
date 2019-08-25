@@ -36,7 +36,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*User-defined custom overrides: if you have special cases or feel you can do it better, by all means, a mechanism to do so is provided
 <br>*Configurable value quantization: choose # bits to occupy and auto-magically quantizes/compresses to fit (great for LOD, <em>see below</em>)
 <br><br><strong>(PRO Only) Record+Replay GONet sessions:</strong>
-<br>*(PRO Only) Everything GONet sends is recorded
+<br>*(PRO Only) Everything GONet sends and receives is recorded (server and clients alike)
 <br>*(PRO Only) Replay is great for: (eSports) In-game instant replay, Location Based Entertainment takeaway not to mention development troubleshooting and bug reproduction (i.e., a <em>"save your bacon"</em> feature)
 <br>*(PRO Only) Recorded session data feeds into time series, statistics-based graphs for analysis during development and perhaps more importantly after game is released
 <br><br><strong>(PRO Only) Level of Detail (LOD) management:</strong>

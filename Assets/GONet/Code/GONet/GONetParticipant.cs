@@ -118,7 +118,7 @@ namespace GONet
         /// <summary>
         /// public: Do NOT use this.  It is internal to GONet!
         /// This is ONLY accurate information during design time.  The location can easily change during runtime.
-        /// This is used for referential purposes only and mainly for auto-propogate spawn support.
+        /// This is used for referential purposes only and mainly for auto-propagate spawn support.
         /// </summary>
         [SerializeField, HideInInspector]
         public string designTimeLocation;
@@ -139,7 +139,7 @@ namespace GONet
         /// The main reason behind this is how GONet uses core <see cref="MonoBehaviour"/> magic methods and other Unity methods/flows
         /// (e.g. <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>) to manage lifecycle here and GONet will not immediately
         /// (i.e., upon instantiation or call to Awake) know if we need to or even can safely process/send any automagical sync.  GONet
-        /// auto propogate instantiation (across the network) stuff is really what necessitates this safety check.</para>
+        /// auto propagate instantiation (across the network) stuff is really what necessitates this safety check.</para>
         /// <para>WARNING: Setting this value is delayed by one frame to ensure the other threads reading from this are not executed too quickly and any bytes handed over to the reliable transport are processed first!</para>
         /// </summary>
         internal bool IsOKToStartAutoMagicalProcessing
@@ -206,7 +206,7 @@ namespace GONet
                 IsOKToStartAutoMagicalProcessing = true;
             }
 
-            GONetMain.Start_AutoPropogateInstantiation_IfAppropriate(this);
+            GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
         }
 
         private void OnDisable()
@@ -221,7 +221,7 @@ namespace GONet
         public static event GNPDelegate OnDestroyCalled;
         private void OnDestroy()
         {
-            GONetMain.OnDestroy_AutoPropogateRemoval_IfAppropriate(this);
+            GONetMain.OnDestroy_AutoPropagateRemoval_IfAppropriate(this);
             OnDestroyCalled?.Invoke(this);
         }
 
