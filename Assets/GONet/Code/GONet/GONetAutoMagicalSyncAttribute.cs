@@ -414,7 +414,7 @@ namespace GONet
     public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
     {
         public const byte DEFAULT_BITS_PER_COMPONENT = 32;
-        public const float DEFAULT_MAX_VALUE = 100f;
+        public const float DEFAULT_MAX_VALUE = 10000f;
         public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
 
         readonly Quantizer quantizer;

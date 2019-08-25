@@ -1224,7 +1224,7 @@ namespace GONet
         private static void Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
         {
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
-            GONetParticipant instance = UnityEngine.Object.Instantiate(template);
+            GONetParticipant instance = UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation);
 
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
             {
