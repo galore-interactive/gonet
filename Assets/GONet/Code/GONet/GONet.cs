@@ -160,7 +160,7 @@ namespace GONet
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
-        static readonly List<uint> gonetIdsDestroyedViaPropogation = new List<uint>(500);
+        static readonly List<uint> gonetIdsDestroyedViaPropagation = new List<uint>(500);
 
         internal const int SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE = 1000;
         static readonly Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>> syncEventsToSaveQueueByEventType = new Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>>(100);
@@ -374,7 +374,7 @@ namespace GONet
             GONetParticipant gonetParticipant;
             if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
             {
-                gonetIdsDestroyedViaPropogation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
+                gonetIdsDestroyedViaPropagation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
 
                 UnityEngine.Object.Destroy(gonetParticipant.gameObject);
             }
@@ -421,7 +421,7 @@ namespace GONet
         /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
         /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
         /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
-        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propagation support to all other machines in this game/session on the network.</para>
         /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
         /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
         /// </summary>
@@ -437,7 +437,7 @@ namespace GONet
         /// <para>This is the option to instantiate/spawn something that uses one original/prefab/template for the authority/owner/originator and a different one for everyone else (i.e., non-authorities).</para>
         /// <para>This is useful in some cases for instantiating/spawning things like players where the authority (i.e., the player) has certain scripts attached and only a model/mesh with arms and legs and non-authorities get less scripts and the full model/mesh.</para>
         /// <para>Only the authority/owner/originator can call this method (i.e., the resulting instance's <see cref="GONetParticipant.OwnerAuthorityId"/> will be set to <see cref="MyAuthorityId"/>).</para>
-        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propogation support to all other machines in this game/session on the network.</para>
+        /// <para>It operates within GONet just like <see cref="UnityEngine.Object.Instantiate{T}(T)"/>, where there is automatic spawn propagation support to all other machines in this game/session on the network.</para>
         /// <para>However, the difference is using this method ensures the other non-owner (networked) parties automatically instantiate <paramref name="nonAuthorityAlternateOriginal"/> instead of <paramref name="authorityOriginal"/>, which will be instantiated here for the authority/owner.</para>
         /// <para>Therefore, if you simply want to instantiate something across the network and it should be the same original <see cref="UnityEngine.Object"/> template, then use <see cref=""/></para>
         /// </summary>
@@ -1662,7 +1662,7 @@ namespace GONet
             }
 
             //GONetLog.Debug("Publish InstantiateGONetParticipantEvent now."); /////////////////////////// DREETS!
-            EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
+            EventBus.Publish(@event); // this causes the auto propagation via local handler to send to all remotes (i.e., all clients if server, server if client)
 
             gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
         }
@@ -1673,9 +1673,9 @@ namespace GONet
             {
                 AutoPropagateInitialDestroy(gonetParticipant);
             }
-            else if (!gonetIdsDestroyedViaPropogation.Contains(gonetParticipant.GONetId))
+            else if (!gonetIdsDestroyedViaPropagation.Contains(gonetParticipant.GONetId))
             {
-                const string NOD = "GONetParticipant being destroyed and IsMine is false, which means the only other GONet-approved reason this should be destroyed is through automatic propogation over the network as a response to the owner destroying it; HOWEVER, that is not the case right now and the ASSumption is that you inadvertantly called UnityEngine.Object.Destroy() on something not owned by you.  GONetId: ";
+                const string NOD = "GONetParticipant being destroyed and IsMine is false, which means the only other GONet-approved reason this should be destroyed is through automatic propagation over the network as a response to the owner destroying it; HOWEVER, that is not the case right now and the ASSumption is that you inadvertantly called UnityEngine.Object.Destroy() on something not owned by you.  GONetId: ";
                 GONetLog.Warning(string.Concat(NOD, gonetParticipant.GONetId));
             }
         }
@@ -1694,7 +1694,7 @@ namespace GONet
 
             DestroyGONetParticipantEvent @event = new DestroyGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
             //GONetLog.Debug("Publish DestroyGONetParticipantEvent now."); /////////////////////////// DREETS!
-            EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
+            EventBus.Publish(@event); // this causes the auto propagation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
         private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
