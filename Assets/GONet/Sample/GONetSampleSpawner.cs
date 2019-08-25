@@ -63,12 +63,6 @@ public class GONetSampleSpawner : MonoBehaviour
             hasServerSpawned = true;
         }
 
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.D))
-        {
-            GameObject cubeta = GameObject.Find("Cubetas");
-            Instantiate(cubeta);
-        }
-
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
             GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);

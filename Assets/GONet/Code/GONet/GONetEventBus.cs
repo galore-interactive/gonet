@@ -488,7 +488,16 @@ namespace GONet
         /// The lower the number, the sooner in the overall order of receipt.
         /// </summary>
         /// <param name="priority"></param>
-        public void SetSubscriptionPriority(int priority)
+        public void SetSubscriptionPriority(short priority)
+        {
+            GONetEventBus.Instance.SetSubscriptionPriority(subscriber, priority);
+        }
+
+        /// <summary>
+        /// This GONet INTERNAL method is the same as <see cref="SetSubscriptionPriority(short)"/> with the exception that the range of values is greater, which allows GONet internal to subscribe and control internal handler priorities such that end-user priorities subscribing to the same message(s) will not cause handler processing order issues/conflicts.
+        /// </summary>
+        /// <param name="priority"></param>
+        internal void SetSubscriptionPriority_INTERNAL(int priority)
         {
             GONetEventBus.Instance.SetSubscriptionPriority(subscriber, priority);
         }

@@ -160,6 +160,8 @@ namespace GONet
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
+        static readonly List<uint> gonetIdsDestroyedViaPropogation = new List<uint>(500);
+
         internal const int SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE = 1000;
         static readonly Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>> syncEventsToSaveQueueByEventType = new Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>>(100);
 
@@ -269,6 +271,10 @@ namespace GONet
             EventBus.Subscribe<IPersistentEvent>(OnPersistentEvent_KeepTrack);
             EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
             EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
+
+            var subscription = EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyEvent_Remote, envelope => envelope.IsSourceRemote);
+            subscription.SetSubscriptionPriority_INTERNAL(int.MinValue); // process internally LAST since the GO will be destroyed and other subscribers may want to do something just prior to it being destroyed
+
             EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
         }
 
@@ -339,11 +345,6 @@ namespace GONet
                     {
                         GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
                         SendBytesToRemoteConnection(remoteClientConnection, bytes, bytes.Length, channelId);
-
-                        if (eventEnvelope.Event is InstantiateGONetParticipantEvent)
-                        {
-                            GONetLog.Debug("Sending InstantiateGONetParticipantEvent that started at a client, but this is server and we are sending to all other clients except originator!");
-                        }
                     }
                 }
             }
@@ -352,11 +353,6 @@ namespace GONet
                 byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
                 bool shouldSendRelilably = true; // TODO support unreliable events?
                 SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
-
-                if (eventEnvelope.Event is InstantiateGONetParticipantEvent)
-                {
-                    GONetLog.Debug("Sending InstantiateGONetParticipantEvent (to all clients) that started here at the server");
-                }
             }
         }
 
@@ -371,6 +367,22 @@ namespace GONet
             GONetLog.Debug(IR);
 
             Instantiate_Remote(eventEnvelope.Event);
+        }
+
+        private static void OnDestroyEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
+        {
+            GONetParticipant gonetParticipant;
+            if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
+            {
+                gonetIdsDestroyedViaPropogation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropogateRemoval_IfAppropriate from thinking it is appropriate to propogate more when it is already being propogated
+
+                UnityEngine.Object.Destroy(gonetParticipant.gameObject);
+            }
+            else
+            {
+                const string DGNP = "Destroy GONetParticipant event received from remote source, but we have no record of this to destroy it.  GONetId: ";
+                GONetLog.Warning(string.Concat(DGNP, eventEnvelope.Event.GONetId));
+            }
         }
 
         private static void InitShouldSkipSyncSupport()
@@ -1655,9 +1667,34 @@ namespace GONet
             gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
         }
 
-        internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gONetParticipant)
+        internal static void OnDestroy_AutoPropogateRemoval_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            throw new NotImplementedException();
+            if (Application.isPlaying && IsMine(gonetParticipant))
+            {
+                AutoPropogateInitialDestroy(gonetParticipant);
+            }
+            else if (!gonetIdsDestroyedViaPropogation.Contains(gonetParticipant.GONetId))
+            {
+                const string NOD = "GONetParticipant being destroyed and IsMine is false, which means the only other GONet-approved reason this should be destroyed is through automatic propogation over the network as a response to the owner destroying it; HOWEVER, that is not the case right now and the ASSumption is that you inadvertantly called UnityEngine.Object.Destroy() on something not owned by you.  GONetId: ";
+                GONetLog.Warning(string.Concat(NOD, gonetParticipant.GONetId));
+            }
+        }
+
+        /// <summary>
+        /// PRE: <paramref name="gonetParticipant"/> is owned by me.
+        /// </summary>
+        private static void AutoPropogateInitialDestroy(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // almost impossible for this to be true, but check anyway
+            {
+                const string NOID = "GONetParticipant that I own was destroyed by me, but it has not been assigned a GONetId yet, which is highly problematic.  Unable to propogate the destroy to others for that reason.  GameObject.name: ";
+                GONetLog.Error(string.Concat(NOID, gonetParticipant.gameObject.name));
+                return;
+            }
+
+            DestroyGONetParticipantEvent @event = new DestroyGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
+            //GONetLog.Debug("Publish DestroyGONetParticipantEvent now."); /////////////////////////// DREETS!
+            EventBus.Publish(@event); // this causes the auto propogation via local handler to send to all remotes (i.e., all clients if server, server if client)
         }
 
         private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)

@@ -168,6 +168,16 @@ namespace GONet
     }
 
     [MessagePackObject]
+    public struct DestroyGONetParticipantEvent : IPersistentEvent
+    {
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(0)]
+        public uint GONetId;
+    }
+
+    [MessagePackObject]
     public struct PersistentEvents_Bundle : ITransientEvent
     {
         [Key(0)]
