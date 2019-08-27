@@ -170,7 +170,7 @@ namespace GONet.Generation
 
         private static void OnGONetParticipantPrefabCreated_Editor(GONetParticipant gonetParticipant_onPrefab)
         {
-            //GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** created.");
+            GONetLog.Debug("[DREETS] *********GONetParticipant PREFAB*********** created.");
             gonetParticipants_prefabsCreatedSinceLastGeneratorRun.Add(gonetParticipant_onPrefab);
         }
 
@@ -228,133 +228,157 @@ namespace GONet.Generation
 
         }
 
+        static internal int howDeepIsYourSaveStack = 0;
+
         /// <summary>
         /// PRE: <paramref name="ensureToIncludeTheseGONetParticipantAssets_paths"/> is either null OR populated with asset path KNOWN to be <see cref="GONetParticipant"/> prefabs in the project!
         /// </summary>
         /// <param name="ensureToIncludeTheseGONetParticipantAssets_paths"></param>
         internal static void DoAllTheGenerationStuffs(IEnumerable<string> ensureToIncludeTheseGONetParticipantAssets_paths = null)
         {
-            /* auto-sync code gen psuedo:
-
-            // NOTE: This method is thought to be called when editor save scene called
-            // 		 TODO: need to account for not saving scene and running from editor......that run needs the latest code gen and id mappings etc...TODO: look for callback for when going into play mode in editor
-
-            -in static initializer that runs before any GONet stuff, attempt load hold all unique encapsulated data (snaps) from persistence
-            -if snaps not found, create empty list/set to hold all unique encapsulated data
-            -find all GONetParticipants (gos) // MUST include in all scene and all prefabs ==AND== MUST be deterministically ordered!
-            -for each GONetParticipant in gos (go)
-	            -find all [AutoMagicalSync]s on go (amss) // MUST be deterministically ordered!
-	            -ask utility for unique snap // pass all info available, for current go and amss combo
-		            -utility => if snap not found in snaps (i.e., no match any other snap layout/content 1-to-1), add snap to snaps and return snap
-	            -annotate go with snap.id (likely matches the index inside snaps), replacing existing value if present (in private [SerializeField] i suppose)
-                    -NOTE: see GONetParticipant.codeGenerationId
-            -for each snap in snaps
-	            -generate a C# class for auto-magical sync support (class name suffix is "_<snap.id>")
-            -compile and save etc...
-            -persist latest unique list/set of snaps (overwriting whatever was there previously)
-            */
-
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence = LoadAllSnapsFromPersistence();
-            allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
-
-            List<GONetParticipant> gonetParticipantsInOpenScenes = new List<GONetParticipant>();
-
-            for (int iOpenScene = 0; iOpenScene < SceneManager.sceneCount; ++iOpenScene)
+            try
             {
-                Scene scene = SceneManager.GetSceneAt(iOpenScene);
-                GameObject[] rootGOs = scene.GetRootGameObjects();
-                for (int iRootGO = 0; iRootGO < rootGOs.Length; ++iRootGO)
+                howDeepIsYourSaveStack++;
+
+                /* auto-sync code gen psuedo:
+
+                // NOTE: This method is thought to be called when editor save scene called
+                // 		 TODO: need to account for not saving scene and running from editor......that run needs the latest code gen and id mappings etc...TODO: look for callback for when going into play mode in editor
+
+                -in static initializer that runs before any GONet stuff, attempt load hold all unique encapsulated data (snaps) from persistence
+                -if snaps not found, create empty list/set to hold all unique encapsulated data
+                -find all GONetParticipants (gos) // MUST include in all scene and all prefabs ==AND== MUST be deterministically ordered!
+                -for each GONetParticipant in gos (go)
+                    -find all [AutoMagicalSync]s on go (amss) // MUST be deterministically ordered!
+                    -ask utility for unique snap // pass all info available, for current go and amss combo
+                        -utility => if snap not found in snaps (i.e., no match any other snap layout/content 1-to-1), add snap to snaps and return snap
+                    -annotate go with snap.id (likely matches the index inside snaps), replacing existing value if present (in private [SerializeField] i suppose)
+                        -NOTE: see GONetParticipant.codeGenerationId
+                -for each snap in snaps
+                    -generate a C# class for auto-magical sync support (class name suffix is "_<snap.id>")
+                -compile and save etc...
+                -persist latest unique list/set of snaps (overwriting whatever was there previously)
+                */
+
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence = LoadAllSnapsFromPersistence();
+                allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
+
+                List<GONetParticipant> gonetParticipantsInOpenScenes = new List<GONetParticipant>();
+
+                for (int iOpenScene = 0; iOpenScene < SceneManager.sceneCount; ++iOpenScene)
                 {
-                    GONetParticipant[] gonetParticipantsInOpenScene = rootGOs[iRootGO].GetComponentsInChildren<GONetParticipant>();
-                    gonetParticipantsInOpenScenes.AddRange(gonetParticipantsInOpenScene);
-                }
-
-            }
-
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleNewUniqueSnaps = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
-            gonetParticipantsInOpenScenes.ForEach(gonetParticipant => possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipant)));
-            // TODO add in stuff to possibleNewUniqueSnaps from gonetParticipants_prefabsCreatedSinceLastGeneratorRun before clearing it out below
-
-            if (ensureToIncludeTheseGONetParticipantAssets_paths != null)
-            {
-                foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
-                {
-                    GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
-                    possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipantPrefab));
-                }
-            }
-
-            byte max_codeGenerationId = allUniqueSnapsForPersistence.Count > 0 ? allUniqueSnapsForPersistence.Max(x => x.codeGenerationId) : GONetParticipant.CodeGenerationId_Unset;
-            GONetLog.Debug("max_codeGenerationId: " + max_codeGenerationId);
-            GONetLog.Debug("gonetParticipantsInOpenScenes.count: " + gonetParticipantsInOpenScenes.Count);
-            GONetLog.Debug("before allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
-            possibleNewUniqueSnaps.ForEach(possibleNew => {
-                if (!allUniqueSnapsForPersistence.Contains(possibleNew, SnapComparer.Instance))
-                {
-                    possibleNew.codeGenerationId = ++max_codeGenerationId; // TODO need to account for any gaps in this list if some are removed at any point
-                    GONetLog.Debug("just assigned codeGenerationId: " + possibleNew.codeGenerationId);
-                    allUniqueSnapsForPersistence.Add(possibleNew);
-                }
-            });
-            GONetLog.Debug("after allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
-
-            bool shouldSaveScene_weChangedCodeGenerationIds = false;
-            { // make sure all GONetParticipants have assigned codeGenerationId, which is vitally important for game play runtime
-                possibleNewUniqueSnaps.ForEach(possibleNew => {
-                    var matchFromPersistence = allUniqueSnapsForPersistence.First(unique => SnapComparer.Instance.Equals(possibleNew, unique));
-                    if (possibleNew.codeGenerationId != matchFromPersistence.codeGenerationId ||
-                        possibleNew.gonetParticipant.codeGenerationId != matchFromPersistence.codeGenerationId)
+                    Scene scene = SceneManager.GetSceneAt(iOpenScene);
+                    GameObject[] rootGOs = scene.GetRootGameObjects();
+                    for (int iRootGO = 0; iRootGO < rootGOs.Length; ++iRootGO)
                     {
-                        GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
-
-                        possibleNew.codeGenerationId = matchFromPersistence.codeGenerationId;
-                        { // cannot simply do the following: possibleNew.gonetParticipant.codeGenerationId = matchFromPersistence.codeGenerationId;
-                            SerializedObject so = new SerializedObject(possibleNew.gonetParticipant);
-                            so.Update();
-                            so.FindProperty(nameof(GONetParticipant.codeGenerationId)).intValue = matchFromPersistence.codeGenerationId;
-                            so.ApplyModifiedProperties();
-                            //EditorSceneManager.MarkAllScenesDirty(); this causes endless loop
-                        }
-
-                        GONetLog.Debug("match found from persistence... AFTER possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
-
-                        shouldSaveScene_weChangedCodeGenerationIds = true;
+                        GONetParticipant[] gonetParticipantsInOpenScene = rootGOs[iRootGO].GetComponentsInChildren<GONetParticipant>();
+                        gonetParticipantsInOpenScenes.AddRange(gonetParticipantsInOpenScene);
                     }
-                    else
+
+                }
+
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleNewUniqueSnaps = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
+                gonetParticipantsInOpenScenes.ForEach(gonetParticipant => possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipant)));
+                // TODO add in stuff to possibleNewUniqueSnaps from gonetParticipants_prefabsCreatedSinceLastGeneratorRun before clearing it out below
+
+                if (ensureToIncludeTheseGONetParticipantAssets_paths != null)
+                {
+                    foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
                     {
-                        GONetLog.Debug("already matched??? rere");
+                        GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
+                        possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipantPrefab));
+                    }
+                }
+
+                byte max_codeGenerationId = allUniqueSnapsForPersistence.Count > 0 ? allUniqueSnapsForPersistence.Max(x => x.codeGenerationId) : GONetParticipant.CodeGenerationId_Unset;
+                GONetLog.Debug("max_codeGenerationId: " + max_codeGenerationId);
+                GONetLog.Debug("gonetParticipantsInOpenScenes.count: " + gonetParticipantsInOpenScenes.Count);
+                GONetLog.Debug("before allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
+                possibleNewUniqueSnaps.ForEach(possibleNew =>
+                {
+                    if (!allUniqueSnapsForPersistence.Contains(possibleNew, SnapComparer.Instance))
+                    {
+                        possibleNew.codeGenerationId = ++max_codeGenerationId; // TODO need to account for any gaps in this list if some are removed at any point
+                        GONetLog.Debug("just assigned codeGenerationId: " + possibleNew.codeGenerationId);
+                        allUniqueSnapsForPersistence.Add(possibleNew);
                     }
                 });
-            }
+                GONetLog.Debug("after allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
 
-            if (shouldSaveScene_weChangedCodeGenerationIds)
-            {
-                // TODO save scene, but gotta be careful we do not get into an endless cycle as the method we are in now is called when scene saved.
-                EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
-                // TODO call this for stuff in gonetParticipants_prefabsCreatedSinceLastGeneratorRun: PrefabUtility.SavePrefabAsset()
-            }
+                bool shouldSaveScene_weChangedCodeGenerationIds = false;
+                { // make sure all GONetParticipants have assigned codeGenerationId, which is vitally important for game play runtime
+                    possibleNewUniqueSnaps.ForEach(possibleNew =>
+                    {
+                        var matchFromPersistence = allUniqueSnapsForPersistence.First(unique => SnapComparer.Instance.Equals(possibleNew, unique));
+                        if (possibleNew.codeGenerationId != matchFromPersistence.codeGenerationId ||
+                            possibleNew.gonetParticipant.codeGenerationId != matchFromPersistence.codeGenerationId)
+                        {
+                            GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
-            { // Do generation stuffs? .... based on what has changed in scene since last save
-                int count = allUniqueSnapsForPersistence.Count;
-                for (int i = 0; i < count; ++i)
-                {
-                    GONetParticipant_ComponentsWithAutoSyncMembers one = allUniqueSnapsForPersistence[i];
-                    one.ApplyProfileToAttributes_IfAppropriate(); // this needs to be done for everyone prior to generation!
-                    GenerateClass(one);
+                            possibleNew.codeGenerationId = matchFromPersistence.codeGenerationId;
+                            { // cannot simply do the following: possibleNew.gonetParticipant.codeGenerationId = matchFromPersistence.codeGenerationId;
+                                SerializedObject so = new SerializedObject(possibleNew.gonetParticipant);
+                                so.Update();
+                                so.FindProperty(nameof(GONetParticipant.codeGenerationId)).intValue = matchFromPersistence.codeGenerationId;
+                                so.ApplyModifiedProperties();
+                                //EditorSceneManager.MarkAllScenesDirty(); this causes endless loop
+                            }
+
+                            GONetLog.Debug("match found from persistence... AFTER possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
+
+                            shouldSaveScene_weChangedCodeGenerationIds = true;
+                        }
+                        else
+                        {
+                            GONetLog.Debug("already matched??? rere");
+                        }
+                    });
                 }
 
-                byte ASSumedMaxCodeGenerationId = (byte)count;
-                BobWad_Generated_Generator.GenerateClass(ASSumedMaxCodeGenerationId, allUniqueSnapsForPersistence);
+                if (shouldSaveScene_weChangedCodeGenerationIds
+                    && howDeepIsYourSaveStack <= 1) // gotta be careful we do not get into an endless cycle as the method we are in now is called when scene saved.
+                {
+                    if (ensureToIncludeTheseGONetParticipantAssets_paths != null)
+                    {
+                        foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
+                        {
+                            GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
+                            PrefabUtility.SavePrefabAsset(gonetParticipantPrefab.gameObject);
+                        }
+                    }
 
-                AssetDatabase.SaveAssets(); // since we are generating the class that is the real thing of value here, ensure we also save the asset to match current state
-                AssetDatabase.Refresh(); // get the Unity editor to recognize any new code just added and recompile it
+                    GONetLog.Debug("magoo...save time....loop endlessly!");
+                    EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                    // TODO call this for stuff in gonetParticipants_prefabsCreatedSinceLastGeneratorRun: PrefabUtility.SavePrefabAsset()
+                    
+                }
+
+                { // Do generation stuffs? .... based on what has changed in scene since last save
+                    int count = allUniqueSnapsForPersistence.Count;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        GONetParticipant_ComponentsWithAutoSyncMembers one = allUniqueSnapsForPersistence[i];
+                        one.ApplyProfileToAttributes_IfAppropriate(); // this needs to be done for everyone prior to generation!
+                        GenerateClass(one);
+                    }
+
+                    byte ASSumedMaxCodeGenerationId = (byte)count;
+                    BobWad_Generated_Generator.GenerateClass(ASSumedMaxCodeGenerationId, allUniqueSnapsForPersistence);
+
+                    AssetDatabase.SaveAssets(); // since we are generating the class that is the real thing of value here, ensure we also save the asset to match current state
+                    AssetDatabase.Refresh(); // get the Unity editor to recognize any new code just added and recompile it
+                }
+
+                { // clean up
+                    gonetParticipants_prefabsCreatedSinceLastGeneratorRun.Clear();
+
+                    DeleteAllSnapsFromPersistence();
+                    SaveAllSnapsToPersistence(allUniqueSnapsForPersistence);
+                }
             }
-
-            { // clean up
-                gonetParticipants_prefabsCreatedSinceLastGeneratorRun.Clear();
-
-                DeleteAllSnapsFromPersistence();
-                SaveAllSnapsToPersistence(allUniqueSnapsForPersistence);
+            finally
+            {
+                howDeepIsYourSaveStack--;
             }
         }
 
