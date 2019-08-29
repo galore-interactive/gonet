@@ -87,7 +87,7 @@ namespace GONet.Generation
             
             foreach (string importedAsset in importedAssets)
             {
-                Debug.Log("Reimported Asset: " + importedAsset);
+                //Debug.Log("Reimported Asset: " + importedAsset);
 
                 string possibleDesignTimeAssetLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, importedAsset);
                 if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
@@ -123,14 +123,14 @@ namespace GONet.Generation
 
             foreach (string deletedAsset in deletedAssets)
             {
-                Debug.Log("Deleted Asset: " + deletedAsset);
+                //Debug.Log("Deleted Asset: " + deletedAsset);
 
                 existingGONetParticipantAssetPaths.Remove(deletedAsset); // no matter what, if this was deleted....get this out of here
             }
 
             for (int i = 0; i < movedAssets.Length; i++)
             {
-                Debug.Log("Moved Asset: " + movedAssets[i] + " from: " + movedFromAssetPaths[i]);
+                //Debug.Log("Moved Asset: " + movedAssets[i] + " from: " + movedFromAssetPaths[i]);
 
                 existingGONetParticipantAssetPaths.Remove(movedFromAssetPaths[i]); // no matter what, if this was moved....get this old one out of here
 
@@ -947,7 +947,6 @@ namespace GONet.Generation
                 foreach (var singleMember in single.autoSyncMembers)
                 {
                     MemberInfo syncMember = memberOwnerType.GetMember(singleMember.memberName, BindingFlags.Public | BindingFlags.Instance)[0];
-                    Debug.Log("singleMember.memberName: "+ singleMember.memberName + " syncMember != null: "+(syncMember != null));
                     Type syncMemberType = syncMember.MemberType == MemberTypes.Property
                                         ? ((PropertyInfo)syncMember).PropertyType
                                         : ((FieldInfo)syncMember).FieldType;
