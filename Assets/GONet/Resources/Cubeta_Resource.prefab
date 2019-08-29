@@ -236,7 +236,6 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/GONet/Resources/Cubeta_Resource.prefab
-  runtimeUID: 0
 --- !u!114 &5054986043853507273
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -252,3 +251,4 @@ MonoBehaviour:
   someCoolGuyFloat: 0
   rottieTotty: 0
   nada: 0
+  shortie: 0

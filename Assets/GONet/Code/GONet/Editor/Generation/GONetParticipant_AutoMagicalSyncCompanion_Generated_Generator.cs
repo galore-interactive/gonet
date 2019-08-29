@@ -63,16 +63,15 @@ namespace GONet.Generation
 #endif
 
             EditorSceneManager.sceneSaved += EditorSceneManager_sceneSaved;
-        }
 
-        static readonly HashSet<string> existingGONetParticipantAssetPaths = new HashSet<string>();
-        static readonly HashSet<string> existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider = new HashSet<string>();
+            EditorApplication.quitting += OnEditorApplicationQuitting;
+        }
 
         internal static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
-
+            HashSet<string> existingGONetParticipantAssetPaths = new HashSet<string>();
             IEnumerable<string> designTimeLocations_gonetParticipants = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
-
+            
             foreach (string importedAsset in importedAssets)
             {
                 Debug.Log("Reimported Asset: " + importedAsset);
@@ -80,19 +79,7 @@ namespace GONet.Generation
                 string possibleDesignTimeAssetLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, importedAsset);
                 if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
                 {
-                    if (existingGONetParticipantAssetPaths.Contains(importedAsset))
-                    {
-                        existingGONetParticipantAssetPaths.Remove(importedAsset); // avoid infinite loop, see IMPORTANT comment at bottom of method!
-                    }
-                    else if (existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Contains(importedAsset))
-                    {
-                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(importedAsset);
-                    }
-                    else
-                    {
-                        existingGONetParticipantAssetPaths.Add(importedAsset);
-                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Add(importedAsset);
-                    }
+                    existingGONetParticipantAssetPaths.Add(importedAsset);
                 }
             }
 
@@ -101,7 +88,6 @@ namespace GONet.Generation
                 Debug.Log("Deleted Asset: " + deletedAsset);
 
                 existingGONetParticipantAssetPaths.Remove(deletedAsset); // no matter what, if this was deleted....get this out of here
-                existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(deletedAsset);
             }
 
             for (int i = 0; i < movedAssets.Length; i++)
@@ -114,19 +100,25 @@ namespace GONet.Generation
                 string possibleDesignTimeAssetLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, movedAsset);
                 if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
                 {
-                    if (existingGONetParticipantAssetPaths.Contains(movedAsset))
-                    {
-                        existingGONetParticipantAssetPaths.Remove(movedAsset); // avoid infinite loop, see IMPORTANT comment at bottom of method!
-                    }
-                    else if (existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Contains(movedAsset))
-                    {
-                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Remove(movedAsset);
-                    }
-                    else
-                    {
-                        existingGONetParticipantAssetPaths.Add(movedAsset);
-                        existingGONetParticipantAssetPaths_secondaryInfiniteLoopAvoider.Add(movedAsset);
-                    }
+                    existingGONetParticipantAssetPaths.Add(movedAsset);
+                }
+            }
+            
+            { // after that, we need to see about do things to ensure ALL prefabs get generated when stuff (e.g., C# files) change that possibly have some changes to sync stuffs
+                IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants.Where(x => x.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)).Select(x => x.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
+                foreach (string gnpPrefabAssetPath in gnpPrefabAssetPaths)
+                {
+                    existingGONetParticipantAssetPaths.Add(gnpPrefabAssetPath);
+                }
+            }
+
+            for (int i = existingGONetParticipantAssetPaths.Count - 1; i >= 0; --i)
+            {
+                string item = existingGONetParticipantAssetPaths.ElementAt(i);
+                int lastFrameCountProcessed;
+                if (gonetParticipantAssetsPaths_to_lastFrameCountProcessed.TryGetValue(item, out lastFrameCountProcessed) && lastFrameCountProcessed == Time.frameCount)
+                {
+                    existingGONetParticipantAssetPaths.Remove(item);
                 }
             }
 
@@ -228,7 +220,17 @@ namespace GONet.Generation
 
         }
 
-        static internal int howDeepIsYourSaveStack = 0;
+        /// <summary>
+        /// This little beast face is here to prevent the continual processing of assets in an infinite loop!
+        /// </summary>
+        static readonly FileBackedMap<string, int> gonetParticipantAssetsPaths_to_lastFrameCountProcessed = new FileBackedMap<string, int>(GENERATION_FILE_PATH + "gonetParticipantAssetsPaths_to_lastFrameCountProcessed.bin");
+
+        static void OnEditorApplicationQuitting()
+        {
+            gonetParticipantAssetsPaths_to_lastFrameCountProcessed.Clear(); // don't want the frameCount from this session carrying over to next session
+        }
+
+        static int howDeepIsYourSaveStack = 0;
 
         /// <summary>
         /// PRE: <paramref name="ensureToIncludeTheseGONetParticipantAssets_paths"/> is either null OR populated with asset path KNOWN to be <see cref="GONetParticipant"/> prefabs in the project!
@@ -236,6 +238,14 @@ namespace GONet.Generation
         /// <param name="ensureToIncludeTheseGONetParticipantAssets_paths"></param>
         internal static void DoAllTheGenerationStuffs(IEnumerable<string> ensureToIncludeTheseGONetParticipantAssets_paths = null)
         {
+            if (ensureToIncludeTheseGONetParticipantAssets_paths != null)
+            {
+                foreach (var path in ensureToIncludeTheseGONetParticipantAssets_paths)
+                {
+                    gonetParticipantAssetsPaths_to_lastFrameCountProcessed[path] = Time.frameCount;
+                }
+            }
+
             try
             {
                 howDeepIsYourSaveStack++;
@@ -286,7 +296,10 @@ namespace GONet.Generation
                     foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
                     {
                         GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
-                        possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipantPrefab));
+                        if (gonetParticipantPrefab != null) // it would be null during some GONet generation flows herein when moving locations...but eventually it will be A-OK...avoid/skip for now
+                        {
+                            possibleNewUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gonetParticipantPrefab));
+                        }
                     }
                 }
 
@@ -343,7 +356,10 @@ namespace GONet.Generation
                         foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
                         {
                             GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
-                            PrefabUtility.SavePrefabAsset(gonetParticipantPrefab.gameObject);
+                            if (gonetParticipantPrefab != null) // it would be null during some GONet generation flows herein when moving locations...but eventually it will be A-OK...avoid/skip for now
+                            {
+                                PrefabUtility.SavePrefabAsset(gonetParticipantPrefab.gameObject);// this will save any changes like codeGenerationId change from above logic
+                            }
                         }
                     }
 
@@ -353,13 +369,22 @@ namespace GONet.Generation
                     
                 }
 
-                { // Do generation stuffs? .... based on what has changed in scene since last save
+                { // Do generation stuffs? .... based on what has changed in scene/project (i.e., any GNP/AutoSync changes) since last save
                     int count = allUniqueSnapsForPersistence.Count;
                     for (int i = 0; i < count; ++i)
                     {
                         GONetParticipant_ComponentsWithAutoSyncMembers one = allUniqueSnapsForPersistence[i];
                         one.ApplyProfileToAttributes_IfAppropriate(); // this needs to be done for everyone prior to generation!
-                        GenerateClass(one);
+
+                        try
+                        {
+                            GenerateClass(one);
+                        }
+                        catch (NullReferenceException)
+                        {
+                            // This is expected to happen when removing [GONetAutoMagicalSync] from members  and no more exist on any members in that MB/class and then running generation is trying to access information to generate class for that old data 
+                            // IMPORTANT: we do not delete/re-use codeGenerationIds, which leads to this......and old generated classes will sit around in projects as a result if the devs remove stuff alot!!!
+                        }
                     }
 
                     byte ASSumedMaxCodeGenerationId = (byte)count;
@@ -529,7 +554,12 @@ namespace GONet.Generation
                 {
                     if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, syncMemberType), out attribute))
                     {
-                        GONetLog.Error("This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: " + memberOwnerType.FullName + " memberType.FullName: " + syncMemberType.FullName);
+                        const string TURD = "This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: ";
+                        const string MTFN = " memberType.FullName: ";
+                        const string EXPECT = "\nThis is expected to happen when removing [GONetAutoMagicalSync] from members  and no more exist on any members in that MB/class and then running generation is trying to access information to generate class for that old data ";
+                        string message = string.Concat(TURD, memberOwnerType.FullName, MTFN, syncMemberType.FullName, EXPECT);
+                        Debug.LogWarning(message);
+                        GONetLog.Warning(message);
                     }
                 }
             }
@@ -540,8 +570,17 @@ namespace GONet.Generation
         /// IMPORTANT: This is required to be called prior to code generation (i.e., <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GenerateClass(GONetParticipant_ComponentsWithAutoSyncMembers)"/>)!
         /// </summary>
         /// <param name="syncMemberType"></param>
-        internal void ApplyProfileToAttribute_IfAppropriate(Type syncMemberType)
+        internal void ApplyProfileToAttribute_IfAppropriate(Type syncMemberType, string memberName)
         {
+            if (attribute == null)
+            {
+                const string NOATTR = "No attribute to which to apply profile.  This is only expected when you just removed the [GONetAutoMagicalSync] off the member of name: ";
+                string message = string.Concat(NOATTR, memberName);
+                GONetLog.Warning(message);
+                Debug.LogWarning(message);
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(attribute.SettingsProfileTemplateName))
             {
                 GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.SettingsProfileTemplateName).Replace(".asset", string.Empty));
@@ -870,11 +909,12 @@ namespace GONet.Generation
                 foreach (var singleMember in single.autoSyncMembers)
                 {
                     MemberInfo syncMember = memberOwnerType.GetMember(singleMember.memberName, BindingFlags.Public | BindingFlags.Instance)[0];
+                    Debug.Log("singleMember.memberName: "+ singleMember.memberName + " syncMember != null: "+(syncMember != null));
                     Type syncMemberType = syncMember.MemberType == MemberTypes.Property
                                         ? ((PropertyInfo)syncMember).PropertyType
                                         : ((FieldInfo)syncMember).FieldType;
 
-                    singleMember.ApplyProfileToAttribute_IfAppropriate(syncMemberType);
+                    singleMember.ApplyProfileToAttribute_IfAppropriate(syncMemberType, singleMember.memberName);
                 }
             }
         }

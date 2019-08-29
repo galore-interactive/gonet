@@ -60,7 +60,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*Local (LAN): good for location-based entertainment (LBE)
 <br>*(PRO Only) Peer-to-Peer (P2P): NAT punchthrough etc...
 <br><br><strong>Support:</strong>
-<br>*Basic forum/email back and forth as time/resources permit
+<br>*Basic tutorials, examples and forum/email back and forth as time/resources permit
 <br>*(PRO Only) Fixes to unique and/or uncommon bugs/issues
 <br>*(PRO Only) Screen sharing collaboration sessions and more in-depth responses at front of email support line
 <br>*(PRO Only) Access to extensive example projects with detailed documentation

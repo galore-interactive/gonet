@@ -72,7 +72,6 @@ MonoBehaviour:
   IsPositionSyncd: 0
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
-  runtimeUID: 0
 --- !u!114 &8643402947905904697
 MonoBehaviour:
   m_ObjectHideFlags: 0

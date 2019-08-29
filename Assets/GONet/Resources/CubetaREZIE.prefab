@@ -112,14 +112,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 1
+  codeGenerationId: 2
   animatorSyncSupport:
     keys: []
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/CubetaREZIE.prefab
-  runtimeUID: 0
 --- !u!114 &8999699362913574804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -136,6 +135,7 @@ MonoBehaviour:
   someCoolGuyFloat: 0
   rottieTotty: 0
   nada: 0
+  shortie: 0
 --- !u!1 &8999699363050880798
 GameObject:
   m_ObjectHideFlags: 0

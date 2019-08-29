@@ -1551,6 +1551,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_4.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_5.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_6.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_7.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
@@ -1570,6 +1571,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\CRC32.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\DateTimeUtils.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\FileBackedDictionary.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FileUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\GONetLog.cs" />
