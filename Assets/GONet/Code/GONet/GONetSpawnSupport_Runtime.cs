@@ -28,7 +28,7 @@ namespace GONet
 
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
-        const string RESOURCES = "Resources/";
+        public const string RESOURCES = "Resources/";
 
         private static readonly Dictionary<string, GONetParticipant> designTimeLocationToProjectTemplate = new Dictionary<string, GONetParticipant>(100);
 

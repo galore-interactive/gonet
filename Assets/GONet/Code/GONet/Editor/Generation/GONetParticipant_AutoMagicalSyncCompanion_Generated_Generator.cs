@@ -43,6 +43,7 @@ namespace GONet.Generation
         /// The index of the inner item matches to the place in order of that attribute being encountered during discovery/enumeration (has to be deterministic).
         /// </summary>
         static List<List<AutoMagicalSyncAttribute_GenerationSupport>> gonetParticipantCombosEncountered = new List<List<AutoMagicalSyncAttribute_GenerationSupport>>();
+
         internal const string GENERATION_FILE_PATH = "Assets/GONet/Code/GONet/Generation/";
         internal const string GENERATED_FILE_PATH = GENERATION_FILE_PATH + "Generated/";
         const string FILE_SUFFIX = ".cs";
@@ -67,6 +68,18 @@ namespace GONet.Generation
             EditorApplication.quitting += OnEditorApplicationQuitting;
         }
 
+        static readonly Dictionary<int, List<GONetParticipant>> OnPostprocessAllAssets_By_frameCountMap = new Dictionary<int, List<GONetParticipant>>();
+        static GONetParticipant[] OnPostprocessAllAssets_By_frameCountMap_empty = new GONetParticipant[0];
+        internal static IEnumerable<GONetParticipant> GetGNPsAddedToPrefabThisFrame()
+        {
+            List<GONetParticipant> gnpsAddedToPrefabsThisFrame;
+            if (!OnPostprocessAllAssets_By_frameCountMap.TryGetValue(Time.frameCount, out gnpsAddedToPrefabsThisFrame))
+            {
+                return OnPostprocessAllAssets_By_frameCountMap_empty;
+            }
+            return gnpsAddedToPrefabsThisFrame;
+        }
+
         internal static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
             HashSet<string> existingGONetParticipantAssetPaths = new HashSet<string>();
@@ -80,6 +93,31 @@ namespace GONet.Generation
                 if (designTimeLocations_gonetParticipants.Contains(possibleDesignTimeAssetLocation))
                 {
                     existingGONetParticipantAssetPaths.Add(importedAsset);
+                }
+                else
+                {
+                    // let's see if it is a new GNP and act accordingly as this is the only place it gets picked up automatically when GNP first added to existing prefab
+
+                    const string PREFAB_EXTENSION = ".prefab";
+                    string resourceLocation = importedAsset.Substring(importedAsset.IndexOf(GONetSpawnSupport_Runtime.RESOURCES) + GONetSpawnSupport_Runtime.RESOURCES.Length).Replace(PREFAB_EXTENSION, string.Empty);
+                    UnityEngine.Object resource = Resources.Load(resourceLocation);
+                    if (resource is GameObject)
+                    {
+                        GameObject gameObject = resource as GameObject;
+                        GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
+                        if (gonetParticipant != null)
+                        {
+                            GONetSpawnSupport_DesignTime.OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
+                            existingGONetParticipantAssetPaths.Add(importedAsset);
+
+                            List<GONetParticipant> gnpsAddedToPrefabsThisFrame;
+                            if (!OnPostprocessAllAssets_By_frameCountMap.TryGetValue(Time.frameCount, out gnpsAddedToPrefabsThisFrame))
+                            {
+                                OnPostprocessAllAssets_By_frameCountMap[Time.frameCount] = gnpsAddedToPrefabsThisFrame = new List<GONetParticipant>();
+                            }
+                            gnpsAddedToPrefabsThisFrame.Add(gonetParticipant);
+                        }
+                    }
                 }
             }
 

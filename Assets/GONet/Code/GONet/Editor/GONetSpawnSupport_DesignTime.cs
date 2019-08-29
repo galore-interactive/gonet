@@ -51,20 +51,34 @@ namespace GONet.Editor
 
             foreach (var gonetParticipant in Resources.FindObjectsOfTypeAll<GONetParticipant>())
             {
-                if (gonetParticipant != null)
-                {
-                    string projectPath = AssetDatabase.GetAssetPath(gonetParticipant);
-                    bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
-                    if (isProjectAsset)
-                    {
-                        string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
+            }
 
-                        // this seems unnecessary and problematic for project assets: 
-                        EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
-                        
-                        //gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
-                    }
+            foreach (GONetParticipant gonetParticipant in GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GetGNPsAddedToPrefabThisFrame()) // IMPORTANT: have to do this because the above call to Resources.FindObjectsOfTypeAll<GONetParticipant>() does NOT identify a prefab that just had GNP added to it this frame!!!
+            {
+                OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
+            }
+        }
+
+        internal static void OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant != null)
+            {
+                string projectPath = AssetDatabase.GetAssetPath(gonetParticipant);
+                bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
+                if (isProjectAsset)
+                {
+                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+
+                    // this seems unnecessary and problematic for project assets: 
+                    EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
+
+                    //gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
                 }
+            }
+            else if ((object)gonetParticipant != null && !string.IsNullOrWhiteSpace(gonetParticipant.designTimeLocation))
+            {
+                EnsureExistsInPersistence(gonetParticipant.designTimeLocation);
             }
         }
 
