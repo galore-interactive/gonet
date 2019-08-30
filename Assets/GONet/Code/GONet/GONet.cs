@@ -156,7 +156,7 @@ namespace GONet
         private static Thread mainUnityThread;
         public static bool IsUnityMainThread => mainUnityThread == Thread.CurrentThread;
 
-        public static bool IsUnityApplicationEditor { get; private set; }  = false;
+        public static bool IsUnityApplicationEditor { get; private set; } = false;
 
         static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
 
@@ -363,8 +363,8 @@ namespace GONet
 
         private static void OnInstantiationEvent_Remote(GONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
         {
-            const string IR = "pub/sub Instantiate REMOTE about to process...";
-            GONetLog.Debug(IR);
+            //const string IR = "pub/sub Instantiate REMOTE about to process...";
+            //GONetLog.Debug(IR);
 
             Instantiate_Remote(eventEnvelope.Event);
         }
@@ -497,7 +497,7 @@ namespace GONet
                 endOfTheLineSendArrayPool = new ArrayPool<byte>(100, 10, 1024, 2048);
                 netThread_outgoingNetworkDataArrayPool_ThreadMap[Thread.CurrentThread] = endOfTheLineSendArrayPool;
             }
-                
+
             byte[] bytesCopy = endOfTheLineSendArrayPool.Borrow(bytesUsedCount);
             Buffer.BlockCopy(bytes, 0, bytesCopy, 0, bytesUsedCount);
 
@@ -898,7 +898,7 @@ namespace GONet
                     Time.SetFromAuthority(newClientTimeTicks);
 
                     OnSyncValueChangeProcessed_Persist_Local(
-                        SyncEvent_Time_ElapsedTicks_SetFromAuthority.Borrow(previous, newClientTimeTicks, GONetClient.connectionToServer.RTT_Latest, GONetClient.connectionToServer.RTT_RecentAverage, GONetClient.connectionToServer.RTTMilliseconds_LowLevelTransportProtocol), 
+                        SyncEvent_Time_ElapsedTicks_SetFromAuthority.Borrow(previous, newClientTimeTicks, GONetClient.connectionToServer.RTT_Latest, GONetClient.connectionToServer.RTT_RecentAverage, GONetClient.connectionToServer.RTTMilliseconds_LowLevelTransportProtocol),
                         false); // NOTE: false is to indicate no copy needed like normally needed due to processing flow of normal/automatic sync events, which this is not
 
                     if (!client_hasClosedTimeSyncGapWithServer)
@@ -1042,8 +1042,8 @@ namespace GONet
                 }
                 //else
                 //{
-                    //const string SENSE = "Does not make sense to apply time sync from this client to the server time using an easing over time due to the large gap between what this client has as the time and what the server says in the time.  Diff (seconds): ";
-                    //GONetLog.Info(string.Concat(SENSE, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalSeconds));
+                //const string SENSE = "Does not make sense to apply time sync from this client to the server time using an easing over time due to the large gap between what this client has as the time and what the server says in the time.  Diff (seconds): ";
+                //GONetLog.Info(string.Concat(SENSE, TimeSpan.FromTicks(lastSetFromAuthorityDiffTicks).TotalSeconds));
                 //}
 
                 return 0;
@@ -1243,8 +1243,8 @@ namespace GONet
                 instance.gameObject.name = instantiateEvent.InstanceName;
             }
 
-            const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
-            GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name));
+            //const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
+            //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name));
 
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
             if (!IsServer || instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
@@ -1310,10 +1310,10 @@ namespace GONet
         /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
         /// The key into this is the <see cref="GONetParticipant.codeGenerationId"/>.
         /// </summary>
-        static readonly Dictionary<GONetCodeGenerationId, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap = 
+        static readonly Dictionary<GONetCodeGenerationId, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap =
             new Dictionary<GONetCodeGenerationId, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(byte.MaxValue);
 
-        static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupportByFrequencyMap = 
+        static readonly Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupportByFrequencyMap =
             new Dictionary<SyncBundleUniqueGrouping, AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable>(5);
 
         static readonly List<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupports_UnityMainThread =
@@ -1385,8 +1385,8 @@ namespace GONet
 
                 internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, GONetSyncableValue value)
                 {
-                    if (value.GONetSyncType == GONetSyncableValueTypes.System_Single || 
-                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 || 
+                    if (value.GONetSyncType == GONetSyncableValueTypes.System_Single ||
+                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 ||
                         value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion) // TODO move this to some public static list for folks to reference! e.g. Allowed Blendy Value Types
                     {
                         return new NumericValueChangeSnapshot(elapsedTicksAtChange, value);
@@ -1567,10 +1567,10 @@ namespace GONet
                     for (int i = 0; i < companion.valuesCount; ++i)
                     {
                         AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport = companion.valuesChangesSupport[i];
-                        SyncBundleUniqueGrouping grouping = 
+                        SyncBundleUniqueGrouping grouping =
                             new SyncBundleUniqueGrouping(
-                                monitoringSupport.syncAttribute_SyncChangesEverySeconds, 
-                                monitoringSupport.syncAttribute_Reliability, 
+                                monitoringSupport.syncAttribute_SyncChangesEverySeconds,
+                                monitoringSupport.syncAttribute_Reliability,
                                 monitoringSupport.syncAttribute_MustRunOnUnityMainThread);
 
                         uniqueSyncGroupings.Add(grouping); // since it is a set, duplicates will be discarded
@@ -1597,7 +1597,7 @@ namespace GONet
                     {
                         if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(uniqueSyncGrouping))
                         {
-                            var autoSyncProcessingSupport = 
+                            var autoSyncProcessingSupport =
                                 new AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable(uniqueSyncGrouping, activeAutoSyncCompanionsByCodeGenerationIdMap); // IMPORTANT: this starts the thread!
 
                             autoSyncProcessingSupportByFrequencyMap[uniqueSyncGrouping] = autoSyncProcessingSupport;
@@ -1616,8 +1616,8 @@ namespace GONet
 
         public static bool IsChannelClientInitializationRelated(GONetChannelId channelId)
         {
-            return 
-                channelId == GONetChannel.ClientInitialization_EventSingles_Reliable || 
+            return
+                channelId == GONetChannel.ClientInitialization_EventSingles_Reliable ||
                 channelId == GONetChannel.ClientInitialization_CustomSerialization_Reliable;
         }
 
@@ -1630,7 +1630,7 @@ namespace GONet
         {
             if (Application.isPlaying && !WasDefinedInScene(gonetParticipant))
             {
-                GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
+                //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
 
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
@@ -2036,7 +2036,7 @@ namespace GONet
         static readonly ArrayPool<byte> mainThread_valueChangeSerializationArrayPool = new ArrayPool<byte>(100, 10, 1024, 2048);
 
         static readonly ArrayPool<byte> mainThread_miscSerializationArrayPool = new ArrayPool<byte>(100, 10, 1024, 2048);
-        
+
 
         static readonly Dictionary<Type, uint> messageTypeToMessageIDMap = new Dictionary<Type, uint>(4096);
         static readonly Dictionary<uint, Type> messageTypeByMessageIDMap = new Dictionary<uint, Type>(4096);
@@ -2265,8 +2265,8 @@ namespace GONet
                         }
                         else
                         {
-                            const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
-                            GONetLog.Warning(NTS);
+                            //const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
+                            //GONetLog.Warning(NTS);
                             return;
                         }
                     }

@@ -84,7 +84,7 @@ namespace GONet
         /// </summary>
         [GONetAutoMagicalSync(
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
-            ProcessingPriority_GONetInternalOverride = int.MaxValue - 1, 
+            ProcessingPriority_GONetInternalOverride = int.MaxValue - 1,
             MustRunOnUnityMainThread = true)]
         public uint OwnerAuthorityId { get; internal set; } = GONetMain.OwnerAuthorityId_Unset;
 
@@ -95,7 +95,7 @@ namespace GONet
         /// </summary>
         [GONetAutoMagicalSync(
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
-            ProcessingPriority_GONetInternalOverride = int.MaxValue, 
+            ProcessingPriority_GONetInternalOverride = int.MaxValue,
             CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
             MustRunOnUnityMainThread = true)]
         public uint GONetId
@@ -144,7 +144,7 @@ namespace GONet
         /// </summary>
         internal bool IsOKToStartAutoMagicalProcessing
         {
-            get => isOKToStartAutoMagicalProcessing && 
+            get => isOKToStartAutoMagicalProcessing &&
                 (endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing < GONetMain.tickCount_endOfTheLineSend_Thread);
 
             set
@@ -197,9 +197,9 @@ namespace GONet
 
         private void Start()
         {
-            const string GNPS = "GNP.Start() name: ";
-            const string WAS = " WasInstantiated: ";
-            GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
+            //const string GNPS = "GNP.Start() name: ";
+            //const string WAS = " WasInstantiated: ";
+            //GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
 
             if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
             {
@@ -242,7 +242,7 @@ namespace GONet
                 GONetParticipant gonetParticipant = null;
                 if ((object)gonetParticipantGO == null)
                 {
-                    GONetLog.Warning("If this is a client "+ (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, but its not and this is the SERVER and you have some worrying to do)") +", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
+                    GONetLog.Warning("If this is a client " + (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, but its not and this is the SERVER and you have some worrying to do)") + ", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
                 }
                 else
                 {
