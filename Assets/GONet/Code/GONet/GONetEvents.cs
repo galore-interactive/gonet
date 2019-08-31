@@ -119,7 +119,7 @@ namespace GONet
         public uint GONetId;
 
         [Key(2)]
-        public uint OwnerAuthorityId;
+        public ushort OwnerAuthorityId;
 
         [Key(3)]
         public Vector3 Position;
@@ -200,7 +200,7 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public uint ClientAuthorityId { get; set; }
+        public ushort ClientAuthorityId { get; set; }
 
         [Key(2)]
         public ClientTypeFlags FlagsPrevious { get; set; }
@@ -208,7 +208,7 @@ namespace GONet
         [Key(3)]
         public ClientTypeFlags FlagsNow { get; set; }
 
-        public ClientTypeFlagsChangedEvent(long occurredAtElapsedTicks, uint myAuthorityId, ClientTypeFlags flagsPrevious, ClientTypeFlags flagsNow)
+        public ClientTypeFlagsChangedEvent(long occurredAtElapsedTicks, ushort myAuthorityId, ClientTypeFlags flagsPrevious, ClientTypeFlags flagsNow)
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             ClientAuthorityId = myAuthorityId;
@@ -249,7 +249,7 @@ namespace GONet
         [Key(1)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
         [IgnoreMember] public long ProcessedAtElapsedTicks;
 
-        [Key(2)] public uint RelatedOwnerAuthorityId;
+        [Key(2)] public ushort RelatedOwnerAuthorityId;
         [Key(3)] public uint GONetId;
 
         [IgnoreMember] public byte CodeGenerationId;

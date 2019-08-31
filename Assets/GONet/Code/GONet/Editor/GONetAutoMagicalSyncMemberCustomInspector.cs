@@ -86,6 +86,15 @@ namespace GONet.Editor
                     EditorGUILayout.EndHorizontal();
                 }
 
+                { // GoNetId RAW
+                    EditorGUILayout.BeginHorizontal();
+                    const string GONET_ID_RAW = "GONetId (RAW)";
+                    EditorGUILayout.LabelField(GONET_ID_RAW);
+                    string value = targetGONetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset ? NOT_SET : targetGONetParticipant.gonetId_raw.ToString();
+                    EditorGUILayout.TextField(value);
+                    EditorGUILayout.EndHorizontal();
+                }
+
                 { // OwnerAuthorityId
                     EditorGUILayout.BeginHorizontal();
                     const string OWNER_AUTHORITY_ID = "OwnerAuthorityId";

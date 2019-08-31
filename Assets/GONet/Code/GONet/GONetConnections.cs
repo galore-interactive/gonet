@@ -33,7 +33,7 @@ namespace GONet
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> messageByteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
-        public uint OwnerAuthorityId { get; internal set; }
+        public ushort OwnerAuthorityId { get; internal set; }
 
         #region round trip time stuffs (RTT)
 

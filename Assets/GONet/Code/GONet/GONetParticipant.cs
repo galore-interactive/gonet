@@ -16,6 +16,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using GONet.Serializables;
 using GONet.Utils;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace GONet
         internal const byte ASSumed_GONetId_INDEX = 0;
 
         public const uint GONetId_Unset = 0;
+        public const uint GONetId_Raw_MaxValue = (uint.MaxValue << GONET_ID_BIT_COUNT_UNUSED) >> GONET_ID_BIT_COUNT_UNUSED;
 
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
@@ -74,6 +76,13 @@ namespace GONet
         [SerializeField, HideInInspector]
         public AnimatorControllerParameterMap animatorSyncSupport;
 
+        public const int OWNER_AUTHORITY_ID_BIT_COUNT_USED = 10;
+        public const int OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED = 16 - OWNER_AUTHORITY_ID_BIT_COUNT_USED;
+
+        public const int GONET_ID_BIT_COUNT_UNUSED = OWNER_AUTHORITY_ID_BIT_COUNT_USED;
+        public const int GONET_ID_BIT_COUNT_USED = 32 - GONET_ID_BIT_COUNT_UNUSED;
+
+        ushort ownerAuthorityId = GONetMain.OwnerAuthorityId_Unset;
         /// <summary>
         /// <para>This is set to a value that represents which machine in the game spawned this instance.</para>
         /// <para>IMPORTANT: Up until some time during <see cref="Start"/>, this value will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown.  Once the owner is known, this value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="GONetMain.EventBus"/>).</para>
@@ -86,8 +95,35 @@ namespace GONet
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue - 1,
             MustRunOnUnityMainThread = true)]
-        public uint OwnerAuthorityId { get; internal set; } = GONetMain.OwnerAuthorityId_Unset;
+        public ushort OwnerAuthorityId
+        {
+            get => ownerAuthorityId;
+            internal set
+            {
+                ownerAuthorityId = value;
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate();
+            }
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate()
+        {
+            ushort ownerAuthorityId_asRepresentedInside_gonetId = (ushort)((gonetId << GONET_ID_BIT_COUNT_USED) >> GONET_ID_BIT_COUNT_USED);
+
+            if (ownerAuthorityId == GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset)
+            {
+                // big ASSumption here, that if the gonetId contains a non-zero value for authority id and we have both (1) not represented that value inside ownerAuthorityId component and (2) ownerAuthorityId is unset....we are ASSuming gonetId composite contains the real/new value for ownerAuthorityId and we should use it!
+                ownerAuthorityId = ownerAuthorityId_asRepresentedInside_gonetId;
+            }
+
+            gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
+            gonetId = unchecked((uint)(gonetId_raw << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId;
+        }
+
+        public uint gonetId_raw { get; private set; } = 0;
+        /// <summary>
+        /// This is the composite value of <see cref="gonetId_raw"/> and <see cref="ownerAuthorityId"/> smashed together into a single uint value
+        /// </summary>
         private uint gonetId = GONetId_Unset;
         /// <summary>
         /// Every instance of <see cref="GONetParticipant"/> will be assigned a unique value to this variable.
@@ -100,12 +136,15 @@ namespace GONet
             MustRunOnUnityMainThread = true)]
         public uint GONetId
         {
-            get { return gonetId; }
+            get => gonetId;
             internal set
             {
+                uint gonetId_previous = gonetId;
                 gonetId = value;
-                GONetMain.gonetParticipantByGONetIdMap[value] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
-                //GONetLog.Info("slamile...gonetId: " + gonetId);
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate();
+
+                GONetMain.gonetParticipantByGONetIdMap.Remove(gonetId_previous);
+                GONetMain.gonetParticipantByGONetIdMap[gonetId] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
             }
         }
 

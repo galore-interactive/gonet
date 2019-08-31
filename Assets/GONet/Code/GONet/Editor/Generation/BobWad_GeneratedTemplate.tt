@@ -167,7 +167,7 @@ namespace GONet
         /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
         ///            here (i.e., to private object pool) via <see cref="Return(<#=className#>)"/> when no longer needed!
         /// </summary>
-        public static <#=className#> Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, uint relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
+        public static <#=className#> Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, <#=memberKVP.Value.Item1#> valuePrevious, <#=memberKVP.Value.Item1#> valueNew)
 		{
             if (borrowThread == null)
             {
@@ -252,7 +252,7 @@ namespace GONet.Generation
 			return null;
 		}
 
-		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, uint filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
+		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, ushort filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
             switch (syncCompanion.gonetParticipant.codeGenerationId)
             {

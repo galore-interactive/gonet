@@ -25,7 +25,7 @@ namespace GONet
 
     public abstract class GONetEventEnvelope
     {
-        public virtual uint SourceAuthorityId { get; set; }
+        public virtual ushort SourceAuthorityId { get; set; }
 
         public virtual bool IsSourceRemote { get; }
 
@@ -42,7 +42,7 @@ namespace GONet
     {
         static readonly ObjectPool<GONetEventEnvelope<T>> pool = new ObjectPool<GONetEventEnvelope<T>>(50, 5);
 
-        public override uint SourceAuthorityId { get; set; }
+        public override ushort SourceAuthorityId { get; set; }
 
         public override bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
 
@@ -54,7 +54,7 @@ namespace GONet
             set => EventUntyped = eventTyped = value;
         }
 
-        internal static GONetEventEnvelope<T> Borrow(T eventTyped, uint sourceAuthorityId, GONetParticipant gonetParticipant)
+        internal static GONetEventEnvelope<T> Borrow(T eventTyped, ushort sourceAuthorityId, GONetParticipant gonetParticipant)
         {
             var envelope = pool.Borrow();
 
@@ -70,7 +70,7 @@ namespace GONet
             pool.Return(borrowed);
         }
 
-        internal void Init(T @event, uint sourceAuthorityId)
+        internal void Init(T @event, ushort sourceAuthorityId)
         {
             Event = @event;
             SourceAuthorityId = sourceAuthorityId;
@@ -119,7 +119,7 @@ namespace GONet
         /// <summary>
         /// IMPORTANT: Only call this from the main Unity thread!
         /// </summary>
-        public void Publish<T>(T @event, uint? remoteSourceAuthorityId = default) where T : IGONetEvent
+        public void Publish<T>(T @event, ushort? remoteSourceAuthorityId = default) where T : IGONetEvent
         {
             if (!GONetMain.IsUnityMainThread)
             {
@@ -130,7 +130,7 @@ namespace GONet
             if (handlersForType != null)
             {
                 int handlerCount = handlersForType.Count;
-                uint sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
+                ushort sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
                 genericEnvelope.Init(@event, sourceAuthorityId);
                 for (int i = 0; i < handlerCount; ++i)
                 {

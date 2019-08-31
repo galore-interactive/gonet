@@ -104,7 +104,7 @@ namespace GONet
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
-        public static uint MyAuthorityId { get; private set; }
+        public static ushort MyAuthorityId { get; private set; }
 
         internal static bool isServerOverride = NetworkUtils.IsIPAddressOnLocalMachine(GONetSampleClientOrServer.serverIP) && !NetworkUtils.IsLocalPortListening(GONetSampleClientOrServer.serverPort); // TODO FIXME gotta iron out good startup process..this is quite temporary
         /// <summary>
@@ -216,13 +216,13 @@ namespace GONet
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
 
-        public const uint OwnerAuthorityId_Unset = 0;
-        public const uint OwnerAuthorityId_Server = uint.MaxValue;
+        public const ushort OwnerAuthorityId_Unset = 0;
+        public const ushort OwnerAuthorityId_Server = unchecked((ushort)(ushort.MaxValue << GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED)) >> GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED;
 
         /// <summary>
         /// Only used/applicable if <see cref="IsServer"/> is true.
         /// </summary>
-        private static uint server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
+        private static ushort server_lastAssignedAuthorityId = OwnerAuthorityId_Unset;
 
         /// <summary>
         /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="EventBus"/>)</para>
@@ -1184,8 +1184,8 @@ namespace GONet
                             }
                             else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
                             {
-                                uint ownerAuthorityId;
-                                bitStream.ReadUInt(out ownerAuthorityId);
+                                ushort ownerAuthorityId;
+                                bitStream.ReadUShort(out ownerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
 
                                 GONetLog.Debug(" ***************************** received authId: " + ownerAuthorityId + " IsServer: " + IsServer);
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
@@ -1247,7 +1247,7 @@ namespace GONet
             //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name));
 
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
-            if (!IsServer || instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
+            if (instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
             {
                 instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
             }
@@ -1292,7 +1292,7 @@ namespace GONet
                 }
 
                 { // body
-                    bitStream.WriteUInt(connectionToClient.OwnerAuthorityId);
+                    bitStream.WriteUShort(connectionToClient.OwnerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
                 }
 
                 bitStream.WriteCurrentPartialByte();
@@ -1428,7 +1428,7 @@ namespace GONet
             internal NumericValueChangeSnapshot[] mostRecentChanges;
             internal int mostRecentChanges_capacitySize;
             internal int mostRecentChanges_usedSize = 0;
-            private uint mostRecentChanges_UpdatedByAuthorityId;
+            private ushort mostRecentChanges_UpdatedByAuthorityId;
 
             /// <summary>
             /// DO NOT USE THIS.
@@ -1589,7 +1589,7 @@ namespace GONet
                             string parameterName = animatorSyncSupportEnum.Current.Key;
                             GONetParticipant.AnimatorControllerParameter parameter = animatorSyncSupportEnum.Current.Value;
 
-                            GONetLog.Debug(string.Concat("animator parameter....name: ", parameterName, " type: ", parameter.valueType, " isSyncd: ", parameter.isSyncd));
+                            //GONetLog.Debug(string.Concat("animator parameter....name: ", parameterName, " type: ", parameter.valueType, " isSyncd: ", parameter.isSyncd));
                         }
                     }
 
@@ -1609,8 +1609,6 @@ namespace GONet
                         }
                     }
                 }
-
-                OnEnable_AssignGONetId_IfAppropriate(gonetParticipant);
             }
         }
 
@@ -1628,21 +1626,48 @@ namespace GONet
 
         internal static void Start_AutoPropagateInstantiation_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            if (Application.isPlaying && !WasDefinedInScene(gonetParticipant))
+            if (Application.isPlaying)
             {
-                //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
-
-                bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
-                if (isThisCondisideredTheMomentOfInitialInstantiation)
+                if (WasDefinedInScene(gonetParticipant))
                 {
-                    gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
-
-                    AutoPropagateInitialInstantiation(gonetParticipant);
+                    if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
+                    {
+                        AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+                    }
                 }
                 else
                 {
-                    // this data item has now served its purpose (i.e., avoid auto propagate since it already came from remote source!), so remove it
-                    remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
+                    //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
+
+                    bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
+                    if (isThisCondisideredTheMomentOfInitialInstantiation)
+                    {
+                        gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+                        AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+
+                        AutoPropagateInitialInstantiation(gonetParticipant);
+                    }
+                    else
+                    {
+                        // this data item has now served its purpose (i.e., avoid auto propagate since it already came from remote source!), so remove it
+                        remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
+                    }
+                }
+            }
+        }
+
+        private static void AssignGONetIdRaw_IfAppropriate(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
+            {
+                if (lastAssignedGONetId < GONetParticipant.GONetId_Raw_MaxValue)
+                {
+                    uint gonetId_raw = ++lastAssignedGONetId;
+                    gonetParticipant.GONetId = gonetId_raw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED;
+                }
+                else
+                {
+                    throw new OverflowException("Unable to assign a new GONetId, because lastAssignedGONetId has reached the max value of GONetParticipant.GONetId_Raw_MaxValue, which is: " + GONetParticipant.GONetId_Raw_MaxValue);
                 }
             }
         }
@@ -1695,14 +1720,6 @@ namespace GONet
             DestroyGONetParticipantEvent @event = new DestroyGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
             //GONetLog.Debug("Publish DestroyGONetParticipantEvent now."); /////////////////////////// DREETS!
             EventBus.Publish(@event); // this causes the auto propagation via local handler to send to all remotes (i.e., all clients if server, server if client)
-        }
-
-        private static void OnEnable_AssignGONetId_IfAppropriate(GONetParticipant gonetParticipant)
-        {
-            if (IsServer && gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
-            {
-                gonetParticipant.GONetId = ++lastAssignedGONetId;
-            }
         }
 
         static readonly HashSet<int> definedInSceneParticipantInstanceIDs = new HashSet<int>();
@@ -2071,7 +2088,7 @@ namespace GONet
         /// POST: return a serialized packet with only the stuff that excludes <paramref name="filterUsingOwnerAuthorityId"/> as to not send to them (i.e., likely because they are the one who owns this data in the first place and already know this change occurred!)
         /// IMPORTANT: The caller is responsible for returning the returned byte[] to <paramref name="byteArrayPool"/>
         /// </summary>
-        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, uint filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
+        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
         {
             if (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset)
             {
@@ -2144,7 +2161,7 @@ namespace GONet
         /// <summary>
         /// Returns the number of changes actually included in/added to the <paramref name="bitStream_headerAlreadyWritten"/> AFTER any filtering this method does (e.g., checking <paramref name="filterUsingOwnerAuthorityId"/>).
         /// </summary>
-        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, uint filterUsingOwnerAuthorityId)
+        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId)
         {
             int countTotal = changes.Count;
             int countMinus1 = countTotal - 1;
@@ -2214,7 +2231,7 @@ namespace GONet
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, uint filterUsingOwnerAuthorityId)
+        private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, ushort filterUsingOwnerAuthorityId)
         {
             return
                 change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
@@ -2230,6 +2247,7 @@ namespace GONet
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
 
+                GONetLog.Debug("gonetId: " + gonetId + " raw: " + (gonetId >> GONetParticipant.GONET_ID_BIT_COUNT_UNUSED));
                 GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
 
