@@ -238,11 +238,122 @@ namespace GONet
         /// <summary>
         /// <para>IMPORTANT: Up until some time during <see cref="GONetParticipant.Start"/>, the value of <see cref="GONetParticipant.OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="EventBus"/>)</para>
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
-        /// <para>From a GONet perspective, this checks if the <paramref name="gameObject"/> has a <see cref="GONetParticipant"/> and if so, whether or not you own it.</para>
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsMine(GONetParticipant gonetParticipant)
         {
             return gonetParticipant.OwnerAuthorityId == MyAuthorityId;
+        }
+
+        /// <summary>
+        /// <para>IMPORTANT: Keep in mind if <paramref name="gonetParticipant"/> has many auto sync members, *ALL* of them have to have enough values in history to support a smooth assumption of authority.</para>
+        /// <para>           Even if only transform position and rotation are auto sync'd, both of them have had to changed at least <see cref="ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE"/> times in order for this to return true.</para>
+        /// <para>           Therefore, this method is only to be required to return true prior to calling <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/> when it is known to make sense!</para>
+        /// <para>           This is up to you to use or not.  You can still call <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/> when this return false and the world will not end and the assumption of authority will still occur (ASSuming <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/> returns true)!</para>
+        /// </summary>
+        /// <param name="gonetParticipant"></param>
+        /// <returns></returns>
+        public static bool Server_HasEnoughValueBlendHistoryToSmoothly_AssumeAuthorityOver(GONetParticipant gonetParticipant)
+        {
+            if (!IsServer || gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset || IsMine(gonetParticipant))
+            {
+                return false;
+            }
+
+            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
+            GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
+                autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
+            {
+                byte valuesCount = autoSyncCompanion.valuesCount;
+                for (int i = 0; i < valuesCount; ++i)
+                {
+                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangesSupport = autoSyncCompanion.valuesChangesSupport[i];
+                    if (valueChangesSupport.mostRecentChanges != null)
+                    {
+                        if (valueChangesSupport.mostRecentChanges_usedSize < ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// <para>If you on running on the server and need to "assume ownership" over something (e.g., a client instantiated projectile), this is the method to do so.</para>
+        /// <para>
+        /// If you want the value blending to go smoothly, you can ensure only to call this once <see cref="Server_HasEnoughValueBlendHistoryToSmoothly_AssumeAuthorityOver(GONetParticipant)"/> returns true.
+        /// This can still be called and work out just ~fine when that method returns false, but there might be a one-frame warp/teleport from old values to new for the original/previous owner
+        /// </para>
+        /// <para>POST: *if* this method returns true, the value of <paramref name="gonetParticipant"/>'s <see cref="GONetParticipant.OwnerAuthorityId"/> will be changed to <see cref="MyAuthorityId"/></para>
+        /// </summary>
+        public static bool Server_AssumeAuthorityOver(GONetParticipant gonetParticipant)
+        {
+            if (IsServer && gonetParticipant.OwnerAuthorityId != OwnerAuthorityId_Unset && !IsMine(gonetParticipant))
+            {
+                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
+                GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
+                if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
+                    autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
+                {
+                    byte valuesCount = autoSyncCompanion.valuesCount;
+                    for (int i = 0; i < valuesCount; ++i)
+                    {
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangesSupport = autoSyncCompanion.valuesChangesSupport[i];
+                        if (valueChangesSupport.mostRecentChanges != null)
+                        {
+                            GONetSyncableValue valueBefore = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
+
+                            if (valueChangesSupport.mostRecentChanges_usedSize < ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE)
+                            {
+                                const string NO_EXTRAP = "While transferring ownership to server, there is not enough information for ApplyValueBlending_IfAppropriate to extrapolate to right now right now, because it would seem highly prefferable to be able to extrapolate to now instead of staying at the value we had from back at negative GONetMain.valueBlendingBufferLeadTicks ago.  GONetId: ";
+                                const string IDX = "  Value index: ";
+                                GONetLog.Warning(string.Concat(NO_EXTRAP, gonetParticipant.GONetId, IDX, i)); // TODO printing out the index is not useful!  print a name of property or something!!!
+                            }
+                            valueChangesSupport.ApplyValueBlending_IfAppropriate(0); // make sure we update it to the latest value for right now right now (i.e., pass 0 instead of GONetMain.valueBlendingBufferLeadTicks) before we transfer ownership
+                            valueChangesSupport.ClearMostRecentChanges(); // most recent changes is only useful for value blending...and since we are now the owner (or will be soon below), no sense in keeping this around
+
+                            GONetSyncableValue valueAfter = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
+                            valueChangesSupport.lastKnownValue = valueChangesSupport.lastKnownValue_previous = valueAfter; // IMPORTANT: now that we are taking over ownership (below), we need to keep tabs on when changes occur and this is first step to baseline things from this point forward
+                        }
+                    }
+                }
+                else
+                {
+                    const string TRANS = "Transferring ownership to server and expecting to find an active auto sync support/companion instance, but did not.  NOTE: The transfer will still occur.  GONetId: ";
+                    GONetLog.Warning(string.Concat(TRANS, gonetParticipant.GONetId));
+                }
+
+                gonetParticipant.OwnerAuthorityId = MyAuthorityId; // NOTE: this will propagate to all other parties through auto sync support
+
+                OnGONetIdComponentChanged_EnsureMapKeysUpdated(gonetParticipant, gonetParticipant.GONetId); // NOTE: yes, this will also be handled via subscribers to SyncEvent_GONetParticipant_GONetId AND SyncEvent_GONetParticipant_OwnerAuthorityId, but it is best to do it immediately here since we already know it changed and those events are fired at end of frame!
+            }
+
+            return false;
+        }
+
+        private static void OnOwnerAuthorityIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
+        {
+            OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
+        }
+
+        private static void OnGONetIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
+        {
+            OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
+        }
+
+        /// <summary>
+        /// Now that OwnerAuthorityId changed, that means any data structures (namely dictionary) using OwnerAuthorityId =OR= GONetId (since it is a composite value that includes OwnerAuthorityId) as a key, need to be updated!
+        /// </summary>
+        private static void OnGONetIdComponentChanged_EnsureMapKeysUpdated(GONetParticipant gonetParticipant, uint previousGONetId)
+        {
+            gonetParticipantByGONetIdMap.Remove(previousGONetId);
+            gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+
+            // well, looks like at time of writing there are no other ones to consider.....ok...we will monitor and hopefully keep this in mind if we add other Dictionary<uint, blah> later!
         }
 
         /// <summary>
@@ -276,6 +387,9 @@ namespace GONet
             subscription.SetSubscriptionPriority_INTERNAL(int.MinValue); // process internally LAST since the GO will be destroyed and other subscribers may want to do something just prior to it being destroyed
 
             EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
+
+            EventBus.Subscribe<SyncEvent_GONetParticipant_GONetId>(OnGONetIdChanged);
+            EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnOwnerAuthorityIdChanged);
         }
 
         private static void OnSyncValueChangeProcessed_Persist_Local(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
@@ -618,15 +732,15 @@ namespace GONet
                 var bEnumerator = a.Value.GetEnumerator(); // TODO use better name!
                 while (bEnumerator.MoveNext())
                 {
-                    var b = bEnumerator.Current; // TODO use better name!
+                    var valueChangeSupportKVP = bEnumerator.Current;
 
-                    int xLength = b.Value.valuesChangesSupport.Length; // TODO use better name!
+                    int xLength = valueChangeSupportKVP.Value.valuesChangesSupport.Length; // TODO use better name!
                     for (int i = 0; i < xLength; ++i)
                     {
-                        var x = b.Value.valuesChangesSupport[i]; // TODO use better name!
-                        if (x != null)
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valueChangeSupportKVP.Value.valuesChangesSupport[i];
+                        if (valueChangeSupport != null)
                         {
-                            x.ApplyValueBlending_IfAppropriate();
+                            valueChangeSupport.ApplyValueBlending_IfAppropriate(valueBlendingBufferLeadTicks);
                         }
                     }
                 }
@@ -1495,13 +1609,21 @@ namespace GONet
             /// Loop through the recent changes to interpolate or extrapolate is possible.
             /// POST: The related/associated value is updated to what is believed to be the current value based on recent changes accumulated from owner/source.
             /// </summary>
-            internal void ApplyValueBlending_IfAppropriate()
+            internal void ApplyValueBlending_IfAppropriate(long useBufferLeadTicks)
             {
                 GONetSyncableValue blendedValue;
-                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks, out blendedValue))
+                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue))
                 {
                     syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
                 }
+            }
+
+            /// <summary>
+            /// At time of writing, the only case for this is when transferring ownership of client owned thing over to server ownership and on server there will no longer be value blending as it will be the owner/source for others
+            /// </summary>
+            internal void ClearMostRecentChanges()
+            {
+                mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here!
             }
         }
 
@@ -2247,7 +2369,6 @@ namespace GONet
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
 
-                GONetLog.Debug("gonetId: " + gonetId + " raw: " + (gonetId >> GONetParticipant.GONET_ID_BIT_COUNT_UNUSED));
                 GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
 
