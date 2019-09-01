@@ -78,7 +78,15 @@ namespace GONet
             SyncEvent_ValueChangeProcessed syncEvent = @event as SyncEvent_ValueChangeProcessed;
             if (syncEvent == null)
             {
-                GONetParticipant = null;
+                IHaveRelatedGONetId iHaveRelatedGONetId = @event as IHaveRelatedGONetId;
+                if (iHaveRelatedGONetId == null)
+                {
+                    GONetParticipant = null;
+                }
+                else
+                {
+                    GONetParticipant = GONetMain.GetGONetParticipantById(iHaveRelatedGONetId.GONetId);
+                }
             }
             else
             {

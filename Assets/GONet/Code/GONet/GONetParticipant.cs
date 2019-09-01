@@ -101,19 +101,30 @@ namespace GONet
             internal set
             {
                 ownerAuthorityId = value;
-                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate();
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate()
+        private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow)
         {
-            ushort ownerAuthorityId_asRepresentedInside_gonetId = (ushort)((gonetId << GONET_ID_BIT_COUNT_USED) >> GONET_ID_BIT_COUNT_USED);
-
-            if (ownerAuthorityId == GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset)
+            if (!isOwnerAuthorityIdKnownToBeGoodValueNow)
             {
-                // big ASSumption here, that if the gonetId contains a non-zero value for authority id and we have both (1) not represented that value inside ownerAuthorityId component and (2) ownerAuthorityId is unset....we are ASSuming gonetId composite contains the real/new value for ownerAuthorityId and we should use it!
-                ownerAuthorityId = ownerAuthorityId_asRepresentedInside_gonetId;
+                ushort ownerAuthorityId_asRepresentedInside_gonetId = (ushort)((gonetId << GONET_ID_BIT_COUNT_USED) >> GONET_ID_BIT_COUNT_USED);
+
+                if (ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId != ownerAuthorityId_asRepresentedInside_gonetId)
+                {
+                    if (ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset)
+                    {
+                        const string CHG = "OwnerAuthorityId changing from a non-unset value to a different non-unset value.  If this is not happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous OwnerAuthorityId: ";
+                        const string NEW = " new OwnerAuthorityId: ";
+                        const string GNS = "<GONet server>";
+                        GONetLog.Info(string.Concat(CHG, ownerAuthorityId, NEW, ownerAuthorityId_asRepresentedInside_gonetId == GONetMain.OwnerAuthorityId_Server ? GNS : ownerAuthorityId_asRepresentedInside_gonetId.ToString()));
+                    }
+
+                    // big ASSumption here, that if the gonetId contains a non-zero value for authority id and we have both (1) not represented that value inside ownerAuthorityId component and (2) ownerAuthorityId is unset....we are ASSuming gonetId composite contains the real/new value for ownerAuthorityId and we should use it!
+                    ownerAuthorityId = ownerAuthorityId_asRepresentedInside_gonetId;
+                }
             }
 
             gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
@@ -141,7 +152,7 @@ namespace GONet
             {
                 uint gonetId_previous = gonetId;
                 gonetId = value;
-                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate();
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(false);
 
                 GONetMain.gonetParticipantByGONetIdMap.Remove(gonetId_previous);
                 GONetMain.gonetParticipantByGONetIdMap[gonetId] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
@@ -277,6 +288,10 @@ namespace GONet
             {
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
+
+                uint GONetId = GONetId_Unset;
+                bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
+
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
                 GONetParticipant gonetParticipant = null;
                 if ((object)gonetParticipantGO == null)
@@ -287,9 +302,6 @@ namespace GONet
                 {
                     gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
                 }
-
-                uint GONetId = GONetId_Unset;
-                bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
 
                 if ((object)gonetParticipant != null)
                 {

@@ -269,7 +269,7 @@ namespace GONet
                 for (int i = 0; i < valuesCount; ++i)
                 {
                     AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangesSupport = autoSyncCompanion.valuesChangesSupport[i];
-                    if (valueChangesSupport.mostRecentChanges != null)
+                    if (valueChangesSupport.mostRecentChanges != null) // TODO FIXME have to include a check for the IsPositionSyncd and IsRotationSyncd check dealios
                     {
                         if (valueChangesSupport.mostRecentChanges_usedSize < ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE)
                         {
@@ -328,11 +328,16 @@ namespace GONet
                 }
 
                 gonetParticipant.OwnerAuthorityId = MyAuthorityId; // NOTE: this will propagate to all other parties through auto sync support
+                AssignGONetIdRaw_IfAppropriate(gonetParticipant, true); // IMPORTANT: whatever the gonetId_raw value was before was only valid for the previous owner, we have to assign that anew here now!
 
                 OnGONetIdComponentChanged_EnsureMapKeysUpdated(gonetParticipant, gonetParticipant.GONetId); // NOTE: yes, this will also be handled via subscribers to SyncEvent_GONetParticipant_GONetId AND SyncEvent_GONetParticipant_OwnerAuthorityId, but it is best to do it immediately here since we already know it changed and those events are fired at end of frame!
-            }
 
-            return false;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         private static void OnOwnerAuthorityIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
@@ -1775,17 +1780,20 @@ namespace GONet
                         remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
                     }
                 }
+
+                var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
+                EventBus.Publish<IGONetEvent>(startEvent);
             }
         }
 
-        private static void AssignGONetIdRaw_IfAppropriate(GONetParticipant gonetParticipant)
+        private static void AssignGONetIdRaw_IfAppropriate(GONetParticipant gonetParticipant, bool shouldForceChangeEventIfAlreadySet = false)
         {
-            if (gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
+            if (shouldForceChangeEventIfAlreadySet || gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
             {
                 if (lastAssignedGONetId < GONetParticipant.GONetId_Raw_MaxValue)
                 {
                     uint gonetId_raw = ++lastAssignedGONetId;
-                    gonetParticipant.GONetId = gonetId_raw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED;
+                    gonetParticipant.GONetId = (gonetId_raw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED) | gonetParticipant.OwnerAuthorityId;
                 }
                 else
                 {
@@ -2334,14 +2342,14 @@ namespace GONet
                 {
                     // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
                     change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
-
-                    GONetLog.Debug("serializing to send momentarily, GONetId");
                 }
                 else
                 {
-                    if (change.syncCompanion.gonetParticipant.GONetId == GONetParticipant.GONetId_Unset)
+                    if (change.syncCompanion.gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset)
                     {
-                        GONetLog.Error("Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): " + ShouldSendChange(change, filterUsingOwnerAuthorityId) + " filterUsingOwnerAuthorityId: " + filterUsingOwnerAuthorityId);
+                        const string SNAFU = "Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): ";
+                        const string FUOA = " filterUsingOwnerAuthorityId: ";
+                        GONetLog.Error(string.Concat(SNAFU, ShouldSendChange(change, filterUsingOwnerAuthorityId), FUOA, filterUsingOwnerAuthorityId));
                     }
                     bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
                     bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize

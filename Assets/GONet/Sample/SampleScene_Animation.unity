@@ -1085,6 +1085,12 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: clientSpawned_AssumeServerAuthorityTest_Prefab
+      value: 
+      objectReference: {fileID: 5250531256022290673, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
+        type: 3}
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: designTimeLocation

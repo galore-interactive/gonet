@@ -69,6 +69,18 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantStartedEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
     [MessagePackObject]
     public struct RequestMessage : ITransientEvent // TODO probably not always going to be considered transient
     {
@@ -233,6 +245,11 @@ namespace GONet
     public interface ISelfReturnEvent
     {
         void Return();
+    }
+
+    public interface IHaveRelatedGONetId
+    {
+        uint GONetId { get; }
     }
 
     /// <summary>
