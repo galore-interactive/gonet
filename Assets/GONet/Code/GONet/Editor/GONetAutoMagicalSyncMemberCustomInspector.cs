@@ -143,7 +143,25 @@ namespace GONet.Editor
                                 EditorGUILayout.BeginHorizontal();
                                 const string ScriptLabel = "Script";
                                 EditorGUILayout.LabelField(ScriptLabel);
-                                EditorGUILayout.TextField(ScriptName);
+
+                                GUI.enabled = true;
+                                if (GUILayout.Button(ScriptName, GetClickableDisabledLabelStyle()))
+                                {
+                                    var script = MonoScript.FromMonoBehaviour(siblingMonoBehaviour);
+                                    if ((EditorApplication.timeSinceStartup - lastClickableLabelClickedTime) < CONSIDER_DOUBLE_CLICK_IF_WITHIN_TIME)
+                                    {
+                                        AssetDatabase.OpenAsset(script);
+                                    }
+                                    else
+                                    {
+                                        //Selection.SetActiveObjectWithContext(script, null); // this would be cool, but prevents the ability to double click since focus goes to this script and the thing to double click is no longer visible in inspector!!!
+                                        EditorGUIUtility.PingObject(script);
+                                    }
+
+                                    lastClickableLabelClickedTime = EditorApplication.timeSinceStartup;
+                                }
+                                GUI.enabled = false;
+
                                 EditorGUILayout.EndHorizontal();
 
                                 foreach (var autoSyncMember in autoSyncMembersInSibling)
@@ -305,6 +323,20 @@ namespace GONet.Editor
 
                 EditorGUI.indentLevel--;
             }
+        }
+
+        static double lastClickableLabelClickedTime;
+        const double CONSIDER_DOUBLE_CLICK_IF_WITHIN_TIME = 0.3;
+
+        static GUIStyle clickableDisabledLabelStyle;
+        static GUIStyle GetClickableDisabledLabelStyle()
+        {
+            if (clickableDisabledLabelStyle == null)
+            {
+                clickableDisabledLabelStyle  = new GUIStyle(GUI.skin.textField);
+                clickableDisabledLabelStyle.normal.textColor = Color.grey; // make it look disabled
+            }
+            return clickableDisabledLabelStyle;
         }
 
         private static void DrawGONetSyncProfileTemplateButton_IfAppropriate(string settingsProfileTemplateName)
