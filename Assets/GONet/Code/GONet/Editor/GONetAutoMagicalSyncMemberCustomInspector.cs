@@ -379,7 +379,8 @@ namespace GONet.Editor
                         const string OOPS = "Oops.  The profile/template name used here (i.e., \"";
                         const string NAME = "\") does NOT match with any of the available entries in the folder: ";
                         const string INSTEAD = ".\nAt runtime, the following profile/template will be used instead: ";
-                        Debug.LogWarning(string.Concat(OOPS, settingsProfileTemplateName ?? string.Empty, NAME, GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH, INSTEAD, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT));
+                        const string NEW = "\nTo create a new sync settings profile/template, open the GONet Editor Support window (see File menu named GONet), enter the name of the new profile/temple, click Create and edit the settings to your liking.";
+                        Debug.LogWarning(string.Concat(OOPS, settingsProfileTemplateName ?? string.Empty, NAME, GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH, INSTEAD, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT, NEW));
                     }
                 }
                 else if (tooltip == TOOLTIP_ATTR)
