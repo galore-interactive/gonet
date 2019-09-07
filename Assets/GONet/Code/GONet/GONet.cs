@@ -27,7 +27,6 @@ using UnityEngine;
 
 using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
-using MessagePack;
 using System.IO;
 using System.Runtime.Serialization;
 
@@ -774,14 +773,14 @@ namespace GONet
             }
         }
 
-        private static void SaveEventsInQueue_IfAppropriate(bool shouldForAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
+        private static void SaveEventsInQueue_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
         {
             var enumerator = syncEventsToSaveQueueByEventType.GetEnumerator();
             while (enumerator.MoveNext())
             {
                 Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue = enumerator.Current.Value;
                 int count = syncEventsToSaveQueue.Count;
-                bool isAppropriate = shouldForAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
+                bool isAppropriate = shouldForceAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
                 if (isAppropriate)
                 {
                     {
@@ -1059,6 +1058,7 @@ namespace GONet
             }
 
             SaveEventsInQueue_IfAppropriate(true);
+            GlobalSessionContext.StartCoroutine_ExecuteEulaRemit(persistenceFilePath); // IMPORTANT: this MUST come AFTER SaveEventsInQueue_IfAppropriate(true) to ensure all the stuffs is written than is to be executed remit eula style
         }
 
         internal struct NetworkData

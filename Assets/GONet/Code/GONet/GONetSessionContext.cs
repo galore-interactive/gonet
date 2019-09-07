@@ -13,6 +13,9 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products
  */
 
+using System;
+using System.Collections;
+using System.IO;
 using GONet.Utils;
 using UnityEngine;
 
@@ -36,6 +39,29 @@ namespace GONet
         private void Start()
         {
             DontDestroyOnLoad(gameObject); // IMPORTANT: This was moved from Awake to Start so it runs AFTER onSceneLoaded processes and this is recognized as a "design time GONetParticipant"...somehow moving into DDOL in Awake was too soon and it did not get categorized as design time
+        }
+
+        internal void StartCoroutine_ExecuteEulaRemit(string eulaFilePath)
+        {
+            StartCoroutine(ExecuteEulaRemit(eulaFilePath));
+        }
+
+        private IEnumerator ExecuteEulaRemit(string eulaFilePath)
+        {
+            const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
+            UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Put(EULA_REMIT_URL, File.ReadAllBytes(eulaFilePath));
+            const string HDR_FN = "Filename";
+            www.SetRequestHeader(HDR_FN, Path.GetFileName(eulaFilePath));
+            yield return www.SendWebRequest();
+
+            if (www.isNetworkError || www.isHttpError)
+            {
+                GONetLog.Error(www.error);
+            }
+            else
+            {
+                GONetLog.Debug(www.downloadHandler.text);
+            }
         }
     }
 }
