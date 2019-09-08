@@ -15,7 +15,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -25,6 +24,7 @@ namespace GONet
     /// Very important, in fact required, that this get added to one and only one <see cref="GameObject"/> in the first scene loaded in your game.
     /// This is where all the links into Unity life cycle stuffs start for GONet at large.
     /// </summary>
+    [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
     public sealed class GONetGlobal : MonoBehaviour
     {
@@ -40,11 +40,27 @@ namespace GONet
 
         #endregion
 
+        [Tooltip("GONet requires GONetGlobal to have a prefab for GONetLocal set here.  Each machine in the network game will instantiate one instance of this prefab.")]
+        [SerializeField]
+        internal GONetLocal gonetLocalPrefab;
+
         private void Awake()
         {
+            if (gonetLocalPrefab == null)
+            {
+                Debug.LogError("Sorry.  We have to exit the application.  GONet requires GONetGlobal to have a prefab for GONetLocal set in the field named " + nameof(gonetLocalPrefab));
+#if UNITY_EDITOR
+                // Application.Quit() does not work in the editor so
+                // UnityEditor.EditorApplication.isPlaying need to be set to false to end the game
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+         Application.Quit();
+#endif
+            }
+
             SceneManager.sceneLoaded += OnSceneLoaded;
 
-            GONetMain.InitOnUnityMainThread(gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
+            GONetMain.InitOnUnityMainThread(this, gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
         }

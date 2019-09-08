@@ -309,7 +309,7 @@ namespace GONet.Generation
                 */
 
                 List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence = LoadAllSnapsFromPersistence();
-                allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
+                //allUniqueSnapsForPersistence.ForEach(x => GONetLog.Debug("from persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
 
                 List<GONetParticipant> gonetParticipantsInOpenScenes = new List<GONetParticipant>();
 
@@ -342,19 +342,19 @@ namespace GONet.Generation
                 }
 
                 byte max_codeGenerationId = allUniqueSnapsForPersistence.Count > 0 ? allUniqueSnapsForPersistence.Max(x => x.codeGenerationId) : GONetParticipant.CodeGenerationId_Unset;
-                GONetLog.Debug("max_codeGenerationId: " + max_codeGenerationId);
-                GONetLog.Debug("gonetParticipantsInOpenScenes.count: " + gonetParticipantsInOpenScenes.Count);
-                GONetLog.Debug("before allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
+                //GONetLog.Debug("max_codeGenerationId: " + max_codeGenerationId);
+                //GONetLog.Debug("gonetParticipantsInOpenScenes.count: " + gonetParticipantsInOpenScenes.Count);
+                //GONetLog.Debug("before allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
                 possibleNewUniqueSnaps.ForEach(possibleNew =>
                 {
                     if (!allUniqueSnapsForPersistence.Contains(possibleNew, SnapComparer.Instance))
                     {
                         possibleNew.codeGenerationId = ++max_codeGenerationId; // TODO need to account for any gaps in this list if some are removed at any point
-                        GONetLog.Debug("just assigned codeGenerationId: " + possibleNew.codeGenerationId);
+                        //GONetLog.Debug("just assigned codeGenerationId: " + possibleNew.codeGenerationId);
                         allUniqueSnapsForPersistence.Add(possibleNew);
                     }
                 });
-                GONetLog.Debug("after allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
+                //GONetLog.Debug("after allUniqueSnapsForPersistence.count: " + allUniqueSnapsForPersistence.Count);
 
                 bool shouldSaveScene_weChangedCodeGenerationIds = false;
                 { // make sure all GONetParticipants have assigned codeGenerationId, which is vitally important for game play runtime
@@ -364,7 +364,7 @@ namespace GONet.Generation
                         if (possibleNew.codeGenerationId != matchFromPersistence.codeGenerationId ||
                             possibleNew.gonetParticipant.codeGenerationId != matchFromPersistence.codeGenerationId)
                         {
-                            GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
+                            //GONetLog.Debug("match found from persistence... BEFORE possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
                             possibleNew.codeGenerationId = matchFromPersistence.codeGenerationId;
                             { // cannot simply do the following: possibleNew.gonetParticipant.codeGenerationId = matchFromPersistence.codeGenerationId;
@@ -375,13 +375,13 @@ namespace GONet.Generation
                                 //EditorSceneManager.MarkAllScenesDirty(); this causes endless loop
                             }
 
-                            GONetLog.Debug("match found from persistence... AFTER possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
+                            //GONetLog.Debug("match found from persistence... AFTER possibleNew.codeGenerationId: " + possibleNew.codeGenerationId);
 
                             shouldSaveScene_weChangedCodeGenerationIds = true;
                         }
                         else
                         {
-                            GONetLog.Debug("already matched??? rere");
+                            //GONetLog.Debug("already matched??? rere");
                         }
                     });
                 }
@@ -401,7 +401,7 @@ namespace GONet.Generation
                         }
                     }
 
-                    GONetLog.Debug("magoo...save time....loop endlessly!");
+                    //GONetLog.Debug("magoo...save time....loop endlessly!");
                     EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
                     // TODO call this for stuff in gonetParticipants_prefabsCreatedSinceLastGeneratorRun: PrefabUtility.SavePrefabAsset()
                     
@@ -719,6 +719,14 @@ namespace GONet.Generation
             { typeof(ulong), GONetSyncableValueTypes.System_UInt64 },
             { typeof(Vector3), GONetSyncableValueTypes.UnityEngine_Vector3 },
             { typeof(bool), GONetSyncableValueTypes.System_Boolean },
+            { typeof(short), GONetSyncableValueTypes.System_Int16 },
+            { typeof(ushort), GONetSyncableValueTypes.System_UInt16 },
+            { typeof(uint), GONetSyncableValueTypes.System_UInt32 },
+            { typeof(long), GONetSyncableValueTypes.System_Int64 },
+            { typeof(double), GONetSyncableValueTypes.System_Double },
+            { typeof(sbyte), GONetSyncableValueTypes.System_SByte },
+            { typeof(Vector2), GONetSyncableValueTypes.UnityEngine_Vector2 },
+            { typeof(Vector4), GONetSyncableValueTypes.UnityEngine_Vector4 },
         };
 
         public const string SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI = "GONet/SyncSettingsProfiles/{0}.asset";
@@ -918,7 +926,7 @@ namespace GONet.Generation
             }
 
             ComponentMemberNames_By_ComponentTypeFullName = componentMemberNames_By_ComponentTypeFullName.ToArray();
-            GONetLog.Debug("new ComponentMemberNames_By_ComponentTypeFullName.length: " + ComponentMemberNames_By_ComponentTypeFullName.Length);
+            //GONetLog.Debug("new ComponentMemberNames_By_ComponentTypeFullName.length: " + ComponentMemberNames_By_ComponentTypeFullName.Length);
 
             { // now that we have arrays, we can swap some stuff to ensure GONetId field is index 0!
                 if (gonetIdOriginalIndex_single > 0) // if it is already 0, nothing to do
@@ -971,7 +979,7 @@ namespace GONet.Generation
                 x.ComponentMemberNames_By_ComponentTypeFullName != null && y.ComponentMemberNames_By_ComponentTypeFullName != null &&
                 x.ComponentMemberNames_By_ComponentTypeFullName.Length == y.ComponentMemberNames_By_ComponentTypeFullName.Length;
 
-            GONetLog.Debug("areInitiallyEqual: " + areInitiallyEqual);
+            //GONetLog.Debug("areInitiallyEqual: " + areInitiallyEqual);
 
             if (areInitiallyEqual)
             {

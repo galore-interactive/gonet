@@ -1559,6 +1559,7 @@
     <Compile Include="Assets\GONet\Code\GONet\GONetEventBus.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetEvents.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetGlobal.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\GONetLocal.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetParticipant.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetServer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSessionContext.cs" />

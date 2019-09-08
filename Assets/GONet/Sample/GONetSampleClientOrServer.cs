@@ -14,10 +14,7 @@
  */
 
 using GONet;
-using GONet.Utils;
 using NetcodeIO.NET;
-using NetcodeIO.NET.Utils.IO;
-using ReliableNetcode;
 using UnityEngine;
 
 public class GONetSampleClientOrServer : MonoBehaviour
@@ -37,18 +34,7 @@ public class GONetSampleClientOrServer : MonoBehaviour
         else
         {
             GONetMain.GONetClient = new GONetClient(new Client());
-            //GONetMain.gonetClient.MessageReceived += Client_OnMessageReceived; // TODO replace this with an EventBus subscription to a certain message type!
             GONetMain.GONetClient.ConnectToServer(serverIP, serverPort);
-        }
-    }
-
-    int client_messagesReceivedCount = 0;
-    private void Client_OnMessageReceived(byte[] messageBytes, int bytesUsedCount)
-    {
-        using (var testPacketReader = ByteArrayReaderWriter.Get(messageBytes))
-        {
-            uint serverSaysItsSentCount = testPacketReader.ReadUInt32();
-            GONetLog.Debug("client received message.....total: " + ++client_messagesReceivedCount + ", server says it has sent total: " + serverSaysItsSentCount + " size of this one: " + bytesUsedCount);
         }
     }
 }

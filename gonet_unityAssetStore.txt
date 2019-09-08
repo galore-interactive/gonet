@@ -1,8 +1,8 @@
 GONet
 <br><br>
-<strong>NOTE: Unity GONet package is now available since UNET is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be supported.</strong>
+<strong>NOTE: Unity GONet package is now available since UNet is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be supported.</strong>
 <br><br>
-GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  If you need to network something and a GameObject is involved, GONet is the answer.  GONet aligns well with the <em>Networked-by-Default</em> and <em>Performance-by-Default</em> initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, requires less steps to <em>"get going"</em> and is our preferred solution over UNET!
+GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  If you need to network something and a GameObject is involved, GONet is the answer.  GONet aligns well with the <em>Networked-by-Default</em> and <em>Performance-by-Default</em> initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, requires less steps to <em>"get going"</em> and is our preferred solution over UNet!
 <br><br>
 <strong>GONet mantra:</strong>
 <br>-doing the easy/common stuff should be dead simple (no programming)

@@ -106,6 +106,14 @@ namespace GONet.Editor
                     EditorGUILayout.TextField(value);
                     EditorGUILayout.EndHorizontal();
                 }
+
+                { // IsMine
+                    EditorGUILayout.BeginHorizontal();
+                    const string IS_MINE = "Is Mine?";
+                    EditorGUILayout.LabelField(IS_MINE);
+                    EditorGUILayout.Toggle(GONetMain.IsMine(targetGONetParticipant));
+                    EditorGUILayout.EndHorizontal();
+                }
             }
 
             GUI.enabled = guiEnabledPrevious;

@@ -188,5 +188,10 @@ namespace GONet
         {
             return remoteClients.FirstOrDefault(x => x.ConnectionToClient == connectionToClient);
         }
+
+        public GONetRemoteClient GetRemoteClientByAuthorityId(ushort authorityId)
+        {
+            return remoteClients.FirstOrDefault(x => x.ConnectionToClient.OwnerAuthorityId == authorityId);
+        }
     }
 }

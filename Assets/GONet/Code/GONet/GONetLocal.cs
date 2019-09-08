@@ -17,24 +17,15 @@ using UnityEngine;
 
 namespace GONet
 {
-    /// <summary>
-    /// TODO: add good description.
-    /// 
-    /// Do NOT add to <see cref="GameObject"/> instances yourself.  This is more of an internal to GONet managed concept.
-    /// </summary>
-    [DisallowMultipleComponent, RequireComponent(typeof(GONetParticipant))]
-    public class GONetSessionContext : MonoBehaviour
+    [RequireComponent(typeof(GONetParticipant))]
+    [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
+    public class GONetLocal : MonoBehaviour
     {
-        private const string WORKAROUND = "GONet logging entry point.  Please do not comment out this log statement.  This is a side effect of getting GONetLog to do static initialization inside the Unity main thread...or else!";
+        internal GONetParticipant gonetParticipant;
 
         private void Awake()
         {
-            GONetLog.Debug(WORKAROUND);
-        }
-
-        private void Start()
-        {
-            DontDestroyOnLoad(gameObject); // IMPORTANT: This was moved from Awake to Start so it runs AFTER onSceneLoaded processes and this is recognized as a "design time GONetParticipant"...somehow moving into DDOL in Awake was too soon and it did not get categorized as design time
+            gonetParticipant = GetComponent<GONetParticipant>();
         }
     }
 }

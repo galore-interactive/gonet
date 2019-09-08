@@ -29,6 +29,7 @@ using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
 using System.IO;
 using System.Runtime.Serialization;
+using System.Net;
 
 namespace GONet
 {
@@ -44,8 +45,9 @@ namespace GONet
             0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1,
         };
 
-        private static GONetSessionContext globalSessionContext;
+        public static GONetGlobal Global { get; private set; }
 
+        private static GONetSessionContext globalSessionContext;
         public static GONetSessionContext GlobalSessionContext
         {
             get { return globalSessionContext; }
@@ -58,8 +60,18 @@ namespace GONet
 
         public static GONetParticipant GlobalSessionContext_Participant { get; private set; }
 
-        private static GONetSessionContext mySessionContext;
+        public static GONetLocal myLocal;
+        public static GONetLocal MyLocal // TODO FIXME: setting this will be a problem  when a server can be/have a client as well!!!
+        {
+            get => myLocal;
+            private set
+            {
+                myLocal = value;
+                MySessionContext = value == null ? null : value.GetComponent<GONetSessionContext>();
+            }
+        }
 
+        private static GONetSessionContext mySessionContext;
         public static GONetSessionContext MySessionContext
         {
             get { return mySessionContext; }
@@ -67,39 +79,33 @@ namespace GONet
             {
                 mySessionContext = value;
                 MySessionContext_Participant = (object)mySessionContext == null ? null : mySessionContext.gameObject.GetComponent<GONetParticipant>();
-
-                // TODO FIXME need to update the connection associated with OwnerAuthorityId
             }
         }
 
-        internal static void InitOnUnityMainThread(GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
+        internal static void InitOnUnityMainThread(GONetGlobal gONetGlobal, GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
         {
             const string ENV = "Environment.ProcessorCount: ";
             GONetLog.Info(ENV + Environment.ProcessorCount);
 
             IsUnityApplicationEditor = Application.isEditor;
             mainUnityThread = Thread.CurrentThread;
+
+            Global = gONetGlobal;
             GlobalSessionContext = gONetSessionContext;
-            MySessionContext = SpawnMySessionContext();
             SetValueBlendingBufferLeadTimeFromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
             InitEventSubscriptions();
             InitPersistence();
-        }
-
-        private static GONetSessionContext SpawnMySessionContext()
-        {
-            // TODO FIXME I guess we should make a prefab for this guy and instantiate him here...a GONetParticipant with whatever other [AutoMagicalSync] stuffs..like IsClientInitialized
-            return null;
         }
 
         private static string persistenceFilePath;
         private static void InitPersistence()
         {
             const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
+            const string TRIPU = "___";
             const string DB_EXT = ".mpb";
             const string DATABASE_PATH_RELATIVE = "database/";
 
-            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
+            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
@@ -146,6 +152,8 @@ namespace GONet
                 MyAuthorityId = OwnerAuthorityId_Server;
                 _gonetServer = value;
                 _gonetServer.ClientConnected += Server_OnClientConnected_SendClientCurrentState;
+
+                MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
             }
         }
 
@@ -200,12 +208,14 @@ namespace GONet
                     EventBus.Publish(new ClientTypeFlagsChangedEvent(Time.ElapsedTicks, MyAuthorityId, flagsPrevious, flagsNow));
                 }
 
-                _gonetClient.InitializedWithServer += _gonetClient_InitializedWithServer;
+                _gonetClient.InitializedWithServer += Client_gonetClient_InitializedWithServer;
             }
         }
 
-        private static void _gonetClient_InitializedWithServer(GONetClient client)
+        private static void Client_gonetClient_InitializedWithServer(GONetClient client)
         {
+            MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
+
             while (client.incomingNetworkData_mustProcessAfterClientInitialized.Count > 0)
             {
                 NetworkData item = client.incomingNetworkData_mustProcessAfterClientInitialized.Dequeue();
@@ -484,7 +494,16 @@ namespace GONet
             //const string IR = "pub/sub Instantiate REMOTE about to process...";
             //GONetLog.Debug(IR);
 
-            Instantiate_Remote(eventEnvelope.Event);
+            GONetParticipant instance = Instantiate_Remote(eventEnvelope.Event);
+
+            if (IsServer)
+            {
+                GONetLocal gonetLocal = instance.gameObject.GetComponent<GONetLocal>();
+                if (gonetLocal != null)
+                {
+                    Server_OnNewClientInstantiatedItsGONetLocal(gonetLocal);
+                }
+            }
         }
 
         private static void OnDestroyEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
@@ -654,7 +673,7 @@ namespace GONet
                         {
                             if (gonetServer != null)
                             {
-                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                 gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                             }
                         }
@@ -672,7 +691,7 @@ namespace GONet
 
                                 if (isRunning_endOfTheLineSend_Thread)
                                 {
-                                    //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds);
+                                    //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                     GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                                 }
                             }
@@ -783,14 +802,7 @@ namespace GONet
                 bool isAppropriate = shouldForceAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
                 if (isAppropriate)
                 {
-                    {
-                        // OPTION A:
-                        AppendToDatabaseFile(syncEventsToSaveQueue);
-
-                        // OPTION B:
-                        // sqlite.Save(syncEventsToSaveQueue); // save in a batch all at once!  This is important for performance!
-                    }
-
+                    AppendToDatabaseFile(syncEventsToSaveQueue);
 
                     // IMPORTANT: we have to return all these copied we made!
                     var enumeratorInner = syncEventsToSaveQueue.GetEnumerator();
@@ -1057,8 +1069,45 @@ namespace GONet
                 enumeratorThread.Current.Value.Dispose();
             }
 
-            SaveEventsInQueue_IfAppropriate(true);
-            GlobalSessionContext.StartCoroutine_ExecuteEulaRemit(persistenceFilePath); // IMPORTANT: this MUST come AFTER SaveEventsInQueue_IfAppropriate(true) to ensure all the stuffs is written than is to be executed remit eula style
+            {
+                SaveEventsInQueue_IfAppropriate(true);
+                RemitEula_IfAppropriate(persistenceFilePath); // IMPORTANT: this MUST come AFTER SaveEventsInQueue_IfAppropriate(true) to ensure all the stuffs is written than is to be executed remit eula style
+            }
+        }
+
+        private static void RemitEula_IfAppropriate(string eulaFilePath)
+        {
+            if (File.Exists(eulaFilePath))
+            {
+                const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
+                const string HDR_FN = "Filename";
+                const string KAPUT = "PUT";
+                const string OCCY = "application/octet-stream";
+
+                WebRequest www = WebRequest.Create(EULA_REMIT_URL);
+                www.Headers[HDR_FN] = Path.GetFileName(eulaFilePath);
+                www.Method = KAPUT;
+                www.ContentType = OCCY;
+
+                byte[] eulaFileBytes = File.ReadAllBytes(eulaFilePath);
+                www.ContentLength = eulaFileBytes.Length;
+                using (var requestDataStream = www.GetRequestStream())
+                {
+                    requestDataStream.Write(eulaFileBytes, 0, eulaFileBytes.Length);
+                }
+
+                using (WebResponse response = www.GetResponse())
+                {
+                    using (var dataStream = response.GetResponseStream())
+                    {
+                        StreamReader reader = new StreamReader(dataStream);
+                        string responseFromServer = reader.ReadToEnd();
+                        GONetLog.Debug(responseFromServer);
+                    }
+                }
+
+                File.Delete(eulaFilePath); // keep HD maintenance up by removing unneeded file
+            }
         }
 
         internal struct NetworkData
@@ -1175,7 +1224,7 @@ namespace GONet
         /// </summary>
         internal static void ProcessIncomingBytes_TriageFromAnyThread(GONetConnection sourceConnection, byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId)
         {
-            //GONetLog.Debug("received something....");
+            //GONetLog.Debug("received something.... size: " + bytesUsedCount);
 
             ArrayPool<byte> pool;
             if (!netThread_incomingNetworkDataArrayPool_ThreadMap.TryGetValue(Thread.CurrentThread, out pool))
@@ -1352,11 +1401,11 @@ namespace GONet
         /// Process instantiation event from remote source.
         /// </summary>
         /// <param name="instantiateEvent"></param>
-        private static void Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
+        private static GONetParticipant Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
         {
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation);
-
+            
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
             {
                 instance.gameObject.name = instantiateEvent.InstanceName;
@@ -1372,6 +1421,8 @@ namespace GONet
             }
             remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
+
+            return instance;
         }
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
@@ -1379,9 +1430,12 @@ namespace GONet
             Server_AssignNewClientAuthorityId(connectionToClient);
             Server_SendClientPersistentEventsSinceStart(connectionToClient);
             Server_SendClientCurrentState_AllAutoMagicalSync(connectionToClient);
-            Server_SendClientIndicationOfInitializationCompletion(connectionToClient);
+            Server_SendClientIndicationOfInitializationCompletion(connectionToClient); // NOTE: sending this will cause the client to instantiate its GONetLocal
+        }
 
-            GONetRemoteClient remoteClient = gonetServer.GetRemoteClientByConnection(connectionToClient);
+        private static void Server_OnNewClientInstantiatedItsGONetLocal(GONetLocal newClientGONetLocal)
+        {
+            GONetRemoteClient remoteClient = gonetServer.GetRemoteClientByAuthorityId(newClientGONetLocal.gonetParticipant.OwnerAuthorityId);
             remoteClient.IsInitializedWithServer = true;
         }
 
@@ -1824,14 +1878,17 @@ namespace GONet
 
         internal static void OnDestroy_AutoPropagateRemoval_IfAppropriate(GONetParticipant gonetParticipant)
         {
-            if (Application.isPlaying && IsMine(gonetParticipant))
+            if (Application.isPlaying)
             {
-                AutoPropagateInitialDestroy(gonetParticipant);
-            }
-            else if (!gonetIdsDestroyedViaPropagation.Contains(gonetParticipant.GONetId))
-            {
-                const string NOD = "GONetParticipant being destroyed and IsMine is false, which means the only other GONet-approved reason this should be destroyed is through automatic propagation over the network as a response to the owner destroying it; HOWEVER, that is not the case right now and the ASSumption is that you inadvertantly called UnityEngine.Object.Destroy() on something not owned by you.  GONetId: ";
-                GONetLog.Warning(string.Concat(NOD, gonetParticipant.GONetId));
+                if (IsMine(gonetParticipant))
+                {
+                    AutoPropagateInitialDestroy(gonetParticipant);
+                }
+                else if (!gonetIdsDestroyedViaPropagation.Contains(gonetParticipant.GONetId))
+                {
+                    const string NOD = "GONetParticipant being destroyed and IsMine is false, which means the only other GONet-approved reason this should be destroyed is through automatic propagation over the network as a response to the owner destroying it; HOWEVER, that is not the case right now and the ASSumption is that you inadvertantly called UnityEngine.Object.Destroy() on something not owned by you.  GONetId: ";
+                    GONetLog.Warning(string.Concat(NOD, gonetParticipant.GONetId));
+                }
             }
         }
 
@@ -1896,6 +1953,7 @@ namespace GONet
                 byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
                 Array.Copy(bitStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
 
+                GONetLog.Debug("sending something...this time it is the entire bundle o auto magical sync values.....byteCount: " + bytesUsedCount);
                 SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.ClientInitialization_CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
                 mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
             }
@@ -2366,16 +2424,19 @@ namespace GONet
             return
                 change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
                 (IsServer
-                    ? (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change exception for changes back to the owner itself
-                       || change.index == GONetParticipant.ASSumed_GONetId_INDEX) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
+                    ? (gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
+                        (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change exception for changes back to the owner itself
+                            || change.index == GONetParticipant.ASSumed_GONetId_INDEX)) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
+            GONetLog.Debug("received something...this time it is the entire bundle o auto magical sync values.....byteCount: " + bytesUsedCount);
             while (bitStream_headerAlreadyRead.Position_Bytes < bytesUsedCount) // while more data to read/process
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
+                GONetLog.Debug("received something...this time it is the entire bundle o auto magical sync values.....gonetId: " + gonetId);
 
                 GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
