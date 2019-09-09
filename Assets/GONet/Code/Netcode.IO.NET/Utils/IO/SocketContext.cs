@@ -71,7 +71,7 @@ namespace NetcodeIO.NET.Utils.IO
 				return true;
 			}
 
-			packet = new Datagram();
+			packet = default;
 			return false;
 		}
 

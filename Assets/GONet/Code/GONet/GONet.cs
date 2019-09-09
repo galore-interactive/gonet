@@ -1453,6 +1453,7 @@ namespace GONet
         {
             // first assign locally
             connectionToClient.OwnerAuthorityId = ++server_lastAssignedAuthorityId;
+            gonetServer.OnConnectionToClientAuthorityIdAssigned(connectionToClient, connectionToClient.OwnerAuthorityId); // TODO this should automatically happen via event...i.e., update the setter above to do event stuff on change!
 
             // then send the assignment to the client
             using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())

@@ -350,7 +350,7 @@ namespace GONet.Editor
         private static void DrawGONetSyncProfileTemplateButton(string settingsProfileTemplateName, MonoBehaviour siblingMonoBehaviour = null)
         {
             const string PROFILE = "profile: ";
-            const string TOOLTIP_PROFILE = "Click to select the corresponding GONet SyncSettingsProfile asset in Project view.\nOnce selected, you can view/edit the sync settings for this value.";
+            const string TOOLTIP_PROFILE = "Click to select the corresponding GONet SyncSettingsProfile asset in Project view.\nOnce selected, you can view/edit the sync settings for all values using this profile.";
             const string TOOLTIP_ATTR = "No profile identified in [GONetAutoMagicalSync(SettingsProfileTemplateName=\"<profile name here>\")].\nClick to open the C# class with the [GONetAutoMagicalSync] attribute for this field/property.\nOnce open, you can view/edit the sync settings for this value directly in the C# Attribute -OR- set the name of the profile you want to use.";
 
             string tooltip = TOOLTIP_PROFILE;

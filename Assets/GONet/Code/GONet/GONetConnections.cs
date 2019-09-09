@@ -121,7 +121,7 @@ namespace GONet
             Buffer.BlockCopy(messageBytes, 0, messageBytes_withHeader, headerSize, bytesUsedCount);
 
             GONetChannel channel = GONetChannel.ById(channelId);
-            if (bodySize_withHeader > 1000) GONetLog.Debug("sending something.... bodySize_withHeader: " + bodySize_withHeader);
+            ///* if (bodySize_withHeader > 1000) */ GONetLog.Debug("sending something.... bodySize_withHeader: " + bodySize_withHeader + " channelId: " + channelId + " qos: " + channel.QualityOfService);
             base.SendMessage(messageBytes_withHeader, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
 
             ReturnByteArray(messageBytes_withHeader);

@@ -191,7 +191,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &53900337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -239,7 +239,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (11)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (11)
 --- !u!65 &53900340
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -306,12 +306,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 53900336}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 8.57, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 4.2494516, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 640867299}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 11
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &71605987
 GameObject:
@@ -970,7 +970,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &228964424
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1018,7 +1018,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (12)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (12)
 --- !u!65 &228964427
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1085,12 +1085,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 228964423}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 11.75, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 7.429452, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1334155179}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 12
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &253550920
 GameObject:
@@ -1113,7 +1113,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &253550921
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1161,7 +1161,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (17)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (17)
 --- !u!65 &253550924
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1228,12 +1228,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 253550920}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 35.88, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 31.559452, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 382001159}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 17
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 7
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &286406657
 PrefabInstance:
@@ -1531,7 +1531,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &441579380
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1579,7 +1579,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (10)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (10)
 --- !u!65 &441579383
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1646,12 +1646,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 441579379}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 5.79, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 1.4694519, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1992926227}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 10
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &442271254 stripped
 Transform:
@@ -2299,15 +2299,6 @@ Transform:
   - {fileID: 219461415}
   - {fileID: 545544090}
   - {fileID: 803055440}
-  - {fileID: 441579386}
-  - {fileID: 53900343}
-  - {fileID: 228964430}
-  - {fileID: 1948070009}
-  - {fileID: 821328054}
-  - {fileID: 1708196122}
-  - {fileID: 1768873739}
-  - {fileID: 253550927}
-  - {fileID: 706843808}
   m_Father: {fileID: 0}
   m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2498,7 +2489,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &706843802
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2546,7 +2537,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (18)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (18)
 --- !u!65 &706843805
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2613,12 +2604,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 706843801}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 42.37, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 38.04945, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 753747863}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 18
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 8
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &753747862
 GameObject:
@@ -3202,7 +3193,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &821328048
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3250,7 +3241,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (14)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (14)
 --- !u!65 &821328051
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3317,12 +3308,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 821328047}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 21.13, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 16.809452, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1762566106}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 14
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &824234601
 GameObject:
@@ -5654,7 +5645,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1708196116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5702,7 +5693,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (15)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (15)
 --- !u!65 &1708196119
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5769,12 +5760,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1708196115}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 27.3, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 22.97945, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 850514233}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 15
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1746987815
 GameObject:
@@ -5919,7 +5910,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1768873733
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5967,7 +5958,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (16)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (16)
 --- !u!65 &1768873736
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6034,12 +6025,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1768873732}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 30.88, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 26.559452, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 2086539874}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 16
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1844668747 stripped
 Transform:
@@ -6068,7 +6059,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1948070003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6116,7 +6107,7 @@ MonoBehaviour:
     values: []
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (13)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (13)
 --- !u!65 &1948070006
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6183,12 +6174,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1948070002}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 16.34, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: 12.019452, y: -2.2962284, z: 22.1633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 2104488604}
-  m_Father: {fileID: 678824498}
-  m_RootOrder: 13
+  m_Father: {fileID: 2024985206}
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1951153512
 GameObject:
@@ -6860,6 +6851,45 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 1157092816}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &2024985205
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2024985206}
+  m_Layer: 0
+  m_Name: NadaCubesTooMuch
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2024985206
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2024985205}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 4.320548, y: 2.5862284, z: 6.2367}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children:
+  - {fileID: 441579386}
+  - {fileID: 53900343}
+  - {fileID: 228964430}
+  - {fileID: 1948070009}
+  - {fileID: 821328054}
+  - {fileID: 1708196122}
+  - {fileID: 1768873739}
+  - {fileID: 253550927}
+  - {fileID: 706843808}
+  m_Father: {fileID: 0}
+  m_RootOrder: 6
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2054932191
 GameObject:
   m_ObjectHideFlags: 0

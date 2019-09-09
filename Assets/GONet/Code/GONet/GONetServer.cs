@@ -31,8 +31,9 @@ namespace GONet
         Server server;
         public uint numConnections = 0;
         public GONetRemoteClient[] remoteClients;
-        Dictionary<RemoteClient, GONetRemoteClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetRemoteClient>(10);
-        ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
+        readonly Dictionary<ushort, GONetRemoteClient> remoteClientsByAuthorityId = new Dictionary<ushort, GONetRemoteClient>(10);
+        readonly Dictionary<RemoteClient, GONetRemoteClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetRemoteClient>(10);
+        readonly ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
 
         public delegate void ClientActionDelegate(GONetConnection_ServerToClient gonetConnection_ServerToClient);
         /// <summary>
@@ -140,7 +141,8 @@ namespace GONet
         /// </summary>
         private void OnClientDisconnected(RemoteClient client)
         {
-            GONetLog.Debug("client *DIS*connected"); // TODO remove unity stuffs
+            const string DIS = "client *DIS*connected";
+            GONetLog.Debug(DIS);
         }
 
         /// <summary>
@@ -148,7 +150,8 @@ namespace GONet
         /// </summary>
         private void OnClientConnected(RemoteClient client)
         {
-            GONetLog.Debug("client connected"); // TODO remove unity stuffs
+            const string CON = "client connected";
+            GONetLog.Debug(CON);
 
             newlyConnectedClients.Enqueue(client);
         }
@@ -191,7 +194,12 @@ namespace GONet
 
         public GONetRemoteClient GetRemoteClientByAuthorityId(ushort authorityId)
         {
-            return remoteClients.FirstOrDefault(x => x.ConnectionToClient.OwnerAuthorityId == authorityId);
+            return remoteClientsByAuthorityId[authorityId];
+        }
+
+        internal void OnConnectionToClientAuthorityIdAssigned(GONetConnection_ServerToClient connectionToClient, ushort ownerAuthorityId)
+        {
+            remoteClientsByAuthorityId[connectionToClient.OwnerAuthorityId] = GetRemoteClientByConnection(connectionToClient);
         }
     }
 }
