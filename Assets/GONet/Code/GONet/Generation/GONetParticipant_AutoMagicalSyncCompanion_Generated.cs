@@ -221,6 +221,13 @@ namespace GONet.Generation
         {
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
+
+        internal delegate HashSet<QuantizerSettingsGroup> GetQuantizerSettingsDelegate();
+        internal static GetQuantizerSettingsDelegate theRealness_quantizerSettings = delegate ()
+        {
+            throw new System.Exception("Run code generation or else the correct QuaniterSettingsGroup values cannot be identified.");
+        };
+
         /// <summary>
         /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.
         /// </summary>
@@ -229,6 +236,11 @@ namespace GONet.Generation
         internal static GONetParticipant_AutoMagicalSyncCompanion_Generated CreateInstance(GONetParticipant gonetParticipant)
         {
             return theRealness(gonetParticipant);
+        }
+
+        internal static HashSet<QuantizerSettingsGroup> GetAllPossibleUniqueQuantizerSettingsGroups()
+        {
+            return theRealness_quantizerSettings();
         }
     }
 

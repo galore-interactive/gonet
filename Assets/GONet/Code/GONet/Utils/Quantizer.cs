@@ -28,7 +28,7 @@ namespace GONet.Utils
         static readonly float[] twoToPower = new float[MAX_QUANTIZED_BIT_COUNT + 1];
         static readonly uint[] maxValueForBits = new uint[MAX_QUANTIZED_BIT_COUNT + 1];
 
-        static readonly ConcurrentDictionary<QuantizerSettingsGroup, Quantizer> quantizersBySettingsMap = new ConcurrentDictionary<QuantizerSettingsGroup, Quantizer>();
+        static readonly Dictionary<QuantizerSettingsGroup, Quantizer> quantizersBySettingsMap = new Dictionary<QuantizerSettingsGroup, Quantizer>();
 
         static Quantizer()
         {
@@ -48,13 +48,25 @@ namespace GONet.Utils
             }
         }
 
-        public static Quantizer LookupQuantizer(QuantizerSettingsGroup settings)
+        /// <summary>
+        /// IMPORTANT: Can only be called from a single thread!
+        /// </summary>
+        internal static void EnsureQuantizerExistsForGroup(QuantizerSettingsGroup settings)
         {
             Quantizer quantizer;
             if (!quantizersBySettingsMap.TryGetValue(settings, out quantizer))
             {
                 quantizer = new Quantizer(settings);
                 quantizersBySettingsMap[settings] = quantizer;
+            }
+        }
+
+        public static Quantizer LookupQuantizer(QuantizerSettingsGroup settings)
+        {
+            Quantizer quantizer;
+            if (!quantizersBySettingsMap.TryGetValue(settings, out quantizer))
+            {
+                throw new ArgumentNullException("No Quantizer exists for settings"); // TODO log the settings
             }
             return quantizer;
         }
@@ -272,7 +284,7 @@ namespace GONet.Utils
         }
     }
 
-    public struct QuantizerSettingsGroup
+    public struct QuantizerSettingsGroup : IEquatable<QuantizerSettingsGroup>
     {
         public float lowerBound;
         public float upperBound;
@@ -304,6 +316,14 @@ namespace GONet.Utils
                    upperBound == group.upperBound &&
                    quantizeToBitCount == group.quantizeToBitCount &&
                    shouldClampValue == group.shouldClampValue;
+        }
+
+        public bool Equals(QuantizerSettingsGroup other)
+        {
+            return lowerBound == other.lowerBound &&
+                   upperBound == other.upperBound &&
+                   quantizeToBitCount == other.quantizeToBitCount &&
+                   shouldClampValue == other.shouldClampValue;
         }
 
         public override int GetHashCode()

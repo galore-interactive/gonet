@@ -28,6 +28,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -232,8 +233,37 @@ namespace GONet.Generation
 		static BobWad()
 		{
 			GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness;
+			GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.theRealness_quantizerSettings = hahaThisIsTrulyTheRealness_quantizerSettings;
+
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness_copy = hahaThisIsTrulyTheRealness_Events_Copy;
+		}
+
+		static internal HashSet<GONet.Utils.QuantizerSettingsGroup> hahaThisIsTrulyTheRealness_quantizerSettings()
+		{
+			HashSet<GONet.Utils.QuantizerSettingsGroup> settings = new HashSet<GONet.Utils.QuantizerSettingsGroup>();
+
+<#
+	foreach (var uniqueEntry in allUniqueSnapsForPersistence)
+    {
+		int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+		for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+		{
+			GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+			int singleMemberCount = single.autoSyncMembers.Length;
+			for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+			{
+				GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+			var item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#> = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
+			settings.Add(item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#>);
+
+<#
+	        }
+		}
+    }
+#>
+			return settings;
 		}
 
 		static internal GONetParticipant_AutoMagicalSyncCompanion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)

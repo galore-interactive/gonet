@@ -103,6 +103,24 @@ namespace GONet
             SetValueBlendingBufferLeadTimeFromMilliseconds(valueBlendingBufferLeadTimeMilliseconds);
             InitEventSubscriptions();
             InitPersistence();
+            InitQuantizers();
+        }
+
+        /// <summary>
+        /// Need to create an instance of each generated child class of <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated"/> in order to get access to each of its unique <see cref="QuantizerSettingsGroup"/> values
+        /// to ensure a corresponding Quantizer instance is created here in the main thread to avoid using ConcurrentDictionary (i.e. runtime GC) for runtime adds and lookups.
+        /// </summary>
+        private static void InitQuantizers()
+        {
+            foreach (QuantizerSettingsGroup settings in GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.GetAllPossibleUniqueQuantizerSettingsGroups())
+            {
+                // not all quantizer settings that are generated will actually equate to a quantizer being used since everything gets a quantizer setting..so check before causing exception
+                bool canBeUsedForQuantization = settings.quantizeToBitCount > 0;
+                if (canBeUsedForQuantization)
+                {
+                    Quantizer.EnsureQuantizerExistsForGroup(settings);
+                }
+            }
         }
 
         private static string persistenceFilePath;
@@ -1764,11 +1782,6 @@ namespace GONet
                                 monitoringSupport.syncAttribute_MustRunOnUnityMainThread);
 
                         uniqueSyncGroupings.Add(grouping); // since it is a set, duplicates will be discarded
-
-                        if (monitoringSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization)
-                        {
-                            var quantizer_ensureCachedUpFront = Quantizer.LookupQuantizer(monitoringSupport.syncAttribute_QuantizerSettingsGroup);
-                        }
                     }
 
                     if (gonetParticipant.animatorSyncSupport != null)
