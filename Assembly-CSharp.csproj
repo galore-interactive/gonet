@@ -1568,6 +1568,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitByBitByteArrayBuilder.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitConverter.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\CastToObjectEqualityOperatorComparer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\Compression.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\CRC32.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\DateTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FileBackedDictionary.cs" />

@@ -82,6 +82,14 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// <para>This is used to automatically to compress **EVERYTHING** GONet sends!</para>
+        /// <para>Default is LZ4 compression.</para>
+        /// <para>Set to null if you prefer not to use compression.</para>
+        /// <para>WARNING: We will open up this API soon...as of now, to chan change this value during runtime, you would have to be very cautious as to the timing and ensure it is not somehow changed between calls to compress/uncompress...since we are not going to figure the timing of all that right now, we will leave setter private.</para>
+        /// </summary>
+        public static IByteArrayCompressionSupport AutoCompressEverything { get; private set; } = LZ4CompressionSupport.Instance;
+
         internal static void InitOnUnityMainThread(GONetGlobal gONetGlobal, GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
         {
             const string ENV = "Environment.ProcessorCount: ";
@@ -1954,7 +1962,6 @@ namespace GONet
                 byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
                 Array.Copy(bitStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
 
-                GONetLog.Debug("sending something...this time it is the entire bundle o auto magical sync values.....byteCount: " + bytesUsedCount);
                 SendBytesToRemoteConnection(connectionToClient, allValuesSerialized, bytesUsedCount, GONetChannel.ClientInitialization_CustomSerialization_Reliable); // NOT using GONetChannel.AutoMagicalSync_Reliable because that one is reserved for things as they are happening and not this one time blast to a new client for all things
                 mainThread_valueChangeSerializationArrayPool.Return(allValuesSerialized);
             }

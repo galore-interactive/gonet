@@ -14,16 +14,23 @@
  */
 
 using MessagePack;
-using MessagePack.Formatters;
 using MessagePack.Resolvers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using UnityEngine;
 
 namespace GONet.Utils
 {
     public static class SerializationUtils
     {
+        public const int MTU = 1400;
+        private const int MTU_X2 = MTU << 1;
+
+        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
+
         static SerializationUtils()
         {
             //MessagePackSerializer.SetDefaultResolver();
@@ -39,6 +46,33 @@ namespace GONet.Utils
                 StandardResolver.Instance,
                 ContractlessStandardResolver.Instance
             );
+        }
+
+
+        /// <summary>
+        /// Use this to borrow byte arrays as needed for the GetBytes calls.
+        /// Ensure you subsequently call <see cref=""/>
+        /// </summary>
+        /// <returns>byte array of size 8</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static byte[] BorrowByteArray(int minimumSize)
+        {
+            ArrayPool<byte> arrayPool;
+            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
+            {
+                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU_X2);
+                byteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
+            }
+            return arrayPool.Borrow(minimumSize);
+        }
+
+        /// <summary>
+        /// PRE: Required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ReturnByteArray(byte[] borrowed)
+        {
+            byteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);
         }
 
         /*

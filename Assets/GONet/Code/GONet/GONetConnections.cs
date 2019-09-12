@@ -17,22 +17,13 @@ using GONet.Utils;
 using NetcodeIO.NET;
 using ReliableNetcode;
 using System;
-using System.Collections.Concurrent;
-using System.IO;
 using System.Net;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using GONetChannelId = System.Byte;
 
 namespace GONet
 {
     public abstract class GONetConnection : ReliableEndpoint
     {
-        public const int MTU = 1400;
-        private const int MTU_X2 = MTU << 1;
-
-        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> messageByteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
-
         public ushort OwnerAuthorityId { get; internal set; }
 
         #region round trip time stuffs (RTT)
@@ -108,23 +99,43 @@ namespace GONet
         }
 
         /// <summary>
-        /// IMPORTANT: You must use this method instead of <see cref="ReliableEndpoint.SendMessage(byte[], int, QosType)"/> in order for the channel stuff to work properly!
+        /// IMPORTANT: You **MUST** use this method instead of <see cref="ReliableEndpoint.SendMessage(byte[], int, QosType)"/> in order for the channel stuff to work properly!
         /// </summary>
         public void SendMessageOverChannel(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId)
         {
             int headerSize = sizeof(GONetChannelId) + sizeof(int);
-            int bodySize_withHeader = bytesUsedCount + headerSize;
-            byte[] messageBytes_withHeader = BorrowByteArray(bodySize_withHeader);
+            int bodySize_withHeader;
 
+            byte[] messageBytesCompressed = null;
+            ushort messageBytesCompressedUsedCount;
+
+            bool isCompressionUsed = GONetMain.AutoCompressEverything != null;
+            if (isCompressionUsed)
+            {
+                GONetMain.AutoCompressEverything.Compress(messageBytes, (ushort)bytesUsedCount, out messageBytesCompressed, out messageBytesCompressedUsedCount);
+                messageBytes = messageBytesCompressed;
+                bytesUsedCount = messageBytesCompressedUsedCount;
+            }
+
+            bodySize_withHeader = bytesUsedCount + headerSize;
+
+            byte[] messageBytes_withHeader = SerializationUtils.BorrowByteArray(bodySize_withHeader);
             Utils.BitConverter.GetBytes(channelId, messageBytes_withHeader, 0);
+
             Utils.BitConverter.GetBytes(bytesUsedCount, messageBytes_withHeader, sizeof(GONetChannelId));
             Buffer.BlockCopy(messageBytes, 0, messageBytes_withHeader, headerSize, bytesUsedCount);
 
             GONetChannel channel = GONetChannel.ById(channelId);
-            ///* if (bodySize_withHeader > 1000) */ GONetLog.Debug("sending something.... bodySize_withHeader: " + bodySize_withHeader + " channelId: " + channelId + " qos: " + channel.QualityOfService);
             base.SendMessage(messageBytes_withHeader, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
 
-            ReturnByteArray(messageBytes_withHeader);
+            { // memory management:
+                SerializationUtils.ReturnByteArray(messageBytes_withHeader);
+
+                if (isCompressionUsed)
+                {
+                    SerializationUtils.ReturnByteArray(messageBytesCompressed);
+                }
+            }
         }
 
         private void OnReceiveCallback(byte[] messageBytes, int bytesUsedCount)
@@ -135,7 +146,7 @@ namespace GONet
             uint bodySize_readFromMessage;
             GONetChannelId channelId_readFromMessage;
 
-            byte[] messageBytes_withoutHeader = BorrowByteArray(bodySize_expected);
+            byte[] messageBytes_withoutHeader = SerializationUtils.BorrowByteArray(bodySize_expected);
             Buffer.BlockCopy(messageBytes, headerSize, messageBytes_withoutHeader, 0, bodySize_expected);
 
             using (var bitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(messageBytes, bytesUsedCount))
@@ -144,35 +155,26 @@ namespace GONet
                 bitStream.ReadUInt(out bodySize_readFromMessage);
             }
 
-            GONetMain.ProcessIncomingBytes_TriageFromAnyThread(this, messageBytes_withoutHeader, (int)bodySize_readFromMessage, channelId_readFromMessage);
+            byte[] messageBytesUncompressed = messageBytes_withoutHeader;
+            ushort messageBytesUncompressedUsedCount;
 
-            ReturnByteArray(messageBytes_withoutHeader);
-        }
-
-        /// <summary>
-        /// Use this to borrow byte arrays as needed for the GetBytes calls.
-        /// Ensure you subsequently call <see cref=""/>
-        /// </summary>
-        /// <returns>byte array of size 8</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static byte[] BorrowByteArray(int minimumSize)
-        {
-            ArrayPool<byte> arrayPool;
-            if (!messageByteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
+            bool isCompressionUsed = GONetMain.AutoCompressEverything != null;
+            if (isCompressionUsed)
             {
-                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU_X2);
-                messageByteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
+                GONetMain.AutoCompressEverything.Uncompress(messageBytes_withoutHeader, (ushort)bodySize_expected, out messageBytesUncompressed, out messageBytesUncompressedUsedCount);
+                bodySize_readFromMessage = messageBytesUncompressedUsedCount;
             }
-            return arrayPool.Borrow(minimumSize);
-        }
 
-        /// <summary>
-        /// PRE: Required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ReturnByteArray(byte[] borrowed)
-        {
-            messageByteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);
+            GONetMain.ProcessIncomingBytes_TriageFromAnyThread(this, messageBytesUncompressed, (int)bodySize_readFromMessage, channelId_readFromMessage);
+
+            { // memory management:
+                SerializationUtils.ReturnByteArray(messageBytes_withoutHeader);
+
+                if (isCompressionUsed)
+                {
+                    SerializationUtils.ReturnByteArray(messageBytesUncompressed);
+                }
+            }
         }
     }
 
