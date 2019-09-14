@@ -284,5 +284,11 @@ namespace GONet.Generation
             copy.ProcessedAtElapsedTicks = original.ProcessedAtElapsedTicks;
             return copy;
         }
+
+        internal static List<Type> GetAllUniqueSyncEventTypes()
+        {
+            // since this is a one time call during init, just going to use reflection for now....if needed more, then go code generation
+            return TypeUtils.GetAllTypesInheritingFrom<SyncEvent_ValueChangeProcessed>(true);
+        }
     }
 }

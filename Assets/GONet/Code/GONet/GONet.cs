@@ -124,17 +124,27 @@ namespace GONet
             }
         }
 
+        internal const int SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE = 1000;
+        const int MAX_SYNC_EVENTS_RETURN_PER_FRAME_THRESHOLD = SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE * 2;
+        const int STARTING_MAX_SYNC_EVENTS_RETURN_PER_FRAME = 25;
+        const int MAX_SYNC_EVENTS_RETURN_PER_FRAME_INCREASEBY_WHENBUSY = 5;
         private static string persistenceFilePath;
         private static FileStream persistenceFileStream;
         private static void InitPersistence()
         {
-            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
+            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss-fff";
             const string TRIPU = "___";
             const string DB_EXT = ".mpb";
             const string DATABASE_PATH_RELATIVE = "database/";
 
             persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
+
+            List<Type> syncEventTypes = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.GetAllUniqueSyncEventTypes();
+            foreach (Type syncEventType in syncEventTypes)
+            {
+                syncEventsToSaveQueueByEventType[syncEventType] = new SyncEventsSaveSupport();
+            }
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
@@ -198,8 +208,94 @@ namespace GONet
 
         static readonly List<uint> gonetIdsDestroyedViaPropagation = new List<uint>(500);
 
-        internal const int SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE = 1000;
-        static readonly Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>> syncEventsToSaveQueueByEventType = new Dictionary<Type, Queue<SyncEvent_ValueChangeProcessed>>(100);
+        internal class SyncEventsSaveSupport
+        {
+            internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSavingASAP = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSaving = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            internal readonly ConcurrentQueue<SyncEvent_ValueChangeProcessed>   queue_needsReturnToPool = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>();
+
+            internal int maxToReturnPerFrame = STARTING_MAX_SYNC_EVENTS_RETURN_PER_FRAME;
+            internal volatile bool IsSaving;
+            internal readonly AutoResetEvent IsSavingMutex = new AutoResetEvent(true);
+
+            internal SyncEventsSaveSupport()
+            {
+                { // just ensure this data structure has enough internal memory stuffs now so no allocations and GC crap has to happen later!
+                    for (int i = 0; i < SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; ++i)
+                    {
+                        queue_needsReturnToPool.Enqueue(new SyncEvent_GONetParticipant_GONetId());
+                    }
+
+                    SyncEvent_ValueChangeProcessed item;
+                    for (int i = 0; i < SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; ++i)
+                    {
+                        queue_needsReturnToPool.TryDequeue(out item);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Transfer queued ASAP items to save queue that will be processed in another thread.
+            /// IMPORTANT: Call this from main Unity thread!
+            /// POST: <see cref="IsSaving"/> will be true.
+            /// </summary>
+            internal void InitiateSave_MainUnityThread()
+            {
+                IsSavingMutex.WaitOne();
+                IsSaving = true;
+
+                lock (queue_needsSaving)
+                {
+                    var enumeratorASAP = queue_needsSavingASAP.GetEnumerator();
+                    while (enumeratorASAP.MoveNext())
+                    {
+                        queue_needsSaving.Enqueue(enumeratorASAP.Current);
+                    }
+                }
+                queue_needsSavingASAP.Clear();
+            }
+
+            /// <summary>
+            /// PRE: This is expected to NOT be called from Main Unity thread, but rather from what we will call the "save thread" (which at time of writing is the <see cref="endOfLineSendAndSaveThread"/>)
+            /// POST: <see cref="queue_needsSaving"/> will be cleared and <see cref="queue_needsReturnToPool"/> will contain all items previously in <see cref="queue_needsSaving"/> and <see cref="IsSaving"/> will be false.
+            /// </summary>
+            internal void OnAfterAllSaved_SaveThread()
+            {
+                lock (queue_needsSaving)
+                {
+                    SyncEvent_ValueChangeProcessed syncEvent;
+                    while (queue_needsSaving.Count > 0 && (syncEvent = queue_needsSaving.Dequeue()) != null)
+                    {
+                        queue_needsReturnToPool.Enqueue(syncEvent);
+                    }
+                }
+
+                IsSavingMutex.Set();
+                IsSaving = false;
+            }
+
+            internal void ReturnSaved_SpreadOverFrames_MainUnityThread()
+            {
+                int queueCount = queue_needsReturnToPool.Count;
+                if (queueCount > MAX_SYNC_EVENTS_RETURN_PER_FRAME_THRESHOLD)
+                {
+                    maxToReturnPerFrame += MAX_SYNC_EVENTS_RETURN_PER_FRAME_INCREASEBY_WHENBUSY; // TODO try a better calculation for what actually makes sense here
+                }
+
+                int actualReturnCount = maxToReturnPerFrame;
+                int remainingCount = actualReturnCount;
+                SyncEvent_ValueChangeProcessed syncEventToReturn;
+                while (remainingCount > 0 && queue_needsReturnToPool.TryDequeue(out syncEventToReturn))
+                {
+                    syncEventToReturn.Return();
+                    --remainingCount;
+                }
+
+                //if (actualReturnCount > 0) GONetLog.Debug("just returned "+actualReturnCount+", how many remain? queue_needsReturnToPool.Count: " + queue_needsReturnToPool.Count);
+            }
+        }
+
+        static readonly Dictionary<Type, SyncEventsSaveSupport> syncEventsToSaveQueueByEventType = new Dictionary<Type, SyncEventsSaveSupport>(100);
 
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread
@@ -442,13 +538,6 @@ namespace GONet
 
         private static void OnSyncValueChangeProcessed_Persist_Local(SyncEvent_ValueChangeProcessed @event, bool doesRequireCopy = true)
         {
-            Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue;
-            Type eventType = @event.GetType();
-            if (!syncEventsToSaveQueueByEventType.TryGetValue(eventType, out syncEventsToSaveQueue))
-            {
-                syncEventsToSaveQueueByEventType[eventType] = syncEventsToSaveQueue = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
-            }
-
             SyncEvent_ValueChangeProcessed instanceToEnqueue;
             if (doesRequireCopy)
             {
@@ -463,7 +552,8 @@ namespace GONet
 
             instanceToEnqueue.ProcessedAtElapsedTicks = Time.ElapsedTicks;
 
-            syncEventsToSaveQueue.Enqueue(instanceToEnqueue); // NOTE: instanceToEnqueu will get returned to its pool when this queue is processed!
+            SyncEventsSaveSupport syncEventsToSaveQueue = syncEventsToSaveQueueByEventType[@event.GetType()];
+            syncEventsToSaveQueue.queue_needsSavingASAP.Enqueue(instanceToEnqueue); // NOTE: instanceToEnqueu will get returned to its pool when this queue is processed!
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -633,7 +723,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread"/>
         /// </summary>
         public static void SendBytesToRemoteConnections(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
         {
@@ -641,7 +731,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread"/>
+        /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread"/>
         /// </summary>
         private static void SendBytesToRemoteConnection(GONetConnection sendToConnection, byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
         {
@@ -688,61 +778,79 @@ namespace GONet
         static readonly ConcurrentQueue<NetworkData> endOfTheLineSendQueue = new ConcurrentQueue<NetworkData>();
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> netThread_outgoingNetworkDataArrayPool_ThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
-        internal static ulong tickCount_endOfTheLineSend_Thread;
-        private static volatile bool isRunning_endOfTheLineSend_Thread;
-        private static void SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread()
+        internal static ulong tickCount_endOfTheLineSendAndSave_Thread;
+        private static volatile bool isRunning_endOfTheLineSendAndSave_Thread;
+        private static void SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread()
         {
-            tickCount_endOfTheLineSend_Thread = 0;
+            tickCount_endOfTheLineSendAndSave_Thread = 0;
 
-            while (isRunning_endOfTheLineSend_Thread)
+            while (isRunning_endOfTheLineSendAndSave_Thread)
             {
-                int processedCount = 0;
-                int count = endOfTheLineSendQueue.Count;
-                NetworkData networkData;
-                while (processedCount < count && endOfTheLineSendQueue.TryDequeue(out networkData))
-                {
-                    if (networkData.relatedConnection == null)
+                { // Do send stuffs
+                    int processedCount = 0;
+                    int count = endOfTheLineSendQueue.Count;
+                    NetworkData networkData;
+                    while (processedCount < count && endOfTheLineSendQueue.TryDequeue(out networkData))
                     {
-                        if (IsServer)
+                        if (networkData.relatedConnection == null)
                         {
-                            if (gonetServer != null)
+                            if (IsServer)
                             {
-                                //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
-                                gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                if (gonetServer != null)
+                                {
+                                    //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
+                                    gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                }
+                            }
+                            else
+                            {
+                                if (GONetClient != null)
+                                {
+                                    while (isRunning_endOfTheLineSendAndSave_Thread && !GONetClient.IsConnectedToServer)
+                                    {
+                                        const string SLEEP = "SLEEP!  So I can send this stuff....not yet connected...that's why.";
+                                        GONetLog.Info(SLEEP);
+
+                                        Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
+                                    }
+
+                                    if (isRunning_endOfTheLineSendAndSave_Thread)
+                                    {
+                                        //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
+                                        GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+                                    }
+                                }
                             }
                         }
                         else
                         {
-                            if (GONetClient != null)
-                            {
-                                while (isRunning_endOfTheLineSend_Thread && !GONetClient.IsConnectedToServer)
-                                {
-                                    const string SLEEP = "SLEEP!  So I can send this stuff....not yet connected...that's why.";
-                                    GONetLog.Info(SLEEP);
-
-                                    Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
-                                }
-
-                                if (isRunning_endOfTheLineSend_Thread)
-                                {
-                                    //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
-                                    GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
-                                }
-                            }
+                            networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                         }
-                    }
-                    else
-                    {
-                        networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
-                    }
 
-                    { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
-                        ConcurrentQueue<NetworkData> readyToReturnQueue = readyToReturnQueue_ThreadMap[networkData.messageBytesBorrowedOnThread];
-                        readyToReturnQueue.Enqueue(networkData);
+                        { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
+                            ConcurrentQueue<NetworkData> readyToReturnQueue = readyToReturnQueue_ThreadMap[networkData.messageBytesBorrowedOnThread];
+                            readyToReturnQueue.Enqueue(networkData);
+                        }
                     }
                 }
 
-                ++tickCount_endOfTheLineSend_Thread;
+                { // Do save stuffs
+                    var syncvEventsEnumerator = syncEventsToSaveQueueByEventType.GetEnumerator();
+                    while (syncvEventsEnumerator.MoveNext())
+                    {
+                        SyncEventsSaveSupport saveSupport = syncvEventsEnumerator.Current.Value;
+                        if (saveSupport.queue_needsSaving.Count > 0 && saveSupport.IsSaving)
+                        {
+                            lock (saveSupport.queue_needsSaving)
+                            {
+                                AppendToDatabaseFile_SaveThread(saveSupport.queue_needsSaving); // this is the act of saving...after this, they no longer need saving
+                            }
+                            saveSupport.OnAfterAllSaved_SaveThread();
+                        }
+                    }
+                }
+
+                ++tickCount_endOfTheLineSendAndSave_Thread;
             }
         }
 
@@ -753,7 +861,7 @@ namespace GONet
         static readonly SyncBundleUniqueGrouping grouping_endOfFrame_reliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Reliable, false);
         static readonly SyncBundleUniqueGrouping grouping_endOfFrame_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Unreliable, false);
 
-        static Thread endOfLineSendThread;
+        static Thread endOfLineSendAndSaveThread;
 
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/>
@@ -805,13 +913,13 @@ namespace GONet
 
             PublishEvents_SyncValueChanges_SentToOthers();
             PublishEvents_SyncValueChanges_ReceivedFromOthers();
-            SaveEventsInQueue_IfAppropriate();
+            SaveEventsInQueueASAP_IfAppropriate();
 
-            if (endOfLineSendThread == null)
+            if (endOfLineSendAndSaveThread == null)
             {
-                isRunning_endOfTheLineSend_Thread = true;
-                endOfLineSendThread = new Thread(SendBytes_EndOfTheLine_AllSendsMUSTComeHere_SeparateThread);
-                endOfLineSendThread.Start();
+                isRunning_endOfTheLineSendAndSave_Thread = true;
+                endOfLineSendAndSaveThread = new Thread(SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread);
+                endOfLineSendAndSaveThread.Start();
             }
 
             if (IsServer)
@@ -826,33 +934,39 @@ namespace GONet
             }
         }
 
-        private static void SaveEventsInQueue_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
+        private static void SaveEventsInQueueASAP_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
         {
             var enumerator = syncEventsToSaveQueueByEventType.GetEnumerator();
             while (enumerator.MoveNext())
             {
-                Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue = enumerator.Current.Value;
-                int count = syncEventsToSaveQueue.Count;
-                bool isAppropriate = shouldForceAppropriateness || count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
+                SyncEventsSaveSupport syncEventsToSaveQueue = enumerator.Current.Value;
+                int count = syncEventsToSaveQueue.queue_needsSavingASAP.Count;
+                bool isAppropriate = shouldForceAppropriateness || (!syncEventsToSaveQueue.IsSaving && count >= SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE); // TODO add in another condition that makes it appropriate: enough time passed since last save (e.g., 30 seconds)
                 if (isAppropriate)
                 {
-                    AppendToDatabaseFile(syncEventsToSaveQueue);
+                    syncEventsToSaveQueue.InitiateSave_MainUnityThread();
+                }
 
-                    // IMPORTANT: we have to return all these copied we made!
-                    var enumeratorInner = syncEventsToSaveQueue.GetEnumerator();
-                    while (enumeratorInner.MoveNext())
-                    {
-                        enumeratorInner.Current.Return();
-                    }
-
-                    syncEventsToSaveQueue.Clear();
+                { // return some that are ready...just be sure to spread it out over multiple frames
+                    syncEventsToSaveQueue.ReturnSaved_SpreadOverFrames_MainUnityThread();
                 }
             }
         }
 
-        private static void AppendToDatabaseFile(Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
+        static readonly Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 100);
+        /// <summary>
+        /// PRE: call this not from the main unity thread, but rather the "save thread" (which is <see cref="endOfLineSendAndSaveThread"/>)
+        /// </summary>
+        private static void AppendToDatabaseFile_SaveThread(Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
         {
-            SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue;
+            syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors.Clear();
+            var sourceEnumerator = syncEventsToSaveQueue.GetEnumerator();
+            while (sourceEnumerator.MoveNext())
+            {
+                syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors.Enqueue(sourceEnumerator.Current);
+            }
+
+            SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors;
             int returnBytesUsedCount;
             byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance, out returnBytesUsedCount);
 
@@ -1077,7 +1191,7 @@ namespace GONet
         /// </summary>
         internal static void Shutdown()
         {
-            isRunning_endOfTheLineSend_Thread = false;
+            isRunning_endOfTheLineSendAndSave_Thread = false;
 
             if (IsServer)
             {
@@ -1095,7 +1209,7 @@ namespace GONet
             }
 
             {
-                SaveEventsInQueue_IfAppropriate(true);
+                SaveEventsInQueueASAP_IfAppropriate(true);
                 if (persistenceFileStream != null)
                 {
                     persistenceFileStream.Close();

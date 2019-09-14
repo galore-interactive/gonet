@@ -178,5 +178,27 @@ namespace GONet.Utils
 
             return toCheckTypes.Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeB); // TODO using Linq here is not good
         }
+
+        static List<Type> uniqueSyncEventTypes;
+        internal static List<Type> GetAllTypesInheritingFrom<T>(bool isConcreteClassRequired)
+        {
+            if (uniqueSyncEventTypes == null)
+            {
+                uniqueSyncEventTypes = new List<Type>(100);
+
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    foreach (var type in assembly.GetTypes())
+                    {
+                        if (IsTypeAInstanceOfTypeB(type, typeof(T)) && (!type.IsAbstract || !isConcreteClassRequired))
+                        {
+                            uniqueSyncEventTypes.Add(type);
+                        }
+                    }
+                }
+            }
+
+            return uniqueSyncEventTypes;
+        }
     }
 }

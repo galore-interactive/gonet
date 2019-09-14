@@ -201,13 +201,13 @@ namespace GONet
         internal bool IsOKToStartAutoMagicalProcessing
         {
             get => isOKToStartAutoMagicalProcessing &&
-                (endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing < GONetMain.tickCount_endOfTheLineSend_Thread);
+                (endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing < GONetMain.tickCount_endOfTheLineSendAndSave_Thread);
 
             set
             {
                 isOKToStartAutoMagicalProcessing = value;
 
-                endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = value ? GONetMain.tickCount_endOfTheLineSend_Thread : uint.MaxValue;
+                endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = value ? GONetMain.tickCount_endOfTheLineSendAndSave_Thread : uint.MaxValue;
             }
         }
 
