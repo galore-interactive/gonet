@@ -30,6 +30,7 @@ using GONetChannelId = System.Byte;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Net;
+using Microsoft.Win32.SafeHandles;
 
 namespace GONet
 {
@@ -124,6 +125,7 @@ namespace GONet
         }
 
         private static string persistenceFilePath;
+        private static FileStream persistenceFileStream;
         private static void InitPersistence()
         {
             const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss";
@@ -132,6 +134,7 @@ namespace GONet
             const string DATABASE_PATH_RELATIVE = "database/";
 
             persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
+            persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
         }
 
         public static GONetParticipant MySessionContext_Participant { get; private set; } // TODO FIXME need to spawn this for everyone and set it here!
@@ -489,7 +492,8 @@ namespace GONet
 
             if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
             {
-                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+                int returnBytesUsedCount;
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
 
                 uint count = _gonetServer.numConnections;// remoteClients.Length;
                 for (uint i = 0; i < count; ++i)
@@ -498,15 +502,19 @@ namespace GONet
                     if (remoteClientConnection.OwnerAuthorityId != eventEnvelope.SourceAuthorityId)
                     {
                         GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
-                        SendBytesToRemoteConnection(remoteClientConnection, bytes, bytes.Length, channelId);
+                        SendBytesToRemoteConnection(remoteClientConnection, bytes, returnBytesUsedCount, channelId);
                     }
                 }
+
+                SerializationUtils.ReturnByteArray(bytes);
             }
             else if (IsServer || !eventEnvelope.IsSourceRemote)
             {
-                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event);
+                int returnBytesUsedCount;
+                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount);
                 bool shouldSendRelilably = true; // TODO support unreliable events?
-                SendBytesToRemoteConnections(bytes, bytes.Length, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+                SendBytesToRemoteConnections(bytes, returnBytesUsedCount, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
+                SerializationUtils.ReturnByteArray(bytes);
             }
         }
 
@@ -845,22 +853,11 @@ namespace GONet
         private static void AppendToDatabaseFile(Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
         {
             SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue;
-            byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance);
+            int returnBytesUsedCount;
+            byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance, out returnBytesUsedCount);
 
-            if (File.Exists(persistenceFilePath))
-            {
-                using (var stream = new FileStream(persistenceFilePath, FileMode.Append))
-                {
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-            }
-            else
-            {
-                using (var stream = File.Create(persistenceFilePath))
-                {
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-            }
+            persistenceFileStream.Write(bytes, 0, returnBytesUsedCount);
+            persistenceFileStream.Flush(true);
 
             //GONetLog.Debug("WROTE DB!!!! ++++++++++++++++++++++++++++++");
 
@@ -874,6 +871,8 @@ namespace GONet
                     bytesRead += bytesReadInner;
                 }
             }*/
+
+            SerializationUtils.ReturnByteArray(bytes);
         }
 
         private static void PublishEvents_SyncValueChanges_ReceivedFromOthers()
@@ -1097,7 +1096,12 @@ namespace GONet
 
             {
                 SaveEventsInQueue_IfAppropriate(true);
-                RemitEula_IfAppropriate(persistenceFilePath); // IMPORTANT: this MUST come AFTER SaveEventsInQueue_IfAppropriate(true) to ensure all the stuffs is written than is to be executed remit eula style
+                if (persistenceFileStream != null)
+                {
+                    persistenceFileStream.Close();
+                }
+
+                RemitEula_IfAppropriate(persistenceFilePath); // IMPORTANT: this MUST come AFTER SaveEventsInQueue_IfAppropriate(true) and closing stream to ensure all the stuffs is written than is to be executed remit eula style
             }
         }
 
@@ -1470,8 +1474,10 @@ namespace GONet
             if (persistentEventsThisSession.Count > 0)
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
-                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
-                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, bytes.Length, GONetChannel.ClientInitialization_EventSingles_Reliable);
+                int returnBytesUsedCount;
+                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
+                SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
+                SerializationUtils.ReturnByteArray(bytes);
             }
         }
 

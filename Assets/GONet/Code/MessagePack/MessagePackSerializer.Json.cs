@@ -15,7 +15,8 @@ namespace MessagePack
         /// </summary>
         public static string ToJson<T>(T obj)
         {
-            return ToJson(Serialize(obj));
+            int sizeems;
+            return ToJson(Serialize(obj, null, out sizeems));
         }
 
         /// <summary>
@@ -23,7 +24,8 @@ namespace MessagePack
         /// </summary>
         public static string ToJson<T>(T obj, IFormatterResolver resolver)
         {
-            return ToJson(Serialize(obj, resolver));
+            int sizeems;
+            return ToJson(Serialize(obj, null, out sizeems, resolver));
         }
 
         /// <summary>

@@ -85,12 +85,14 @@ namespace GONet.Utils
         }
         */
 
+        private static readonly Func<int, byte[]> borrowByteArray_messagePackFunc = BorrowByteArray;
         /// <summary>
         /// This is the best general purpose object serializer GONet can provide.
+        /// IMPORTANT: As soon as you are done with the returned byte[], pass it to <see cref="ReturnByteArray(byte[])"/> and make sure it is returned from the same thread as this method is called from!
         /// </summary>
-        public static byte[] SerializeToBytes<T>(T @object)
+        public static byte[] SerializeToBytes<T>(T @object, out int returnBytesUsedCount)
         {
-            return MessagePackSerializer.Serialize(@object);
+            return MessagePackSerializer.Serialize<T>(@object, borrowByteArray_messagePackFunc, out returnBytesUsedCount);
             //return MessagePackSerializer.Serialize(@object, StandardResolverAllowPrivate.Instance);
         }
 

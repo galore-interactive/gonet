@@ -80,8 +80,10 @@ namespace GONet.Utils
 
         private void SaveToFile()
         {
-            byte[] fileBytes = SerializationUtils.SerializeToBytes(new Dicky<TKey, TValue>(dictionary));
-            File.WriteAllBytes(filePath, fileBytes);
+            int returnBytesUsedCount;
+            byte[] fileBytes = SerializationUtils.SerializeToBytes(new Dicky<TKey, TValue>(dictionary), out returnBytesUsedCount);
+            FileUtils.WriteBytesToFile(filePath, fileBytes, returnBytesUsedCount, FileMode.Truncate);
+            SerializationUtils.ReturnByteArray(fileBytes);
         }
     }
 

@@ -30,7 +30,7 @@ namespace MessagePack
             if (resolver == null) resolver = MessagePackSerializer.DefaultResolver;
             var buffer = SerializeCore(obj, resolver);
 
-            return MessagePackBinary.FastCloneWithResize(buffer.Array, buffer.Count);
+            return MessagePackBinary.FastCloneWithResize(buffer.Array, buffer.Count, CreateNewByteArray);
         }
 
         /// <summary>
@@ -86,10 +86,15 @@ namespace MessagePack
             }
         }
 
+        private static byte[] CreateNewByteArray(int size)
+        {
+            return new byte[size];
+        }
+
         public static byte[] ToLZ4Binary(ArraySegment<byte> messagePackBinary)
         {
             var buffer = ToLZ4BinaryCore(messagePackBinary);
-            return MessagePackBinary.FastCloneWithResize(buffer.Array, buffer.Count);
+            return MessagePackBinary.FastCloneWithResize(buffer.Array, buffer.Count, CreateNewByteArray);
         }
 
         static ArraySegment<byte> SerializeCore<T>(T obj, IFormatterResolver resolver)

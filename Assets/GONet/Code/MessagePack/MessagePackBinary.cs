@@ -322,18 +322,18 @@ namespace MessagePack
 #if NETSTANDARD
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
 #endif
-        public static byte[] FastCloneWithResize(byte[] array, int newSize)
+        public static byte[] FastCloneWithResize(byte[] array, int newSize, Func<int, byte[]> returnBufferCreator)
         {
             if (newSize < 0) throw new ArgumentOutOfRangeException("newSize");
 
             byte[] array2 = array;
             if (array2 == null)
             {
-                array = new byte[newSize];
+                array = returnBufferCreator(newSize);
                 return array;
             }
 
-            byte[] array3 = new byte[newSize];
+            byte[] array3 = returnBufferCreator(newSize);
             Buffer.BlockCopy(array2, 0, array3, 0, (array2.Length > newSize) ? newSize : array2.Length);
             return array3;
         }

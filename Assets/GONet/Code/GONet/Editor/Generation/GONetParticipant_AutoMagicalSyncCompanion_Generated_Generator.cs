@@ -485,8 +485,10 @@ namespace GONet.Generation
 
             allSnaps.ForEach(x => GONetLog.Debug("SAVING to persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
 
-            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps);
-            File.WriteAllBytes(SNAPS_FILE, snapsFileBytes);
+            int returnBytesUsedCount;
+            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount);
+            FileUtils.WriteBytesToFile(SNAPS_FILE, snapsFileBytes, returnBytesUsedCount, FileMode.Truncate);
+            SerializationUtils.ReturnByteArray(snapsFileBytes);
         }
 
         private static void DeleteAllSnapsFromPersistence()
