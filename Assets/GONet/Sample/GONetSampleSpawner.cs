@@ -55,14 +55,19 @@ public class GONetSampleSpawner : MonoBehaviour
 
         foreach (string arg in args)
         {
-            if (arg == "-server")
+            const string SERVER = "-server";
+            if (arg == SERVER)
             {
                 Instantiate(GONetServerPREFAB);
                 hasServerSpawned = true;
             }
-            else if (arg == "-client")
+            else
             {
-                Instantiate(GONetClientPREFAB);
+                const string CLIENT = "-client";
+                if (arg == CLIENT)
+                {
+                    Instantiate(GONetClientPREFAB);
+                }
             }
         }
     }
@@ -91,7 +96,7 @@ public class GONetSampleSpawner : MonoBehaviour
             {
                 foreach (var penny in pendulumJalous)
                 {
-                    if (!GONetMain.IsMine(penny.gnp))
+                    if (!penny.gnp.IsMine)
                     {
                         if (GONetMain.Server_AssumeAuthorityOver(penny.gnp))
                         {

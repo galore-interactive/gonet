@@ -1,6 +1,6 @@
 GONet
 <br><br>
-<strong>NOTE: Unity GONet package is now available since UNet is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be supported.</strong>
+<strong>NOTE: Unity GONet package is now available since UNet is deprecated/obsolete and in its end-of-life long term support (LTS) cycle. This version provides the newest features and will continue to be actively supported.</strong>
 <br><br>
 GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  If you need to network something and a GameObject is involved, GONet is the answer.  GONet aligns well with the <em>Networked-by-Default</em> and <em>Performance-by-Default</em> initiatives!  Written with an extensive history of Unity game development team experience, collaboration and feedback.  GONet makes the most difficult aspects of multi-player game development approachable so you can deliver your game to the world in a timely manner with confidence.  With hindsight 20/20 on our side, GONet is now less restrictive, requires less steps to <em>"get going"</em> and is our preferred solution over UNet!
 <br><br>
@@ -64,14 +64,18 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*(PRO Only) Fixes to unique and/or uncommon bugs/issues
 <br>*(PRO Only) Screen sharing collaboration sessions and more in-depth responses at front of email support line
 <br>*(PRO Only) Access to extensive example projects with detailed documentation
-<br>*(DELUXE Studio Only) GONet support team working directly with your team with off-site and on-site options
-<br>*(DELUXE Studio Only) GONet custom feature requests
+<br>*(Premium Only) GONet support team working directly with your team with off-site and on-site options
+<br>*(Premium Only) GONet custom feature requests
 <br><br><strong>Logging:</strong>
 <br>*Built atop the robust, well-known log4net api/library
 <br>*Writes to Console in editor and to "logs/gonet.log" file in builds
-<br>*Outputs the realworld time, current frame time, thread # and logging level with every log statement (if you have ever performed troubleshooting on a networked game, you know this is one of those <em>"save your bacon"</em> features)
+<br>*Outputs logging level, thread #, system time, frame time and your message with every log statement (if you have ever performed troubleshooting on a networked game, you know this is one of those <em>"save your bacon"</em> features)
 <br>*Used in GONet code and fully available to use wherever you like
 
+<br><br>
+<strong>Recommended Minimum System Specifications (Running GONet Games):</strong>
+<br>*Baseline requirements listed on Unity site: https://unity3d.com/unity/system-requirements
+<br>*64-bit CPU with 4 cores
 
 
 <br><br>

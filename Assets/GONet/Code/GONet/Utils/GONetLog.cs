@@ -46,7 +46,6 @@ namespace GONet
 
         const char NewLine = '\n';
         const string SPACE = " ";
-        private const string FORMAT = "[{0}] ({1:dd MMM yyyy H:mm:ss.fff}) {2}";
 
         private static string lastLog;
         public static string LastLog { get { return lastLog; } }
@@ -118,7 +117,9 @@ namespace GONet
             else
             {
                 StackTrace trace = new StackTrace(1, true);
-                ProcessMessageViaLogger(string.Concat(keyXxx, SPACE, message), trace.ToString(), logType);
+                const string FRAME_PRE = "(frame:";
+                const string FRAME_POST = "s) ";
+                ProcessMessageViaLogger(string.Concat(FRAME_PRE, GONetMain.Time.ElapsedSeconds, FRAME_POST, keyXxx, SPACE, message), trace.ToString(), logType);
             }
         }
 

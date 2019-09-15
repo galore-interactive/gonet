@@ -665,13 +665,17 @@ namespace GONet
 
         static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
         {
-            GONetLog.Error(string.Concat("Error Message: ", e.Exception.Message, "\nError Stacktrace:\n", e.Exception.StackTrace));
+            const string EM = "Error Message: ";
+            const string ST = "\nError Stacktrace:\n";
+            GONetLog.Error(string.Concat(EM, e.Exception.Message, ST, e.Exception.StackTrace));
         }
 
         static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
+            const string EM = "Error Message: ";
+            const string ST = "\nError Stacktrace:\n";
             Exception exception = (e.ExceptionObject as Exception);
-            GONetLog.Error(string.Concat("Error Message: ", exception.Message, "\nError Stacktrace:\n", exception.StackTrace));
+            GONetLog.Error(string.Concat(EM, exception.Message, ST, exception.StackTrace));
         }
 
         #region public methods
@@ -808,7 +812,7 @@ namespace GONet
                                 {
                                     while (isRunning_endOfTheLineSendAndSave_Thread && !GONetClient.IsConnectedToServer)
                                     {
-                                        const string SLEEP = "SLEEP!  So I can send this stuff....not yet connected...that's why.";
+                                        const string SLEEP = "SLEEP!  I am not yet connected.  I have data to send, but need to wait to be connected in order to send it.";
                                         GONetLog.Info(SLEEP);
 
                                         Thread.Sleep(33); // TODO FIXME I am sure things will eventually get into strange states out in the wild where clients spotty network puts them here too often and I wonder if this is problematic...certainly quick/dirty and nieve!
@@ -973,7 +977,7 @@ namespace GONet
             persistenceFileStream.Write(bytes, 0, returnBytesUsedCount);
             persistenceFileStream.Flush(true);
 
-            //GONetLog.Debug("WROTE DB!!!! ++++++++++++++++++++++++++++++");
+            //GONetLog.Debug("WROTE DB!!!! ++++++++++++++++++++++++++++++ count: " + syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors.Count);
 
             /*{ // example of reading from file:
                 byte[] allBytes = File.ReadAllBytes(persistenceFilePath);
@@ -1001,7 +1005,8 @@ namespace GONet
                 }
                 catch (Exception e)
                 {
-                    GONetLog.Error("Boo.  Publishing this sync value change event failed.  Error.Message: " + e.Message);
+                    const string BOO = "Boo.  Publishing this sync value change event failed.  Error.Message: ";
+                    GONetLog.Error(string.Concat(BOO, e.Message));
                 }
             }
         }
@@ -1022,7 +1027,8 @@ namespace GONet
                     }
                     catch (Exception e)
                     {
-                        GONetLog.Error("Boo.  Publishing this sync value change event failed.  Error.Message: " + e.Message);
+                        const string BOO = "Boo.  Publishing this sync value change event failed.  Error.Message: ";
+                        GONetLog.Error(string.Concat(BOO, e.Message));
                     }
                     finally
                     {
@@ -1180,7 +1186,7 @@ namespace GONet
                     }
 
                 }
-                else { GONetLog.Warning("throwing away older time from server"); }
+                //else { GONetLog.Warning("The time sync response from server is somehow (i.e., UDP out of order packets) older than the another response already process.  It makes no sense to use this out of date information."); }
             }
         }
 
@@ -1499,9 +1505,11 @@ namespace GONet
                                 ushort ownerAuthorityId;
                                 bitStream.ReadUShort(out ownerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
 
-                                GONetLog.Debug(" ***************************** received authId: " + ownerAuthorityId + " IsServer: " + IsServer);
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
                                 {
+                                    const string REC = " ***************************** this client received from server my assigned ownerAuthorityId: ";
+                                    GONetLog.Debug(string.Concat(REC, ownerAuthorityId));
+
                                     MyAuthorityId = ownerAuthorityId;
                                 } // else log warning?
                             }
@@ -2573,11 +2581,9 @@ namespace GONet
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
-            GONetLog.Debug("received something...this time it is the entire bundle o auto magical sync values.....byteCount: " + bytesUsedCount);
             while (bitStream_headerAlreadyRead.Position_Bytes < bytesUsedCount) // while more data to read/process
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
-                GONetLog.Debug("received something...this time it is the entire bundle o auto magical sync values.....gonetId: " + gonetId);
 
                 GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
