@@ -211,7 +211,7 @@ namespace GONet
         internal class SyncEventsSaveSupport
         {
             internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSavingASAP = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
-            internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSaving = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            internal readonly ConcurrentQueue<SyncEvent_ValueChangeProcessed>   queue_needsSaving = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>();
             internal readonly ConcurrentQueue<SyncEvent_ValueChangeProcessed>   queue_needsReturnToPool = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>();
 
             internal int maxToReturnPerFrame = STARTING_MAX_SYNC_EVENTS_RETURN_PER_FRAME;
@@ -223,12 +223,15 @@ namespace GONet
                 { // just ensure this data structure has enough internal memory stuffs now so no allocations and GC crap has to happen later!
                     for (int i = 0; i < SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; ++i)
                     {
-                        queue_needsReturnToPool.Enqueue(new SyncEvent_GONetParticipant_GONetId());
+                        SyncEvent_GONetParticipant_GONetId dumski = new SyncEvent_GONetParticipant_GONetId();
+                        queue_needsSaving.Enqueue(dumski);
+                        queue_needsReturnToPool.Enqueue(dumski);
                     }
 
                     SyncEvent_ValueChangeProcessed item;
                     for (int i = 0; i < SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; ++i)
                     {
+                        queue_needsSaving.TryDequeue(out item);
                         queue_needsReturnToPool.TryDequeue(out item);
                     }
                 }
@@ -244,13 +247,10 @@ namespace GONet
                 IsSavingMutex.WaitOne();
                 IsSaving = true;
 
-                lock (queue_needsSaving)
+                var enumeratorASAP = queue_needsSavingASAP.GetEnumerator();
+                while (enumeratorASAP.MoveNext())
                 {
-                    var enumeratorASAP = queue_needsSavingASAP.GetEnumerator();
-                    while (enumeratorASAP.MoveNext())
-                    {
-                        queue_needsSaving.Enqueue(enumeratorASAP.Current);
-                    }
+                    queue_needsSaving.Enqueue(enumeratorASAP.Current);
                 }
                 queue_needsSavingASAP.Clear();
             }
@@ -261,13 +261,11 @@ namespace GONet
             /// </summary>
             internal void OnAfterAllSaved_SaveThread()
             {
-                lock (queue_needsSaving)
+                SyncEvent_ValueChangeProcessed syncEvent;
+                int count = queue_needsSaving.Count;
+                while (count > 0 && queue_needsSaving.TryDequeue(out syncEvent))
                 {
-                    SyncEvent_ValueChangeProcessed syncEvent;
-                    while (queue_needsSaving.Count > 0 && (syncEvent = queue_needsSaving.Dequeue()) != null)
-                    {
-                        queue_needsReturnToPool.Enqueue(syncEvent);
-                    }
+                    queue_needsReturnToPool.Enqueue(syncEvent);
                 }
 
                 IsSavingMutex.Set();
@@ -841,10 +839,7 @@ namespace GONet
                         SyncEventsSaveSupport saveSupport = syncvEventsEnumerator.Current.Value;
                         if (saveSupport.queue_needsSaving.Count > 0 && saveSupport.IsSaving)
                         {
-                            lock (saveSupport.queue_needsSaving)
-                            {
-                                AppendToDatabaseFile_SaveThread(saveSupport.queue_needsSaving); // this is the act of saving...after this, they no longer need saving
-                            }
+                            AppendToDatabaseFile_SaveThread(saveSupport.queue_needsSaving); // this is the act of saving...after this, they no longer need saving
                             saveSupport.OnAfterAllSaved_SaveThread();
                         }
                     }
@@ -957,7 +952,7 @@ namespace GONet
         /// <summary>
         /// PRE: call this not from the main unity thread, but rather the "save thread" (which is <see cref="endOfLineSendAndSaveThread"/>)
         /// </summary>
-        private static void AppendToDatabaseFile_SaveThread(Queue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
+        private static void AppendToDatabaseFile_SaveThread(ConcurrentQueue<SyncEvent_ValueChangeProcessed> syncEventsToSaveQueue)
         {
             syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors.Clear();
             var sourceEnumerator = syncEventsToSaveQueue.GetEnumerator();
