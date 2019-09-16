@@ -216,6 +216,11 @@ namespace GONet
     {
         public override object TypeId => base.TypeId;
 
+        /// <summary>
+        /// This is a special value that indicates to GONet internals to take the values directly off the properties in the/this attribute instance
+        /// instead of from the corresponding <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate"/> asset of the matching name provided in this value.
+        /// </summary>
+        public const string PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY = "";
         public const string PROFILE_TEMPLATE_NAME___DEFAULT = "__GONet_DEFAULT";
         public const string PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION = "_GONet_Transform_Rotation";
         public const string PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION = "_GONet_Transform_Position";
@@ -227,7 +232,7 @@ namespace GONet
         /// <para>Check out the public const string definitions on <see cref="GONetAutoMagicalSyncAttribute"/> that start with the prefix "PROFILE_TEMPLATE_NAME___".</para>
         /// <para>IMPORTANT: If this is provided, the settings defined on the corresponding profile/template will be used and NOT the settings on the attribute!</para>
         /// </summary>
-        public string SettingsProfileTemplateName;
+        public string SettingsProfileTemplateName = PROFILE_TEMPLATE_NAME___DEFAULT;
 
         /// <summary>
         /// GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.

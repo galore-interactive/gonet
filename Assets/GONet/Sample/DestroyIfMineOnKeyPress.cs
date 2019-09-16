@@ -7,7 +7,7 @@ namespace GONet
     {
         GONetParticipant gnp;
 
-        [GONetAutoMagicalSync(ProcessingPriority = 3)]
+        [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, ProcessingPriority = 3)]
         public float willHeUpdate;
 
         private void Awake()

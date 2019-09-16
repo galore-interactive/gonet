@@ -166,11 +166,11 @@ namespace GONet.Generation
             support5.lastKnownValue_previous.UnityEngine_Vector3 = FieldChangeTest.color; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
 					support5.syncCompanion = this;
 			support5.index = 5;
-			support5.syncAttribute_MustRunOnUnityMainThread = false;
+			support5.syncAttribute_MustRunOnUnityMainThread = true;
 			support5.syncAttribute_ProcessingPriority = 0;
 			support5.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
 			support5.syncAttribute_SyncChangesEverySeconds = 0.04166667f;
-			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Reliable;
+			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support5.syncAttribute_ShouldBlendBetweenValuesReceived = false;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support5.syncAttribute_ShouldSkipSync);
 			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
@@ -331,8 +331,8 @@ namespace GONet.Generation
 								bitStream_appendTo.WriteFloat(DestroyIfMineOnKeyPress.willHeUpdate);
 							}
 			{ // FieldChangeTest.color
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, FieldChangeTest.color);
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, FieldChangeTest.color);
 			}
 			{ // FieldChangeTest.nada
 				SerializeSingleQuantized(bitStream_appendTo, 6, FieldChangeTest.nada);
@@ -392,7 +392,7 @@ namespace GONet.Generation
 
 				case 5:
 				{ // FieldChangeTest.color
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, FieldChangeTest.color);
 				}
 				break;
@@ -459,7 +459,7 @@ namespace GONet.Generation
 								DestroyIfMineOnKeyPress.willHeUpdate = value;
 							}
 			{ // FieldChangeTest.color
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
 				FieldChangeTest.color = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 			}
 			{ // FieldChangeTest.nada
@@ -542,7 +542,7 @@ namespace GONet.Generation
 
 				case 5:
 				{ // FieldChangeTest.color
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 
 									FieldChangeTest.color = value;

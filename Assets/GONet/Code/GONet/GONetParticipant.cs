@@ -92,6 +92,7 @@ namespace GONet
         /// </para>
         /// </summary>
         [GONetAutoMagicalSync(
+            GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue - 1,
             MustRunOnUnityMainThread = true)]
@@ -112,13 +113,18 @@ namespace GONet
         public bool IsMine => GONetMain.IsMine(this);
 
         /// <summary>
+        /// <para>
         /// The expectation on setting this to true is the values for <see cref="IsPositionSyncd"/> and <see cref="IsRotationSyncd"/> are true
         /// and the associated <see cref="GameObject"/> has a <see cref="Rigidbody"/> installed on it as well 
         /// and <see cref="Rigidbody.isKinematic"/> is false and if using gravity, <see cref="Rigidbody.useGravity"/> is true.
+        /// </para>
+        /// <para>
         /// If all that applies, then non-owners (i.e., <see cref="IsMine"/> is false) will have <see cref="Rigidbody.isKinematic"/> set to true and <see cref="Rigidbody.useGravity"/> set to false
         /// so the auto magically sync'd values for position and rotation come from owner controlled actions only.
+        /// </para>
+        /// <para>IMPORTANT: This is not going have an effect if/when changed during a running game.  This needs to be set during design time.  Maybe a future release will decorate it with <see cref="GONetAutoMagicalSyncAttribute"/>, if people need it.</para>
         /// </summary>
-        public bool IsRigidBodyControlledOnlyByOwner;
+        public bool IsRigidBodyOwnerOnlyControlled;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow)
@@ -156,6 +162,7 @@ namespace GONet
         /// IMPORTANT: This is the most important message to process first as data management in GONet relies on it.
         /// </summary>
         [GONetAutoMagicalSync(
+            GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue,
             CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
@@ -174,10 +181,10 @@ namespace GONet
             }
         }
 
-        [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT)]
+        [GONetAutoMagicalSync]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
-        [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT)]
+        [GONetAutoMagicalSync]
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
         /// <summary>
@@ -274,7 +281,7 @@ namespace GONet
             GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
 
             Rigidbody rigidbody;
-            if (IsRigidBodyControlledOnlyByOwner && !IsMine && (rigidbody = GetComponent<Rigidbody>()) != null)
+            if (IsRigidBodyOwnerOnlyControlled && !IsMine && (rigidbody = GetComponent<Rigidbody>()) != null)
             {
                 rigidbody.isKinematic = true;
                 rigidbody.useGravity = false;
