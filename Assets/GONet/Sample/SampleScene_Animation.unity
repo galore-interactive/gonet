@@ -222,6 +222,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &53900339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -234,7 +235,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -802,6 +803,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &219461411
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -814,7 +816,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -1005,6 +1007,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &228964426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1017,7 +1020,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -1150,6 +1153,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &253550923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1162,7 +1166,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -1570,6 +1574,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &441579382
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1582,7 +1587,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -1996,6 +2001,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &545544086
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2008,7 +2014,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -2532,6 +2538,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &706843804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2544,7 +2551,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -2735,6 +2742,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &788867692
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2747,7 +2755,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -2937,6 +2945,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &803055436
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2949,7 +2958,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -3242,6 +3251,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &821328050
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3254,7 +3264,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -4734,6 +4744,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &1250679054
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4746,7 +4757,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -5698,6 +5709,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &1708196118
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5710,7 +5722,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -5965,6 +5977,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &1768873735
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5977,7 +5990,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -6116,6 +6129,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &1948070005
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6128,7 +6142,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -6639,6 +6653,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &1994730300
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6651,7 +6666,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -6784,6 +6799,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &2004450827
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6796,7 +6812,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -6974,6 +6990,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &2054932194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6986,7 +7003,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -7285,6 +7302,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &2077870151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7297,7 +7315,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []
@@ -7708,6 +7726,7 @@ MonoBehaviour:
   nada: 0
   shortie: 0
   color: {x: 0, y: 0, z: 0}
+  color_dosientos: {x: 0, y: 0, z: 0}
 --- !u!114 &2087634824
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7720,7 +7739,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 2
+  codeGenerationId: 4
   animatorSyncSupport:
     keys: []
     values: []

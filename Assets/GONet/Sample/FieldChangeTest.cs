@@ -29,11 +29,11 @@ public class FieldChangeTest : MonoBehaviour
 
     TMPro.TextMeshProUGUI nadaText;
 
-    [GONetAutoMagicalSync(
-        SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS,
-        Reliability = AutoMagicalSyncReliability.Reliable,
-        CustomSerialize_Type = typeof(Vector3Serializer))]
+    [GONetAutoMagicalSync]
     public Vector3 color;
+
+    [GONetAutoMagicalSync]
+    public Vector3 color_dosientos;
 
     Vector3 startPosition;
     Quaternion startRotation;
