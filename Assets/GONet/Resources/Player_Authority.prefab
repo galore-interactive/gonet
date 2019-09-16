@@ -689,6 +689,7 @@ MonoBehaviour:
       isSyncd: 1
     - valueType: 4
       isSyncd: 1
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/GONet/Resources/Player_Authority.prefab

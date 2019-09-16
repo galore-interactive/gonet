@@ -1,7 +1,12 @@
-1. import package into project (Unity 2018.3+)
-2. ensure usafe code allowed: Edit => Project Settings => Player => Allow 'unsafe' Code
-3. ensure .NET API version: Edit => Project Settings => Player => Api Compatibility Level* => .NET 4.x
-4. ensure logging configured: Edit => Project Settings => Player => Scripting Define Symbols (contains at least: "LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL") 
+export package notes:
+1. Ensure to include required generated classes: SyncEvent_GONetParticipant_Xxx.cs
+
+
+1. ensure usafe code allowed: Edit => Project Settings => Player => Allow 'unsafe' Code
+2. ensure .NET API version: Edit => Project Settings => Player => Api Compatibility Level* => .NET 4.x
+3. ensure logging configured: Edit => Project Settings => Player => Scripting Define Symbols (contains at least: "LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL") 
+4. import package into project (Unity 2018.3+)
+4.5 COMPILE or the subsequent steps are not going to work
 5. drag Resources/GONet_GlobalContext into your start-up scene (optionally => open Assets/GONet/Sample/GONetSampleScene.unity that already has it instead of using your scene)
 6. ensure Script Execution Order is setup: Edit => Project Settings => Script Execution Order (Add GONet.GONetGlobal at a value of -200)  <== setting included in package
 7. click Run/Play in Unity editor to play the scene (code generation will occur and scene should play....no errors/exceptions...if all is well)

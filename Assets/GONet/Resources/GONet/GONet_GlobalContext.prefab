@@ -52,8 +52,6 @@ MonoBehaviour:
     type: 3}
   authorityPrefab: {fileID: 4427451128044106635, guid: cd51da3f44ba1a04f8b94ee6b34bd32f,
     type: 3}
-  nonAuthorityPrefab: {fileID: 320, guid: 69985f555febbc14da5b579e026d4370, type: 3}
-  clientSpawned_AssumeServerAuthorityTest_Prefab: {fileID: 0}
 --- !u!114 &8643402947905904696
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -70,6 +68,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab

@@ -706,6 +706,34 @@ namespace GONet.Generation
 					var value = BitConverter.ToDouble(bytes, 0);
 <#
 				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+				{
+#>
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector2).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+				{
+#>
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector3).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
+				{
+#>
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector4).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+				{
+#>
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Quaternion).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#
+				}
 			}#>
 
 <#			if (singleMember.attribute.ShouldBlendBetweenValuesReceived

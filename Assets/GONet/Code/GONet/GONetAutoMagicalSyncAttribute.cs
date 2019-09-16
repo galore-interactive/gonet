@@ -411,6 +411,42 @@ namespace GONet
         GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom);
     }
 
+    public class Vector2Serializer : IGONetAutoMagicalSync_CustomSerializer
+    {
+        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
+        public const float DEFAULT_MAX_VALUE = 10000f;
+        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
+
+        readonly Quantizer quantizer;
+        byte bitsPerComponent;
+
+        public Vector2Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+
+        public Vector2Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        {
+            this.bitsPerComponent = bitsPerComponent;
+            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+        }
+
+        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
+        {
+            uint x;
+            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+            uint y;
+            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+
+            return new Vector2(quantizer.Unquantize(x), quantizer.Unquantize(y));
+        }
+
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
+        {
+            Vector2 vector2 = value.UnityEngine_Vector2;
+
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.x), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.y), bitsPerComponent);
+        }
+    }
+
     public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
     {
         public const byte DEFAULT_BITS_PER_COMPONENT = 32;
@@ -447,6 +483,48 @@ namespace GONet
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
+        }
+    }
+
+    public class Vector4Serializer : IGONetAutoMagicalSync_CustomSerializer
+    {
+        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
+        public const float DEFAULT_MAX_VALUE = 10000f;
+        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
+
+        readonly Quantizer quantizer;
+        byte bitsPerComponent;
+
+        public Vector4Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+
+        public Vector4Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        {
+            this.bitsPerComponent = bitsPerComponent;
+            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+        }
+
+        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
+        {
+            uint x;
+            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+            uint y;
+            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+            uint z;
+            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
+            uint w;
+            bitStream_readFrom.ReadUInt(out w, bitsPerComponent);
+
+            return new Vector4(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z), quantizer.Unquantize(w));
+        }
+
+        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
+        {
+            Vector4 vector4 = value.UnityEngine_Vector4;
+
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.x), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.y), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.z), bitsPerComponent);
+            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.w), bitsPerComponent);
         }
     }
 

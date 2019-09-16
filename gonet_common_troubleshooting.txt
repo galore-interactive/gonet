@@ -1,0 +1,43 @@
+Common issues:
+1) StreamingAssets/GONet/DesignTimeLocations.txt does not have all the content it needs (i.e., one per each unique asset with GONetParticipant on it to include anything in any scene and any prefab in the project)....check all your prefabs out.
+2) WasInstantiated returning true for things defined in scene.  Well, it will actually change to a value of false by the time the MonoBehaviour lifecycle method Start() is called.  This is due to the timing of Unity's SceneManager.sceneLoaded callback (see https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager-sceneLoaded.html).  It is called between OnEnable() and Start().  This callback is what GONet uses to keep track of what was defined in a scene (i.e., WasInstantiated = false) and what is in the game due to Object.Instantiate() having been called programmatically by code (i.e., WasInstantiated = true)
+3) <put end result noticed from user here> - codeGenerationId does not update when structural change made to GNP and its related MBs and syncing at runtime fails
+4) line endings on all generated class files looks different between teammates/machines...well, if using git check the following:
+# line endings
+*.cs eol=crlf
+*.asset eol=crlf
+*.txt eol=crlf
+5) 
+
+
+========================================================================================================================================
+ANSWER: (right click in Project window) RE-import your project asset with GONetParticipant attached to it to update Assets\StreamingAssets\GONet\DesignTimeLocations.txt
+
+Runtime Log Error/Issue: 
+[Log:Error] (Thread:1) (12 Sep 2019 20:08:54.894) (frame:271.2878328s) (GONetEventBus handler error) Event Type: GONet.InstantiateGONetParticipantEvent
+(GONetEventBus handler error) Event Published as generic Type: GONet.IGONetEvent
+(GONetEventBus handler error) Error Event: The given key was not present in the dictionary.
+(GONetEventBus handler error)  Error Stack Trace:   at System.Collections.Generic.Dictionary`2[TKey,TValue].get_Item (TKey key) [0x0001e] in <d7ac571ca2d04b2f981d0d886fa067cf>:0 
+  at GONet.GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation (System.String designTimeLocation) [0x0004b] in C:\projects\unity\gonet\Assets\GONet\Code\GONet\GONetSpawnSupport_Runtime.cs:108 
+  at GONet.GONetMain.Instantiate_Remote (GONet.InstantiateGONetParticipantEvent instantiateEvent) [0x00001] in C:\projects\unity\gonet\Assets\GONet\Code\GONet\GONet.cs:1432 
+  at GONet.GONetMain.OnInstantiationEvent_Remote (GONet.GONetEventEnvelope`1[T] eventEnvelope) [0x00001] in C:\projects\unity\gonet\Assets\GONet\Code\GONet\GONet.cs:523 
+  at GONet.GONetEventBus+HandlerWrapper`1[T].Handle (GONet.GONetEventEnvelope eventEnvelope) [0x0001e] in C:\projects\unity\gonet\Assets\GONet\Code\GONet\GONetEventBus.cs:435 
+  at GONet.GONetEventBus.Publish[T] (T event, System.Nullable`1[T] remoteSourceAuthorityId) [0x000aa] in C:\projects\unity\gonet\Assets\GONet\Code\GONet\GONetEventBus.cs:150 
+UnityEngine.Debug:LogError(Object)
+GONet.GONetLog:LogInternal(String, String, LogType) (at Assets/GONet/Code/GONet/Utils/GONetLog.cs:114)
+GONet.GONetLog:Error(String) (at Assets/GONet/Code/GONet/Utils/GONetLog.cs:87)
+GONet.GONetEventBus:Publish(IGONetEvent, Nullable`1) (at Assets/GONet/Code/GONet/GONetEventBus.cs:158)
+GONet.GONetMain:DeserializeBody_EventSingle(Byte[], GONetConnection) (at Assets/GONet/Code/GONet/GONet.cs:1423)
+GONet.GONetMain:ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData) (at Assets/GONet/Code/GONet/GONet.cs:1341)
+GONet.GONetMain:ProcessIncomingBytes_QueuedNetworkData_MainThread() (at Assets/GONet/Code/GONet/GONet.cs:1323)
+GONet.GONetMain:Update() (at Assets/GONet/Code/GONet/GONet.cs:757)
+GONet.GONetGlobal:Update() (at Assets/GONet/Code/GONet/GONetGlobal.cs:98)
+=========================================================================================================
+Situation: you added [GONetAutoMagicalSync] to a Vector3 field and then you start getting a compile issue in a generated class on a line like this:
+case 5:
+				{ // FieldChangeTest.color
+
+									FieldChangeTest.color = value;
+								}
+								
+ANSWER: GONet does not intrinsically have things setup to know how you would like to (de)serialize a Vector3.  GONet does provide a custom serializer for Vecto3 though and there are a couple of options to inform GONet to use it. (1) IF not using a profile, set the [GONetAutoMagicalSync(CustomSerializerClass=typeof(Vector3Serializer))] (2) Use the DEFAULT profile, which already has this set.

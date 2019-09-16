@@ -111,6 +111,15 @@ namespace GONet
         /// </summary>
         public bool IsMine => GONetMain.IsMine(this);
 
+        /// <summary>
+        /// The expectation on setting this to true is the values for <see cref="IsPositionSyncd"/> and <see cref="IsRotationSyncd"/> are true
+        /// and the associated <see cref="GameObject"/> has a <see cref="Rigidbody"/> installed on it as well 
+        /// and <see cref="Rigidbody.isKinematic"/> is false and if using gravity, <see cref="Rigidbody.useGravity"/> is true.
+        /// If all that applies, then non-owners (i.e., <see cref="IsMine"/> is false) will have <see cref="Rigidbody.isKinematic"/> set to true and <see cref="Rigidbody.useGravity"/> set to false
+        /// so the auto magically sync'd values for position and rotation come from owner controlled actions only.
+        /// </summary>
+        public bool IsRigidBodyControlledOnlyByOwner;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow)
         {
@@ -263,6 +272,13 @@ namespace GONet
             }
 
             GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
+
+            Rigidbody rigidbody;
+            if (IsRigidBodyControlledOnlyByOwner && !IsMine && (rigidbody = GetComponent<Rigidbody>()) != null)
+            {
+                rigidbody.isKinematic = true;
+                rigidbody.useGravity = false;
+            }
         }
 
         private void OnDisable()

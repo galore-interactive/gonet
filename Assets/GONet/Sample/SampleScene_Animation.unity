@@ -221,6 +221,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &53900339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -237,6 +238,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (11)
@@ -799,6 +801,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &219461411
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -815,6 +818,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (7)
@@ -1000,6 +1004,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &228964426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1016,6 +1021,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (12)
@@ -1143,6 +1149,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &253550923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1159,6 +1166,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (17)
@@ -1561,6 +1569,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &441579382
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1577,6 +1586,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (10)
@@ -1985,6 +1995,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &545544086
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2001,6 +2012,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (8)
@@ -2519,6 +2531,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &706843804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2535,6 +2548,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (18)
@@ -2720,6 +2734,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &788867692
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2736,6 +2751,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (5)
@@ -2920,6 +2936,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &803055436
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2936,6 +2953,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (9)
@@ -3223,6 +3241,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &821328050
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3239,6 +3258,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (14)
@@ -4713,6 +4733,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &1250679054
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4729,6 +4750,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (1)
@@ -5675,6 +5697,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &1708196118
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5691,6 +5714,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (15)
@@ -5940,6 +5964,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &1768873735
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5956,6 +5981,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (16)
@@ -6089,6 +6115,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &1948070005
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6105,6 +6132,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (13)
@@ -6610,6 +6638,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &1994730300
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6626,6 +6655,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (3)
@@ -6753,6 +6783,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &2004450827
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6769,6 +6800,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (2)
@@ -6941,6 +6973,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &2054932194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6957,6 +6990,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (6)
@@ -7250,6 +7284,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &2077870151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7266,6 +7301,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (4)
@@ -7671,6 +7707,7 @@ MonoBehaviour:
   rottieTotty: 0
   nada: 0
   shortie: 0
+  color: {x: 0, y: 0, z: 0}
 --- !u!114 &2087634824
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7687,6 +7724,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  IsRigidBodyControlledOnlyByOwner: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube

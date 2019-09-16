@@ -15,7 +15,6 @@
 
 using GONet;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class GONetSampleSpawner : MonoBehaviour
@@ -24,25 +23,8 @@ public class GONetSampleSpawner : MonoBehaviour
     public GONetSampleClientOrServer GONetClientPREFAB;
 
     public GONetParticipant authorityPrefab;
-    public GONetParticipant nonAuthorityPrefab;
-
-    public PendulumJalou clientSpawned_AssumeServerAuthorityTest_Prefab;
-
-    readonly List<PendulumJalou> pendulumJalous = new List<PendulumJalou>();
-
-    GONetParticipant authorityInstance_lastInstantiatedByMe;
 
     private bool hasServerSpawned;
-
-    private void Awake()
-    {
-        GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(OnPendulumJalouStarted, envelope => envelope.GONetParticipant != null && envelope.GONetParticipant.gameObject.GetComponent<PendulumJalou>() != null);
-    }
-
-    private void OnPendulumJalouStarted(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
-    {
-        pendulumJalous.Add(eventEnvelope.GONetParticipant.gameObject.GetComponent<PendulumJalou>());
-    }
 
     private void Start()
     {
@@ -87,30 +69,7 @@ public class GONetSampleSpawner : MonoBehaviour
 
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
-            authorityInstance_lastInstantiatedByMe = GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
-        }
-
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.J)) // j for pendulum jalou!
-        {
-            if (GONetMain.IsServer)
-            {
-                foreach (var penny in pendulumJalous)
-                {
-                    if (!penny.gnp.IsMine)
-                    {
-                        if (GONetMain.Server_AssumeAuthorityOver(penny.gnp))
-                        {
-                            GONetLog.Debug("HAHA.  You thought you owned me you pesky little client..  I am the server!  I own this one now too: " + penny.gnp.GONetId);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                Vector3 position = authorityInstance_lastInstantiatedByMe == null ? Vector3.zero : authorityInstance_lastInstantiatedByMe.transform.position;
-                Quaternion rotation = authorityInstance_lastInstantiatedByMe == null ? Quaternion.identity : authorityInstance_lastInstantiatedByMe.transform.rotation;
-                Instantiate(clientSpawned_AssumeServerAuthorityTest_Prefab, position, rotation);
-            }
+            Instantiate(authorityPrefab, transform.position, transform.rotation);
         }
     }
 }
