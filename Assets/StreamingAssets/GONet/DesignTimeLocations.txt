@@ -1,10 +1,3 @@
 project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab
-scene://SampleScene/Cubeta (1)
-scene://SampleScene/Cubetas_+30N06
-scene://SampleScene/Cubetas_+31N06
-scene://SampleScene/GONet_GlobalContext
-scene://SampleScene_Animation/GONet_GlobalContext
-scene://SampleScene2/Directional Light
-scene://SampleScene2/Stoochie
-scene://SampleSceneThress/Cubeta_Copy_Copy
+scene://NewScene/GONet_GlobalContext

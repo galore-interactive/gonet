@@ -21,11 +21,13 @@ public class GONetSampleClientOrServer : MonoBehaviour
 {
     public bool isServer = true;
 
-    public const string serverIP = "10.0.0.53";
+    public const string serverIP = "127.0.0.1";
     public const int serverPort = 40000;
 
     private void Awake()
     {
+        DontDestroyOnLoad(gameObject);
+
         if (isServer)
         {
             GONetMain.gonetServer = new GONetServer(64, serverIP, serverPort);
