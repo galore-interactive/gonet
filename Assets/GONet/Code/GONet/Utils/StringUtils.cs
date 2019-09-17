@@ -113,6 +113,30 @@ namespace GONet.Utils
             return sb.ToString();
         }
 
+        public static string AddSpacesBeforeUppercase(string @string, int startIndex = 0)
+        {
+            if (string.IsNullOrWhiteSpace(@string) || startIndex >= @string.Length)
+            {
+                return @string;
+            }
+
+            const char SPACE = ' ';
+            StringBuilder result = new StringBuilder(@string.Length + 20);
+
+            for (int i = 0; i < @string.Length; ++i)
+            {
+                if (i >= startIndex && char.IsUpper(@string[i]))
+                {
+                    result.Append(SPACE);
+                }
+
+                result.Append(@string[i]);
+            }
+
+
+            return result.ToString();
+        }
+
         /// <summary>
         /// Parses a hex string into its equivalent byte array.
         /// </summary>

@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Utils;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -50,6 +51,10 @@ namespace GONet.Editor
 
             const string NOT_SET = "<not set>";
 
+            serializedObject.Update();
+            EditorGUI.BeginChangeCheck();
+            serializedObject.UpdateIfRequiredOrScript();
+
             {
                 EditorGUILayout.BeginHorizontal();
                 const string DESIGN = "Design Time Location";
@@ -67,6 +72,28 @@ namespace GONet.Editor
                 EditorGUILayout.EndHorizontal();
             }
 
+            { // IsRigidBodyOwnerOnlyControlled
+                var pre = GUI.enabled;
+                GUI.enabled = !Application.isPlaying;
+                EditorGUILayout.BeginHorizontal();
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.IsRigidBodyOwnerOnlyControlled));
+                const string TT = @"The expectation on setting this to true is the values for <see cref=""IsPositionSyncd""/> and <see cref=""IsRotationSyncd""/> are true
+and the associated <see cref=""GameObject""/> has a <see cref=""Rigidbody""/> installed on it as well 
+and <see cref=""Rigidbody.isKinematic""/> is false and if using gravity, <see cref=""Rigidbody.useGravity""/> is true.
+
+If all that applies, then non-owners (i.e., <see cref=""IsMine""/> is false) will have <see cref=""Rigidbody.isKinematic""/> set to true and <see cref=""Rigidbody.useGravity""/> set to false
+so the auto magically sync'd values for position and rotation come from owner controlled actions only.
+
+IMPORTANT: This is not going have an effect if/when changed during a running game.  This needs to be set during design time.  Maybe a future release will decorate it with <see cref=""GONetAutoMagicalSyncAttribute""/>, if people need it.";
+                GUIContent tooltip = new GUIContent(StringUtils.AddSpacesBeforeUppercase(nameof(GONetParticipant.IsRigidBodyOwnerOnlyControlled), 1), TT);
+                if (EditorGUILayout.PropertyField(serializedProperty, tooltip))
+                {
+                    // TODO why does this method return bool?  do we need to do something!
+                }
+                EditorGUILayout.EndHorizontal();
+                GUI.enabled = pre;
+            }
+
             if (Application.isPlaying) // this value is only really relevant during play (not to mention, the way we determine this is faulty otherwise...false positives everywhere)
             { // design time?
                 {
@@ -79,8 +106,10 @@ namespace GONet.Editor
 
                 { // GoNetId
                     EditorGUILayout.BeginHorizontal();
-                    const string GONET_ID = "GONetId";
-                    EditorGUILayout.LabelField(GONET_ID);
+                    const string GONET_ID = "GO Net Id";
+                    const string TT = "This is a combination of GO Net Id (RAW) and Owner Authority Id";
+                    GUIContent tooltip = new GUIContent(GONET_ID, TT);
+                    EditorGUILayout.LabelField(tooltip);
                     string value = targetGONetParticipant.GONetId == GONetParticipant.GONetId_Unset ? NOT_SET : targetGONetParticipant.GONetId.ToString();
                     EditorGUILayout.TextField(value);
                     EditorGUILayout.EndHorizontal();
@@ -88,7 +117,7 @@ namespace GONet.Editor
 
                 { // GoNetId RAW
                     EditorGUILayout.BeginHorizontal();
-                    const string GONET_ID_RAW = "GONetId (RAW)";
+                    const string GONET_ID_RAW = "GO Net Id (RAW)";
                     EditorGUILayout.LabelField(GONET_ID_RAW);
                     string value = targetGONetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset ? NOT_SET : targetGONetParticipant.gonetId_raw.ToString();
                     EditorGUILayout.TextField(value);
@@ -97,7 +126,7 @@ namespace GONet.Editor
 
                 { // OwnerAuthorityId
                     EditorGUILayout.BeginHorizontal();
-                    const string OWNER_AUTHORITY_ID = "OwnerAuthorityId";
+                    const string OWNER_AUTHORITY_ID = "Owner Authority Id";
                     EditorGUILayout.LabelField(OWNER_AUTHORITY_ID);
                     const string GONET_SERVER = "<GONet server>";
                     string value = targetGONetParticipant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Server
@@ -193,10 +222,6 @@ namespace GONet.Editor
                     }
                 }
 
-
-                serializedObject.Update();
-                EditorGUI.BeginChangeCheck();
-                serializedObject.UpdateIfRequiredOrScript();
 
                 Animator animator = targetGONetParticipant.GetComponent<Animator>();
                 if (animator != null && animator.parameterCount > 0)

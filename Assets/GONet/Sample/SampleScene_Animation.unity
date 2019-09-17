@@ -239,7 +239,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (11)
@@ -820,7 +820,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (7)
@@ -1024,7 +1024,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (12)
@@ -1170,7 +1170,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (17)
@@ -1591,7 +1591,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (10)
@@ -2018,7 +2018,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (8)
@@ -2555,7 +2555,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (18)
@@ -2759,7 +2759,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (5)
@@ -2962,7 +2962,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (9)
@@ -3268,7 +3268,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (14)
@@ -4761,7 +4761,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (1)
@@ -5421,6 +5421,11 @@ PrefabInstance:
       propertyPath: codeGenerationId
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: IsRigidBodyOwnerOnlyControlled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: valueBlendingBufferLeadTimeMilliseconds
@@ -5726,7 +5731,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (15)
@@ -5994,7 +5999,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (16)
@@ -6146,7 +6151,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (13)
@@ -6670,7 +6675,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (3)
@@ -6816,7 +6821,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (2)
@@ -7007,7 +7012,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (6)
@@ -7319,7 +7324,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (4)
@@ -7743,7 +7748,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube
