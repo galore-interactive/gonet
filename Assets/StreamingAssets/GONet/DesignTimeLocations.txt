@@ -1,30 +1,10 @@
 project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab
-project://Assets/GONet/Resources/Player_Authority.prefab
 scene://SampleScene/Cubeta (1)
 scene://SampleScene/Cubetas_+30N06
 scene://SampleScene/Cubetas_+31N06
 scene://SampleScene/GONet_GlobalContext
 scene://SampleScene_Animation/GONet_GlobalContext
-scene://SampleScene_Animation/NadaCubes/NadaCube
-scene://SampleScene_Animation/NadaCubes/NadaCube (1)
-scene://SampleScene_Animation/NadaCubes/NadaCube (2)
-scene://SampleScene_Animation/NadaCubes/NadaCube (3)
-scene://SampleScene_Animation/NadaCubes/NadaCube (4)
-scene://SampleScene_Animation/NadaCubes/NadaCube (5)
-scene://SampleScene_Animation/NadaCubes/NadaCube (6)
-scene://SampleScene_Animation/NadaCubes/NadaCube (7)
-scene://SampleScene_Animation/NadaCubes/NadaCube (8)
-scene://SampleScene_Animation/NadaCubes/NadaCube (9)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (10)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (11)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (12)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (13)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (14)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (15)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (16)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (17)
-scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (18)
 scene://SampleScene2/Directional Light
 scene://SampleScene2/Stoochie
 scene://SampleSceneThress/Cubeta_Copy_Copy

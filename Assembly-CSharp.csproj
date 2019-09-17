@@ -1546,10 +1546,6 @@
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_3.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_4.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_5.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
@@ -1579,7 +1575,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\HierarchyUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\HighResolutionTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\NetworkUtils.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Utils\NotSoSoftCour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ObjectPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\Quantizer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\SerializationUtils.cs" />
@@ -1694,11 +1689,8 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ObjPool.cs" />
-    <Compile Include="Assets\GONet\Sample\DestroyIfMineOnKeyPress.cs" />
-    <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
-    <Compile Include="Assets\GONet\Sample\PendulumJalou.cs" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Properties.cginc" />
