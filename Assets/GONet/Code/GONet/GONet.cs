@@ -138,6 +138,7 @@ namespace GONet
             const string DATABASE_PATH_RELATIVE = "database/";
 
             persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
+            Directory.CreateDirectory(DATABASE_PATH_RELATIVE);
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
 
             IEnumerable<Type> syncEventTypes = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.GetAllUniqueSyncEventTypes();
