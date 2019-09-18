@@ -266,6 +266,8 @@ namespace GONet.Generation
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
 
+        internal static List<Type> allUniqueSyncEventTypes;
+
         /// <summary>
         /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.
         /// </summary>
@@ -285,10 +287,9 @@ namespace GONet.Generation
             return copy;
         }
 
-        internal static List<Type> GetAllUniqueSyncEventTypes()
+        internal static IEnumerable<Type> GetAllUniqueSyncEventTypes()
         {
-            // since this is a one time call during init, just going to use reflection for now....if needed more, then go code generation
-            return TypeUtils.GetAllTypesInheritingFrom<SyncEvent_ValueChangeProcessed>(true);
+            return allUniqueSyncEventTypes;
         }
     }
 }

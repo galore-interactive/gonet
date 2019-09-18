@@ -10,9 +10,9 @@
  * -The ability to view and reference source code without changing it
  * -The ability to enhance debugging with source code access
  * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
- * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  * -The ability to modify source code for local use only
- * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
@@ -572,6 +572,28 @@ namespace GONet.Generation
 
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness_copy = hahaThisIsTrulyTheRealness_Events_Copy;
+
+			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.allUniqueSyncEventTypes = new List<Type>()
+			{
+				typeof(GONet.AutoMagicalSync_AllCurrentValues_Message),
+				typeof(GONet.AutoMagicalSync_ValueChanges_Message),
+				typeof(GONet.ClientTypeFlagsChangedEvent),
+				typeof(GONet.DestroyGONetParticipantEvent),
+				typeof(GONet.GONetParticipantStartedEvent),
+				typeof(GONet.InstantiateGONetParticipantEvent),
+				typeof(GONet.OwnerAuthorityIdAssignmentEvent),
+				typeof(GONet.PersistentEvents_Bundle),
+				typeof(GONet.RequestMessage),
+				typeof(GONet.ResponseMessage),
+				typeof(GONet.ServerSaysClientInitializationCompletion),
+				typeof(GONet.SyncEvent_GONetParticipant_GONetId),
+				typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd),
+				typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd),
+				typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId),
+				typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority),
+				typeof(GONet.SyncEvent_Transform_position),
+				typeof(GONet.SyncEvent_Transform_rotation),
+			};
 		}
 
 		static internal HashSet<GONet.Utils.QuantizerSettingsGroup> hahaThisIsTrulyTheRealness_quantizerSettings()

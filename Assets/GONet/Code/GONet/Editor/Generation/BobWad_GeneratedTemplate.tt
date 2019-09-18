@@ -67,6 +67,7 @@ namespace GONet
         }
     }
 
+	List<string> tmpTypeFullNames_ALL = new List<string>(tmpTypeFullNames);
 	int iPersistentEvents = 0;
 	foreach (string tmpTypeFullName in tmpTypeFullNames.OrderBy(x => x))
     {
@@ -237,6 +238,18 @@ namespace GONet.Generation
 
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness_copy = hahaThisIsTrulyTheRealness_Events_Copy;
+
+			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.allUniqueSyncEventTypes = new List<Type>()
+			{
+<#
+		foreach (string syncEventTypeFullName in tmpTypeFullNames_ALL.OrderBy(x => x))
+        {
+#>
+				typeof(<#=syncEventTypeFullName#>),
+<#
+        }
+#>
+			};
 		}
 
 		static internal HashSet<GONet.Utils.QuantizerSettingsGroup> hahaThisIsTrulyTheRealness_quantizerSettings()
