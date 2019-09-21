@@ -31,38 +31,42 @@ namespace GONet
 		[MessagePack.Union(1, typeof(GONet.AutoMagicalSync_ValueChanges_Message))]
 		[MessagePack.Union(2, typeof(GONet.ClientTypeFlagsChangedEvent))]
 		[MessagePack.Union(3, typeof(GONet.DestroyGONetParticipantEvent))]
-		[MessagePack.Union(4, typeof(GONet.GONetParticipantStartedEvent))]
-		[MessagePack.Union(5, typeof(GONet.InstantiateGONetParticipantEvent))]
-		[MessagePack.Union(6, typeof(GONet.OwnerAuthorityIdAssignmentEvent))]
-		[MessagePack.Union(7, typeof(GONet.PersistentEvents_Bundle))]
-		[MessagePack.Union(8, typeof(GONet.RequestMessage))]
-		[MessagePack.Union(9, typeof(GONet.ResponseMessage))]
-		[MessagePack.Union(10, typeof(GONet.ServerSaysClientInitializationCompletion))]
-		[MessagePack.Union(11, typeof(GONet.SyncEvent_GONetParticipant_GONetId))]
-		[MessagePack.Union(12, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
-		[MessagePack.Union(13, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
-		[MessagePack.Union(14, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
-		[MessagePack.Union(15, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
-		[MessagePack.Union(16, typeof(GONet.SyncEvent_Transform_position))]
-		[MessagePack.Union(17, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(4, typeof(GONet.GONetParticipantDisabledEvent))]
+		[MessagePack.Union(5, typeof(GONet.GONetParticipantEnabledEvent))]
+		[MessagePack.Union(6, typeof(GONet.GONetParticipantStartedEvent))]
+		[MessagePack.Union(7, typeof(GONet.InstantiateGONetParticipantEvent))]
+		[MessagePack.Union(8, typeof(GONet.OwnerAuthorityIdAssignmentEvent))]
+		[MessagePack.Union(9, typeof(GONet.PersistentEvents_Bundle))]
+		[MessagePack.Union(10, typeof(GONet.RequestMessage))]
+		[MessagePack.Union(11, typeof(GONet.ResponseMessage))]
+		[MessagePack.Union(12, typeof(GONet.ServerSaysClientInitializationCompletion))]
+		[MessagePack.Union(13, typeof(GONet.SyncEvent_GONetParticipant_GONetId))]
+		[MessagePack.Union(14, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
+		[MessagePack.Union(15, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
+		[MessagePack.Union(16, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
+		[MessagePack.Union(17, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
+		[MessagePack.Union(18, typeof(GONet.SyncEvent_Transform_position))]
+		[MessagePack.Union(19, typeof(GONet.SyncEvent_Transform_rotation))]
 		public partial interface IGONetEvent { }
 
 
 	[MessagePack.Union(0, typeof(GONet.AutoMagicalSync_AllCurrentValues_Message))]
 		[MessagePack.Union(1, typeof(GONet.AutoMagicalSync_ValueChanges_Message))]
 		[MessagePack.Union(2, typeof(GONet.ClientTypeFlagsChangedEvent))]
-		[MessagePack.Union(3, typeof(GONet.GONetParticipantStartedEvent))]
-		[MessagePack.Union(4, typeof(GONet.PersistentEvents_Bundle))]
-		[MessagePack.Union(5, typeof(GONet.RequestMessage))]
-		[MessagePack.Union(6, typeof(GONet.ResponseMessage))]
-		[MessagePack.Union(7, typeof(GONet.ServerSaysClientInitializationCompletion))]
-		[MessagePack.Union(8, typeof(GONet.SyncEvent_GONetParticipant_GONetId))]
-		[MessagePack.Union(9, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
-		[MessagePack.Union(10, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
-		[MessagePack.Union(11, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
-		[MessagePack.Union(12, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
-		[MessagePack.Union(13, typeof(GONet.SyncEvent_Transform_position))]
-		[MessagePack.Union(14, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(3, typeof(GONet.GONetParticipantDisabledEvent))]
+		[MessagePack.Union(4, typeof(GONet.GONetParticipantEnabledEvent))]
+		[MessagePack.Union(5, typeof(GONet.GONetParticipantStartedEvent))]
+		[MessagePack.Union(6, typeof(GONet.PersistentEvents_Bundle))]
+		[MessagePack.Union(7, typeof(GONet.RequestMessage))]
+		[MessagePack.Union(8, typeof(GONet.ResponseMessage))]
+		[MessagePack.Union(9, typeof(GONet.ServerSaysClientInitializationCompletion))]
+		[MessagePack.Union(10, typeof(GONet.SyncEvent_GONetParticipant_GONetId))]
+		[MessagePack.Union(11, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
+		[MessagePack.Union(12, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
+		[MessagePack.Union(13, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
+		[MessagePack.Union(14, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
+		[MessagePack.Union(15, typeof(GONet.SyncEvent_Transform_position))]
+		[MessagePack.Union(16, typeof(GONet.SyncEvent_Transform_rotation))]
 		public partial interface ITransientEvent : IGONetEvent { }
 
 
@@ -579,6 +583,8 @@ namespace GONet.Generation
 				typeof(GONet.AutoMagicalSync_ValueChanges_Message),
 				typeof(GONet.ClientTypeFlagsChangedEvent),
 				typeof(GONet.DestroyGONetParticipantEvent),
+				typeof(GONet.GONetParticipantDisabledEvent),
+				typeof(GONet.GONetParticipantEnabledEvent),
 				typeof(GONet.GONetParticipantStartedEvent),
 				typeof(GONet.InstantiateGONetParticipantEvent),
 				typeof(GONet.OwnerAuthorityIdAssignmentEvent),

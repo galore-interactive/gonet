@@ -44,6 +44,14 @@ namespace GONet
         [SerializeField]
         internal GONetLocal gonetLocalPrefab;
 
+        private readonly List<GONetParticipant> enabledGONetParticipants = new List<GONetParticipant>(1000);
+        /// <summary>
+        /// <para>A convenient collection of all the <see cref="GONetParticipant"/> instances that are currently enabled no matter what the value of <see cref="GONetParticipant.OwnerAuthorityId"/> value is.</para>
+        /// <para>Elements are added here once Start() was called on the <see cref="GONetParticipant"/> and removed once OnDisable() is called.</para>
+        /// <para>Do NOT attempt to modify this collection as to avoid creating issues for yourself/others.</para>
+        /// </summary>
+        public IEnumerable<GONetParticipant> EnabledGONetParticipants => enabledGONetParticipants;
+
         private void Awake()
         {
             if (gonetLocalPrefab == null)
@@ -63,6 +71,33 @@ namespace GONet
             GONetMain.InitOnUnityMainThread(this, gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
+
+            enabledGONetParticipants.Clear();
+            GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(OnGNPEnabled_AddToList);
+            GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(OnGNPStarted_AddToList);
+            GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled_RemoveFromList);
+        }
+
+        private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
+        {
+            bool isTooEarlyToAdd_StartRequiredFirst = (object)eventEnvelope.GONetParticipant == null;
+            if (!isTooEarlyToAdd_StartRequiredFirst)
+            {
+                enabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
+            }
+        }
+
+        private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
+        {
+            if (!enabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
+            {
+                enabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
+            }
+        }
+
+        private void OnGNPDisabled_RemoveFromList(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
+        {
+            enabledGONetParticipants.Remove(eventEnvelope.GONetParticipant);
         }
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)

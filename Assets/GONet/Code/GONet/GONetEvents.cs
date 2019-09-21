@@ -69,6 +69,25 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
+    /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
+    /// </summary>
+    public struct GONetParticipantEnabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantEnabledEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its Start() method called and it is ready to be used by other game logic.
+    /// </summary>
     public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
@@ -76,6 +95,21 @@ namespace GONet
         public uint GONetId { get; set; }
 
         public GONetParticipantStartedEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnDisable() method called and will no longer be active in the game.
+    /// </summary>
+    public struct GONetParticipantDisabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantDisabledEvent(GONetParticipant gonetParticipant)
         {
             GONetId = gonetParticipant.GONetId;
         }
@@ -179,6 +213,9 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
+    /// </summary>
     [MessagePackObject]
     public struct DestroyGONetParticipantEvent : IPersistentEvent
     {

@@ -1945,6 +1945,14 @@ namespace GONet
                         }
                     }
                 }
+
+                if (gonetParticipant.GONetId != GONetParticipant.GONetId_Unset) // FYI, the normal case is that at this point, GONetId will be 0/unset
+                {
+                    gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // be doubly sure we have this (the case where it would not already is if gnp was started-disabled-enabled
+                }
+
+                var enableEvent = new GONetParticipantEnabledEvent(gonetParticipant);
+                EventBus.Publish<IGONetEvent>(enableEvent); // ensure this comes after gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant....so the lookup of the GNP to attach to the envelope will find it!
             }
         }
 
@@ -2663,9 +2671,10 @@ namespace GONet
                     }
                 }
 
-                gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);
+                var disabledEvent = new GONetParticipantDisabledEvent(gonetParticipant);
+                EventBus.Publish<IGONetEvent>(disabledEvent); // make sure this comes before gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId); or else the GNP will not be found to attach to the envelope and the subscription handlers will not have what they are expecing
 
-                // do we need to send event to disable this thing?
+                gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);
             }
         }
 
