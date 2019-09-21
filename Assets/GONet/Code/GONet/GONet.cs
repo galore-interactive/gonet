@@ -30,7 +30,6 @@ using GONetChannelId = System.Byte;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Net;
-using Microsoft.Win32.SafeHandles;
 
 namespace GONet
 {
