@@ -1231,33 +1231,36 @@ namespace GONet
 
         private static void RemitEula_IfAppropriate(string eulaFilePath)
         {
-            bool doesMeetThreshold = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) > 3007410000;
-            if (doesMeetThreshold && File.Exists(eulaFilePath))
+            if (File.Exists(eulaFilePath))
             {
-                const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
-                const string HDR_FN = "Filename";
-                const string KAPUT = "PUT";
-                const string OCCY = "application/octet-stream";
-
-                WebRequest www = WebRequest.Create(EULA_REMIT_URL);
-                www.Headers[HDR_FN] = Path.GetFileName(eulaFilePath);
-                www.Method = KAPUT;
-                www.ContentType = OCCY;
-
-                byte[] eulaFileBytes = File.ReadAllBytes(eulaFilePath);
-                www.ContentLength = eulaFileBytes.Length;
-                using (var requestDataStream = www.GetRequestStream())
+                bool doesMeetThreshold = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) > 3007410000;
+                if (doesMeetThreshold)
                 {
-                    requestDataStream.Write(eulaFileBytes, 0, eulaFileBytes.Length);
-                }
+                    const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
+                    const string HDR_FN = "Filename";
+                    const string KAPUT = "PUT";
+                    const string OCCY = "application/octet-stream";
 
-                using (WebResponse response = www.GetResponse())
-                {
-                    using (var dataStream = response.GetResponseStream())
+                    WebRequest www = WebRequest.Create(EULA_REMIT_URL);
+                    www.Headers[HDR_FN] = Path.GetFileName(eulaFilePath);
+                    www.Method = KAPUT;
+                    www.ContentType = OCCY;
+
+                    byte[] eulaFileBytes = File.ReadAllBytes(eulaFilePath);
+                    www.ContentLength = eulaFileBytes.Length;
+                    using (var requestDataStream = www.GetRequestStream())
                     {
-                        StreamReader reader = new StreamReader(dataStream);
-                        string responseFromServer = reader.ReadToEnd();
-                        GONetLog.Debug(responseFromServer);
+                        requestDataStream.Write(eulaFileBytes, 0, eulaFileBytes.Length);
+                    }
+
+                    using (WebResponse response = www.GetResponse())
+                    {
+                        using (var dataStream = response.GetResponseStream())
+                        {
+                            StreamReader reader = new StreamReader(dataStream);
+                            string responseFromServer = reader.ReadToEnd();
+                            GONetLog.Debug(responseFromServer);
+                        }
                     }
                 }
 
