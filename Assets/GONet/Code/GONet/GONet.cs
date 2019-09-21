@@ -91,6 +91,8 @@ namespace GONet
         /// </summary>
         public static IByteArrayCompressionSupport AutoCompressEverything { get; private set; } = LZ4CompressionSupport.Instance;
 
+        static long ticksAtLastInit_UtcNow;
+
         internal static void InitOnUnityMainThread(GONetGlobal gONetGlobal, GONetSessionContext gONetSessionContext, int valueBlendingBufferLeadTimeMilliseconds)
         {
             const string ENV = "Environment.ProcessorCount: ";
@@ -105,6 +107,8 @@ namespace GONet
             InitEventSubscriptions();
             InitPersistence();
             InitQuantizers();
+
+            ticksAtLastInit_UtcNow = DateTime.UtcNow.Ticks;
         }
 
         /// <summary>
@@ -1228,7 +1232,8 @@ namespace GONet
 
         private static void RemitEula_IfAppropriate(string eulaFilePath)
         {
-            if (File.Exists(eulaFilePath))
+            bool doesMeetThreshold = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) > 3007410000;
+            if (doesMeetThreshold && File.Exists(eulaFilePath))
             {
                 const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
                 const string HDR_FN = "Filename";
