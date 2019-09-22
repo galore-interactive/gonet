@@ -71,6 +71,25 @@ namespace GONet
             }
         }
 
+        public const long SessionGUID_Unset = default;
+        static long sessionGUID = SessionGUID_Unset;
+        public static long SessionGUID
+        {
+            get => sessionGUID;
+            private set
+            {
+                if (sessionGUID == SessionGUID_Unset)
+                {
+                    sessionGUID = value;
+                }
+                else
+                {
+                    const string SUIDX = "For some reason, something is attempting to change the SessionGUID; however this is not allowed.  This could be due to host migration, which is not currently support...so, Hmmm....";
+                    GONetLog.Warning(SUIDX);
+                }
+            }
+        }
+
         private static GONetSessionContext mySessionContext;
         public static GONetSessionContext MySessionContext
         {
@@ -133,14 +152,15 @@ namespace GONet
         const int MAX_SYNC_EVENTS_RETURN_PER_FRAME_INCREASEBY_WHENBUSY = 5;
         private static string persistenceFilePath;
         private static FileStream persistenceFileStream;
+        const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss-fff";
+        const string TRIPU = "___";
+        const string SGUID = "SGUID";
+        const string MOAId = "MOAId";
+        const string DB_EXT = ".mpb";
+        const string DATABASE_PATH_RELATIVE = "database/";
         private static void InitPersistence()
         {
-            const string DATE_FORMAT = "yyyy_MM_dd___HH-mm-ss-fff";
-            const string TRIPU = "___";
-            const string DB_EXT = ".mpb";
-            const string DATABASE_PATH_RELATIVE = "database/";
-
-            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), DB_EXT);
+            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), TRIPU, SGUID, TRIPU, MOAId, DB_EXT);
             Directory.CreateDirectory(DATABASE_PATH_RELATIVE);
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
 
@@ -192,6 +212,11 @@ namespace GONet
             get { return _gonetServer; }
             set
             {
+                if (value != null)
+                {
+                    SessionGUID = GUID.Generate().AsInt64();
+                }
+
                 MyAuthorityId = OwnerAuthorityId_Server;
                 _gonetServer = value;
                 _gonetServer.ClientConnected += Server_OnClientConnected_SendClientCurrentState;
@@ -1233,8 +1258,8 @@ namespace GONet
         {
             if (File.Exists(eulaFilePath))
             {
-                bool doesMeetThreshold = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) > 3007410000;
-                if (doesMeetThreshold)
+                bool isEulaRequirementMetOtherMeans = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) < 3007410000 || (IsServer && server_lastAssignedAuthorityId == OwnerAuthorityId_Unset);
+                if (!isEulaRequirementMetOtherMeans)
                 {
                     const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
                     const string HDR_FN = "Filename";
@@ -1242,7 +1267,7 @@ namespace GONet
                     const string OCCY = "application/octet-stream";
 
                     WebRequest www = WebRequest.Create(EULA_REMIT_URL);
-                    www.Headers[HDR_FN] = Path.GetFileName(eulaFilePath);
+                    www.Headers[HDR_FN] = string.Concat(Path.GetFileName(eulaFilePath).Replace(SGUID, Math.Abs(SessionGUID).ToString()).Replace(MOAId, MyAuthorityId.ToString()));
                     www.Method = KAPUT;
                     www.ContentType = OCCY;
 
@@ -1513,6 +1538,10 @@ namespace GONet
                                 ushort ownerAuthorityId;
                                 bitStream.ReadUShort(out ownerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
 
+                                long sessionGUIDremote;
+                                bitStream.ReadLong(out sessionGUIDremote);
+                                SessionGUID = sessionGUIDremote;
+
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
                                 {
                                     const string REC = " ***************************** this client received from server my assigned ownerAuthorityId: ";
@@ -1629,6 +1658,7 @@ namespace GONet
 
                 { // body
                     bitStream.WriteUShort(connectionToClient.OwnerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
+                    bitStream.WriteLong(SessionGUID);
                 }
 
                 bitStream.WriteCurrentPartialByte();
