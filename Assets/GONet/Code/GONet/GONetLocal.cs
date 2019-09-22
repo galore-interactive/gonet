@@ -13,8 +13,8 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace GONet
@@ -46,7 +46,7 @@ namespace GONet
 
             foreach (GONetParticipant gnp in GameObject.FindObjectsOfType<GONetParticipant>()) // since GONetLocal is spawned in at runtime (unlike GONetGlobal), go ahead and add all the ones that are present now
             {
-                if (gnp.IsMine)
+                if (IsRelatedToThisLocality(gnp))
                 {
                     myEnabledGONetParticipants.Add(gnp);
                 }
@@ -69,15 +69,27 @@ namespace GONet
 
         private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
         {
-            if (eventEnvelope.GONetParticipant.IsMine && !myEnabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
+            if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
+                IsRelatedToThisLocality(eventEnvelope.GONetParticipant) &&
+                !myEnabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
             {
                 myEnabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
             }
         }
 
+        /// <summary>
+        /// PRE: <paramref name="someGNP"/> known to not be null!
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsRelatedToThisLocality(GONetParticipant someGNP)
+        {
+            return someGNP.OwnerAuthorityId == gonetParticipant.OwnerAuthorityId;
+        }
+
         private void OnGNPAuthorityChanged_CheckIfStilllMine(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
         {
-            if (eventEnvelope.GONetParticipant.IsMine)
+            if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
+                IsRelatedToThisLocality(eventEnvelope.GONetParticipant))
             {
                 // since we have a list and not a hashset, we need to double check we do not already have this stored
                 if (!myEnabledGONetParticipants.Contains(eventEnvelope.GONetParticipant))

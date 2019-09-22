@@ -30,3 +30,10 @@ Getting started with GONet:
 13a. run first instance of build, focus mouse there, press left ALT + S (server needs to start first...BEWARE: there is really no indication the server is started, but if the window had focus and you pressed the key combo it started)
 13b. run second instance of build, focus mouse there, press Left ALT + C (client will connect to local server...BEWARE: before pressing the key combo in the client window, the game might appear to be out of "data sync" and will correct itself once the client is connected to server....the client thinks he owns stuff that he does not until it is forced into submission!)
 =============== (yeah...you are off the ground with GONet!  Go add some stuff to the scene with GONetParticipant component added to it and do something interesting with it, create another build, test again, rinse, repeat!)
+
+
+
+
+2017.4 LTS Notes:
+2. ensure Scripting Runtime Version  Experimental (.NET 4.6 Equivalent)
+2. ensure .NET API version: Edit => Project Settings => Player => Api Compatibility Level* => .NET 4.6

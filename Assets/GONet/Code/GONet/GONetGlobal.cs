@@ -89,7 +89,8 @@ namespace GONet
 
         private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
         {
-            if (!enabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
+            if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
+                !enabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
             {
                 enabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
             }
