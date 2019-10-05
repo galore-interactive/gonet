@@ -325,6 +325,15 @@
     <Reference Include="SyntaxTree.VisualStudio.Unity.Bridge">
       <HintPath>C:/Program Files (x86)/Microsoft Visual Studio Tools for Unity/15.0/Editor/SyntaxTree.VisualStudio.Unity.Bridge.dll</HintPath>
     </Reference>
+    <Reference Include="AssetStoreTools">
+      <HintPath>C:/projects/unity/gonet/Assets/AssetStoreTools/Editor/AssetStoreTools.dll</HintPath>
+    </Reference>
+    <Reference Include="AssetStoreToolsExtra">
+      <HintPath>C:/projects/unity/gonet/Assets/AssetStoreTools/Editor/AssetStoreToolsExtra.dll</HintPath>
+    </Reference>
+    <Reference Include="ConsoleE">
+      <HintPath>C:/projects/unity/gonet/Assets/ConsoleE/Editor/ConsoleE.dll</HintPath>
+    </Reference>
     <Reference Include="Common.Logging">
       <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/Common.Logging.dll</HintPath>
     </Reference>
@@ -351,15 +360,6 @@
     </Reference>
     <Reference Include="UnityEditor.Purchasing">
       <HintPath>C:/projects/unity/gonet/Library/PackageCache/com.unity.purchasing@2.0.3/Editor/UnityEditor.Purchasing.dll</HintPath>
-    </Reference>
-    <Reference Include="AssetStoreToolsExtra">
-      <HintPath>C:/projects/unity/gonet/Assets/AssetStoreTools/Editor/AssetStoreToolsExtra.dll</HintPath>
-    </Reference>
-    <Reference Include="AssetStoreTools">
-      <HintPath>C:/projects/unity/gonet/Assets/AssetStoreTools/Editor/AssetStoreTools.dll</HintPath>
-    </Reference>
-    <Reference Include="ConsoleE">
-      <HintPath>C:/projects/unity/gonet/Assets/ConsoleE/Editor/ConsoleE.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib">
       <HintPath>C:/Program Files/Unity/Hub/Editor/2018.3.14f1/Editor/Data/MonoBleedingEdge/lib/mono/4.7.1-api/mscorlib.dll</HintPath>
