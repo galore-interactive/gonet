@@ -103,6 +103,11 @@ namespace GONet
             {
                 ownerAuthorityId = value;
                 OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true);
+
+                if (ownerAuthorityId == GONetMain.MyAuthorityId)
+                {
+                    WasMineAtAnyPoint = true;
+                }
             }
         }
 
@@ -111,6 +116,21 @@ namespace GONet
         /// <para>Use this to write code that does one thing if you are the owner and another thing if not.</para>
         /// </summary>
         public bool IsMine => GONetMain.IsMine(this);
+
+        /// <summary>
+        /// <para>This might be valuable to know for client side GNPs that have since been transferred over to server authority (via <see cref="GONetMain.Server_AssumeAuthorityOver(GONetParticipant)"/>).</para>
+        /// <para>In that case (which is not necessary the case even when this is true), <see cref="IsMine"/> will return false, and this will return true - NOTE: for that exact semantic, use <see cref="IsNoLongerMine"/> instead of this to be more clear.</para>
+        /// <para>Although, it is important to realize both <see cref="IsMine"/> can be true and this be true at same time (i.e., authority was never transferred to server).</para>
+        /// <para>See <see cref="IsNoLongerMine"/> for another semantic look at authority transferring.</para>
+        /// </summary>
+        public bool WasMineAtAnyPoint { get; private set; }
+
+        /// <summary>
+        /// <para>This might be valuable to know for client side GNPs that have since been transferred over to server authority (via <see cref="GONetMain.Server_AssumeAuthorityOver(GONetParticipant)"/>).</para>
+        /// <para>In that case, <see cref="IsMine"/> will return false, and this will return true.</para>
+        /// <para><see cref="IsMine"/> will return false, and this will return true.</para>
+        /// </summary>
+        public bool IsNoLongerMine => WasMineAtAnyPoint && !IsMine;
 
         /// <summary>
         /// <para>

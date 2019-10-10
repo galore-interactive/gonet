@@ -1691,6 +1691,8 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ObjPool.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Properties.cginc" />

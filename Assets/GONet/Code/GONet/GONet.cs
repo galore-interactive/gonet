@@ -1863,6 +1863,11 @@ namespace GONet
             /// </summary>
             internal void ApplyValueBlending_IfAppropriate(long useBufferLeadTicks)
             {
+                if (syncCompanion.gonetParticipant.IsNoLongerMine)
+                {
+                    useBufferLeadTicks = 0;
+                }
+
                 GONetSyncableValue blendedValue;
                 if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue))
                 {
