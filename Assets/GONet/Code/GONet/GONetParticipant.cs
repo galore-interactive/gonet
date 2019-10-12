@@ -146,6 +146,22 @@ namespace GONet
         /// </summary>
         public bool IsRigidBodyOwnerOnlyControlled;
 
+        /// <summary>
+        /// <para>
+        /// This is an option (good for projectiles) to deal with there being an inherent delay of <see cref="GONetMain.valueBlendingBufferLeadSeconds"/> from the time a
+        /// remote instantiation of this <see cref="GONetParticipant"/> (and <see cref="IsMine"/> is false) occurs and the time auto-magical sync data starts processing for value blending 
+        /// (i.e., <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.ShouldBlendBetweenValuesReceived"/> and <see cref="GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived"/>).
+        /// </para>
+        /// <para>
+        /// When this option is set to true, all <see cref="Renderer"/> components on this (including children) are turned off during the buffer lead time delay and then turned back on.
+        /// </para>
+        /// <para>
+        /// If this option does not exactly suit your needs and you want something similar, then just subscribe using <see cref="GONetMain.EventBus"/> to the <see cref="GONetParticipantStartedEvent"/>
+        /// and check if that event's envelope has <see cref="GONetEventEnvelope.IsSourceRemote"/> set to true and you can implement your own option to deal with this situation.
+        /// </para>
+        /// </summary>
+        public bool ShouldHideDuringRemoteInstantiate;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow)
         {

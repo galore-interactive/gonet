@@ -370,6 +370,7 @@ MonoBehaviour:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 1
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Sample/Projectile/Resources/CannonBall.prefab

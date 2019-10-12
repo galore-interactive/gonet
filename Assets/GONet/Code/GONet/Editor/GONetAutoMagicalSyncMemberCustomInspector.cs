@@ -94,6 +94,28 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
                 GUI.enabled = pre;
             }
 
+            { // ShouldHideDuringRemoteInstantiate
+                var pre = GUI.enabled;
+                GUI.enabled = !Application.isPlaying;
+                EditorGUILayout.BeginHorizontal();
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.ShouldHideDuringRemoteInstantiate));
+                const string TT = @"This is an option (good for projectiles) to deal with there being an inherent delay of <see cref=""GONetMain.valueBlendingBufferLeadSeconds""/> from the time a
+remote instantiation of this <see cref=""GONetParticipant""/> (and <see cref=""IsMine""/> is false) occurs and the time auto-magical sync data starts processing for value blending 
+(i.e., <see cref=""GONetAutoMagicalSyncSettings_ProfileTemplate.ShouldBlendBetweenValuesReceived""/> and <see cref=""GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived""/>).
+
+When this option is set to true, all <see cref=""Renderer""/> components on this (including children) are turned off during the buffer lead time delay and then turned back on.
+
+If this option does not exactly suit your needs and you want something similar, then just subscribe using <see cref=""GONetMain.EventBus""/> to the <see cref=""GONetParticipantStartedEvent""/>
+and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRemote""/> set to true and you can implement your own option to deal with this situation.";
+                GUIContent tooltip = new GUIContent(StringUtils.AddSpacesBeforeUppercase(nameof(GONetParticipant.ShouldHideDuringRemoteInstantiate), 1), TT);
+                if (EditorGUILayout.PropertyField(serializedProperty, tooltip))
+                {
+                    // TODO why does this method return bool?  do we need to do something!
+                }
+                EditorGUILayout.EndHorizontal();
+                GUI.enabled = pre;
+            }
+
             if (Application.isPlaying) // this value is only really relevant during play (not to mention, the way we determine this is faulty otherwise...false positives everywhere)
             { // design time?
                 {

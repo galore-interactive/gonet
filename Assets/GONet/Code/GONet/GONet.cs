@@ -30,6 +30,7 @@ using GONetChannelId = System.Byte;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Net;
+using System.Collections;
 
 namespace GONet
 {
@@ -656,6 +657,38 @@ namespace GONet
                 {
                     Server_OnNewClientInstantiatedItsGONetLocal(gonetLocal);
                 }
+            }
+
+            if (instance.ShouldHideDuringRemoteInstantiate && valueBlendingBufferLeadSeconds > 0)
+            {
+                GlobalSessionContext.StartCoroutine(OnInstantiationEvent_Remote_HideDuringBufferLeadTime(instance));
+            }
+        }
+
+        /// <summary>
+        /// PRE: <see cref="valueBlendingBufferLeadSeconds"/> is greater than 0
+        /// IMPORTANT: If there is a transition of authority (i.e., a call to <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/>) and 
+        ///            <see cref="GONetParticipant.IsMine"/> becomes true during this waiting period, then the renders will bet set to enabled instead of waiting.
+        /// </summary>
+        private static IEnumerator OnInstantiationEvent_Remote_HideDuringBufferLeadTime(GONetParticipant instance)
+        {
+            Renderer[] activeRenderers = instance.GetComponentsInChildren<Renderer>(false);
+
+            int count = activeRenderers.Length;
+            for (int i = 0; i < count; ++i)
+            {
+                activeRenderers[i].enabled = false;
+            }
+
+            long startTicks = Time.ElapsedTicks;
+            while (instance != null && !instance.IsMine && ((Time.ElapsedTicks - startTicks) < valueBlendingBufferLeadTicks))
+            {
+                yield return null;
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                activeRenderers[i].enabled = true;
             }
         }
 
