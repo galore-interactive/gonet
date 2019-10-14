@@ -102,7 +102,7 @@ namespace GONet
             internal set
             {
                 ownerAuthorityId = value;
-                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true);
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true, gonetId);
 
                 if (ownerAuthorityId == GONetMain.MyAuthorityId)
                 {
@@ -163,7 +163,7 @@ namespace GONet
         public bool ShouldHideDuringRemoteInstantiate;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow)
+        private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow, uint gonetId_priorToChanges)
         {
             if (!isOwnerAuthorityIdKnownToBeGoodValueNow)
             {
@@ -173,7 +173,7 @@ namespace GONet
                 {
                     if (ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset)
                     {
-                        const string CHG = "OwnerAuthorityId changing from a non-unset value to a different non-unset value.  If this is not happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous OwnerAuthorityId: ";
+                        const string CHG = "OwnerAuthorityId changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous OwnerAuthorityId: ";
                         const string NEW = " new OwnerAuthorityId: ";
                         const string GNS = "<GONet server>";
                         GONetLog.Info(string.Concat(CHG, ownerAuthorityId, NEW, ownerAuthorityId_asRepresentedInside_gonetId == GONetMain.OwnerAuthorityId_Server ? GNS : ownerAuthorityId_asRepresentedInside_gonetId.ToString()));
@@ -186,6 +186,7 @@ namespace GONet
 
             gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
             gonetId = unchecked((uint)(gonetId_raw << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId;
+            GONetMain.OnGONetIdSet(gonetId_priorToChanges, gonetId, this);
         }
 
         public uint gonetId_raw { get; private set; } = 0;
@@ -210,10 +211,7 @@ namespace GONet
             {
                 uint gonetId_previous = gonetId;
                 gonetId = value;
-                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(false);
-
-                GONetMain.gonetParticipantByGONetIdMap.Remove(gonetId_previous);
-                GONetMain.gonetParticipantByGONetIdMap[gonetId] = this; // TODO first check for collision/overwrite and throw exception....or warning at least!
+                OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(false, gonetId_previous);
             }
         }
 
@@ -278,6 +276,12 @@ namespace GONet
             DefaultConstructorCalled?.Invoke(this);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool DoesGONetIdContainAllComponents()
+        {
+            return gonetId_raw != GONetId_Unset && OwnerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
+        }
+
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
@@ -303,6 +307,14 @@ namespace GONet
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
         }
 
+        struct RigidBodySettings
+        {
+            public bool isKinematic;
+            public bool useGravity;
+        }
+        Rigidbody myRigidBody;
+        RigidBodySettings myRigidbodySettingsAtStart;
+
         private void Start()
         {
             //const string GNPS = "GNP.Start() name: ";
@@ -316,11 +328,33 @@ namespace GONet
 
             GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
 
-            Rigidbody rigidbody;
-            if (IsRigidBodyOwnerOnlyControlled && !IsMine && (rigidbody = GetComponent<Rigidbody>()) != null)
+            if ((myRigidBody = GetComponent<Rigidbody>()) != null)
             {
-                rigidbody.isKinematic = true;
-                rigidbody.useGravity = false;
+                myRigidbodySettingsAtStart.isKinematic = myRigidBody.isKinematic;
+                myRigidbodySettingsAtStart.useGravity = myRigidBody.useGravity;
+
+                SetRigidBodySettingsConsideringOwner();
+            }
+        }
+
+        /// <summary>
+        /// PRE: <see cref="IsRigidBodyOwnerOnlyControlled"/> is known to be true and <see cref="myRigidBody"/> is not null; otherwise this method call will have NO effect.
+        /// Call this in Start() and any time <see cref="OwnerAuthorityId"/> changes.
+        /// </summary>
+        internal void SetRigidBodySettingsConsideringOwner()
+        {
+            if (IsRigidBodyOwnerOnlyControlled && (object)myRigidBody != null)
+            {
+                if (IsMine)
+                {
+                    myRigidBody.isKinematic = myRigidbodySettingsAtStart.isKinematic;
+                    myRigidBody.useGravity = myRigidbodySettingsAtStart.useGravity;
+                }
+                else
+                {
+                    myRigidBody.isKinematic = true;
+                    myRigidBody.useGravity = false;
+                }
             }
         }
 

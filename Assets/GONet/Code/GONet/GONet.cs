@@ -200,6 +200,23 @@ namespace GONet
         public static bool IsClient => _gonetClient == null ? false : _gonetClient.ClientTypeFlags != ClientTypeFlags.None;
 
         /// <summary>
+        /// Since the value of <see cref="GONetParticipant.GONetId"/> can change (i.e., <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/> called),
+        /// this is the mechanism to find the original value at time of initial instantiation.  Not sure how this helps others, but internally to GONet it is useful.
+        /// </summary>
+        public static uint GetGONetIdAtInstantiation(uint currentGONetId)
+        {
+            uint gonetId;
+            if (gonetIdAtInstantiation_by_currentGONetId.TryGetValue(currentGONetId, out gonetId))
+            {
+                return gonetId;
+            }
+            else
+            {
+                return GONetParticipant.GONetId_Unset;
+            }
+        }
+
+        /// <summary>
         /// IMPORTANT: Prior to things being initialized with network connection(s), we may not know if we are a client or a server...in which case, this will return false!
         /// </summary>
         public static bool IsClientVsServerStatusKnown => IsServer || IsClient;
@@ -234,7 +251,10 @@ namespace GONet
 
         public static bool IsUnityApplicationEditor { get; private set; } = false;
 
-        static readonly Queue<IPersistentEvent> persistentEventsThisSession = new Queue<IPersistentEvent>();
+        /// <summary>
+        /// IMPORTANT: This will NOT include ALL events that implement <see cref="IPersistentEvent"/> as it may sound *IF* anything cancelled out another/previous event (i.e., <see cref="ICancelOutOtherEvents"/>).
+        /// </summary>
+        static readonly LinkedList<IPersistentEvent> persistentEventsThisSession = new LinkedList<IPersistentEvent>();
 
         static readonly List<uint> gonetIdsDestroyedViaPropagation = new List<uint>(500);
 
@@ -506,11 +526,48 @@ namespace GONet
 
         private static void OnOwnerAuthorityIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
         {
-            OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
+            ////GONetLog.Debug("DREETS pork");
+
+            GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
+            OnGONetIdComponentChanged_EnsureMapKeysUpdated(gonetParticipant, eventEnvelope.Event.valuePrevious);
+
+            if ((object)gonetParticipant != null && gonetParticipant.gonetId_raw != GONetParticipant.GONetId_Unset)
+            {
+                gonetParticipant.SetRigidBodySettingsConsideringOwner();
+            }
+            else
+            {
+                const string EXP = "Expecting to receive a non-null GNP, but it is null.";
+                GONetLog.Warning(EXP);
+            }
+        }
+
+        internal static readonly Dictionary<uint, uint> gonetIdAtInstantiation_by_currentGONetId = new Dictionary<uint, uint>(5000);
+
+        internal static void OnGONetIdSet(uint gonetId_previous, uint gonetId_new, GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant.DoesGONetIdContainAllComponents())
+            {
+                uint gonetId_atInstantiation;
+                if (gonetIdAtInstantiation_by_currentGONetId.TryGetValue(gonetId_previous, out gonetId_atInstantiation))
+                {
+                    gonetIdAtInstantiation_by_currentGONetId.Remove(gonetId_previous); // this step may seem unnecessary, because the data is actually still valid, we just expect noone will ever need to look up by something that is no longer going to be valid...the real reason to do this is to keep dictionary as small as possible
+                    gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_atInstantiation;
+                }
+                else
+                {
+                    gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_new;
+                }
+            }
+
+            gonetParticipantByGONetIdMap.Remove(gonetId_previous);
+            gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
         }
 
         private static void OnGONetIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
         }
 
@@ -520,7 +577,16 @@ namespace GONet
         private static void OnGONetIdComponentChanged_EnsureMapKeysUpdated(GONetParticipant gonetParticipant, uint previousGONetId)
         {
             gonetParticipantByGONetIdMap.Remove(previousGONetId);
-            gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+
+            if ((object)gonetParticipant != null && gonetParticipant.GONetId != GONetParticipant.GONetId_Unset)
+            {
+                gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+            }
+            else
+            {
+                const string EXP = "Expecting to receive a non-null GNP for ensuring map keys updated, but it is null.  Proper maintenance is likely not happening as a result.  All we have is previousGONetId: ";
+                GONetLog.Warning(string.Concat(EXP, previousGONetId, " reference null? ", (object)gonetParticipant == null));
+            }
 
             // well, looks like at time of writing there are no other ones to consider.....ok...we will monitor and hopefully keep this in mind if we add other Dictionary<uint, blah> later!
         }
@@ -563,6 +629,8 @@ namespace GONet
 
         private static void OnSyncValueChangeProcessed_Persist_Local(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             OnSyncValueChangeProcessed_Persist_Local(eventEnvelope.Event);
         }
 
@@ -588,9 +656,11 @@ namespace GONet
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             foreach (var item in eventEnvelope.Event.PersistentEvents)
             {
-                persistentEventsThisSession.Enqueue(item);
+                persistentEventsThisSession.AddLast(item);
 
                 if (item is InstantiateGONetParticipantEvent)
                 {
@@ -605,6 +675,8 @@ namespace GONet
         /// </summary>
         private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(GONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             if (eventEnvelope.Event is ILocalOnlyPublish)
             {
                 return;
@@ -640,11 +712,39 @@ namespace GONet
 
         private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
-            persistentEventsThisSession.Enqueue(eventEnvelope.Event);
+            ////GONetLog.Debug("DREETS pork");
+
+            bool doesCurrentEventCancelOutPreviousEvent = false;
+
+            IPersistentEvent lastConsideredEvent = null;
+            ICancelOutOtherEvents iCancelOthers = eventEnvelope.Event as ICancelOutOtherEvents;
+            if (iCancelOthers != null)
+            {
+                var enumerator = persistentEventsThisSession.GetEnumerator(); // TODO consider narrowing down to just the items in there that match iCancelOthers.OtherEventTypeCancelledOut, but Linq is not desired...not sure how best to do this
+                while (!doesCurrentEventCancelOutPreviousEvent && enumerator.MoveNext())
+                {
+                    lastConsideredEvent = enumerator.Current;
+                    if (lastConsideredEvent.GetType() == iCancelOthers.OtherEventTypeCancelledOut && iCancelOthers.DoesCancelOutOtherEvent(lastConsideredEvent))
+                    {
+                        doesCurrentEventCancelOutPreviousEvent = true;
+                    }
+                }
+            }
+
+            if (doesCurrentEventCancelOutPreviousEvent)
+            {
+                persistentEventsThisSession.Remove(lastConsideredEvent); // remove the cancelled out earlier event
+            }
+            else
+            {
+                persistentEventsThisSession.AddLast(eventEnvelope.Event);
+            }
         }
 
         private static void OnInstantiationEvent_Remote(GONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             //const string IR = "pub/sub Instantiate REMOTE about to process...";
             //GONetLog.Debug(IR);
 
@@ -688,18 +788,32 @@ namespace GONet
 
             for (int i = 0; i < count; ++i)
             {
-                activeRenderers[i].enabled = true;
+                Renderer renderer = activeRenderers[i];
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                }
             }
         }
 
         private static void OnDestroyEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             GONetParticipant gonetParticipant;
             if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
             {
                 gonetIdsDestroyedViaPropagation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
 
-                UnityEngine.Object.Destroy(gonetParticipant.gameObject);
+                if (gonetParticipant == null || gonetParticipant.gameObject == null)
+                {
+                    const string REC = "Received remote notification to destroy a GNP, but Unity says it's already null.  Ensure only the owner (i.e., GNP.IsMine) is the one who calls Unity's Destroy() method and the propogation across the network will be automatic via GONet.";
+                    GONetLog.Error(REC);
+                }
+                else
+                {
+                    UnityEngine.Object.Destroy(gonetParticipant.gameObject);
+                }
             }
             else
             {
@@ -997,6 +1111,23 @@ namespace GONet
             {
                 Client_SyncTimeWithServer_Initiate_IfAppropriate();
                 GONetClient?.Update();
+            }
+
+            foreach (var gnp in gnpsAwaitingCompanion)
+            {
+                if (gnp != null)
+                {
+                    GONetLog.Debug("gnp now not unity null...gnp.gonetId: " + gnp.GONetId);
+
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap;
+                    if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out companionMap))
+                    {
+                        if (companionMap.ContainsKey(gnp))
+                        {
+                            GONetLog.Debug("gnp also now in map.....can now proceed with processing the remaining bytes!");
+                        }
+                    }
+                }
             }
         }
 
@@ -1619,12 +1750,21 @@ namespace GONet
             EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
         }
 
+        static bool isCurrentlyProcessingInstantiateGNPEvent;
+        /// <summary>
+        /// only relevant while <see cref="isCurrentlyProcessingInstantiateGNPEvent"/> is true.
+        /// </summary>
+        static InstantiateGONetParticipantEvent currentlyProcessingInstantiateGNPEvent;
+
         /// <summary>
         /// Process instantiation event from remote source.
         /// </summary>
         /// <param name="instantiateEvent"></param>
         private static GONetParticipant Instantiate_Remote(InstantiateGONetParticipantEvent instantiateEvent)
         {
+            isCurrentlyProcessingInstantiateGNPEvent = true;
+            currentlyProcessingInstantiateGNPEvent = instantiateEvent;
+
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation);
             
@@ -1634,7 +1774,8 @@ namespace GONet
             }
 
             //const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
-            //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name));
+            //const string ID = " gonetId: ";
+            //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name, ID + instantiateEvent.GONetId));
 
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
             if (instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
@@ -1643,6 +1784,8 @@ namespace GONet
             }
             remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
+
+            isCurrentlyProcessingInstantiateGNPEvent = false;
 
             return instance;
         }
@@ -2017,12 +2160,13 @@ namespace GONet
                     }
                 }
 
-                if (gonetParticipant.GONetId != GONetParticipant.GONetId_Unset) // FYI, the normal case is that at this point, GONetId will be 0/unset
+                if (gonetParticipant.GONetId != GONetParticipant.GONetId_Unset) // FYI, the normal case is that at this point, GONetId will be 0/unset, because this is happening as a result of Instantiate being called in which case the actual GONetId assignment will not occur until just AFTER OnEnable is finished!
                 {
                     gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // be doubly sure we have this (the case where it would not already is if gnp was started-disabled-enabled
                 }
 
-                var enableEvent = new GONetParticipantEnabledEvent(gonetParticipant);
+                uint gonetIdThatIsGoingToBePopulated = isCurrentlyProcessingInstantiateGNPEvent ? currentlyProcessingInstantiateGNPEvent.GONetId : gonetParticipant.GONetId;
+                var enableEvent = new GONetParticipantEnabledEvent(gonetIdThatIsGoingToBePopulated);
                 EventBus.Publish<IGONetEvent>(enableEvent); // ensure this comes after gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant....so the lookup of the GNP to attach to the envelope will find it!
             }
         }
@@ -2676,6 +2820,11 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// Awaiting to not be unity null and to have an entry in the corresponding entry/map in <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/> for its codeGenerationId.
+        /// </summary>
+        static readonly List<GONetParticipant> gnpsAwaitingCompanion = new List<GONetParticipant>(1000);
+
         private static void DeserializeBody_ChangesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend)
         {
             ushort count;
@@ -2712,14 +2861,30 @@ namespace GONet
 
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
 
-                    byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
-                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                    if (gonetParticipant == null)
+                    {
+                        GONetLog.Error("dude's Unity null...the rest will fail.  reference null too? " + ((object)gonetParticipant == null) + " gonetId: " + ((object)gonetParticipant == null ? GONetParticipant.GONetId_Unset : gonetParticipant.GONetId));
+                        gnpsAwaitingCompanion.Add(gonetParticipant);
+                    }
 
-                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+                    try
+                    {
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
 
-                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                        byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
+                        syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+
+                        syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                    }
+                    catch (Exception e)
+                    {
+                        GONetLog.Error("BOOM! bitStream_headerAlreadyRead    position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
+
+                        throw e;
+                    }
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));
@@ -2734,11 +2899,16 @@ namespace GONet
             {
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                    if (!autoSyncCompanions.Remove(gonetParticipant)) // NOTE: This is the only place where the inner dictionary is removed from and is ensured to run on unity main thread since OnDisable, so no need for concurrency as long as we can say the same about adds
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
+                    if (!autoSyncCompanions.TryGetValue(gonetParticipant, out syncCompanion) || !autoSyncCompanions.Remove(gonetParticipant)) // NOTE: This is the only place where the inner dictionary is removed from and is ensured to run on unity main thread since OnDisable, so no need for concurrency as long as we can say the same about adds
                     {
                         const string PORK = "Expecting to find active auto-sync companion in order to de-active/remove it upon gonetParticipant.OnDisable, but did not. gonetParticipant.GONetId: ";
                         const string NAME = " gonetParticipant.gameObject.name: ";
                         GONetLog.Warning(string.Concat(PORK, gonetParticipant.GONetId, NAME, gonetParticipant.gameObject.name));
+                    }
+                    if (syncCompanion != null)
+                    {
+                        syncCompanion.Dispose();
                     }
                 }
 

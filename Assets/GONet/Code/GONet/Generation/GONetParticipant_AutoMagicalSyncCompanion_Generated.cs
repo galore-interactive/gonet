@@ -26,7 +26,7 @@ namespace GONet.Generation
     /// <summary>
     /// TODO: make the main dll internals visible to editor dll so this can be made internal again
     /// </summary>
-    public abstract class GONetParticipant_AutoMagicalSyncCompanion_Generated
+    public abstract class GONetParticipant_AutoMagicalSyncCompanion_Generated : IDisposable
     {
         internal GONetParticipant gonetParticipant;
 
@@ -63,7 +63,7 @@ namespace GONet.Generation
             this.gonetParticipant = gonetParticipant;
         }
 
-        ~GONetParticipant_AutoMagicalSyncCompanion_Generated()
+        public void Dispose()
         {
             lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
 

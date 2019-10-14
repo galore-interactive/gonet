@@ -47,6 +47,25 @@ namespace GONet
     /// </summary>
     public interface ILocalOnlyPublish { }
 
+    /// <summary>
+    /// This is something that would only apply to event class that implement <see cref="IPersistentEvent"/> that get queued up on server and sent to newly connecting clients.
+    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypeCancelledOut"/> and see if they cancel one another out 
+    /// so these messages can be removed from consideration in pairs as to not send these events anywhere.
+    /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DestroyGONetParticipantEvent"/>.
+    /// </summary>
+    public interface ICancelOutOtherEvents
+    {
+        /// <summary>
+        /// At time of writing, this should only be types that implement <see cref="IPersistentEvent"/>.
+        /// </summary>
+        Type OtherEventTypeCancelledOut { get; }
+
+        /// <summary>
+        /// This will only get called when <paramref name="otherEvent"/> is of the type <see cref="OtherEventTypeCancelledOut"/>.
+        /// </summary>
+        bool DoesCancelOutOtherEvent(IGONetEvent otherEvent);
+    }
+
     #endregion
 
     public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
@@ -79,9 +98,9 @@ namespace GONet
 
         public uint GONetId { get; set; }
 
-        public GONetParticipantEnabledEvent(GONetParticipant gonetParticipant)
+        public GONetParticipantEnabledEvent(uint gonetId)
         {
-            GONetId = gonetParticipant.GONetId;
+            GONetId = gonetId;
         }
     }
 
@@ -217,13 +236,24 @@ namespace GONet
     /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
     /// </summary>
     [MessagePackObject]
-    public struct DestroyGONetParticipantEvent : IPersistentEvent
+    public struct DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
     {
         [IgnoreMember]
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(0)]
         public uint GONetId;
+
+        static readonly Type otherEventTypeCancelledOut = typeof(InstantiateGONetParticipantEvent);
+
+        [IgnoreMember]
+        public Type OtherEventTypeCancelledOut => otherEventTypeCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
+            return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId);
+        }
     }
 
     [MessagePackObject]
@@ -233,9 +263,9 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public Queue<IPersistentEvent> PersistentEvents;
+        public LinkedList<IPersistentEvent> PersistentEvents;
 
-        public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, LinkedList<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             PersistentEvents = persistentEvents;
