@@ -237,8 +237,7 @@ namespace GONet.Generation
 			{
 				case 0:
 				{ // GONetParticipant.GONetId
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(); // TODO need to cache this locally instead of having to lookup each time
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, GONetParticipant.GONetId);
+					bitStream_appendTo.WriteUInt(GONetParticipant.GONetId);
 				}
 				break;
 
@@ -319,8 +318,8 @@ namespace GONet.Generation
 			{
 				case 0:
 				{ // GONetParticipant.GONetId
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(); // TODO need to cache this locally instead of having to lookup each time
-					var value = customSerializer.Deserialize(bitStream_readFrom).System_UInt32;
+					uint value;
+					bitStream_readFrom.ReadUInt(out value);
 
 									GONetParticipant.GONetId = value;
 								}

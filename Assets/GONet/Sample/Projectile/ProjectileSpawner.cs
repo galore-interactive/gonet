@@ -14,6 +14,8 @@ public class ProjectileSpawner : MonoBehaviour
     private void Awake()
     {
         GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => {
+            ////GONetLog.Debug("DREETS pork");
+
             if (envelope.GONetParticipant.GetComponent<Projectile>() != null)
             {
                 Projectile projectile = envelope.GONetParticipant.GetComponent<Projectile>();

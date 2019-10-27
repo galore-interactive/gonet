@@ -60,6 +60,8 @@ namespace GONet
 
         private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             bool isTooEarlyToAdd_StartRequiredFirst = (object)eventEnvelope.GONetParticipant == null;
             if (!isTooEarlyToAdd_StartRequiredFirst)
             {
@@ -69,6 +71,8 @@ namespace GONet
 
         private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
                 IsRelatedToThisLocality(eventEnvelope.GONetParticipant) &&
                 !myEnabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
@@ -88,6 +92,8 @@ namespace GONet
 
         private void OnGNPAuthorityChanged_CheckIfStilllMine(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
                 IsRelatedToThisLocality(eventEnvelope.GONetParticipant))
             {
@@ -105,6 +111,8 @@ namespace GONet
 
         private void OnGNPDisabled_RemoveFromList(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             myEnabledGONetParticipants.Remove(eventEnvelope.GONetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
     }

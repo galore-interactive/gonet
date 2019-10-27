@@ -21,12 +21,13 @@ using GONet.Utils;
 using NetcodeIO.NET;
 
 using GONetChannelId = System.Byte;
+using NetcodeIO.NET.Utils;
 
 namespace GONet
 {
     public class GONetServer
     {
-        public int MaxSlots { get; private set; }
+        public int MaxClientCount { get; private set; }
 
         Server server;
         public uint numConnections = 0;
@@ -41,13 +42,13 @@ namespace GONet
         /// </summary>
         public event ClientActionDelegate ClientConnected;
 
-        public GONetServer(int maxSlots, string address, int port)
+        public GONetServer(int maxClientCount, string address, int port)
         {
-            MaxSlots = maxSlots;
+            MaxClientCount = maxClientCount;
 
-            server = new Server(maxSlots, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
+            server = new Server(maxClientCount, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
-            remoteClients = new GONetRemoteClient[maxSlots];
+            remoteClients = new GONetRemoteClient[maxClientCount];
 
             server.LogLevel = NetcodeLogLevel.Debug;
 
@@ -75,7 +76,7 @@ namespace GONet
         {
             try
             {
-                server.Start();
+                server.Start(90); // NOTE: this starts a separate thread where the server's Tick method is called
                 GONetMain.isServerOverride = true; // wherever the server is running is automatically considered "the" server
             }
             catch (Exception)
@@ -171,7 +172,7 @@ namespace GONet
 
         private void ProcessNewClientConnection_MainUnityThread(RemoteClient client)
         {
-            if (numConnections < MaxSlots)
+            if (numConnections < MaxClientCount)
             {
                 GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client);
                 GONetRemoteClient remoteClient = new GONetRemoteClient(client, gonetConnection_ServerToClient);

@@ -164,5 +164,10 @@ namespace ReliableNetcode
 			if (TransmitExtendedCallback != null)
 				TransmitExtendedCallback(Index, buffer, length);
 		}
+
+        public string GetUsageStatistics()
+        {
+            return _reliableChannel.GetUsageStatistics(); // TODO other options...make API clear
+        }
 	}
 }

@@ -80,6 +80,8 @@ namespace GONet
 
         private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             bool isTooEarlyToAdd_StartRequiredFirst = (object)eventEnvelope.GONetParticipant == null;
             if (!isTooEarlyToAdd_StartRequiredFirst)
             {
@@ -89,6 +91,8 @@ namespace GONet
 
         private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
                 !enabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
             {
@@ -98,6 +102,8 @@ namespace GONet
 
         private void OnGNPDisabled_RemoveFromList(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
         {
+            ////GONetLog.Debug("DREETS pork");
+
             enabledGONetParticipants.Remove(eventEnvelope.GONetParticipant);
         }
 

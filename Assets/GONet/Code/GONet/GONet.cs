@@ -812,6 +812,9 @@ namespace GONet
                 }
                 else
                 {
+                    //const string DEAD = "Received remote notification to destroy a GNP.GONetId: ";
+                    //GONetLog.Info(string.Concat(DEAD, gonetParticipant.GONetId));
+
                     UnityEngine.Object.Destroy(gonetParticipant.gameObject);
                 }
             }
@@ -1731,6 +1734,10 @@ namespace GONet
 
                 // TODO this should only deserialize the message....and then send over to an EventBus where subscribers to that event/message from the bus can process accordingly
             }
+            catch (GONetOutOfOrderHorseDickoryException outOfOrderException)
+            {
+                GONetLog.Error(outOfOrderException.Message);
+            }
             catch (Exception e)
             {
                 GONetLog.Error(string.Concat("Error Message: ", e.Message, "\nError Stacktrace:\n", e.StackTrace));
@@ -1774,7 +1781,7 @@ namespace GONet
             }
 
             //const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
-            //const string ID = " gonetId: ";
+            //const string ID = " event.gonetId: ";
             //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name, ID + instantiateEvent.GONetId));
 
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
@@ -2699,7 +2706,15 @@ namespace GONet
                 int xPriority = x.syncAttribute_ProcessingPriority_GONetInternalOverride != 0 ? x.syncAttribute_ProcessingPriority_GONetInternalOverride : x.syncAttribute_ProcessingPriority;
                 int yPriority = y.syncAttribute_ProcessingPriority_GONetInternalOverride != 0 ? y.syncAttribute_ProcessingPriority_GONetInternalOverride : y.syncAttribute_ProcessingPriority;
 
-                return yPriority.CompareTo(xPriority); // descending...highest priority first!
+                int priorityComparison = yPriority.CompareTo(xPriority); // descending...highest priority first!
+
+                if (priorityComparison == 0)
+                { // if the priority is the same, then we want to put the most recent (i.e., highest value) changes in authority last as to not possibly cause issue during deserialize of an entire bundle because the owner authority change has not been processed yet!
+                    return x.syncCompanion.gonetParticipant.OwnerAuthorityId_LastChangedElapsedSeconds
+                        .CompareTo(y.syncCompanion.gonetParticipant.OwnerAuthorityId_LastChangedElapsedSeconds);
+                }
+
+                return priorityComparison;
             }
         }
 
@@ -2771,25 +2786,15 @@ namespace GONet
 
                 syncEventQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
 
-                bool canASSumeNetId = change.index == GONetParticipant.ASSumed_GONetId_INDEX;
-                bitStream_headerAlreadyWritten.WriteBit(canASSumeNetId);
-                if (canASSumeNetId)
+                if (change.syncCompanion.gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset)
                 {
-                    // this will use GONetId_InitialAssignment_CustomSerializer and write the full unique path and the gonetId:
-                    change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, GONetParticipant.ASSumed_GONetId_INDEX);
+                    const string SNAFU = "Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): ";
+                    const string FUOA = " filterUsingOwnerAuthorityId: ";
+                    GONetLog.Error(string.Concat(SNAFU, ShouldSendChange(change, filterUsingOwnerAuthorityId), FUOA, filterUsingOwnerAuthorityId));
                 }
-                else
-                {
-                    if (change.syncCompanion.gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset)
-                    {
-                        const string SNAFU = "Snafoo....gonetid 0.....why are we about to send change? ...makes no sense! ShouldSendChange(change, filterUsingOwnerAuthorityId): ";
-                        const string FUOA = " filterUsingOwnerAuthorityId: ";
-                        GONetLog.Error(string.Concat(SNAFU, ShouldSendChange(change, filterUsingOwnerAuthorityId), FUOA, filterUsingOwnerAuthorityId));
-                    }
-                    bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
-                    bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
-                    change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
-                }
+                bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
+                bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
+                change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
             }
 
             return countFiltered;
@@ -2832,59 +2837,51 @@ namespace GONet
             //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
-                bool canASSumeNetId;
-                bitStream_headerAlreadyRead.ReadBit(out canASSumeNetId);
-                if (canASSumeNetId)
+                uint gonetId;
+                bitStream_headerAlreadyRead.ReadUInt(out gonetId);
+
+                if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                 {
-                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead);
+                    QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
+                    if (channelQuality == QosType.Reliable)
+                    {
+                        const string GLAD = "Reliable changes bundle being process and GONetParticipant NOT FOUND by GONetId: ";
+                        const string COUNT = "  This will cause us not to be able to process this and the rest of the bundle, which means we will not process count: ";
+                        throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, COUNT, (count - i)));
+                    }
+                    else
+                    {
+                        //const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
+                        //GONetLog.Warning(NTS);
+                        return;
+                    }
                 }
-                else
+
+                GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
+                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+
+                if (gonetParticipant == null)
                 {
-                    uint gonetId;
-                    bitStream_headerAlreadyRead.ReadUInt(out gonetId);
+                    GONetLog.Error("dude's Unity null...the rest will fail.  reference null too? " + ((object)gonetParticipant == null) + " gonetId: " + ((object)gonetParticipant == null ? GONetParticipant.GONetId_Unset : gonetParticipant.GONetId));
+                    gnpsAwaitingCompanion.Add(gonetParticipant);
+                }
 
-                    if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
-                    {
-                        QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
-                        if (channelQuality == QosType.Reliable)
-                        {
-                            const string GLAD = "GONetParticipant NOT FOUND by GONetId: ";
-                            throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId));
-                        }
-                        else
-                        {
-                            //const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
-                            //GONetLog.Warning(NTS);
-                            return;
-                        }
-                    }
+                try
+                {
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
 
-                    GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
-                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                    byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
+                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
-                    if (gonetParticipant == null)
-                    {
-                        GONetLog.Error("dude's Unity null...the rest will fail.  reference null too? " + ((object)gonetParticipant == null) + " gonetId: " + ((object)gonetParticipant == null ? GONetParticipant.GONetId_Unset : gonetParticipant.GONetId));
-                        gnpsAwaitingCompanion.Add(gonetParticipant);
-                    }
+                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
 
-                    try
-                    {
-                        GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant];
+                    syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                }
+                catch (Exception e)
+                {
+                    GONetLog.Error("BOOM! bitStream_headerAlreadyRead    position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
 
-                        byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
-                        syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
-
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
-
-                        syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
-                    }
-                    catch (Exception e)
-                    {
-                        GONetLog.Error("BOOM! bitStream_headerAlreadyRead    position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
-
-                        throw e;
-                    }
+                    throw e;
                 }
             }
             //GONetLog.Debug(string.Concat("************done reading changes bundle"));

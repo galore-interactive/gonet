@@ -58,7 +58,7 @@ namespace NetcodeIO.NET
 
 			NetcodePrivateConnectToken privateConnectToken = new NetcodePrivateConnectToken();
 			privateConnectToken.ClientID = clientID;
-			privateConnectToken.TimeoutSeconds = serverTimeout;
+			privateConnectToken.TimeoutAfterSeconds = serverTimeout;
 
 			// generate random crypto keys
 			byte[] clientToServerKey = new byte[32];

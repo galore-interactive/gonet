@@ -9,34 +9,53 @@ namespace NetcodeIO.NET
 	{
 		internal struct encryptionMapEntry
 		{
-			public double ExpireTime;
-			public double LastAccessTime;
-			public int TimeoutSeconds;
-			public uint ClientID;
-			public EndPoint Address;
-			public byte[] SendKey;
-			public byte[] ReceiveKey;
+            double expireTime;
+			public double ExpiresAtSeconds { get => expireTime; set { expireTime = value; isReset = false; } }
 
-			public void Reset()
+            double lastAccessedAtSeconds;
+			public double LastAccessedAtSeconds { get => lastAccessedAtSeconds; set { lastAccessedAtSeconds = value; isReset = false; } }
+
+            int timeoutAfterSeconds;
+            public int TimeoutAfterSeconds { get => timeoutAfterSeconds; set { timeoutAfterSeconds = value; isReset = false; } }
+
+            uint clientID;
+            public uint ClientID { get => clientID; set { clientID = value; isReset = false; } }
+
+            EndPoint address;
+            public EndPoint Address { get => address; set { address = value; isReset = false; } }
+
+            public byte[] SendKey;
+
+            public byte[] ReceiveKey;
+
+            private bool isReset;
+            public bool IsReset => isReset;
+
+            public void Reset()
 			{
-				ExpireTime = -1.0;
-				LastAccessTime = -1000.0;
+                ExpiresAtSeconds = -1.0;
+				LastAccessedAtSeconds = -1000.0;
 				Address = null;
-				TimeoutSeconds = 0;
+				TimeoutAfterSeconds = 0;
 				ClientID = 0;
 
 				Array.Clear(SendKey, 0, SendKey.Length);
 				Array.Clear(ReceiveKey, 0, ReceiveKey.Length);
-			}
-		}
 
-		internal int numEncryptionMappings;
+                isReset = true;
+            }
+        }
+
+		internal int encyrptionMappings_usedCount;
+        private int encyrptionMappings_totalCount;
 		internal encryptionMapEntry[] encryptionMappings;
 
 		public EncryptionManager(int maxClients)
 		{
 			encryptionMappings = new encryptionMapEntry[maxClients * 4];
-			for (int i = 0; i < encryptionMappings.Length; i++)
+            encyrptionMappings_totalCount = encryptionMappings.Length;
+
+            for (int i = 0; i < encyrptionMappings_totalCount; ++i)
 			{
 				encryptionMappings[i].SendKey = new byte[32];
 				encryptionMappings[i].ReceiveKey = new byte[32];
@@ -47,150 +66,162 @@ namespace NetcodeIO.NET
 
 		public void Reset()
 		{
-			numEncryptionMappings = 0;
-			for (int i = 0; i < encryptionMappings.Length; i++)
+			encyrptionMappings_usedCount = 0;
+			for (int i = 0; i < encyrptionMappings_totalCount; ++i)
 			{
 				encryptionMappings[i].Reset();
 			}
 		}
 
-		public bool AddEncryptionMapping(EndPoint address, byte[] sendKey, byte[] receiveKey, double time, double expireTime, int timeoutSeconds, uint clientID)
+		public bool AddEncryptionMapping(EndPoint address, byte[] sendKey, byte[] receiveKey, double currentSeconds, double expiresAtSeconds, int timeoutAfterSeconds, uint clientID)
 		{
-			for (int i = 0; i < numEncryptionMappings; i++)
+			for (int i = 0; i < encyrptionMappings_totalCount; i++) // first try to find an expired or timed out, previously used slot for this address and re-use it
 			{
-				if (MiscUtils.AddressEqual(encryptionMappings[i].Address, address)
-					&& ( timeoutSeconds >= 0 && encryptionMappings[i].LastAccessTime + timeoutSeconds >= time ))
+                encryptionMapEntry encryptionMapping = encryptionMappings[i];
+                if (!encryptionMapping.IsReset
+                    && MiscUtils.AddressEqual(encryptionMapping.Address, address)
+					&& (
+                            (encryptionMapping.TimeoutAfterSeconds > 0 && (encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds) >= currentSeconds)
+                            || (encryptionMapping.ExpiresAtSeconds > 0.0 && encryptionMapping.ExpiresAtSeconds < currentSeconds)
+                       )
+                    )
 				{
-					encryptionMappings[i].ExpireTime = expireTime;
-					encryptionMappings[i].LastAccessTime = time;
-					encryptionMappings[i].TimeoutSeconds = timeoutSeconds;
-					encryptionMappings[i].ClientID = clientID;
+                    encryptionMappings[i].ExpiresAtSeconds = expiresAtSeconds;
+                    encryptionMappings[i].LastAccessedAtSeconds = currentSeconds;
+                    encryptionMappings[i].TimeoutAfterSeconds = timeoutAfterSeconds;
+                    encryptionMappings[i].ClientID = clientID;
 
-					Buffer.BlockCopy(sendKey, 0, encryptionMappings[i].SendKey, 0, 32);
-					Buffer.BlockCopy(receiveKey, 0, encryptionMappings[i].ReceiveKey, 0, 32);
-					return true;
+                    Buffer.BlockCopy(sendKey, 0, encryptionMappings[i].SendKey, 0, 32);
+                    Buffer.BlockCopy(receiveKey, 0, encryptionMappings[i].ReceiveKey, 0, 32);
+
+                    // NOTE: encyrptionMappings_usedCount stays the same since we are reusing and expired one that was considered in use any way
+                    return true;
 				}
 			}
 
-			for (int i = 0; i < encryptionMappings.Length; i++)
+			for (int i = 0; i < encyrptionMappings_totalCount; i++) // second, if an expired one could not be found/re-used for this address, just find a completely unused/reset slot and use it
 			{
-				if ((encryptionMappings[i].TimeoutSeconds >= 0 && encryptionMappings[i].LastAccessTime + encryptionMappings[i].TimeoutSeconds < time) ||
-					(encryptionMappings[i].ExpireTime >= 0.0 && encryptionMappings[i].ExpireTime < time))
+                if (encryptionMappings[i].IsReset)
 				{
-					encryptionMappings[i].Address = address;
-					encryptionMappings[i].ExpireTime = expireTime;
-					encryptionMappings[i].LastAccessTime = time;
-					encryptionMappings[i].TimeoutSeconds = timeoutSeconds;
-					encryptionMappings[i].ClientID = clientID;
+                    encryptionMappings[i].Address = address;
+                    encryptionMappings[i].ExpiresAtSeconds = expiresAtSeconds;
+                    encryptionMappings[i].LastAccessedAtSeconds = currentSeconds;
+                    encryptionMappings[i].TimeoutAfterSeconds = timeoutAfterSeconds;
+                    encryptionMappings[i].ClientID = clientID;
 
-					Buffer.BlockCopy(sendKey, 0, encryptionMappings[i].SendKey, 0, 32);
-					Buffer.BlockCopy(receiveKey, 0, encryptionMappings[i].ReceiveKey, 0, 32);
+                    Buffer.BlockCopy(sendKey, 0, encryptionMappings[i].SendKey, 0, 32);
+                    Buffer.BlockCopy(receiveKey, 0, encryptionMappings[i].ReceiveKey, 0, 32);
 
-					if (i + 1 > numEncryptionMappings)
-						numEncryptionMappings = i + 1;
-
-					return true;
-				}
-			}
-
-			return false;
-		}
-
-		public bool RemoveEncryptionMapping(EndPoint address, double time)
-		{
-			for (int i = 0; i < numEncryptionMappings; i++)
-			{
-				if (MiscUtils.AddressEqual(encryptionMappings[i].Address, address))
-				{
-					encryptionMappings[i].Reset();
-
-					if (i + 1 == numEncryptionMappings)
-					{
-						int index = i - 1;
-						while (index >= 0)
-						{
-							if ((encryptionMappings[index].TimeoutSeconds < 0 || encryptionMappings[index].LastAccessTime + encryptionMappings[index].TimeoutSeconds >= time ) &&
-								(encryptionMappings[index].ExpireTime < 0 || encryptionMappings[index].ExpireTime > time))
-								break;
-							index--;
-						}
-						numEncryptionMappings = index + 1;
-					}
+					++encyrptionMappings_usedCount;
 
 					return true;
 				}
 			}
 
-			return false;
+            return false; // third, you are out of luck since we only allocate a specific number of slots...they are all in use and not expired...sorry (TODO: maybe add some new slots!)
 		}
 
-		public byte[] GetSendKey(int idx)
+        /// <returns>The number of mappings removed (i.e., that match the <paramref name="address"/>).</returns>
+		public int RemoveAllEncryptionMappings(EndPoint address)
 		{
-			if (idx == -1 || idx >= encryptionMappings.Length) return null;
-			return encryptionMappings[idx].SendKey;
+            int removedCount = 0;
+
+			for (int i = 0; i < encyrptionMappings_totalCount; i++)
+			{
+                if (!encryptionMappings[i].IsReset && MiscUtils.AddressEqual(encryptionMappings[i].Address, address))
+				{
+                    encryptionMappings[i].Reset();
+                    --encyrptionMappings_usedCount;
+                    ++removedCount;
+                }
+			}
+
+			return removedCount;
 		}
 
-		public byte[] GetReceiveKey(int idx)
+		public byte[] GetSendKey(int index)
 		{
-			if (idx == -1 || idx >= encryptionMappings.Length) return null;
-			return encryptionMappings[idx].ReceiveKey;
+			if (index == -1 || index >= encyrptionMappings_totalCount) return null;
+			return encryptionMappings[index].SendKey;
 		}
 
-		public int GetTimeoutSeconds(int idx)
+		public byte[] GetReceiveKey(int index)
 		{
-			if (idx == -1 || idx >= encryptionMappings.Length) return -1;
-			return encryptionMappings[idx].TimeoutSeconds;
+			if (index == -1 || index >= encyrptionMappings_totalCount) return null;
+			return encryptionMappings[index].ReceiveKey;
 		}
 
-		public uint GetClientID(int idx)
+		public int GetTimeoutSeconds(int index)
 		{
-			if (idx == -1 || idx >= encryptionMappings.Length) return 0;
-			return encryptionMappings[idx].ClientID;
+			if (index == -1 || index >= encyrptionMappings_totalCount) return -1;
+			return encryptionMappings[index].TimeoutAfterSeconds;
 		}
 
-		public void SetClientID(int idx, uint clientID)
+		public uint GetClientID(int index)
 		{
-			if (idx < 0 || idx >= numEncryptionMappings)
-				throw new IndexOutOfRangeException();
-
-			encryptionMappings[idx].ClientID = clientID;
+			if (index == -1 || index >= encyrptionMappings_totalCount) return 0;
+			return encryptionMappings[index].ClientID;
 		}
 
-		public bool Touch(int index, EndPoint address, double time)
+		public void SetClientID(int index, uint clientID)
 		{
-			if (index < 0 || index >= numEncryptionMappings)
-				throw new IndexOutOfRangeException();
+			if (index < 0 || index >= encyrptionMappings_usedCount)
+				throw new IndexOutOfRangeException(nameof(index));
 
-			if (!MiscUtils.AddressEqual(encryptionMappings[index].Address, address))
+			encryptionMappings[index].ClientID = clientID;
+		}
+
+		public bool Touch(int index, EndPoint address, double currentSeconds)
+		{
+			if (index < 0 || index >= encyrptionMappings_usedCount)
+				throw new IndexOutOfRangeException(nameof(index));
+
+            if (!MiscUtils.AddressEqual(encryptionMappings[index].Address, address))
 				return false;
 
-			encryptionMappings[index].LastAccessTime = time;
-			encryptionMappings[index].ExpireTime = time + Defines.NETCODE_TIMEOUT_SECONDS;
+            encryptionMappings[index].LastAccessedAtSeconds = currentSeconds;
+            encryptionMappings[index].ExpiresAtSeconds = currentSeconds + Defines.NETCODE_TIMEOUT_SECONDS;
 			return true;
 		}
 
-		public void SetExpireTime(int index, double expireTime)
+		public void SetExpiresAtSeconds(int index, double expiresAtSeconds)
 		{
-			if (index < 0 || index >= numEncryptionMappings)
-				throw new IndexOutOfRangeException();
+			if (index < 0 || index >= encyrptionMappings_usedCount)
+				throw new IndexOutOfRangeException(nameof(index));
 
-			encryptionMappings[index].ExpireTime = expireTime;
+			encryptionMappings[index].ExpiresAtSeconds = expiresAtSeconds;
 		}
 
-		public int FindEncryptionMapping(EndPoint address, double time)
+		public unsafe int GetEncryptionMappingIndexForTime(EndPoint address, double currentSeconds)
 		{
-			for (int i = 0; i < numEncryptionMappings; i++)
+            System.Text.StringBuilder msg = new System.Text.StringBuilder(500);
+
+            msg.Append("numEncryptionMappings: ").Append(encyrptionMappings_usedCount);
+
+            for (int i = 0; i < encyrptionMappings_totalCount; ++i)
 			{
-				if (MiscUtils.AddressEqual(encryptionMappings[i].Address, address) &&
-					(encryptionMappings[i].LastAccessTime + encryptionMappings[i].TimeoutSeconds >= time || encryptionMappings[i].TimeoutSeconds < 0) &&
-					(encryptionMappings[i].ExpireTime < 0.0 || encryptionMappings[i].ExpireTime >= time))
+                encryptionMapEntry encryptionMapping = encryptionMappings[i];
+                if (!encryptionMapping.IsReset &&
+                    MiscUtils.AddressEqual(encryptionMapping.Address, address) &&
+					(encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds >= currentSeconds || encryptionMapping.TimeoutAfterSeconds <= 0) &&
+					(encryptionMapping.ExpiresAtSeconds < 0.0 || encryptionMapping.ExpiresAtSeconds >= currentSeconds))
 				{
-					encryptionMappings[i].LastAccessTime = time;
+                    encryptionMappings[i].LastAccessedAtSeconds = currentSeconds;
 					return i;
 				}
-			}
 
-			return -1;
+                msg
+                    .Append("\ni: ").Append(i).Append(" hashCode: ").Append(encryptionMapping.GetHashCode())
+                    .Append(" address ?= ").Append(MiscUtils.AddressEqual(encryptionMapping.Address, address)).Append(" address: ").Append(address.ToString()).Append(" encryptionMapping.Address: ").Append(encryptionMapping.Address == null ? "<null>" : encryptionMapping.Address.ToString())
+                    .Append(" lastAccessTime: ").Append(encryptionMapping.LastAccessedAtSeconds)
+                    .Append(" encryptionMappings[i].TimeoutSeconds: ").Append(encryptionMapping.TimeoutAfterSeconds)
+                    .Append(" time: ").Append(currentSeconds)
+                    .Append(" encryptionMappings[i].ExpireTime: ").Append(encryptionMapping.ExpiresAtSeconds);
+            }
+
+            GONet.GONetLog.Debug(msg.ToString());
+
+            return -1;
 		}
 	}
 }

@@ -1575,6 +1575,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\HierarchyUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\HighResolutionTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\NetworkUtils.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\NotSoSoftCour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ObjectPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\Quantizer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\SerializationUtils.cs" />
@@ -1689,6 +1690,7 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ObjPool.cs" />
+    <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />

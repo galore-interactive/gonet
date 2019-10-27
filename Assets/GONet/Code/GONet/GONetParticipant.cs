@@ -38,6 +38,7 @@ namespace GONet
         /// </summary>
         internal const byte ASSumed_GONetId_INDEX = 0;
 
+        public const uint GONetIdRaw_Unset = 0;
         public const uint GONetId_Unset = 0;
         public const uint GONetId_Raw_MaxValue = (uint.MaxValue << GONET_ID_BIT_COUNT_UNUSED) >> GONET_ID_BIT_COUNT_UNUSED;
 
@@ -101,6 +102,7 @@ namespace GONet
             get => ownerAuthorityId;
             internal set
             {
+                ushort previous = ownerAuthorityId;
                 ownerAuthorityId = value;
                 OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true, gonetId);
 
@@ -108,8 +110,27 @@ namespace GONet
                 {
                     WasMineAtAnyPoint = true;
                 }
+
+                if (previous != GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset && previous != ownerAuthorityId)
+                {
+                    OwnerAuthorityId_LastChangedElapsedSeconds = GONetMain.Time.ElapsedSeconds;
+                }
             }
         }
+
+        const double OwnerAuthorityId_LastChangedElapsedSeconds_Unset = double.MinValue;
+
+        /// <summary>
+        /// This only gets set when it changed from non-<see cref="GONetMain.OwnerAuthorityId_Unset"/> value to another.
+        /// </summary>
+        public double OwnerAuthorityId_LastChangedElapsedSeconds { get; private set; } = OwnerAuthorityId_LastChangedElapsedSeconds_Unset;
+
+        /// <summary>
+        /// <para>Let's you know if the <see cref="OwnerAuthorityId"/> has changed from non-<see cref="GONetMain.OwnerAuthorityId_Unset"/> value to another at some point, perhaps multiple times.</para>
+        /// <para>See <see cref="OwnerAuthorityId_LastChangedElapsedSeconds"/> to know when the last change like this occurred.</para>
+        /// <para>This would be true if <see cref="GONetMain.Server_AssumeAuthorityOver(GONetParticipant)"/> was called in this.</para>
+        /// </summary>
+        public bool HasChangedAuthorityAtSomePoint => OwnerAuthorityId_LastChangedElapsedSeconds != OwnerAuthorityId_LastChangedElapsedSeconds_Unset;
 
         /// <summary>
         /// <para>IMPORTANT: Up until some time during <see cref="Start"/>, the value of <see cref="OwnerAuthorityId"/> will be <see cref="GONetMain.OwnerAuthorityId_Unset"/> and the owner is essentially unknown, which means this method will return false for everyone (even the actual owner).  Once the owner is known, <see cref="GONetParticipant.OwnerAuthorityId"/> value will change and the <see cref="SyncEvent_GONetParticipant_OwnerAuthorityId"/> event will fire (i.e., you should call <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/> on <see cref="EventBus"/>)</para>
@@ -184,12 +205,21 @@ namespace GONet
                 }
             }
 
+            uint gonetId_raw_priorToChanges = (gonetId_priorToChanges >> GONET_ID_BIT_COUNT_UNUSED);
             gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
             gonetId = unchecked((uint)(gonetId_raw << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId;
+
+            if (gonetId_raw_priorToChanges != GONetIdRaw_Unset && gonetId_raw != gonetId_raw_priorToChanges)
+            {
+                const string CHG = "gonetId_raw changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous gonetId_raw: ";
+                const string NEW = " new gonetId_raw: ";
+                GONetLog.Info(string.Concat(CHG, gonetId_raw_priorToChanges, NEW, gonetId_raw));
+            }
+
             GONetMain.OnGONetIdSet(gonetId_priorToChanges, gonetId, this);
         }
 
-        public uint gonetId_raw { get; private set; } = 0;
+        public uint gonetId_raw { get; private set; } = GONetIdRaw_Unset;
         /// <summary>
         /// This is the composite value of <see cref="gonetId_raw"/> and <see cref="ownerAuthorityId"/> smashed together into a single uint value
         /// </summary>
@@ -202,7 +232,6 @@ namespace GONet
             GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue,
-            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
             MustRunOnUnityMainThread = true)]
         public uint GONetId
         {
@@ -387,10 +416,10 @@ namespace GONet
             {
                 string fullUniquePath;
                 bitStream_readFrom.ReadString(out fullUniquePath);
-
-                uint GONetId = GONetId_Unset;
-                bitStream_readFrom.ReadUInt(out GONetId); // should we order change list by this id ascending and just put diff from last value?
-
+                
+                uint gonetId = GONetId_Unset;
+                bitStream_readFrom.ReadUInt(out gonetId); // should we order change list by this id ascending and just put diff from last value?
+                
                 GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
                 GONetParticipant gonetParticipant = null;
                 if ((object)gonetParticipantGO == null)
@@ -404,10 +433,10 @@ namespace GONet
 
                 if ((object)gonetParticipant != null)
                 {
-                    gonetParticipant.GONetId = GONetId;
+                    gonetParticipant.GONetId = gonetId;
                 }
 
-                return GONetId;
+                return gonetId;
             }
 
             public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)

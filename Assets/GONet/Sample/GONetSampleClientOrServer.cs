@@ -36,7 +36,7 @@ public class GONetSampleClientOrServer : MonoBehaviour
         else
         {
             GONetMain.GONetClient = new GONetClient(new Client());
-            GONetMain.GONetClient.ConnectToServer(serverIP, serverPort);
+            GONetMain.GONetClient.ConnectToServer(serverIP, serverPort, 30);
         }
     }
 }

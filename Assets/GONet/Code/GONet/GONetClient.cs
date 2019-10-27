@@ -94,9 +94,9 @@ namespace GONet
             client.OnStateChanged += OnStateChanged;
         }
 
-        public void ConnectToServer(string serverIP, int serverPort)
+        public void ConnectToServer(string serverIP, int serverPort, int ongoingTimeoutSeconds)
         {
-            connectionToServer.Connect(serverIP, serverPort);
+            connectionToServer.Connect(serverIP, serverPort, ongoingTimeoutSeconds);
         }
 
         public void SendBytesToServer(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)

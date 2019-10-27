@@ -253,14 +253,16 @@ namespace ReliableNetcode
         public ushort SendPacket(byte[] packetData, int length, byte channelID)
         {
             if (length > config.MaxPacketSize)
-                throw new ArgumentOutOfRangeException("Packet is too large to send, max packet size is " + config.MaxPacketSize + " bytes");
+                throw new ArgumentOutOfRangeException(string.Concat("Packet is too large to send, max packet size is ", config.MaxPacketSize, " bytes"));
 
             ushort sequence = this.sequence++;
             ushort ack;
             uint ackBits;
 
-            lock( receivedPackets )
+            lock (receivedPackets)
+            {
                 receivedPackets.GenerateAckBits(out ack, out ackBits);
+            }
 
             SentPacketData sentPacketData = sentPackets.Insert(sequence);
             sentPacketData.timeSeconds = this.timeSeconds;
@@ -480,6 +482,33 @@ namespace ReliableNetcode
                     fragmentReassembly.Remove(sequence);
                 }
             }
+        }
+
+        public string GetUsageStatistics()
+        {
+            StringBuilder stringBuilder = new StringBuilder(2000);
+
+            const string RTT = "RTTMilliseconds: ";
+            const string PL = " PacketLoss: ";
+            const string SB = " SentBandwidthKBPS: ";
+            const string RB = " ReceivedBandwidthKBPS: ";
+            const string AB = " AckedBandwidthKBPS: ";
+            const string SP = " sentPackets.Size: ";
+            const string RP = " receivedPackets.Size: ";
+            const string FR = " fragmentReassembly.Size: ";
+
+            stringBuilder
+                .Append(RTT).Append(RTTMilliseconds)
+                .Append(PL).Append(PacketLoss)
+                .Append(SB).Append(SentBandwidthKBPS)
+                .Append(RB).Append(ReceivedBandwidthKBPS)
+                .Append(AB).Append(AckedBandwidthKBPS)
+                .Append(SP).Append(sentPackets.Size)
+                .Append(RP).Append(receivedPackets.Size)
+                .Append(FR).Append(fragmentReassembly.Size)
+                ;
+
+            return stringBuilder.ToString();
         }
     }
 }

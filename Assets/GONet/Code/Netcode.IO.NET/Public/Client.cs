@@ -170,7 +170,7 @@ namespace NetcodeIO.NET
 		private ClientState pendingDisconnectState;
 
 		private double lastResponseTime;
-		internal double time;
+		internal double totalSeconds;
 		internal double dt;
 
 		private uint clientIndex;
@@ -287,30 +287,27 @@ namespace NetcodeIO.NET
 
 			if (autoTick)
 			{
-				this.time = DateTime.UtcNow.GetTotalSeconds();
-				ThreadPool.QueueUserWorkItem(clientTick);
+				this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
+				ThreadPool.QueueUserWorkItem(clientTick_SeparateThread);
 			}
 		}
 
-		/// <summary>
-		/// Send a payload to the server
-		/// </summary>
-		public void Send(byte[] payload, int payloadSize)
-		{
-			if (state != ClientState.Connected)
-				throw new InvalidOperationException();
+        /// <summary>
+        /// Send a payload to the server
+        /// </summary>
+        public void Send(byte[] payload, int payloadSize)
+        {
+            if (state != ClientState.Connected)
+                throw new InvalidOperationException();
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, (writer) =>
-			{
-				writer.WriteBuffer(payload, payloadSize);
-			}, clientToServerKey);
-		}
+            serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, writer => writer.WriteBuffer(payload, payloadSize), clientToServerKey);
+        }
 
-		#endregion
+        #endregion
 
-		#region Core
+        #region Core
 
-		private void createSocket(EndPoint endpoint)
+        private void createSocket(EndPoint endpoint)
 		{
 			this.socket = socketFactory(endpoint);
 		}
@@ -349,15 +346,18 @@ namespace NetcodeIO.NET
 
 			this.socket.Pump();
 
-			this.dt = time - this.time;
-			this.time = time;
+			this.dt = time - this.totalSeconds;
+			this.totalSeconds = time;
 
 			// process buffered packets
 			Datagram datagram;
-			while (socket != null && socket.Read(out datagram))
+            int countAvailable = socket == null ? 0 : socket.AvailableToReadCount;
+            int countProcessed = 0;
+			while (countProcessed < countAvailable && socket.Read(out datagram))
 			{
 				processDatagram(datagram);
 				datagram.Release();
+                ++countProcessed;
 			}
 
 			// process current state
@@ -372,19 +372,31 @@ namespace NetcodeIO.NET
 				case ClientState.Connected:
 					connected();
 					break;
+                default:
+                    GONet.GONetLog.Warning("not in one of the main states....state: " + state);
+                    break;
 			}
 		}
 
 		private double timer = 0.0;
-		private void clientTick(Object stateInfo)
+		private void clientTick_SeparateThread(Object stateInfo)
 		{
 			while (isRunning)
 			{
-				Tick(DateTime.UtcNow.GetTotalSeconds());
-
-				// sleep until next tick
-				double tickLength = 1.0 / tickrate;
-				Thread.Sleep((int)(tickLength * 1000));
+                try
+                {
+                    Tick(DateTime.UtcNow.GetTotalSeconds());
+                }
+                catch (Exception e)
+                {
+                    GONet.GONetLog.Error(string.Concat("Unexpected error while ticking in separate thread.  Exception.Type: ", e.GetType().Name, " Exception.Message: ", e.Message, " \nException.StackTrace: ", e.StackTrace));
+                }
+                finally
+                {
+                    // sleep until next tick
+                    double tickLength = 1.0 / tickrate;
+                    Thread.Sleep((int)(tickLength * 1000));
+                }
 			}
 		}
 
@@ -451,7 +463,7 @@ namespace NetcodeIO.NET
 				sendKeepAlive();
 			}
 
-			if ((time - lastResponseTime) >= Defines.NETCODE_TIMEOUT_SECONDS)
+			if ((totalSeconds - lastResponseTime) >= Defines.NETCODE_TIMEOUT_SECONDS)
 			{
 				disconnect(ClientState.ConnectionTimedOut);
 			}
@@ -461,7 +473,7 @@ namespace NetcodeIO.NET
 		private void sendingConnectionRequest()
 		{
 			// check and make sure connect token hasn't expired while we've been trying to connect
-			if ((ulong)Math.Truncate(time) >= connectToken.ExpireTimestamp)
+			if ((ulong)Math.Truncate(totalSeconds) >= connectToken.ExpireTimestamp)
 			{
 				disconnect(ClientState.ConnectTokenExpired);
 				return;
@@ -536,9 +548,9 @@ namespace NetcodeIO.NET
 				return;
 			}
 
-			lastResponseTime = time;
-			if (OnMessageReceived != null)
-				OnMessageReceived(payloadPacket.Payload, payloadPacket.Length);
+			lastResponseTime = totalSeconds;
+            //GONet.GONetLog.Debug("processing message (which should happen each receive)");
+			OnMessageReceived?.Invoke(payloadPacket.Payload, payloadPacket.Length);
 
 			payloadPacket.Release();
 		}
@@ -555,7 +567,7 @@ namespace NetcodeIO.NET
 			}
 
 			if (this.state == ClientState.Connected || this.state == ClientState.SendingChallengeResponse)
-				lastResponseTime = time;
+				lastResponseTime = totalSeconds;
 
 			if (this.state == ClientState.SendingChallengeResponse)
 			{

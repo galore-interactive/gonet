@@ -269,7 +269,7 @@ namespace NetcodeIO.NET
 	internal struct NetcodePrivateConnectToken
 	{
 		public ulong ClientID;
-		public int TimeoutSeconds;
+		public int TimeoutAfterSeconds;
 		public ConnectTokenServerEntry[] ConnectServers;
 		public byte[] ClientToServerKey;
 		public byte[] ServerToClientKey;
@@ -294,7 +294,7 @@ namespace NetcodeIO.NET
 				using (var reader = ByteArrayReaderWriter.Get(tokenBuffer))
 				{
 					this.ClientID = reader.ReadUInt64();
-					this.TimeoutSeconds = (int)reader.ReadUInt32();
+					this.TimeoutAfterSeconds = (int)reader.ReadUInt32();
 					uint numServerAddresses = reader.ReadUInt32();
 
 					if (numServerAddresses == 0 || numServerAddresses > Defines.MAX_SERVER_ADDRESSES)
@@ -331,7 +331,7 @@ namespace NetcodeIO.NET
 		public void Write(ByteArrayReaderWriter stream)
 		{
 			stream.Write(ClientID);
-			stream.Write((uint)TimeoutSeconds);
+			stream.Write((uint)TimeoutAfterSeconds);
 			stream.Write((uint)ConnectServers.Length);
 			foreach (var server in ConnectServers)
 				server.WriteData(stream);
