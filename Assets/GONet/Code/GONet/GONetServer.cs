@@ -31,10 +31,11 @@ namespace GONet
 
         Server server;
         public uint numConnections = 0;
-        public GONetRemoteClient[] remoteClients;
+        public List<GONetRemoteClient> remoteClients;
         readonly Dictionary<ushort, GONetRemoteClient> remoteClientsByAuthorityId = new Dictionary<ushort, GONetRemoteClient>(10);
         readonly Dictionary<RemoteClient, GONetRemoteClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetRemoteClient>(10);
         readonly ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
+        readonly ConcurrentQueue<RemoteClient> newlyDisconnectedClients = new ConcurrentQueue<RemoteClient>();
 
         public delegate void ClientActionDelegate(GONetConnection_ServerToClient gonetConnection_ServerToClient);
         /// <summary>
@@ -48,7 +49,7 @@ namespace GONet
 
             server = new Server(maxClientCount, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
-            remoteClients = new GONetRemoteClient[maxClientCount];
+            remoteClients = new List<GONetRemoteClient>(maxClientCount);
 
             server.LogLevel = NetcodeLogLevel.Debug;
 
@@ -99,7 +100,7 @@ namespace GONet
                 gONetConnection_ServerToClient.Update(); // have to do this in order for anything to really be processed, in or out.
             }
 
-            ProcessNewClientConnections_MainUnityThread();
+            ProcessClientsNewlyConnectedDisconnected_MainUnityThread();
         }
 
         public void SendBytesToAllClients(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
@@ -144,6 +145,8 @@ namespace GONet
         {
             const string DIS = "client *DIS*connected";
             GONetLog.Debug(DIS);
+
+            newlyDisconnectedClients.Enqueue(client);
         }
 
         /// <summary>
@@ -157,7 +160,7 @@ namespace GONet
             newlyConnectedClients.Enqueue(client);
         }
 
-        private void ProcessNewClientConnections_MainUnityThread()
+        private void ProcessClientsNewlyConnectedDisconnected_MainUnityThread()
         {
             int count = newlyConnectedClients.Count;
             for (int i = 0; i < count && !newlyConnectedClients.IsEmpty; ++i)
@@ -165,22 +168,44 @@ namespace GONet
                 RemoteClient client;
                 if (newlyConnectedClients.TryDequeue(out client))
                 {
-                    ProcessNewClientConnection_MainUnityThread(client);
+                    ProcessClientNewlyConnected_MainUnityThread(client);
+                } // else TODO warn
+            }
+
+            count = newlyDisconnectedClients.Count;
+            for (int i = 0; i < count && !newlyDisconnectedClients.IsEmpty; ++i)
+            {
+                RemoteClient client;
+                if (newlyDisconnectedClients.TryDequeue(out client))
+                {
+                    ProcessClientNewlyDisconnected_MainUnityThread(client);
                 } // else TODO warn
             }
         }
 
-        private void ProcessNewClientConnection_MainUnityThread(RemoteClient client)
+        private void ProcessClientNewlyConnected_MainUnityThread(RemoteClient client)
         {
             if (numConnections < MaxClientCount)
             {
                 GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client);
                 GONetRemoteClient remoteClient = new GONetRemoteClient(client, gonetConnection_ServerToClient);
-                remoteClients[numConnections++] = remoteClient;
+                remoteClients.Add(remoteClient);
+                ++numConnections;
                 remoteClientToGONetConnectionMap[client] = remoteClient;
 
                 ClientConnected?.Invoke(gonetConnection_ServerToClient);
-            }
+            } // else TODO warn
+        }
+
+        private void ProcessClientNewlyDisconnected_MainUnityThread(RemoteClient client)
+        {
+            GONetRemoteClient gonetRemoteClient;
+            if (remoteClientToGONetConnectionMap.TryGetValue(client, out gonetRemoteClient) && remoteClients.Remove(gonetRemoteClient))
+            {
+                --numConnections;
+            } // else TODO warn
+
+            remoteClientToGONetConnectionMap.Remove(client);
         }
 
         public void Stop()

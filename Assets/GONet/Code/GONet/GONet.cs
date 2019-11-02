@@ -705,7 +705,7 @@ namespace GONet
                 byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
 
                 uint count = _gonetServer.numConnections;// remoteClients.Length;
-                for (uint i = 0; i < count; ++i)
+                for (int i = 0; i < count; ++i)
                 {
                     GONetConnection_ServerToClient remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
                     if (remoteClientConnection.OwnerAuthorityId != eventEnvelope.SourceAuthorityId)
