@@ -137,6 +137,17 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                     EditorGUILayout.EndHorizontal();
                 }
 
+                if (targetGONetParticipant.GONetIdAtInstantiation != targetGONetParticipant.GONetId)
+                { // GoNetIdAtInstantiation
+                    EditorGUILayout.BeginHorizontal();
+                    const string GONET_ID = "GO Net Id (At Instantiation)";
+                    const string TT = "This is the original/first GONetId assigned, but it has changed due to someone else assuming authority over it (e.g., the server via GONetMain.Server_AssumeAuthorityOver()).";
+                    GUIContent tooltip = new GUIContent(GONET_ID, TT);
+                    EditorGUILayout.LabelField(tooltip);
+                    EditorGUILayout.TextField(targetGONetParticipant.GONetIdAtInstantiation.ToString());
+                    EditorGUILayout.EndHorizontal();
+                }
+
                 { // GoNetId RAW
                     EditorGUILayout.BeginHorizontal();
                     const string GONET_ID_RAW = "GO Net Id (RAW)";

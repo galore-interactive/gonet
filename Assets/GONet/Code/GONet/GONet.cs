@@ -205,10 +205,10 @@ namespace GONet
         /// </summary>
         public static uint GetGONetIdAtInstantiation(uint currentGONetId)
         {
-            uint gonetId;
-            if (gonetIdAtInstantiation_by_currentGONetId.TryGetValue(currentGONetId, out gonetId))
+            GONetParticipant gonetParticipant;
+            if (gonetParticipantByGONetIdMap.TryGetValue(currentGONetId, out gonetParticipant))
             {
-                return gonetId;
+                return gonetParticipant.GONetIdAtInstantiation;
             }
             else
             {
@@ -552,33 +552,32 @@ namespace GONet
             }
         }
 
-        internal static readonly Dictionary<uint, uint> gonetIdAtInstantiation_by_currentGONetId = new Dictionary<uint, uint>(5000);
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipant_by_gonetIdAtInstantiation = new Dictionary<uint, GONetParticipant>(5000);
 
-        internal static void OnGONetIdAboutToBeSet(uint gonetId_previous, uint gonetId_new, uint gonetId_raw_new, ushort ownerAuthorityId_new, GONetParticipant gonetParticipant)
+        internal static void OnGONetIdAboutToBeSet(uint gonetId_new, uint gonetId_raw_new, ushort ownerAuthorityId_new, GONetParticipant gonetParticipant)
         {
-            if (GONetParticipant.AreAllGONetIdComponentsPopulated(gonetId_raw_new, ownerAuthorityId_new)) // IMPORTANT: since the change is not yet made and is about to be set, we have to call this method instead of gonetParticipant.DoesGONetIdContainAllComponents() directly on the gnp
+            if (gonetId_new == gonetParticipant.GONetIdAtInstantiation)
             {
-                uint gonetId_atInstantiation;
-                if (gonetIdAtInstantiation_by_currentGONetId.TryGetValue(gonetId_previous, out gonetId_atInstantiation))
-                {
-                    // cannot do this anymore since "ChangesBundle" serialization counts on this being populated: gonetIdAtInstantiation_by_currentGONetId.Remove(gonetId_previous); // OLD COMMENT>  but worth remembering: this step may seem unnecessary, because the data is actually still valid, we just expect noone will ever need to look up by something that is no longer going to be valid...the real reason to do this is to keep dictionary as small as possible
-                }
-                else
-                {
-                    gonetId_atInstantiation = gonetId_new;
-                    gonetParticipant_by_gonetIdAtInstantiation[gonetId_atInstantiation] = gonetParticipant;
-                }
-
-                gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_atInstantiation;
-
-                //const string GNI = "gonetId: ";
-                //const string MAP = " is now mapped to gonetId_atInstantiation: ";
-                //GONetLog.Debug(string.Concat(GNI, gonetId_new, MAP, gonetId_atInstantiation));
+                gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+                gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant;
             }
+            else
+            {
+                ushort ownerAuthorityId_asRepresentedInside_gonetIdAtInstantiation = (ushort)((gonetParticipant.GONetIdAtInstantiation << GONetParticipant.GONET_ID_BIT_COUNT_USED) >> GONetParticipant.GONET_ID_BIT_COUNT_USED);
+                uint gonetId_raw_asRepresentedInside_gonetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation >> GONetParticipant.GONET_ID_BIT_COUNT_UNUSED;
 
-            gonetParticipantByGONetIdMap.Remove(gonetId_previous);
-            gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
+                bool areAllComponentsChanging =
+                    ownerAuthorityId_asRepresentedInside_gonetIdAtInstantiation != ownerAuthorityId_new &&
+                    gonetId_raw_asRepresentedInside_gonetIdAtInstantiation != gonetId_raw_new;
+
+                if (areAllComponentsChanging)
+                {
+                    gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+
+                    gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
+                    gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
+                }
+            }
         }
 
         private static void OnGONetIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
@@ -593,11 +592,29 @@ namespace GONet
         /// </summary>
         private static void OnGONetIdComponentChanged_EnsureMapKeysUpdated(GONetParticipant gonetParticipant, uint previousGONetId)
         {
-            gonetParticipantByGONetIdMap.Remove(previousGONetId);
-
             if ((object)gonetParticipant != null && gonetParticipant.GONetId != GONetParticipant.GONetId_Unset)
             {
-                gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+                if (gonetParticipant.GONetId == gonetParticipant.GONetIdAtInstantiation)
+                {
+                    gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+                }
+                else
+                {
+                    ushort ownerAuthorityId_asRepresentedInside_gonetIdAtInstantiation = (ushort)((gonetParticipant.GONetIdAtInstantiation << GONetParticipant.GONET_ID_BIT_COUNT_USED) >> GONetParticipant.GONET_ID_BIT_COUNT_USED);
+                    uint gonetId_raw_asRepresentedInside_gonetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation >> GONetParticipant.GONET_ID_BIT_COUNT_UNUSED;
+
+                    bool areAllComponentsChanging =
+                        ownerAuthorityId_asRepresentedInside_gonetIdAtInstantiation != gonetParticipant.OwnerAuthorityId &&
+                        gonetId_raw_asRepresentedInside_gonetIdAtInstantiation != gonetParticipant.gonetId_raw;
+
+                    if (areAllComponentsChanging)
+                    {
+                        gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+
+                        gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
+                        gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
+                    }
+                }
             }
             else
             {
@@ -2790,7 +2807,7 @@ namespace GONet
             }
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
-            GONetLog.AppendLine(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
+            //GONetLog.AppendLine(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
             Queue<SyncEvent_ValueChangeProcessed> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
             for (int i = 0; i < countTotal; ++i)
@@ -2810,20 +2827,18 @@ namespace GONet
                     GONetLog.Error(string.Concat(SNAFU, ShouldSendChange(change, filterUsingOwnerAuthorityId), FUOA, filterUsingOwnerAuthorityId));
                 }
 
-                uint gonetIdAtInstantiation = GetGONetIdAtInstantiation(change.syncCompanion.gonetParticipant.GONetId);
-
-                if (gonetIdAtInstantiation == GONetParticipant.GONetId_Unset)
+                if (change.syncCompanion.gonetParticipant.GONetIdAtInstantiation == GONetParticipant.GONetId_Unset)
                 {
                     const string SNAFU = "Snafoo....gonetIdAtInstantiation 0.....how is this possible? gnp.gonetId: ";
                     GONetLog.Error(string.Concat(SNAFU, change.syncCompanion.gonetParticipant.GONetId));
                 }
 
-                GONetLog.Append(gonetIdAtInstantiation + ", ");
-                bitStream_headerAlreadyWritten.WriteUInt(gonetIdAtInstantiation); // have to write the gonetid first before each changed value
+                //GONetLog.Append(change.syncCompanion.gonetParticipant.GONetIdAtInstantiation + ", ");
+                bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetIdAtInstantiation); // have to write the gonetid first before each changed value
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
             }
-            GONetLog.Append_FlushDebug();
+            //GONetLog.Append_FlushDebug();
 
             return countFiltered;
         }
@@ -2862,17 +2877,19 @@ namespace GONet
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
-            GONetLog.AppendLine(string.Concat("about to read changes bundle...count: " + count));
+            //GONetLog.AppendLine(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
                 uint gonetIdAtInstantiation;
                 bitStream_headerAlreadyRead.ReadUInt(out gonetIdAtInstantiation);
+                //GONetLog.Append(gonetIdAtInstantiation + ", ");
 
                 uint gonetId = GetCurrentGONetIdByIdAtInstantiation(gonetIdAtInstantiation);
-                GONetLog.Append(gonetId + ", ");
 
                 if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                 {
+                    //GONetLog.Append_FlushDebug();
+
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
                     if (channelQuality == QosType.Reliable)
                     {
@@ -2917,7 +2934,7 @@ namespace GONet
                     throw e;
                 }
             }
-            GONetLog.Append_FlushDebug(string.Concat("\n************done reading changes bundle"));
+            //GONetLog.Append_FlushDebug("\n************done reading changes bundle");
         }
 
         /// <summary>

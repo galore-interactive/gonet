@@ -218,7 +218,14 @@ namespace GONet
                 GONetLog.Info(string.Concat(CHG, gonetId_raw_priorToChanges, NEW, gonetId_raw_new));
             }
 
-            GONetMain.OnGONetIdAboutToBeSet(gonetId_priorToChanges, gonetId_new, gonetId_raw_new, ownerAuthorityId_new, this);
+            if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
+            {
+                //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
+
+                GONetIdAtInstantiation = gonetId_new;
+            }
+
+            GONetMain.OnGONetIdAboutToBeSet(gonetId_new, gonetId_raw_new, ownerAuthorityId_new, this);
 
             ownerAuthorityId = ownerAuthorityId_new;
             gonetId_raw = gonetId_raw_new;
@@ -250,6 +257,8 @@ namespace GONet
                 OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(false, gonetId_previous);
             }
         }
+
+        public uint GONetIdAtInstantiation { get; private set; }
 
         [GONetAutoMagicalSync]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
@@ -316,12 +325,6 @@ namespace GONet
         public bool DoesGONetIdContainAllComponents()
         {
             return gonetId_raw != GONetId_Unset && OwnerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool AreAllGONetIdComponentsPopulated(uint gonetId_raw, ushort ownerAuthorityId)
-        {
-            return gonetId_raw != GONetId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
         }
 
         /// <summary>
@@ -467,13 +470,12 @@ namespace GONet
 
             public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
             {
-                uint gonetIdAtInstantiation = GONetMain.GetGONetIdAtInstantiation(gonetParticipant.GONetId);
-                bool isOwnershipChange = gonetIdAtInstantiation != value.System_UInt32; // IMPORTANT: this is only good logic when the server assumes ownership over client....and no other ownership changes after that will register here
+                bool isOwnershipChange = gonetParticipant.GONetIdAtInstantiation != value.System_UInt32; // IMPORTANT: this is only good logic when the server assumes ownership over client....and no other ownership changes after that will register here
                 bitStream_appendTo.WriteBit(isOwnershipChange);
 
                 if (isOwnershipChange)
                 {
-                    bitStream_appendTo.WriteUInt(gonetIdAtInstantiation);
+                    bitStream_appendTo.WriteUInt(gonetParticipant.GONetIdAtInstantiation);
                 }
                 else
                 {
