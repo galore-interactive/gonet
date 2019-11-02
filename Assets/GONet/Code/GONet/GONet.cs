@@ -2790,7 +2790,7 @@ namespace GONet
             }
 
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
-            //GONetLog.Debug(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
+            GONetLog.AppendLine(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
             Queue<SyncEvent_ValueChangeProcessed> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
             for (int i = 0; i < countTotal; ++i)
@@ -2818,10 +2818,12 @@ namespace GONet
                     GONetLog.Error(string.Concat(SNAFU, change.syncCompanion.gonetParticipant.GONetId));
                 }
 
+                GONetLog.Append(gonetIdAtInstantiation + ", ");
                 bitStream_headerAlreadyWritten.WriteUInt(gonetIdAtInstantiation); // have to write the gonetid first before each changed value
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
             }
+            GONetLog.Append_FlushDebug();
 
             return countFiltered;
         }
@@ -2860,13 +2862,14 @@ namespace GONet
         {
             ushort count;
             bitStream_headerAlreadyRead.ReadUShort(out count);
-            //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
+            GONetLog.AppendLine(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
                 uint gonetIdAtInstantiation;
                 bitStream_headerAlreadyRead.ReadUInt(out gonetIdAtInstantiation);
 
                 uint gonetId = GetCurrentGONetIdByIdAtInstantiation(gonetIdAtInstantiation);
+                GONetLog.Append(gonetId + ", ");
 
                 if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                 {
@@ -2914,7 +2917,7 @@ namespace GONet
                     throw e;
                 }
             }
-            //GONetLog.Debug(string.Concat("************done reading changes bundle"));
+            GONetLog.Append_FlushDebug(string.Concat("\n************done reading changes bundle"));
         }
 
         /// <summary>

@@ -19,6 +19,8 @@ using UnityEngine;
 using log4net;
 using System;
 using System.Threading;
+using System.Collections.Concurrent;
+using System.Text;
 
 namespace GONet
 {
@@ -61,6 +63,108 @@ namespace GONet
             FileInfo info = new FileInfo(Path.Combine(Application.dataPath, configPath));
             log4net.Config.XmlConfigurator.Configure(info);
         }
+
+        #region Append methods
+
+        static readonly ConcurrentDictionary<Thread, StringBuilder> appendStringBuilderByThreadMap = new ConcurrentDictionary<Thread, StringBuilder>();
+
+        public static void Append(string message)
+        {
+            Append(message, false);
+        }
+
+        public static void AppendLine(string message)
+        {
+            Append(message, true);
+        }
+
+        private static void Append(string message, bool doesIncludeEOL)
+        {
+            StringBuilder stringBuilder;
+            if (!appendStringBuilderByThreadMap.TryGetValue(Thread.CurrentThread, out stringBuilder))
+            {
+                appendStringBuilderByThreadMap[Thread.CurrentThread] = stringBuilder = new StringBuilder(5000);
+            }
+
+            stringBuilder.Append(message);
+            if (doesIncludeEOL)
+            {
+                stringBuilder.Append(Environment.NewLine);
+            }
+        }
+
+        public static bool Append_FlushVerbose(string message = null)
+        {
+            return Append_Flush(KeyVerbose, message);
+        }
+
+        public static bool Append_FlushDebug(string message = null)
+        {
+            return Append_Flush(KeyDebug, message);
+        }
+
+        public static bool Append_FlushInfo(string message = null)
+        {
+            return Append_Flush(KeyInfo, message);
+        }
+
+        public static bool Append_FlushWarning(string message = null)
+        {
+            return Append_Flush(KeyWarning, message);
+        }
+
+        public static bool Append_FlushError(string message = null)
+        {
+            return Append_Flush(KeyError, message);
+        }
+
+        public static bool Append_FlushFatal(string message = null)
+        {
+            return Append_Flush(KeyFatal, message);
+        }
+
+        private static bool Append_Flush(string logLevelKey, string message)
+        {
+            if (message != null)
+            {
+                Append(message, false);
+            }
+
+            StringBuilder stringBuilder;
+            if (appendStringBuilderByThreadMap.TryGetValue(Thread.CurrentThread, out stringBuilder))
+            {
+                if (stringBuilder.Length > 0)
+                {
+                    switch (logLevelKey)
+                    {
+                        case KeyVerbose:
+                            Verbose(stringBuilder.ToString());
+                            break;
+                        case KeyDebug:
+                            Debug(stringBuilder.ToString());
+                            break;
+                        case KeyInfo:
+                            Info(stringBuilder.ToString());
+                            break;
+                        case KeyWarning:
+                            Warning(stringBuilder.ToString());
+                            break;
+                        case KeyError:
+                            Error(stringBuilder.ToString());
+                            break;
+                        case KeyFatal:
+                            Fatal(stringBuilder.ToString());
+                            break;
+                    }
+                    stringBuilder.Clear();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
 
         [Conditional("LOG_INFO")]
         public static void Info(string message)
