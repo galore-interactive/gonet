@@ -842,7 +842,11 @@ namespace NetcodeIO.NET
 				sendKeepAlive(client);
 
 			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
-			if (cryptIdx == -1) return;
+            if (cryptIdx == -1)
+            {
+                GONet.GONetLog.Warning("This is some bogus turdmeal.  Trying to send payload to client, but no encryption mapping is going go cause not sending it.  Double you tea, Eff?");
+                return;
+            }
 
             byte[] cryptKey = encryptionManager.GetSendKey(cryptIdx);
 
@@ -929,8 +933,9 @@ namespace NetcodeIO.NET
 				packetLen = (int)packetWriter.WritePosition;
 			}
 
-			// send packet
-			listenSocket.SendTo(packetBuffer, packetLen, endpoint);
+            // send packet
+            //GONet.GONetLog.Debug("sending...packetLen: " + packetLen);
+            listenSocket.SendTo(packetBuffer, packetLen, endpoint);
 
 			BufferPool.ReturnBuffer(packetBuffer);
 			BufferPool.ReturnBuffer(encryptedPacketBuffer);

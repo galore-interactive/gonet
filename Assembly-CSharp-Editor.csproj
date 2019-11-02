@@ -72,7 +72,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetGlobalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLocalCustomInspector.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLog_EditorSupport.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
@@ -334,9 +333,6 @@
     </Reference>
     <Reference Include="ConsoleE">
       <HintPath>C:/projects/unity/gonet/Assets/ConsoleE/Editor/ConsoleE.dll</HintPath>
-    </Reference>
-    <Reference Include="ConsoleE">
-      <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/ConsoleE/Editor/ConsoleE.dll</HintPath>
     </Reference>
     <Reference Include="Common.Logging">
       <HintPath>C:/projects/unity/gonet/Assets/GONet/Plugins/log4net/Common.Logging.dll</HintPath>

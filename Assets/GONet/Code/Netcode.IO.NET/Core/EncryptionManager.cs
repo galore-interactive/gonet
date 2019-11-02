@@ -192,34 +192,20 @@ namespace NetcodeIO.NET
 			encryptionMappings[index].ExpiresAtSeconds = expiresAtSeconds;
 		}
 
-		public unsafe int GetEncryptionMappingIndexForTime(EndPoint address, double currentSeconds)
+		public int GetEncryptionMappingIndexForTime(EndPoint address, double currentSeconds)
 		{
-            System.Text.StringBuilder msg = new System.Text.StringBuilder(500);
-
-            msg.Append("numEncryptionMappings: ").Append(encyrptionMappings_usedCount);
-
             for (int i = 0; i < encyrptionMappings_totalCount; ++i)
 			{
                 encryptionMapEntry encryptionMapping = encryptionMappings[i];
                 if (!encryptionMapping.IsReset &&
                     MiscUtils.AddressEqual(encryptionMapping.Address, address) &&
-					(encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds >= currentSeconds || encryptionMapping.TimeoutAfterSeconds <= 0) &&
-					(encryptionMapping.ExpiresAtSeconds < 0.0 || encryptionMapping.ExpiresAtSeconds >= currentSeconds))
+					((encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds) >= currentSeconds || encryptionMapping.TimeoutAfterSeconds <= 0) &&
+					(encryptionMapping.ExpiresAtSeconds <= 0.0 || encryptionMapping.ExpiresAtSeconds >= currentSeconds))
 				{
                     encryptionMappings[i].LastAccessedAtSeconds = currentSeconds;
 					return i;
 				}
-
-                msg
-                    .Append("\ni: ").Append(i).Append(" hashCode: ").Append(encryptionMapping.GetHashCode())
-                    .Append(" address ?= ").Append(MiscUtils.AddressEqual(encryptionMapping.Address, address)).Append(" address: ").Append(address.ToString()).Append(" encryptionMapping.Address: ").Append(encryptionMapping.Address == null ? "<null>" : encryptionMapping.Address.ToString())
-                    .Append(" lastAccessTime: ").Append(encryptionMapping.LastAccessedAtSeconds)
-                    .Append(" encryptionMappings[i].TimeoutSeconds: ").Append(encryptionMapping.TimeoutAfterSeconds)
-                    .Append(" time: ").Append(currentSeconds)
-                    .Append(" encryptionMappings[i].ExpireTime: ").Append(encryptionMapping.ExpiresAtSeconds);
             }
-
-            GONet.GONetLog.Debug(msg.ToString());
 
             return -1;
 		}

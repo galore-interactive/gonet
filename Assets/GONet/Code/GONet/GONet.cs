@@ -216,6 +216,16 @@ namespace GONet
             }
         }
 
+        public static uint GetCurrentGONetIdByIdAtInstantiation(uint gonetIdAtInstantiation)
+        {
+            GONetParticipant gonetParticipant = null;
+            if (gonetParticipant_by_gonetIdAtInstantiation.TryGetValue(gonetIdAtInstantiation, out gonetParticipant))
+            {
+                return gonetParticipant.GONetId;
+            }
+            return GONetParticipant.GONetId_Unset;
+        }
+
         /// <summary>
         /// IMPORTANT: Prior to things being initialized with network connection(s), we may not know if we are a client or a server...in which case, this will return false!
         /// </summary>
@@ -543,21 +553,28 @@ namespace GONet
         }
 
         internal static readonly Dictionary<uint, uint> gonetIdAtInstantiation_by_currentGONetId = new Dictionary<uint, uint>(5000);
+        internal static readonly Dictionary<uint, GONetParticipant> gonetParticipant_by_gonetIdAtInstantiation = new Dictionary<uint, GONetParticipant>(5000);
 
-        internal static void OnGONetIdSet(uint gonetId_previous, uint gonetId_new, GONetParticipant gonetParticipant)
+        internal static void OnGONetIdAboutToBeSet(uint gonetId_previous, uint gonetId_new, uint gonetId_raw_new, ushort ownerAuthorityId_new, GONetParticipant gonetParticipant)
         {
-            if (gonetParticipant.DoesGONetIdContainAllComponents())
+            if (GONetParticipant.AreAllGONetIdComponentsPopulated(gonetId_raw_new, ownerAuthorityId_new)) // IMPORTANT: since the change is not yet made and is about to be set, we have to call this method instead of gonetParticipant.DoesGONetIdContainAllComponents() directly on the gnp
             {
                 uint gonetId_atInstantiation;
                 if (gonetIdAtInstantiation_by_currentGONetId.TryGetValue(gonetId_previous, out gonetId_atInstantiation))
                 {
-                    gonetIdAtInstantiation_by_currentGONetId.Remove(gonetId_previous); // this step may seem unnecessary, because the data is actually still valid, we just expect noone will ever need to look up by something that is no longer going to be valid...the real reason to do this is to keep dictionary as small as possible
-                    gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_atInstantiation;
+                    // cannot do this anymore since "ChangesBundle" serialization counts on this being populated: gonetIdAtInstantiation_by_currentGONetId.Remove(gonetId_previous); // OLD COMMENT>  but worth remembering: this step may seem unnecessary, because the data is actually still valid, we just expect noone will ever need to look up by something that is no longer going to be valid...the real reason to do this is to keep dictionary as small as possible
                 }
                 else
                 {
-                    gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_new;
+                    gonetId_atInstantiation = gonetId_new;
+                    gonetParticipant_by_gonetIdAtInstantiation[gonetId_atInstantiation] = gonetParticipant;
                 }
+
+                gonetIdAtInstantiation_by_currentGONetId[gonetId_new] = gonetId_atInstantiation;
+
+                //const string GNI = "gonetId: ";
+                //const string MAP = " is now mapped to gonetId_atInstantiation: ";
+                //GONetLog.Debug(string.Concat(GNI, gonetId_new, MAP, gonetId_atInstantiation));
             }
 
             gonetParticipantByGONetIdMap.Remove(gonetId_previous);
@@ -1679,7 +1696,7 @@ namespace GONet
                         bitStream.ReadLong(out elapsedTicksAtSend);
                         ////////////////////////////////////////////////////////////////////////////
 
-                        //GONetLog.Debug("received something....my seconds: " + Time.ElapsedSeconds);
+                        //GONetLog.Debug("received something....networkData.bytesUsedCount: " + networkData.bytesUsedCount);
 
                         {  // body:
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
@@ -2542,7 +2559,7 @@ namespace GONet
                                 byte[] changesSerialized_clientSpecific = SerializeWhole_ChangesBundle(syncValuesToSend, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, gONetConnection_ServerToClient.OwnerAuthorityId, myTicks);
                                 if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
                                 {
-                                    //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this.");  /////////////////////////// DREETS!
+                                    //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this. bytesUsedCount: " + bytesUsedCount);  /////////////////////////// DREETS!
                                     SendBytesToRemoteConnection(gONetConnection_ServerToClient, changesSerialized_clientSpecific, bytesUsedCount, uniqueGrouping_channelId);
                                     myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
                                 }
@@ -2792,7 +2809,16 @@ namespace GONet
                     const string FUOA = " filterUsingOwnerAuthorityId: ";
                     GONetLog.Error(string.Concat(SNAFU, ShouldSendChange(change, filterUsingOwnerAuthorityId), FUOA, filterUsingOwnerAuthorityId));
                 }
-                bitStream_headerAlreadyWritten.WriteUInt(change.syncCompanion.gonetParticipant.GONetId); // have to write the gonetid first before each changed value
+
+                uint gonetIdAtInstantiation = GetGONetIdAtInstantiation(change.syncCompanion.gonetParticipant.GONetId);
+
+                if (gonetIdAtInstantiation == GONetParticipant.GONetId_Unset)
+                {
+                    const string SNAFU = "Snafoo....gonetIdAtInstantiation 0.....how is this possible? gnp.gonetId: ";
+                    GONetLog.Error(string.Concat(SNAFU, change.syncCompanion.gonetParticipant.GONetId));
+                }
+
+                bitStream_headerAlreadyWritten.WriteUInt(gonetIdAtInstantiation); // have to write the gonetid first before each changed value
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
             }
@@ -2837,8 +2863,10 @@ namespace GONet
             //GONetLog.Debug(string.Concat("about to read changes bundle...count: " + count));
             for (int i = 0; i < count; ++i)
             {
-                uint gonetId;
-                bitStream_headerAlreadyRead.ReadUInt(out gonetId);
+                uint gonetIdAtInstantiation;
+                bitStream_headerAlreadyRead.ReadUInt(out gonetIdAtInstantiation);
+
+                uint gonetId = GetCurrentGONetIdByIdAtInstantiation(gonetIdAtInstantiation);
 
                 if (!gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                 {
@@ -2846,13 +2874,15 @@ namespace GONet
                     if (channelQuality == QosType.Reliable)
                     {
                         const string GLAD = "Reliable changes bundle being process and GONetParticipant NOT FOUND by GONetId: ";
+                        const string INST = " gonetId@instantiation(as found in serialized body): ";
                         const string COUNT = "  This will cause us not to be able to process this and the rest of the bundle, which means we will not process count: ";
-                        throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, COUNT, (count - i)));
+                        throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT, (count - i)));
                     }
                     else
                     {
-                        //const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"";
-                        //GONetLog.Warning(NTS);
+                        const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"  gonetId(from message, which is expected to be at instantiation): ";
+                        const string LOCAL = " gonetId (from lookup, supposed to be current): ";
+                        GONetLog.Warning(string.Concat(NTS, gonetIdAtInstantiation, LOCAL, gonetId));
                         return;
                     }
                 }

@@ -186,37 +186,43 @@ namespace GONet
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow, uint gonetId_priorToChanges)
         {
+            ushort ownerAuthorityId_new = ownerAuthorityId;
+
             if (!isOwnerAuthorityIdKnownToBeGoodValueNow)
             {
                 ushort ownerAuthorityId_asRepresentedInside_gonetId = (ushort)((gonetId << GONET_ID_BIT_COUNT_USED) >> GONET_ID_BIT_COUNT_USED);
 
-                if (ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId != ownerAuthorityId_asRepresentedInside_gonetId)
+                if (ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId_new != ownerAuthorityId_asRepresentedInside_gonetId)
                 {
-                    if (ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset)
+                    if (ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
                     {
                         const string CHG = "OwnerAuthorityId changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous OwnerAuthorityId: ";
                         const string NEW = " new OwnerAuthorityId: ";
                         const string GNS = "<GONet server>";
-                        GONetLog.Info(string.Concat(CHG, ownerAuthorityId, NEW, ownerAuthorityId_asRepresentedInside_gonetId == GONetMain.OwnerAuthorityId_Server ? GNS : ownerAuthorityId_asRepresentedInside_gonetId.ToString()));
+                        GONetLog.Info(string.Concat(CHG, ownerAuthorityId_new, NEW, ownerAuthorityId_asRepresentedInside_gonetId == GONetMain.OwnerAuthorityId_Server ? GNS : ownerAuthorityId_asRepresentedInside_gonetId.ToString()));
                     }
 
                     // big ASSumption here, that if the gonetId contains a non-zero value for authority id and we have both (1) not represented that value inside ownerAuthorityId component and (2) ownerAuthorityId is unset....we are ASSuming gonetId composite contains the real/new value for ownerAuthorityId and we should use it!
-                    ownerAuthorityId = ownerAuthorityId_asRepresentedInside_gonetId;
+                    ownerAuthorityId_new = ownerAuthorityId_asRepresentedInside_gonetId;
                 }
             }
 
             uint gonetId_raw_priorToChanges = (gonetId_priorToChanges >> GONET_ID_BIT_COUNT_UNUSED);
-            gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
-            gonetId = unchecked((uint)(gonetId_raw << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId;
+            uint gonetId_raw_new = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
+            uint gonetId_new = unchecked((uint)(gonetId_raw_new << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId_new;
 
-            if (gonetId_raw_priorToChanges != GONetIdRaw_Unset && gonetId_raw != gonetId_raw_priorToChanges)
+            if (gonetId_raw_priorToChanges != GONetIdRaw_Unset && gonetId_raw_new != gonetId_raw_priorToChanges)
             {
                 const string CHG = "gonetId_raw changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous gonetId_raw: ";
                 const string NEW = " new gonetId_raw: ";
-                GONetLog.Info(string.Concat(CHG, gonetId_raw_priorToChanges, NEW, gonetId_raw));
+                GONetLog.Info(string.Concat(CHG, gonetId_raw_priorToChanges, NEW, gonetId_raw_new));
             }
 
-            GONetMain.OnGONetIdSet(gonetId_priorToChanges, gonetId, this);
+            GONetMain.OnGONetIdAboutToBeSet(gonetId_priorToChanges, gonetId_new, gonetId_raw_new, ownerAuthorityId_new, this);
+
+            ownerAuthorityId = ownerAuthorityId_new;
+            gonetId_raw = gonetId_raw_new;
+            gonetId = gonetId_new;
         }
 
         public uint gonetId_raw { get; private set; } = GONetIdRaw_Unset;
@@ -232,6 +238,7 @@ namespace GONet
             GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
             SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, // important that this gets immediately communicated when it changes to avoid other changes related to this participant possibly getting processed before this required prerequisite assignment is made (i.e., other end will not be able to correlate the other changes to this participant if this has not been processed yet)
             ProcessingPriority_GONetInternalOverride = int.MaxValue,
+            CustomSerialize_Type = typeof(GONetId_InitialAssignment_CustomSerializer),
             MustRunOnUnityMainThread = true)]
         public uint GONetId
         {
@@ -309,6 +316,12 @@ namespace GONet
         public bool DoesGONetIdContainAllComponents()
         {
             return gonetId_raw != GONetId_Unset && OwnerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AreAllGONetIdComponentsPopulated(uint gonetId_raw, ushort ownerAuthorityId)
+        {
+            return gonetId_raw != GONetId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
         }
 
         /// <summary>
@@ -414,22 +427,35 @@ namespace GONet
 
             public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
             {
-                string fullUniquePath;
-                bitStream_readFrom.ReadString(out fullUniquePath);
-                
-                uint gonetId = GONetId_Unset;
-                bitStream_readFrom.ReadUInt(out gonetId); // should we order change list by this id ascending and just put diff from last value?
-                
-                GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
                 GONetParticipant gonetParticipant = null;
-                if ((object)gonetParticipantGO == null)
+
+                bool isOwnershipChange;
+                bitStream_readFrom.ReadBit(out isOwnershipChange);
+                if (isOwnershipChange)
                 {
-                    GONetLog.Warning("If this is a client " + (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, but its not and this is the SERVER and you have some worrying to do)") + ", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
+                    uint gonetIdAtInstantiation = GONetId_Unset;
+                    bitStream_readFrom.ReadUInt(out gonetIdAtInstantiation);
+
+                    gonetParticipant = GONetMain.GetGONetParticipantById(gonetIdAtInstantiation);
                 }
                 else
                 {
-                    gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+                    string fullUniquePath;
+                    bitStream_readFrom.ReadString(out fullUniquePath);
+
+                    GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
+                    if ((object)gonetParticipantGO == null)
+                    {
+                        GONetLog.Warning("If this is a client " + (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, it's not and this is the SERVER and you have some worrying to do)") + ", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
+                    }
+                    else
+                    {
+                        gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
+                    }
                 }
+
+                uint gonetId = GONetId_Unset;
+                bitStream_readFrom.ReadUInt(out gonetId); // should we order change list by this id ascending and just put diff from last value?
 
                 if ((object)gonetParticipant != null)
                 {
@@ -441,8 +467,19 @@ namespace GONet
 
             public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
             {
-                string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
-                bitStream_appendTo.WriteString(fullUniquePath);
+                uint gonetIdAtInstantiation = GONetMain.GetGONetIdAtInstantiation(gonetParticipant.GONetId);
+                bool isOwnershipChange = gonetIdAtInstantiation != value.System_UInt32; // IMPORTANT: this is only good logic when the server assumes ownership over client....and no other ownership changes after that will register here
+                bitStream_appendTo.WriteBit(isOwnershipChange);
+
+                if (isOwnershipChange)
+                {
+                    bitStream_appendTo.WriteUInt(gonetIdAtInstantiation);
+                }
+                else
+                {
+                    string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
+                    bitStream_appendTo.WriteString(fullUniquePath);
+                }
 
                 uint gonetId = value.System_UInt32;
                 bitStream_appendTo.WriteUInt(gonetId);

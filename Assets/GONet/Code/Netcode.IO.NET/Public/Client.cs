@@ -526,7 +526,7 @@ namespace NetcodeIO.NET
 			if (checkReplay(header)) return;
 			if (this.state != ClientState.Connected) return;
 
-			var decryptKey = serverToClientKey;
+            byte[] decryptKey = serverToClientKey;
 			var disconnectPacket = new NetcodeDisconnectPacket() { Header = header };
 			if (!disconnectPacket.Read(stream, length, decryptKey, connectToken.ProtocolID))
 			{
@@ -538,10 +538,15 @@ namespace NetcodeIO.NET
 
 		private void processConnectionPayload(NetcodePacketHeader header, int length, ByteArrayReaderWriter stream)
 		{
-			if (checkReplay(header)) return;
-			if (this.state != ClientState.Connected) return;
+            if (checkReplay(header))
+            {
+                GONet.GONetLog.Warning("This is some bogus turdmeal.  Trying to send payload to client, but no encryption mapping is going go cause not sending it.  Double you tea, Eff?");
+                return;
+            }
 
-			var decryptKey = serverToClientKey;
+			if (state != ClientState.Connected) return;
+
+            byte[] decryptKey = serverToClientKey;
 			var payloadPacket = new NetcodePayloadPacket() { Header = header };
 			if (!payloadPacket.Read(stream, length, decryptKey, connectToken.ProtocolID))
 			{
@@ -549,7 +554,7 @@ namespace NetcodeIO.NET
 			}
 
 			lastResponseTime = totalSeconds;
-            //GONet.GONetLog.Debug("processing message (which should happen each receive)");
+            //GONet.GONetLog.Debug("processing message (which should happen each receive), payloadPacket.Length: " + payloadPacket.Length);
 			OnMessageReceived?.Invoke(payloadPacket.Payload, payloadPacket.Length);
 
 			payloadPacket.Release();
