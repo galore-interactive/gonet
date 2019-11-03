@@ -194,6 +194,7 @@ namespace GONet
 
                 if (ownerAuthorityId_asRepresentedInside_gonetId != GONetMain.OwnerAuthorityId_Unset && ownerAuthorityId_new != ownerAuthorityId_asRepresentedInside_gonetId)
                 {
+                    /* In games where this happens a lot, it appears in the log a lot and seems unhelpful/spammy:
                     if (ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
                     {
                         const string CHG = "OwnerAuthorityId changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous OwnerAuthorityId: ";
@@ -201,6 +202,7 @@ namespace GONet
                         const string GNS = "<GONet server>";
                         GONetLog.Info(string.Concat(CHG, ownerAuthorityId_new, NEW, ownerAuthorityId_asRepresentedInside_gonetId == GONetMain.OwnerAuthorityId_Server ? GNS : ownerAuthorityId_asRepresentedInside_gonetId.ToString()));
                     }
+                    */
 
                     // big ASSumption here, that if the gonetId contains a non-zero value for authority id and we have both (1) not represented that value inside ownerAuthorityId component and (2) ownerAuthorityId is unset....we are ASSuming gonetId composite contains the real/new value for ownerAuthorityId and we should use it!
                     ownerAuthorityId_new = ownerAuthorityId_asRepresentedInside_gonetId;
@@ -211,14 +213,16 @@ namespace GONet
             uint gonetId_raw_new = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
             uint gonetId_new = unchecked((uint)(gonetId_raw_new << GONET_ID_BIT_COUNT_UNUSED)) | ownerAuthorityId_new;
 
+            /* In games where this happens a lot, it appears in the log a lot and seems unhelpful/spammy:
             if (gonetId_raw_priorToChanges != GONetIdRaw_Unset && gonetId_raw_new != gonetId_raw_priorToChanges)
             {
                 const string CHG = "gonetId_raw changing from a non-unset value to a different non-unset value.  If this is happening due to a call to GONetMain.Server_AssumeAuthorityOver(GNP), then all is well; however, if not.....EXPLAIN yourself!  previous gonetId_raw: ";
                 const string NEW = " new gonetId_raw: ";
                 GONetLog.Info(string.Concat(CHG, gonetId_raw_priorToChanges, NEW, gonetId_raw_new));
             }
+            */
 
-            if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
+                    if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
             {
                 //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
 
