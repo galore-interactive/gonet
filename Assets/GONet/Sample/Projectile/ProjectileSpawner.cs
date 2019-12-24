@@ -1,6 +1,6 @@
 ﻿using GONet;
 using GONet.Sample;
-using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -14,8 +14,6 @@ public class ProjectileSpawner : MonoBehaviour
     private void Awake()
     {
         GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => {
-            ////GONetLog.Debug("DREETS pork");
-
             if (envelope.GONetParticipant && envelope.GONetParticipant.GetComponent<Projectile>() != null)
             {
                 Projectile projectile = envelope.GONetParticipant.GetComponent<Projectile>();
@@ -23,7 +21,8 @@ public class ProjectileSpawner : MonoBehaviour
 
                 if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
                 {
-                    StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
+                    //StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
+                    GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
                 }
             }
         });
@@ -43,11 +42,16 @@ public class ProjectileSpawner : MonoBehaviour
             Instantiate(projectilPrefab, transform.position, transform.rotation);
         }
 
+        int count = 0;
+        int total = projectiles.Count;
         foreach (var projectile in projectiles)
         {
+            ++count;
             if (projectile.GONetParticipant.IsMine)
             {
-                projectile.transform.Translate(Vector3.forward * Time.deltaTime * projectile.speed);
+                //GONetLog.Debug($"DREETS moving {count}/{total}");
+                //projectile.transform.position += new Vector3(0, 0, 1); // transform.forward * Time.deltaTime * projectile.speed;
+                projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
             }
         }
     }

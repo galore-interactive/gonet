@@ -488,40 +488,7 @@ namespace GONet
         {
             if (IsServer && gonetParticipant.OwnerAuthorityId != OwnerAuthorityId_Unset && !IsMine(gonetParticipant))
             {
-                Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
-                GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
-                if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
-                    autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
-                {
-                    byte valuesCount = autoSyncCompanion.valuesCount;
-                    for (int i = 0; i < valuesCount; ++i)
-                    {
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangesSupport = autoSyncCompanion.valuesChangesSupport[i];
-                        if (valueChangesSupport.mostRecentChanges != null)
-                        {
-                            GONetSyncableValue valueBefore = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
-
-                            /*This happens every time on at least one property/index...so it seems spammy:
-                            if (valueChangesSupport.mostRecentChanges_usedSize < ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE)
-                            {
-                                const string NO_EXTRAP = "While transferring ownership to server, there is not enough information for ApplyValueBlending_IfAppropriate to extrapolate to right now right now, because it would seem highly prefferable to be able to extrapolate to now instead of staying at the value we had from back at negative GONetMain.valueBlendingBufferLeadTicks ago.  GONetId: ";
-                                const string IDX = "  Value index: ";
-                                GONetLog.Warning(string.Concat(NO_EXTRAP, gonetParticipant.GONetId, IDX, i)); // TODO printing out the index is not useful!  print a name of property or something!!!
-                            }
-                            */
-                            valueChangesSupport.ApplyValueBlending_IfAppropriate(0); // make sure we update it to the latest value for right now right now (i.e., pass 0 instead of GONetMain.valueBlendingBufferLeadTicks) before we transfer ownership
-                            valueChangesSupport.ClearMostRecentChanges(); // most recent changes is only useful for value blending...and since we are now the owner (or will be soon below), no sense in keeping this around
-
-                            GONetSyncableValue valueAfter = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
-                            valueChangesSupport.lastKnownValue = valueChangesSupport.lastKnownValue_previous = valueAfter; // IMPORTANT: now that we are taking over ownership (below), we need to keep tabs on when changes occur and this is first step to baseline things from this point forward
-                        }
-                    }
-                }
-                else
-                {
-                    const string TRANS = "Transferring ownership to server and expecting to find an active auto sync support/companion instance, but did not.  NOTE: The transfer will still occur.  GONetId: ";
-                    GONetLog.Warning(string.Concat(TRANS, gonetParticipant.GONetId));
-                }
+                Server_AssumeAuthorityOver_MakeCurrentAndStopValueBlending(gonetParticipant);
 
                 gonetParticipant.OwnerAuthorityId = MyAuthorityId; // NOTE: this will propagate to all other parties through auto sync support
                 AssignGONetIdRaw_IfAppropriate(gonetParticipant, true); // IMPORTANT: whatever the gonetId_raw value was before was only valid for the previous owner, we have to assign that anew here now!
@@ -533,6 +500,48 @@ namespace GONet
             else
             {
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/>.
+        /// Clear out all value blending data/support from previous owner since I/server will now be the owner and having this value blending data around could be problematic:
+        /// </summary>
+        private static void Server_AssumeAuthorityOver_MakeCurrentAndStopValueBlending(GONetParticipant gonetParticipant)
+        {
+            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
+            GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
+                autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
+            {
+                byte valuesCount = autoSyncCompanion.valuesCount;
+                for (int i = 0; i < valuesCount; ++i)
+                {
+                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangesSupport = autoSyncCompanion.valuesChangesSupport[i];
+                    if (valueChangesSupport.mostRecentChanges != null)
+                    {
+                        GONetSyncableValue valueBefore = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
+
+                        /*This happens every time on at least one property/index...so it seems spammy:
+                        if (valueChangesSupport.mostRecentChanges_usedSize < ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE)
+                        {
+                            const string NO_EXTRAP = "While transferring ownership to server, there is not enough information for ApplyValueBlending_IfAppropriate to extrapolate to right now right now, because it would seem highly prefferable to be able to extrapolate to now instead of staying at the value we had from back at negative GONetMain.valueBlendingBufferLeadTicks ago.  GONetId: ";
+                            const string IDX = "  Value index: ";
+                            GONetLog.Warning(string.Concat(NO_EXTRAP, gonetParticipant.GONetId, IDX, i)); // TODO printing out the index is not useful!  print a name of property or something!!!
+                        }
+                        */
+                        valueChangesSupport.ApplyValueBlending_IfAppropriate(0); // make sure we update it to the latest value for right now right now (i.e., pass 0 instead of GONetMain.valueBlendingBufferLeadTicks) before we transfer ownership
+                        valueChangesSupport.ClearMostRecentChanges(); // most recent changes is only useful for value blending...and since we are now the owner (or will be soon below), no sense in keeping this around
+
+                        GONetSyncableValue valueAfter = valueChangesSupport.syncCompanion.GetAutoMagicalSyncValue((byte)i);
+                        valueChangesSupport.lastKnownValue = valueChangesSupport.lastKnownValue_previous = valueAfter; // IMPORTANT: now that we are taking over ownership (below), we need to keep tabs on when changes occur and this is first step to baseline things from this point forward
+                    }
+                }
+            }
+            else
+            {
+                const string TRANS = "Transferring ownership to server and expecting to find an active auto sync support/companion instance, but did not.  NOTE: The transfer will still occur.  GONetId: ";
+                GONetLog.Warning(string.Concat(TRANS, gonetParticipant.GONetId));
             }
         }
 
@@ -1108,20 +1117,20 @@ namespace GONet
                 autoSyncProcessingSupport_mainThread.ProcessASAP();
             }
 
-            var aEnumerator = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator(); // TODO use better name!
-            while (aEnumerator.MoveNext())
+            var enumerator_activeAutoSyncCompanionsMapByCodeGenerationId = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
+            while (enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.MoveNext())
             {
-                var a = aEnumerator.Current; // TODO use better name!
+                var kvp_activeAutoSyncCompanionsMapForCodeGenerationId = enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.Current;
 
-                var bEnumerator = a.Value.GetEnumerator(); // TODO use better name!
-                while (bEnumerator.MoveNext())
+                var enumerator_activeAutoSyncCompanionsMap = kvp_activeAutoSyncCompanionsMapForCodeGenerationId.Value.GetEnumerator();
+                while (enumerator_activeAutoSyncCompanionsMap.MoveNext())
                 {
-                    var valueChangeSupportKVP = bEnumerator.Current;
-
-                    int xLength = valueChangeSupportKVP.Value.valuesChangesSupport.Length; // TODO use better name!
-                    for (int i = 0; i < xLength; ++i)
+                    var kvp_activeAutoSyncCompanion = enumerator_activeAutoSyncCompanionsMap.Current;
+                    var activeAutoSyncCompanion = kvp_activeAutoSyncCompanion.Value;
+                    int length_valueChangesSupport = activeAutoSyncCompanion.valuesChangesSupport.Length;
+                    for (int i = 0; i < length_valueChangesSupport; ++i)
                     {
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valueChangeSupportKVP.Value.valuesChangesSupport[i];
+                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = activeAutoSyncCompanion.valuesChangesSupport[i];
                         if (valueChangeSupport != null)
                         {
                             valueChangeSupport.ApplyValueBlending_IfAppropriate(valueBlendingBufferLeadTicks);
@@ -2076,12 +2085,18 @@ namespace GONet
             }
 
             /// <summary>
-            /// Expected that this is called each frame.
-            /// Loop through the recent changes to interpolate or extrapolate is possible.
-            /// POST: The related/associated value is updated to what is believed to be the current value based on recent changes accumulated from owner/source.
+            /// <para>Expected that this is called each frame.</para>
+            /// <para>IMPORTANT: This method will do nothing (i.e., not appripriate) if <see cref="syncCompanion"/>'s <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated.gonetParticipant"/> is mine (<see cref="GONetMain.IsMine(GONetParticipant)"/>) - do not value blend on something I own...value blending is only something that makes sense for GNPs that others own</para>
+            /// <para>Loop through the recent changes to interpolate or extrapolate is possible.</para>
+            /// <para>POST: The related/associated value is updated to what is believed to be the current value based on recent changes accumulated from owner/source.</para>
             /// </summary>
             internal void ApplyValueBlending_IfAppropriate(long useBufferLeadTicks)
             {
+                if (syncCompanion.gonetParticipant.IsMine)
+                {
+                    return;
+                }
+
                 if (syncCompanion.gonetParticipant.IsNoLongerMine)
                 {
                     useBufferLeadTicks = 0;
