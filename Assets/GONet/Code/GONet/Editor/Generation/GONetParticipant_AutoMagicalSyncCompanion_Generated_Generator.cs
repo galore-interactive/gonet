@@ -447,7 +447,7 @@ namespace GONet.Generation
 
         #region persistence
 
-        const string SNAPS_FILE = GENERATION_FILE_PATH + "Unique_GONetParticipant_ComponentsWithAutoSyncMembers.bin";
+        internal const string SNAPS_FILE = GENERATION_FILE_PATH + "Unique_GONetParticipant_ComponentsWithAutoSyncMembers.bin";
 
         /// <summary>
         /// returns empty list if nothing persisted.
