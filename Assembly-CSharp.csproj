@@ -1550,6 +1550,7 @@
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncSettings_ProfileTemplate.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\GONetBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetClient.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetConnections.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetEventBus.cs" />
