@@ -303,6 +303,7 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                         for (int i = 0; i < animator.parameterCount; ++i)
                         {
                             AnimatorControllerParameter animatorControllerParameter = animator.parameters[i];
+                            bool isAnimParamTypeSupportedInGONet = animatorControllerParameter.type != AnimatorControllerParameterType.Trigger;
                             string parameterSyncMap_key = animatorControllerParameter.name;
                             if (!targetGONetParticipant.animatorSyncSupport.ContainsKey(parameterSyncMap_key))
                             {
@@ -314,12 +315,24 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                             }
                             int parameterSyncMap_keyIndex = targetGONetParticipant.animatorSyncSupport.GetCustomKeyIndex(parameterSyncMap_key);
 
+                            bool guiItemPrior = GUI.enabled;
+                            if (!isAnimParamTypeSupportedInGONet)
+                            {
+                                // Currently trigger type is not supported as we do not know how to monitor and network when trigger occurs...still thinking, but until then we do NOT want to give the appearance that we can allow it, so do not show it in UI as editable, but at least show it with a note so users know what is going on
+                                GUI.enabled = false;
+                            }
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Syncd: ", parameterSyncMap_key));
+                            string labelString = string.Concat("Is Syncd: ", parameterSyncMap_key);
+                            GUIContent labelContent = new GUIContent(labelString, string.Empty);
+                            if (!isAnimParamTypeSupportedInGONet)
+                            {
+                                labelContent.tooltip = "Currently, the trigger type is not supported as we do not know how to monitor and network when trigger occurs...still thinking, but until then, we do NOT want to give the appearance that we can allow it, so only show it in UI as readonly.  At least users can see it greyed out, see this tooltip and know what is going on.";
+                            }
+                            EditorGUILayout.LabelField(labelContent);
                             SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.animatorSyncSupport)}.values.Array.data[{parameterSyncMap_keyIndex}].{nameof(GONetParticipant.AnimatorControllerParameter.isSyncd)}");
                             EditorGUILayout.PropertyField(specificInnerMapValue_serializedProperty, GUIContent.none, false); // IMPORTANT: without this, editing prefabs would never save/persist changes!
                             EditorGUILayout.EndHorizontal();
-
+                            GUI.enabled = guiItemPrior;
                         }
 
                         GUI.enabled = guiEnabledPrevious_inner;
