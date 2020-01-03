@@ -100,3 +100,4 @@ MonoBehaviour:
   valueBlendingBufferLeadTimeMilliseconds: 150
   gonetLocalPrefab: {fileID: 5118336138822136954, guid: 338c05f05b3eb634894468e022a5a11f,
     type: 3}
+  shouldAttemptAutoStartAsClient: 1

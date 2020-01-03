@@ -44,6 +44,9 @@ namespace GONet
         [SerializeField]
         internal GONetLocal gonetLocalPrefab;
 
+        [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
+        public bool shouldAttemptAutoStartAsClient = true;
+
         private readonly List<GONetParticipant> enabledGONetParticipants = new List<GONetParticipant>(1000);
         /// <summary>
         /// <para>A convenient collection of all the <see cref="GONetParticipant"/> instances that are currently enabled no matter what the value of <see cref="GONetParticipant.OwnerAuthorityId"/> value is.</para>
@@ -76,6 +79,36 @@ namespace GONet
             GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(OnGNPEnabled_AddToList);
             GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(OnGNPStarted_AddToList);
             GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled_RemoveFromList);
+
+            if (shouldAttemptAutoStartAsClient)
+            {
+                AttemptStartAsClientIfAppropriate();
+            }
+        }
+
+        private void AttemptStartAsClientIfAppropriate()
+        {
+            bool isAppropriate = !GONetMain.IsServer && !GONetMain.IsClient && Application.isEditor;
+            if (isAppropriate) // do not attempt to start a client when we already know this is the server...no matter what the shouldAttemptAutoStartAsClient set to true seems to indicate!
+            {
+                var sampleSpawner = GetComponent<GONetSampleSpawner>();
+                if (sampleSpawner)
+                {
+                    sampleSpawner.InstantiateClient();
+                }
+                else
+                {
+                    const string UNABLE = "Unable to honor your setting of true on ";
+                    const string BECAUSE = " because we could not find ";
+                    const string ATTACHED = " attached to this GameObject, which is required to automatically start the client in this manner.";
+                    GONetLog.Error(string.Concat(UNABLE, nameof(shouldAttemptAutoStartAsClient), BECAUSE, nameof(GONetSampleSpawner), ATTACHED));
+                }
+            }
+            else
+            {
+                const string INAP = "It was deemed inappropriate to auto-start a client; however, do not fret if this is a client that was started via a build executable passing in '-client' as a command line argument since that would still be honored in which case this is a client.";
+                GONetLog.Info(INAP);
+            }
         }
 
         private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)

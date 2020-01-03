@@ -316,7 +316,7 @@ namespace GONet
 
     public interface IHaveRelatedGONetId
     {
-        uint GONetId { get; }
+        uint GONetId { get; set; }
     }
 
     /// <summary>

@@ -58,7 +58,7 @@ public class GONetSampleSpawner : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
         {
-            Instantiate(GONetClientPREFAB);
+            InstantiateClient();
         }
 
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
@@ -71,5 +71,10 @@ public class GONetSampleSpawner : MonoBehaviour
         {
             Instantiate(authorityPrefab, transform.position, transform.rotation);
         }
+    }
+
+    internal void InstantiateClient()
+    {
+        Instantiate(GONetClientPREFAB);
     }
 }

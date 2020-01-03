@@ -270,9 +270,9 @@ namespace GONet
 
         internal class SyncEventsSaveSupport
         {
-            internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSavingASAP = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
-            internal readonly Queue<SyncEvent_ValueChangeProcessed>             queue_needsSaving = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
-            internal readonly ConcurrentQueue<SyncEvent_ValueChangeProcessed>   queue_needsReturnToPool = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>();
+            internal readonly Queue<SyncEvent_ValueChangeProcessed> queue_needsSavingASAP = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            internal readonly Queue<SyncEvent_ValueChangeProcessed> queue_needsSaving = new Queue<SyncEvent_ValueChangeProcessed>(SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE);
+            internal readonly ConcurrentQueue<SyncEvent_ValueChangeProcessed> queue_needsReturnToPool = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>();
 
             internal int maxToReturnPerFrame = STARTING_MAX_SYNC_EVENTS_RETURN_PER_FRAME;
             internal volatile bool IsSaving;
@@ -1819,7 +1819,7 @@ namespace GONet
 
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance = UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation);
-            
+
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
             {
                 instance.gameObject.name = instantiateEvent.InstanceName;
@@ -2225,7 +2225,7 @@ namespace GONet
 
                 uint gonetIdThatIsGoingToBePopulated = isCurrentlyProcessingInstantiateGNPEvent ? currentlyProcessingInstantiateGNPEvent.GONetId : gonetParticipant.GONetId;
                 var enableEvent = new GONetParticipantEnabledEvent(gonetIdThatIsGoingToBePopulated);
-                EventBus.Publish<IGONetEvent>(enableEvent); // ensure this comes after gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant....so the lookup of the GNP to attach to the envelope will find it!
+                PublishEventAsSoonAsGONetIdAssigned(enableEvent, gonetParticipant);
             }
         }
 
@@ -2272,8 +2272,47 @@ namespace GONet
                 }
 
                 var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
-                EventBus.Publish<IGONetEvent>(startEvent);
+                PublishEventAsSoonAsGONetIdAssigned(startEvent, gonetParticipant);
             }
+        }
+
+        /// <summary>
+        /// PRE: <paramref name="event"/> must also implement <see cref="IHaveRelatedGONetId"/>.
+        /// </summary>
+        private static void PublishEventAsSoonAsGONetIdAssigned(IGONetEvent @event, GONetParticipant gonetParticipant)
+        {
+            if (!((object)@event is IHaveRelatedGONetId))
+            {
+                throw new ArgumentException("Argument must an event that implements IHaveRelatedGONetId for this to make any sense and work....the way the event classes/interfaces was implemented causes this unsightly inability to just use IHaveRelatedGONetId as the param type, but do it!", nameof(@event));
+            }
+
+            if (gonetParticipant.DoesGONetIdContainAllComponents() && gonetParticipantByGONetIdMap[gonetParticipant.GONetId] == gonetParticipant)
+            {
+                EventBus.Publish<IGONetEvent>(@event);
+            }
+            else
+            {
+                GlobalSessionContext_Participant.StartCoroutine(PublishEventAsSoonAsGONetIdAssigned_Coroutine(@event, gonetParticipant));
+            }
+        }
+
+        /// <summary>
+        /// PRE: <paramref name="event"/> must also implement <see cref="IHaveRelatedGONetId"/>.
+        /// This method should only ever be called on a client and as a result of having an event ready to go (e.g., <see cref="GONetParticipantStartedEvent"/> or <see cref="GONetParticipantEnabledEvent"/>)
+        /// but since the associated <see cref="GONetParticipant"/> was defined in a unity scene and since the server will assign its <see cref="GONetParticipant.GONetId"/> and this client
+        /// will get it momentarily after this initialization causing this event to be raised is processed...we need a mechanism to postpone the event publish until gonetid assigned so the
+        /// event publish process of placing into an envelope with a reference to the actual GNP will find the GNP since the proper gonetid is known.
+        /// </summary>
+        private static IEnumerator PublishEventAsSoonAsGONetIdAssigned_Coroutine(IGONetEvent @event, GONetParticipant gonetParticipant)
+        {
+            GONetParticipant mappedGNP;
+            while (!gonetParticipant.DoesGONetIdContainAllComponents() || !gonetParticipantByGONetIdMap.TryGetValue(gonetParticipant.GONetId, out mappedGNP) || mappedGNP != gonetParticipant)
+            {
+                yield return null;
+            }
+
+            ((IHaveRelatedGONetId)@event).GONetId = gonetParticipant.GONetId;
+            EventBus.Publish<IGONetEvent>(@event);
         }
 
         private static void AssignGONetIdRaw_IfAppropriate(GONetParticipant gonetParticipant, bool shouldForceChangeEventIfAlreadySet = false)
