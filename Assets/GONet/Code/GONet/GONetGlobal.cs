@@ -94,7 +94,7 @@ namespace GONet
                 var sampleSpawner = GetComponent<GONetSampleSpawner>();
                 if (sampleSpawner)
                 {
-                    sampleSpawner.InstantiateClient();
+                    sampleSpawner.InstantiateClientIfNotAlready();
                 }
                 else
                 {

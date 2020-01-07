@@ -1283,7 +1283,7 @@ PrefabInstance:
     - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: valueBlendingBufferLeadTimeMilliseconds
-      value: 1000
+      value: 150
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 56c1b12035c5c034f81a7b4c212a379e, type: 3}

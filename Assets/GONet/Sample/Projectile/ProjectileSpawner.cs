@@ -1,6 +1,5 @@
 ﻿using GONet;
 using GONet.Sample;
-using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -21,7 +20,7 @@ public class ProjectileSpawner : MonoBehaviour
 
                 if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
                 {
-                    //StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
+                    // example option (wait a bit before server assumes authority): StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
                     GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
                 }
             }
@@ -42,15 +41,10 @@ public class ProjectileSpawner : MonoBehaviour
             Instantiate(projectilPrefab, transform.position, transform.rotation);
         }
 
-        int count = 0;
-        int total = projectiles.Count;
         foreach (var projectile in projectiles)
         {
-            ++count;
             if (projectile.GONetParticipant.IsMine)
             {
-                //GONetLog.Debug($"DREETS moving {count}/{total}");
-                //projectile.transform.position += new Vector3(0, 0, 1); // transform.forward * Time.deltaTime * projectile.speed;
                 projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
             }
         }

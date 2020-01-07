@@ -25,6 +25,7 @@ public class GONetSampleSpawner : MonoBehaviour
     public GONetParticipant authorityPrefab;
 
     private bool hasServerSpawned;
+    private bool hasClientSpawned;
 
     private void Start()
     {
@@ -40,15 +41,14 @@ public class GONetSampleSpawner : MonoBehaviour
             const string SERVER = "-server";
             if (arg == SERVER)
             {
-                Instantiate(GONetServerPREFAB);
-                hasServerSpawned = true;
+                InstantiateServerIfNotAlready();
             }
             else
             {
                 const string CLIENT = "-client";
                 if (arg == CLIENT)
                 {
-                    Instantiate(GONetClientPREFAB);
+                    InstantiateClientIfNotAlready();
                 }
             }
         }
@@ -58,13 +58,12 @@ public class GONetSampleSpawner : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
         {
-            InstantiateClient();
+            InstantiateClientIfNotAlready();
         }
 
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S))
         {
-            Instantiate(GONetServerPREFAB);
-            hasServerSpawned = true;
+            InstantiateServerIfNotAlready();
         }
 
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
@@ -73,8 +72,21 @@ public class GONetSampleSpawner : MonoBehaviour
         }
     }
 
-    internal void InstantiateClient()
+    private void InstantiateServerIfNotAlready()
     {
-        Instantiate(GONetClientPREFAB);
+        if (!hasServerSpawned)
+        {
+            Instantiate(GONetServerPREFAB);
+            hasServerSpawned = true;
+        }
+    }
+
+    internal void InstantiateClientIfNotAlready()
+    {
+        if (!hasClientSpawned)
+        {
+            Instantiate(GONetClientPREFAB);
+            hasClientSpawned = true;
+        }
     }
 }

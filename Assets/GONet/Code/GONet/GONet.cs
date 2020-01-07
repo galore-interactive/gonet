@@ -2906,10 +2906,43 @@ namespace GONet
                 change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
                 (IsServer
                     ? (gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
-                        (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change exception for changes back to the owner itself
+                        (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change except for changes back to the owner itself
+                            // TODO try to make this work as an option: || IsThisChangeTheMomentOfInception(change)
                             || change.index == GONetParticipant.ASSumed_GONetId_INDEX)) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
+
+        /* the initial idea behind this was good for a test, but the more I thought about it, the impl details did not actually make sense (perf and functionality)....keeping for now as reference
+        private static bool IsThisChangeTheMomentOfInception(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change)
+        {
+            bool shouldConsiderOlderItems = true;
+            var enumerator = persistentEventsThisSession.GetEnumerator();
+
+            Type syncEventBaseType = typeof(SyncEvent_ValueChangeProcessed);
+            long tooOldTicks = TimeSpan.FromSeconds(0.5f).Ticks;
+
+            while (shouldConsiderOlderItems && enumerator.MoveNext())
+            {
+                var lastConsideredEvent = enumerator.Current;
+                if (TypeUtils.IsTypeAInstanceOfTypeB(lastConsideredEvent.GetType(), syncEventBaseType))
+                {
+                    SyncEvent_ValueChangeProcessed syncEvent = (SyncEvent_ValueChangeProcessed)lastConsideredEvent;
+                    dynamic syncEventDynamic = syncEvent;
+                    if (syncEvent.GONetId == change.syncCompanion.gonetParticipant.GONetId &&
+                        syncEvent.CodeGenerationId == change.syncCompanion.CodeGenerationId &&
+                        syncEvent.SyncMemberIndex == change.index &&
+                        syncEventDynamic.valueNew == change.lastKnownValue)
+                    {
+                        return true;
+                    }
+                }
+
+                shouldConsiderOlderItems = Time.ElapsedTicks - lastConsideredEvent.OccurredAtElapsedTicks < tooOldTicks;
+            }
+
+            return false;
+        }
+        */
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
