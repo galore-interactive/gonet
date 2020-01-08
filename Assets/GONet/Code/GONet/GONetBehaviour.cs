@@ -74,6 +74,8 @@ namespace GONet
     /// </summary>
     public abstract class GONetParticipantCompanionBehaviour : GONetBehaviour
     {
+        public GONetParticipant GONetParticipant => gonetParticipant;
+
         protected GONetParticipant gonetParticipant;
 
         protected override void Awake()

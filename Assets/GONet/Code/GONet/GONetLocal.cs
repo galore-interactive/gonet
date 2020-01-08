@@ -24,11 +24,9 @@ namespace GONet
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
-    public class GONetLocal : MonoBehaviour
+    public class GONetLocal : GONetParticipantCompanionBehaviour
     {
         public ushort OwnerAuthorityId => gonetParticipant.OwnerAuthorityId;
-
-        internal GONetParticipant gonetParticipant;
 
         private readonly List<GONetParticipant> myEnabledGONetParticipants = new List<GONetParticipant>(200);
         /// <summary>
@@ -38,47 +36,46 @@ namespace GONet
         /// </summary>
         public IEnumerable<GONetParticipant> MyEnabledGONetParticipants => myEnabledGONetParticipants;
 
-        private void Awake()
+        protected override void Awake()
         {
-            gonetParticipant = GetComponent<GONetParticipant>();
+            base.Awake();
 
             myEnabledGONetParticipants.Clear();
 
             foreach (GONetParticipant gnp in GameObject.FindObjectsOfType<GONetParticipant>()) // since GONetLocal is spawned in at runtime (unlike GONetGlobal), go ahead and add all the ones that are present now
             {
-                if (IsRelatedToThisLocality(gnp))
-                {
-                    myEnabledGONetParticipants.Add(gnp);
-                }
+                AddIfAppropriate(gnp);
             }
 
-            GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(OnGNPEnabled_AddToList);
-            GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(OnGNPStarted_AddToList);
             GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnGNPAuthorityChanged_CheckIfStilllMine);
-            GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled_RemoveFromList);
         }
 
-        private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
+        public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
         {
-            ////GONetLog.Debug("DREETS pork");
+            base.OnGONetParticipantEnabled(gonetParticipant);
 
-            bool isTooEarlyToAdd_StartRequiredFirst = (object)eventEnvelope.GONetParticipant == null;
-            if (!isTooEarlyToAdd_StartRequiredFirst)
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantStarted(gonetParticipant);
+
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        private void AddIfAppropriate(GONetParticipant gonetParticipant)
+        {
+            if (IsRelatedToThisLocality(gonetParticipant) &&
+                !myEnabledGONetParticipants.Contains(gonetParticipant)) // may have already been added elsewhere
             {
-                myEnabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
+                myEnabledGONetParticipants.Add(gonetParticipant);
             }
         }
 
-        private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
+        public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
         {
-            ////GONetLog.Debug("DREETS pork");
-
-            if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
-                IsRelatedToThisLocality(eventEnvelope.GONetParticipant) &&
-                !myEnabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
-            {
-                myEnabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
-            }
+            myEnabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
 
         /// <summary>
@@ -92,8 +89,6 @@ namespace GONet
 
         private void OnGNPAuthorityChanged_CheckIfStilllMine(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
         {
-            ////GONetLog.Debug("DREETS pork");
-
             if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
                 IsRelatedToThisLocality(eventEnvelope.GONetParticipant))
             {
@@ -107,13 +102,6 @@ namespace GONet
             {
                 myEnabledGONetParticipants.Remove(eventEnvelope.GONetParticipant);
             }
-        }
-
-        private void OnGNPDisabled_RemoveFromList(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
-        {
-            ////GONetLog.Debug("DREETS pork");
-
-            myEnabledGONetParticipants.Remove(eventEnvelope.GONetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
     }
 }

@@ -26,7 +26,7 @@ namespace GONet
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
-    public sealed class GONetGlobal : MonoBehaviour
+    public sealed class GONetGlobal : GONetParticipantCompanionBehaviour
     {
         #region TODO this should be configurable/set elsewhere potentially AFTER loading up and depending on other factors like match making etc...
 
@@ -55,7 +55,7 @@ namespace GONet
         /// </summary>
         public IEnumerable<GONetParticipant> EnabledGONetParticipants => enabledGONetParticipants;
 
-        private void Awake()
+        protected override void Awake()
         {
             if (gonetLocalPrefab == null)
             {
@@ -73,17 +73,43 @@ namespace GONet
 
             GONetMain.InitOnUnityMainThread(this, gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 
+            base.Awake(); // YUK: code smell...having to break OO protocol here and call base here as it needs to come AFTER the init stuff is done in GONetMain.InitOnUnityMainThread() and unity main thread identified or exceptions will be thrown in base.Awake() when subscribing
+
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
 
             enabledGONetParticipants.Clear();
-            GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(OnGNPEnabled_AddToList);
-            GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(OnGNPStarted_AddToList);
-            GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled_RemoveFromList);
 
             if (shouldAttemptAutoStartAsClient)
             {
                 AttemptStartAsClientIfAppropriate();
             }
+        }
+
+        public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantEnabled(gonetParticipant);
+
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantStarted(gonetParticipant);
+
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        private void AddIfAppropriate(GONetParticipant gonetParticipant)
+        {
+            if (!enabledGONetParticipants.Contains(gonetParticipant)) // may have already been added elsewhere
+            {
+                enabledGONetParticipants.Add(gonetParticipant);
+            }
+        }
+
+        public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
+        {
+            enabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
 
         private void AttemptStartAsClientIfAppropriate()
@@ -109,35 +135,6 @@ namespace GONet
                 const string INAP = "It was deemed inappropriate to auto-start a client; however, do not fret if this is a client that was started via a build executable passing in '-client' as a command line argument since that would still be honored in which case this is a client.";
                 GONetLog.Info(INAP);
             }
-        }
-
-        private void OnGNPEnabled_AddToList(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
-        {
-            ////GONetLog.Debug("DREETS pork");
-
-            bool isTooEarlyToAdd_StartRequiredFirst = (object)eventEnvelope.GONetParticipant == null;
-            if (!isTooEarlyToAdd_StartRequiredFirst)
-            {
-                enabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
-            }
-        }
-
-        private void OnGNPStarted_AddToList(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
-        {
-            ////GONetLog.Debug("DREETS pork");
-
-            if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
-                !enabledGONetParticipants.Contains(eventEnvelope.GONetParticipant)) // may have already been added in OnGNPEnabled_AddToList
-            {
-                enabledGONetParticipants.Add(eventEnvelope.GONetParticipant);
-            }
-        }
-
-        private void OnGNPDisabled_RemoveFromList(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
-        {
-            ////GONetLog.Debug("DREETS pork");
-
-            enabledGONetParticipants.Remove(eventEnvelope.GONetParticipant);
         }
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)

@@ -1852,7 +1852,7 @@ namespace GONet
 
         private static void Server_OnNewClientInstantiatedItsGONetLocal(GONetLocal newClientGONetLocal)
         {
-            GONetRemoteClient remoteClient = gonetServer.GetRemoteClientByAuthorityId(newClientGONetLocal.gonetParticipant.OwnerAuthorityId);
+            GONetRemoteClient remoteClient = gonetServer.GetRemoteClientByAuthorityId(newClientGONetLocal.GONetParticipant.OwnerAuthorityId);
             remoteClient.IsInitializedWithServer = true;
         }
 
