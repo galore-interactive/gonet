@@ -195,12 +195,16 @@ namespace GONet
         [Key(5)]
         public string InstanceName;
 
+        [Key(6)]
+        public string ParentFullUniquePath;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
             @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;

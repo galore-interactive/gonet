@@ -1818,7 +1818,10 @@ namespace GONet
             currentlyProcessingInstantiateGNPEvent = instantiateEvent;
 
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
-            GONetParticipant instance = UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation);
+            GONetParticipant instance =
+                string.IsNullOrWhiteSpace(instantiateEvent.ParentFullUniquePath)
+                    ? UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation)
+                    : UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation, HierarchyUtils.FindByFullUniquePath(instantiateEvent.ParentFullUniquePath).transform);
 
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
             {
