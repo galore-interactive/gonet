@@ -4,6 +4,7 @@
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp.dll" #>
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp-Editor.dll" #>
 
+<#@ import namespace="System.Globalization" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Text" #>
 <#@ import namespace="System.Collections.Generic" #>
@@ -101,7 +102,7 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
 			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(<#=singleMember.attribute.ShouldSkipSync_RegistrationId#>, out support<#=iOverall#>.syncAttribute_ShouldSkipSync);
-			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
+			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 <#			if (singleMember.attribute.	ShouldBlendBetweenValuesReceived)
             {#>		
             int support<#=iOverall#>_mostRecentChanges_calcdSize = support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;

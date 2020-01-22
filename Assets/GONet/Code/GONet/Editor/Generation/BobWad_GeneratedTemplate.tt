@@ -4,6 +4,7 @@
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp.dll" #>
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp-Editor.dll" #>
 
+<#@ import namespace="System.Globalization" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Text" #>
 <#@ import namespace="System.Collections.Generic" #>
@@ -268,7 +269,7 @@ namespace GONet.Generation
 			{
 				GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
-			var item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#> = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
+			var item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#> = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 			settings.Add(item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#>);
 
 <#
