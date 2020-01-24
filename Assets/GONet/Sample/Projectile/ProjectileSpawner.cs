@@ -19,27 +19,27 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ProjectileSpawner : MonoBehaviour
+public class ProjectileSpawner : GONetBehaviour
 {
     public GONetParticipant projectilPrefab;
 
     private readonly List<Projectile> projectiles = new List<Projectile>(100);
 
-    private void Awake()
+    public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
     {
-        GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => {
-            if (envelope.GONetParticipant && envelope.GONetParticipant.GetComponent<Projectile>() != null)
-            {
-                Projectile projectile = envelope.GONetParticipant.GetComponent<Projectile>();
-                projectiles.Add(projectile);
+        base.OnGONetParticipantStarted(gonetParticipant);
 
-                if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
-                {
-                    // example option (wait a bit before server assumes authority): StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
-                    GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
-                }
+        if (gonetParticipant.GetComponent<Projectile>() != null)
+        {
+            Projectile projectile = gonetParticipant.GetComponent<Projectile>();
+            projectiles.Add(projectile);
+
+            if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
+            {
+                // example option (wait a bit before server assumes authority): StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
+                GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
             }
-        });
+        }
     }
 
     private IEnumerator Server_AssumeOwnershipAfterSeconds(GONetParticipant gonetParticipant, float seconds)
