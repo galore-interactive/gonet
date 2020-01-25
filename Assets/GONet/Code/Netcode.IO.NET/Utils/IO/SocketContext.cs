@@ -11,6 +11,7 @@ namespace NetcodeIO.NET.Utils.IO
 {
 	internal interface ISocketContext : IDisposable
 	{
+        int AvailableToReadCount { get; }
 		int BoundPort { get; }
 		void Close();
 		void Bind(EndPoint endpoint);
@@ -22,15 +23,11 @@ namespace NetcodeIO.NET.Utils.IO
 
 	internal class UDPSocketContext : ISocketContext
 	{
-		public int BoundPort
-		{
-			get
-			{
-				return ((IPEndPoint)internalSocket.LocalEndPoint).Port;
-			}
-		}
+		public int BoundPort => ((IPEndPoint)internalSocket.LocalEndPoint).Port;
 
-		private Socket internalSocket;
+        public int AvailableToReadCount => datagramQueue.Count;
+
+        private Socket internalSocket;
 		private Thread socketThread;
 
 		private DatagramQueue datagramQueue;
@@ -52,14 +49,16 @@ namespace NetcodeIO.NET.Utils.IO
 		public void SendTo(byte[] data, EndPoint remoteEP)
 		{
 			internalSocket.SendTo(data, remoteEP);
-		}
+            //GONet.GONetLog.Debug("sending...length[]: " + data.Length);
+        }
 
-		public void SendTo(byte[] data, int length, EndPoint remoteEP)
+        public void SendTo(byte[] data, int length, EndPoint remoteEP)
 		{
 			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
-		}
+            //GONet.GONetLog.Debug("sending...length: " + length);
+        }
 
-		public void Pump()
+        public void Pump()
 		{
 		}
 
@@ -166,12 +165,11 @@ namespace NetcodeIO.NET.Utils.IO
 
 	internal class NetworkSimulatorSocketContext : ISocketContext
 	{
-		public int BoundPort
-		{
-			get { return ((IPEndPoint)endpoint).Port; }
-		}
+		public int BoundPort => ((IPEndPoint)endpoint).Port;
 
-		private struct simulatedPacket
+        public int AvailableToReadCount => datagramQueue.Count;
+
+        private struct simulatedPacket
 		{
 			public double receiveTime;
 			public byte[] packetData;

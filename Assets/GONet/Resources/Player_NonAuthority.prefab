@@ -468,7 +468,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 3
+  codeGenerationId: 2
   animatorSyncSupport:
     keys:
     - Speed
@@ -493,7 +493,8 @@ MonoBehaviour:
       isSyncd: 1
     - valueType: 4
       isSyncd: 1
-  IsRigidBodyControlledOnlyByOwner: 0
+  IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: project://Assets/GONet/Resources/Player_NonAuthority.prefab

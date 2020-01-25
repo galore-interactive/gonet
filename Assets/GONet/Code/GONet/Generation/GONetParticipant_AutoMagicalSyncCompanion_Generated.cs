@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -26,7 +26,7 @@ namespace GONet.Generation
     /// <summary>
     /// TODO: make the main dll internals visible to editor dll so this can be made internal again
     /// </summary>
-    public abstract class GONetParticipant_AutoMagicalSyncCompanion_Generated
+    public abstract class GONetParticipant_AutoMagicalSyncCompanion_Generated : IDisposable
     {
         internal GONetParticipant gonetParticipant;
 
@@ -63,7 +63,7 @@ namespace GONet.Generation
             this.gonetParticipant = gonetParticipant;
         }
 
-        ~GONetParticipant_AutoMagicalSyncCompanion_Generated()
+        public void Dispose()
         {
             lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
 
@@ -266,6 +266,8 @@ namespace GONet.Generation
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };
 
+        internal static List<Type> allUniqueSyncEventTypes;
+
         /// <summary>
         /// Order of operations in static processing, this needs to come after the declaration of <see cref="theRealness"/>.
         /// </summary>
@@ -285,10 +287,9 @@ namespace GONet.Generation
             return copy;
         }
 
-        internal static List<Type> GetAllUniqueSyncEventTypes()
+        internal static IEnumerable<Type> GetAllUniqueSyncEventTypes()
         {
-            // since this is a one time call during init, just going to use reflection for now....if needed more, then go code generation
-            return TypeUtils.GetAllTypesInheritingFrom<SyncEvent_ValueChangeProcessed>(true);
+            return allUniqueSyncEventTypes;
         }
     }
 }

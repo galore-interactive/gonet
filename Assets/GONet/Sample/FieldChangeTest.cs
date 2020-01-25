@@ -16,7 +16,7 @@
 using GONet;
 using UnityEngine;
 
-public class FieldChangeTest : MonoBehaviour
+public class FieldChangeTest : GONetParticipantCompanionBehaviour
 {
     public float someCoolGuyFloat;
     public float rottieTotty;
@@ -24,7 +24,7 @@ public class FieldChangeTest : MonoBehaviour
     [GONetAutoMagicalSync(SettingsProfileTemplateName = "FloatieMcFloats")]
     public float nada;
 
-    [GONetAutoMagicalSync(SettingsProfileTemplateName = "??")] // NOTE: "??" will not be found and default settings profile/template should be used
+    [GONetAutoMagicalSync(SettingsProfileTemplateName = "?test_not_found?")] // NOTE: "?test_not_found?" will not be found and default settings profile/template should be used
     public short shortie;
 
     TMPro.TextMeshProUGUI nadaText;
@@ -41,17 +41,21 @@ public class FieldChangeTest : MonoBehaviour
     float moveAmount = 5f;
     float moveAmount_rottieTotty = 0.25f;
 
-    private void Awake()
+    protected override void Awake()
     {
+        base.Awake();
+
         startPosition = transform.position;
         startRotation = transform.rotation;
         nadaText = GetComponentInChildren<TMPro.TextMeshProUGUI>();
+
+        moveAmount = Random.Range(2f, 7f);
     }
 
     private void Update()
     {
         /* test with an ever-changing field value: */
-        if (GONetMain.IsMine(gameObject))
+        if (gonetParticipant.IsMine)
         {
             someCoolGuyFloat += moveAmount * Time.deltaTime;
             if (someCoolGuyFloat >= 6 || someCoolGuyFloat <= -6)

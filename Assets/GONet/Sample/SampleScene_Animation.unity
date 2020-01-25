@@ -191,7 +191,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &53900337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -235,11 +235,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (11)
@@ -772,7 +773,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &219461409
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -816,11 +817,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (7)
@@ -1020,14 +1022,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (12)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubes_More/NadaCube (12)
 --- !u!65 &228964427
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1094,7 +1097,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 228964423}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 7.429452, y: -2.2962284, z: 22.1633}
+  m_LocalPosition: {x: 7.429452, y: -2.2962284, z: 29.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1334155179}
@@ -1122,7 +1125,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &253550921
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1166,11 +1169,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (17)
@@ -1587,14 +1591,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (10)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubes_More/NadaCube (10)
 --- !u!65 &441579383
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1661,7 +1666,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 441579379}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.4694519, y: -2.2962284, z: 22.1633}
+  m_LocalPosition: {x: 1.4694519, y: -2.2962284, z: 25.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1992926227}
@@ -2014,11 +2019,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (8)
@@ -2551,14 +2557,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (18)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubes_More/NadaCube (18)
 --- !u!65 &706843805
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2625,7 +2632,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 706843801}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 38.04945, y: -2.2962284, z: 22.1633}
+  m_LocalPosition: {x: 38.04945, y: -2.2962284, z: 0.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 753747863}
@@ -2711,7 +2718,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &788867690
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2755,11 +2762,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (5)
@@ -2914,7 +2922,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &803055434
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2958,11 +2966,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (9)
@@ -3264,14 +3273,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (14)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubes_More/NadaCube (14)
 --- !u!65 &821328051
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3338,7 +3348,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 821328047}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 16.809452, y: -2.2962284, z: 22.1633}
+  m_LocalPosition: {x: 16.809452, y: -2.2962284, z: 33.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1762566106}
@@ -4713,7 +4723,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1250679052
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4757,11 +4767,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (1)
@@ -5411,6 +5422,11 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 5250531256022290673, guid: 8dbb42a00f39ec74c90dbf75f6b019b4,
         type: 3}
+    - target: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: nonAuthorityPrefab
+      value: 
+      objectReference: {fileID: 320, guid: 69985f555febbc14da5b579e026d4370, type: 3}
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: designTimeLocation
@@ -5683,7 +5699,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1708196116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5727,11 +5743,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (15)
@@ -5995,14 +6012,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (16)
+  designTimeLocation: scene://SampleScene_Animation/NadaCubes_More/NadaCube (16)
 --- !u!65 &1768873736
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6069,7 +6087,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1768873732}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 26.559452, y: -2.2962284, z: 22.1633}
+  m_LocalPosition: {x: 26.559452, y: -2.2962284, z: 38.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 2086539874}
@@ -6103,7 +6121,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1948070003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6147,11 +6165,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubesTooMuch/NadaCube (13)
@@ -6627,7 +6646,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1994730298
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6671,11 +6690,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (3)
@@ -6817,11 +6837,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (2)
@@ -6891,7 +6912,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2004450824}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -21.14, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: -21.14, y: 0.29, z: 39.22}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 950147523}
@@ -6914,7 +6935,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2024985206}
   m_Layer: 0
-  m_Name: NadaCubesTooMuch
+  m_Name: NadaCubes_More
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7008,11 +7029,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (6)
@@ -7082,7 +7104,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2054932191}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -8.87, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: -8.87, y: 0.29, z: 32.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1746987816}
@@ -7320,11 +7342,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube (4)
@@ -7394,7 +7417,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2077870148}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -15.02, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: -15.02, y: 0.29, z: 36.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 950766220}
@@ -7707,7 +7730,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2087634818}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -28.9, y: 0.29, z: 28.4}
+  m_LocalPosition: {x: -28.9, y: 0.29, z: 42.36}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1384803162}
@@ -7744,11 +7767,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 3
   animatorSyncSupport:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
   designTimeLocation: scene://SampleScene_Animation/NadaCubes/NadaCube

@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -47,6 +47,25 @@ namespace GONet
     /// </summary>
     public interface ILocalOnlyPublish { }
 
+    /// <summary>
+    /// This is something that would only apply to event class that implement <see cref="IPersistentEvent"/> that get queued up on server and sent to newly connecting clients.
+    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypeCancelledOut"/> and see if they cancel one another out 
+    /// so these messages can be removed from consideration in pairs as to not send these events anywhere.
+    /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DestroyGONetParticipantEvent"/>.
+    /// </summary>
+    public interface ICancelOutOtherEvents
+    {
+        /// <summary>
+        /// At time of writing, this should only be types that implement <see cref="IPersistentEvent"/>.
+        /// </summary>
+        Type OtherEventTypeCancelledOut { get; }
+
+        /// <summary>
+        /// This will only get called when <paramref name="otherEvent"/> is of the type <see cref="OtherEventTypeCancelledOut"/>.
+        /// </summary>
+        bool DoesCancelOutOtherEvent(IGONetEvent otherEvent);
+    }
+
     #endregion
 
     public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
@@ -69,6 +88,25 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
+    /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
+    /// </summary>
+    public struct GONetParticipantEnabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantEnabledEvent(uint gonetId)
+        {
+            GONetId = gonetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its Start() method called and it is ready to be used by other game logic.
+    /// </summary>
     public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
@@ -76,6 +114,21 @@ namespace GONet
         public uint GONetId { get; set; }
 
         public GONetParticipantStartedEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnDisable() method called and will no longer be active in the game.
+    /// </summary>
+    public struct GONetParticipantDisabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantDisabledEvent(GONetParticipant gonetParticipant)
         {
             GONetId = gonetParticipant.GONetId;
         }
@@ -179,14 +232,28 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
+    /// </summary>
     [MessagePackObject]
-    public struct DestroyGONetParticipantEvent : IPersistentEvent
+    public struct DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
     {
         [IgnoreMember]
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(0)]
         public uint GONetId;
+
+        static readonly Type otherEventTypeCancelledOut = typeof(InstantiateGONetParticipantEvent);
+
+        [IgnoreMember]
+        public Type OtherEventTypeCancelledOut => otherEventTypeCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
+            return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId);
+        }
     }
 
     [MessagePackObject]
@@ -196,9 +263,9 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public Queue<IPersistentEvent> PersistentEvents;
+        public LinkedList<IPersistentEvent> PersistentEvents;
 
-        public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, LinkedList<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             PersistentEvents = persistentEvents;
@@ -249,7 +316,7 @@ namespace GONet
 
     public interface IHaveRelatedGONetId
     {
-        uint GONetId { get; }
+        uint GONetId { get; set; }
     }
 
     /// <summary>

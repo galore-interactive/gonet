@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -23,8 +23,10 @@ public class GONetSampleSpawner : MonoBehaviour
     public GONetSampleClientOrServer GONetClientPREFAB;
 
     public GONetParticipant authorityPrefab;
+    public GONetParticipant nonAuthorityPrefab;
 
     private bool hasServerSpawned;
+    private bool hasClientSpawned;
 
     private void Start()
     {
@@ -40,15 +42,14 @@ public class GONetSampleSpawner : MonoBehaviour
             const string SERVER = "-server";
             if (arg == SERVER)
             {
-                Instantiate(GONetServerPREFAB);
-                hasServerSpawned = true;
+                InstantiateServerIfNotAlready();
             }
             else
             {
                 const string CLIENT = "-client";
                 if (arg == CLIENT)
                 {
-                    Instantiate(GONetClientPREFAB);
+                    InstantiateClientIfNotAlready();
                 }
             }
         }
@@ -58,18 +59,45 @@ public class GONetSampleSpawner : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
         {
-            Instantiate(GONetClientPREFAB);
+            InstantiateClientIfNotAlready();
         }
 
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S))
         {
-            Instantiate(GONetServerPREFAB);
-            hasServerSpawned = true;
+            InstantiateServerIfNotAlready();
         }
 
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
-            Instantiate(authorityPrefab, transform.position, transform.rotation);
+            if (authorityPrefab)
+            {
+                if (nonAuthorityPrefab)
+                {
+                    GONetMain.Instantiate_WithNonAuthorityAlternate(authorityPrefab, nonAuthorityPrefab, transform.position, transform.rotation);
+                }
+                else
+                {
+                    Instantiate(authorityPrefab, transform.position, transform.rotation);
+                }
+            }
+        }
+    }
+
+    private void InstantiateServerIfNotAlready()
+    {
+        if (!hasServerSpawned)
+        {
+            Instantiate(GONetServerPREFAB);
+            hasServerSpawned = true;
+        }
+    }
+
+    internal void InstantiateClientIfNotAlready()
+    {
+        if (!hasClientSpawned)
+        {
+            Instantiate(GONetClientPREFAB);
+            hasClientSpawned = true;
         }
     }
 }

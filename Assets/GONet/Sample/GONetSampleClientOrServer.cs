@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -21,11 +21,13 @@ public class GONetSampleClientOrServer : MonoBehaviour
 {
     public bool isServer = true;
 
-    public const string serverIP = "10.0.0.53";
+    public const string serverIP = "127.0.0.1";
     public const int serverPort = 40000;
 
     private void Awake()
     {
+        DontDestroyOnLoad(gameObject);
+
         if (isServer)
         {
             GONetMain.gonetServer = new GONetServer(64, serverIP, serverPort);
@@ -34,7 +36,7 @@ public class GONetSampleClientOrServer : MonoBehaviour
         else
         {
             GONetMain.GONetClient = new GONetClient(new Client());
-            GONetMain.GONetClient.ConnectToServer(serverIP, serverPort);
+            GONetMain.GONetClient.ConnectToServer(serverIP, serverPort, 30);
         }
     }
 }

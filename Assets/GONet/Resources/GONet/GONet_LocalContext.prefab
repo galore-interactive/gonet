@@ -50,6 +50,7 @@ MonoBehaviour:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab

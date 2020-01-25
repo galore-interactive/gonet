@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -203,13 +203,19 @@ namespace GONet
             ReceivePacket(payloadBytes, payloadSize);
         }
 
-        public void Connect(string serverIP, int serverPort)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="serverIP"></param>
+        /// <param name="serverPort"></param>
+        /// <param name="ongoingTimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
+        public void Connect(string serverIP, int serverPort, int ongoingTimeoutSeconds)
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
             ulong clientID = (ulong)GUID.Generate().AsInt64();
             byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { new IPEndPoint(IPAddress.Parse(serverIP), serverPort) },
                 30,
-                5,
+                ongoingTimeoutSeconds,
                 1UL,
                 clientID,
                 new byte[256]);

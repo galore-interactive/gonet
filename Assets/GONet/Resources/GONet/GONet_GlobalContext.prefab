@@ -52,6 +52,7 @@ MonoBehaviour:
     type: 3}
   authorityPrefab: {fileID: 4427451128044106635, guid: cd51da3f44ba1a04f8b94ee6b34bd32f,
     type: 3}
+  nonAuthorityPrefab: {fileID: 0}
 --- !u!114 &8643402947905904696
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -69,6 +70,7 @@ MonoBehaviour:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
@@ -96,6 +98,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 627d57d90dfe8444abe3b2b34dd4e617, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  valueBlendingBufferLeadTimeMilliseconds: 250
+  valueBlendingBufferLeadTimeMilliseconds: 150
   gonetLocalPrefab: {fileID: 5118336138822136954, guid: 338c05f05b3eb634894468e022a5a11f,
     type: 3}
+  shouldAttemptAutoStartAsClient: 1

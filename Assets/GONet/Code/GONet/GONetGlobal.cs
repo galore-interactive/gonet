@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -26,7 +26,7 @@ namespace GONet
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
-    public sealed class GONetGlobal : MonoBehaviour
+    public sealed class GONetGlobal : GONetParticipantCompanionBehaviour
     {
         #region TODO this should be configurable/set elsewhere potentially AFTER loading up and depending on other factors like match making etc...
 
@@ -44,7 +44,18 @@ namespace GONet
         [SerializeField]
         internal GONetLocal gonetLocalPrefab;
 
-        private void Awake()
+        [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
+        public bool shouldAttemptAutoStartAsClient = true;
+
+        private readonly List<GONetParticipant> enabledGONetParticipants = new List<GONetParticipant>(1000);
+        /// <summary>
+        /// <para>A convenient collection of all the <see cref="GONetParticipant"/> instances that are currently enabled no matter what the value of <see cref="GONetParticipant.OwnerAuthorityId"/> value is.</para>
+        /// <para>Elements are added here once Start() was called on the <see cref="GONetParticipant"/> and removed once OnDisable() is called.</para>
+        /// <para>Do NOT attempt to modify this collection as to avoid creating issues for yourself/others.</para>
+        /// </summary>
+        public IEnumerable<GONetParticipant> EnabledGONetParticipants => enabledGONetParticipants;
+
+        protected override void Awake()
         {
             if (gonetLocalPrefab == null)
             {
@@ -62,7 +73,68 @@ namespace GONet
 
             GONetMain.InitOnUnityMainThread(this, gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 
+            base.Awake(); // YUK: code smell...having to break OO protocol here and call base here as it needs to come AFTER the init stuff is done in GONetMain.InitOnUnityMainThread() and unity main thread identified or exceptions will be thrown in base.Awake() when subscribing
+
             GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
+
+            enabledGONetParticipants.Clear();
+
+            if (shouldAttemptAutoStartAsClient)
+            {
+                AttemptStartAsClientIfAppropriate();
+            }
+        }
+
+        public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantEnabled(gonetParticipant);
+
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantStarted(gonetParticipant);
+
+            AddIfAppropriate(gonetParticipant);
+        }
+
+        private void AddIfAppropriate(GONetParticipant gonetParticipant)
+        {
+            if (!enabledGONetParticipants.Contains(gonetParticipant)) // may have already been added elsewhere
+            {
+                enabledGONetParticipants.Add(gonetParticipant);
+            }
+        }
+
+        public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
+        {
+            enabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
+        }
+
+        private void AttemptStartAsClientIfAppropriate()
+        {
+            bool isAppropriate = !GONetMain.IsServer && !GONetMain.IsClient && Application.isEditor;
+            if (isAppropriate) // do not attempt to start a client when we already know this is the server...no matter what the shouldAttemptAutoStartAsClient set to true seems to indicate!
+            {
+                var sampleSpawner = GetComponent<GONetSampleSpawner>();
+                if (sampleSpawner)
+                {
+                    sampleSpawner.InstantiateClientIfNotAlready();
+                }
+                else
+                {
+                    const string UNABLE = "Unable to honor your setting of true on ";
+                    const string BECAUSE = " because we could not find ";
+                    const string ATTACHED = " attached to this GameObject, which is required to automatically start the client in this manner.";
+                    GONetLog.Error(string.Concat(UNABLE, nameof(shouldAttemptAutoStartAsClient), BECAUSE, nameof(GONetSampleSpawner), ATTACHED));
+                }
+            }
+            else
+            {
+                const string INAP = "It was deemed inappropriate to auto-start a client; however, do not fret if this is a client that was started via a build executable passing in '-client' as a command line argument since that would still be honored in which case this is a client.";
+                GONetLog.Info(INAP);
+            }
         }
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)

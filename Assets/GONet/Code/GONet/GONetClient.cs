@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -94,9 +94,9 @@ namespace GONet
             client.OnStateChanged += OnStateChanged;
         }
 
-        public void ConnectToServer(string serverIP, int serverPort)
+        public void ConnectToServer(string serverIP, int serverPort, int ongoingTimeoutSeconds)
         {
-            connectionToServer.Connect(serverIP, serverPort);
+            connectionToServer.Connect(serverIP, serverPort, ongoingTimeoutSeconds);
         }
 
         public void SendBytesToServer(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)

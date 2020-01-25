@@ -111,6 +111,7 @@ MonoBehaviour:
     keys: []
     values: []
   IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   designTimeLocation: project://Assets/GONet/Resources/PendulumJalou.prefab
