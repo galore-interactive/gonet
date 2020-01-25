@@ -1537,7 +1537,22 @@ namespace GONet
             double elapsedSeconds = ElapsedSecondsUnset;
             public double ElapsedSeconds => elapsedSeconds;
 
+            float lastUpdateSeconds;
+            /// <summary>
+            /// <para>Duration of seconds between the most two recent calls to <see cref="Update"/>.</para>
+            /// <para>This is the GONet ~equivalent to <see cref="UnityEngine.Time.deltaTime"/>, but does NOT account for being called from within FixedUpdate and will NEVER represent the deltaTime for between calls to FixedUpdate is local to this instance.</para>
+            /// </summary>
+            public float DeltaTime => lastUpdateSeconds;
+
             internal volatile int updateCount = 0;
+
+            public SecretaryOfTemporalAffairs() { }
+
+            public SecretaryOfTemporalAffairs(SecretaryOfTemporalAffairs initFromAuthority)
+            {
+                SetFromAuthority(initFromAuthority.ElapsedTicks);
+            }
+
             public int UpdateCount
             {
                 get { return updateCount; }
@@ -1573,6 +1588,8 @@ namespace GONet
             /// </summary>
             internal void Update()
             {
+                double elapsedSecondsPrevious = elapsedSeconds;
+
                 ++UpdateCount;
 
                 if (elapsedSeconds == ElapsedSecondsUnset)
@@ -1584,6 +1601,13 @@ namespace GONet
                 ElapsedTicks = elapsedTicks_withoutEasement - GetTicksToSubtractForSetFromAuthorityEasing();
 
                 elapsedSeconds = TimeSpan.FromTicks(ElapsedTicks).TotalSeconds;
+
+                lastUpdateSeconds = (float)(elapsedSeconds - elapsedSecondsPrevious);
+
+                if (IsUnityMainThread)
+                {
+                    //GONetLog.Debug(string.Concat("gonet.seconds: ", ElapsedSeconds, " unity.seconds: ", UnityEngine.Time.time, " diff: ", (UnityEngine.Time.time - ElapsedSeconds), " gonet.hash: ", GetHashCode()));
+                }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2497,7 +2521,7 @@ namespace GONet
 
             readonly ArrayPool<byte> myThread_valueChangeSerializationArrayPool;
 
-            static readonly SecretaryOfTemporalAffairs myThread_Time = new SecretaryOfTemporalAffairs();
+            readonly SecretaryOfTemporalAffairs myThread_Time;
 
             /// <summary>
             /// IMPORTANT: If a value of <see cref="AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS"/> is passed in here for <paramref name="scheduleFrequency"/>,
@@ -2519,6 +2543,8 @@ namespace GONet
                 isSetupToRunInSeparateThread = !uniqueGrouping.mustRunOnUnityMainThread;
                 if (isSetupToRunInSeparateThread)
                 {
+                    myThread_Time = new SecretaryOfTemporalAffairs(GONetMain.Time); // since not running on main thread, we need to use a new/separate instance to avoid cross thread access conflicts
+
                     thread = new Thread(ContinuallyProcess_NotMainThread);
 
                     syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
@@ -2529,6 +2555,8 @@ namespace GONet
                 }
                 else
                 {
+                    myThread_Time = Time; // if running on main thread, no need to use a different instance that will already be used on the main thread
+
                     if (!syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
                     {
                         syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
@@ -2539,7 +2567,10 @@ namespace GONet
 
             private void Time_TimeSetFromAuthority(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks)
             {
-                myThread_Time.SetFromAuthority(toElapsedTicks);
+                if (myThread_Time != Time) // avoid SetFromAuthority if the local time instance is the same as GONetMain instance since it will be already handled/set
+                {
+                    myThread_Time.SetFromAuthority(toElapsedTicks);
+                }
             }
 
             ~AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable()
@@ -2588,7 +2619,10 @@ namespace GONet
             /// </summary>
             private void Process()
             {
-                myThread_Time.Update();
+                if (myThread_Time != Time) // avoid updating time if the local time instance is the same as GONetMain instance since it will be updated already
+                {
+                    myThread_Time.Update();
+                }
                 long myTicks = myThread_Time.ElapsedTicks;
                 // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
                 syncValuesToSend.Clear();

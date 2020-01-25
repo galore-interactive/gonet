@@ -59,7 +59,7 @@ namespace GONet
         /// <summary>
         /// <para>When this is called, GONet knows whether or not this machine is going to be a GONet client or server.  So any action that must know that first is now OK to execute.</para>
         /// <para>Futhermore, GONet has also assigned an authority id for this machine (i.e., <see cref="GONetMain.MyAuthorityId"/> is set) and that is important as well before doing certain things like instantiating/spawning prefabs with <see cref="GONetParticipant"/> attached.</para>
-        /// <para>So, please after this is called, feel free to instantiate/spawn networked GameObjects into the scene.</para>
+        /// <para>So, please after this is called, feel free to instantiate/spawn networked GameObjects (i.e., with <see cref="GONetParticipant"/>) into the scene.</para>
         /// </summary>
         /// <param name="isClient">The value of <see cref="GONetMain.IsClient"/> at the time of calling this method.</param>
         /// <param name="isServer">The value of <see cref="GONetMain.IsServer"/> at the time of calling this method.</param>
