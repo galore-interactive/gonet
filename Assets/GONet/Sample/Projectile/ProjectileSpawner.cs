@@ -60,6 +60,7 @@ public class ProjectileSpawner : GONetBehaviour
         {
             if (projectile.GONetParticipant.IsMine)
             {
+                // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
                 projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
             }
         }
