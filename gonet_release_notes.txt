@@ -1,0 +1,14 @@
+[2020 Jan 08] 1.0
+
+[2020 Jan 13] 1.0.1
+Minor update:
+-add license text to most recent C# files
+-remove some unnecessary (and problematic) files from GONetStreamingAssets.zip to avoid an accidental SNAFU if done after project initialization (i.e., overwrite DesignTimeLocations.txt)
+
+[2020 Jan 26] 1.0.2
+Important update:
+-fix code generation for users where float.ToString() outputs a comma instead of a period for the decimal point
+-noticeably improved value blending smoothness for data/values on non-authority coming from authority via GNP auto-magical sync
+-added support for spawning a GONetParticipant (i.e., GNP) with any arbitrary parent via Instantiate(prefab, parent)
+-updated GONet-Setup-Guide.pdf to reflect current state
+-made use of GONetBehaviour and GONetParticipantCompanionBehaviour in sample code since it is easier for beginners (over using GONet event API) -enhanced the projectile test scene for troubleshooting purposes
