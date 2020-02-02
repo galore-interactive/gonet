@@ -591,7 +591,8 @@ namespace GONet.Generation
         internal void PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
         {
             Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
-            MemberInfo syncMember = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance)[0];
+            MemberInfo[] methods = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance);
+            MemberInfo syncMember = methods[0];
             Type syncMemberType = syncMember.MemberType == MemberTypes.Property
                                 ? ((PropertyInfo)syncMember).PropertyType
                                 : ((FieldInfo)syncMember).FieldType;

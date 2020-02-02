@@ -1546,6 +1546,7 @@
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />
@@ -1690,6 +1691,7 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ObjPool.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetInputSync.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />
