@@ -18,13 +18,15 @@ using System.Linq;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using GONet.Utils;
 
 namespace GONet.Sample
 {
     [RequireComponent(typeof(GONetParticipant))]
     public class Projectile : GONetParticipantCompanionBehaviour
     {
-        public float speed = 2;
+        private float startSpeed;
+        public float speed = 5;
 
         TextMeshProUGUI text;
 
@@ -34,6 +36,8 @@ namespace GONet.Sample
 
             text = GetComponentInChildren<TextMeshProUGUI>();
 
+            startSpeed = speed;
+
             InitSutffForSupportingHoveringDuplicate();
         }
 
@@ -41,12 +45,21 @@ namespace GONet.Sample
         {
             if (gonetParticipant.IsMine)
             {
-                const string MINE = "MINE";
-                text.text = MINE;
-                text.color = Color.green;
+                if (speed > -startSpeed)
+                {
+                    speed -= Time.deltaTime;
 
-                hoveringDuplicateChild.gameObject.GetComponent<Renderer>().enabled = true;
-                SimulateNonAuthorityInterpolation(hoveringDuplicateChild);
+                    const string MINE = "Mine";
+                    text.text = MINE;
+                    text.color = Color.green;
+
+                    hoveringDuplicateChild.gameObject.GetComponent<Renderer>().enabled = true;
+                    SimulateNonAuthorityInterpolation(hoveringDuplicateChild);
+                }
+                else
+                {
+                    Destroy(gameObject); // avoid having an ever growing list of things going when they go off screen and cannot be seen
+                }
             }
             else
             {
@@ -66,6 +79,7 @@ namespace GONet.Sample
         readonly Queue<Vector3> sentPositionBuffer = new Queue<Vector3>();
         readonly Queue<long> sentTimeInTicksBuffer = new Queue<long>();
         private static readonly int VALUE_COUNT_NEEDED_TO_EXTRAPOLATE = 2;
+        private static readonly int VALUE_COUNT_NEEDED_TO_EXTRAPOLATE_BASED_ON_ACCELERATION = 3;
         int buffer_capacitySize;
 
         private void InitSutffForSupportingHoveringDuplicate()
@@ -114,7 +128,10 @@ namespace GONet.Sample
                     sentPositionBuffer.Reverse().ToArray(), 
                     sentTimeInTicksBuffer.Reverse().ToArray(), 
                     sentPositionBuffer.Count,
-                    simulatedNonAuthorityTime.ElapsedTicks - GONetMain.valueBlendingBufferLeadTicks, 
+                    
+                    //simulatedNonAuthorityTime.ElapsedTicks - GONetMain.valueBlendingBufferLeadTicks,
+                    GONetMain.Time.ElapsedTicks - GONetMain.valueBlendingBufferLeadTicks, // Test only...seeing if smoother when this time being used
+                    
                     out interpolatedPosition))
             {
                 applySimulationToTransform.position = new Vector3(
@@ -152,8 +169,32 @@ namespace GONet.Sample
                             if (atElapsedTicks >= newest_elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
                                 bool isEnoughInfoToExtrapolate = valueCount >= VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
-                                if (isEnoughInfoToExtrapolate)
+                                bool isEnoughInfoToExtrapolateBasedOnAcceleration = valueCount >= VALUE_COUNT_NEEDED_TO_EXTRAPOLATE_BASED_ON_ACCELERATION;
+                                /*if (isEnoughInfoToExtrapolateBasedOnAcceleration)
+                                { // use velocity and acceleration presuming that it will be more accurate than regular interpolation
+                                    int olderBufferIndex = newestBufferIndex + 1;
+                                    Vector3 older_numericValue = sentPositionBuffer[olderBufferIndex];
+                                    long older_elapsedTicksAtChange = sentTimeInTicksBuffer[olderBufferIndex];
+
+                                    int oldererBufferIndex = olderBufferIndex + 1;
+                                    Vector3 olderer_numericValue = sentPositionBuffer[oldererBufferIndex];
+                                    long olderer_elapsedTicksAtChange = sentTimeInTicksBuffer[oldererBufferIndex];
+
+                                    long time_newerOlder = newest_elapsedTicksAtChange - older_elapsedTicksAtChange;
+                                    long time = atElapsedTicks - newest_elapsedTicksAtChange;
+
+                                    Vector3 older_velocity = (older_numericValue - olderer_numericValue) / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+                                    Vector3 newer_velocity = (newest_numericValue - older_numericValue) / time_newerOlder;
+                                    Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
+
+                                    Vector3 blended_velocity = newer_velocity + newer_acceleration * time;
+                                    blendedValue = newest_numericValue + blended_velocity * time;
+
+                                    GONetLog.Debug(string.Concat("we extroip_accelerated his ace...blended_velocity: ", blended_velocity.x, ",", blended_velocity.y, ",", blended_velocity.z, " newerAcceleration: ", newer_acceleration.x, ",", newer_acceleration.y, ",", newer_acceleration.z));
+                                }
+                                else */ if (isEnoughInfoToExtrapolate)
                                 {
+                                    
                                     Vector3 justBeforenewest_numericValue = sentPositionBuffer[newestBufferIndex + 1];
                                     long justBeforenewest_elapsedTicksAtChange = sentTimeInTicksBuffer[newestBufferIndex + 1];
                                     Vector3 valueDiffBetweenLastTwo = newestValue - justBeforenewest_numericValue;
@@ -162,13 +203,26 @@ namespace GONet.Sample
                                     long extrapolated_TicksAtSend = newest_elapsedTicksAtChange + ticksBetweenLastTwo;
                                     Vector3 extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                     float interpolationTime = (atElapsedTicks - newest_elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest_elapsedTicksAtChange);
-                                    blendedValue = Vector3.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
+                                    //blendedValue = Vector3.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
                                     //GONetLog.Debug("extroip'd....newest: " + TimeSpan.FromTicks(newest_elapsedTicksAtChange).TotalSeconds + " extrap'd: " + TimeSpan.FromTicks(extrapolated_TicksAtSend).TotalSeconds + " interpolationPERCENTAGE: " + interpolationTime);
+
+                                    //if (interpolationTime > 1 || atElapsedTicks > extrapolated_TicksAtSend) { GONetLog.Debug("bull shiznittle!"); }
+
+                                    /*
+                                     * double totalMilliseconds = TimeSpan.FromTicks(ticksBetweenLastTwo).TotalMilliseconds;
+                                    const string m = "magnitude: ";
+                                    const string s = " / ";
+                                    const string e = " = ";
+                                    GONetLog.Debug(string.Concat(m, valueDiffBetweenLastTwo.magnitude, s, totalMilliseconds, e, valueDiffBetweenLastTwo.magnitude / totalMilliseconds));
+                                    */
+
+                                    float bezierTime = 0.5f + (interpolationTime / 2f);
+                                    blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforenewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                 }
                                 else
                                 {
                                     blendedValue = newestValue;
-                                    //GONetLog.Debug("VECTOR3 new new beast");
+                                    GONetLog.Debug("VECTOR3 new new beast");
                                 }
                             }
                             else if (atElapsedTicks <= oldest_elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
@@ -179,29 +233,55 @@ namespace GONet.Sample
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
                                 bool didWeLoip = false;
+
                                 for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
                                 {
                                     Vector3 newer_numericValue = sentPositionBuffer[i - 1];
                                     long newer_elapsedTicksAtChange = sentTimeInTicksBuffer[i - 1];
 
-                                    if (atElapsedTicks <= newer_elapsedTicksAtChange)
+                                    if (atElapsedTicks <= newer_elapsedTicksAtChange) // did we find the two items in buffer that immediately surround the desired atElapsedTicks time?
                                     {
                                         Vector3 older_numericValue = sentPositionBuffer[i];
                                         long older_elapsedTicksAtChange = sentTimeInTicksBuffer[i];
 
-                                        float interpolationTime = (atElapsedTicks - older_elapsedTicksAtChange) / (float)(newer_elapsedTicksAtChange - older_elapsedTicksAtChange);
-                                        blendedValue = Vector3.Lerp(
-                                            older_numericValue,
-                                            newer_numericValue,
-                                            interpolationTime);
-                                        //GONetLog.Debug("we loip'd 'eem");
-                                        didWeLoip = true;
+                                        bool areEnoughPriorValuesForAcceleration = i < oldestBufferIndex; // i.e., there is at least one item older than the older_numericValue to be used below
+                                        long time_newerOlder = newer_elapsedTicksAtChange - older_elapsedTicksAtChange;
+                                        long time = atElapsedTicks - older_elapsedTicksAtChange;
+                                        if (areEnoughPriorValuesForAcceleration)
+                                        { // use velocity and acceleration presuming that it will be more accurate than regular interpolation
+                                            Vector3 olderer_numericValue = sentPositionBuffer[i + 1]; // olderer is the item immediately older than the one we call older
+                                            long olderer_elapsedTicksAtChange = sentTimeInTicksBuffer[i + 1];
+
+                                            /*
+                                            Vector3 older_velocity = (older_numericValue - olderer_numericValue) / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+                                            Vector3 newer_velocity = (newer_numericValue - older_numericValue) / time_newerOlder;
+                                            Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
+                                            Vector3 blended_velocity = older_velocity + newer_acceleration * time;
+                                            blendedValue = older_numericValue + blended_velocity * time;
+
+                                            //GONetLog.Debug("we accelerated his ace");
+                                            */
+
+                                            float bezierTime = (atElapsedTicks - olderer_elapsedTicksAtChange) / (float)(newer_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+                                            blendedValue = ValueBlendUtils.GetQuadraticBezierValue(olderer_numericValue, older_numericValue, newer_numericValue, bezierTime);
+                                        }
+                                        else
+                                        { // regular interpolation
+                                            float interpolationTime = time / (float)time_newerOlder;
+                                            blendedValue = Vector3.Lerp(
+                                                older_numericValue,
+                                                newer_numericValue,
+                                                interpolationTime);
+                                            //GONetLog.Debug("we loip'd 'eem");
+                                            didWeLoip = true;
+                                        }
+
                                         break;
                                     }
                                 }
                                 if (!didWeLoip)
                                 {
-                                    GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                    //GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                 }
                             }
                         }

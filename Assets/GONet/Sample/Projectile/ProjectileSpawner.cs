@@ -15,7 +15,6 @@
 
 using GONet;
 using GONet.Sample;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -36,17 +35,16 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
             {
-                // example option (wait a bit before server assumes authority): StartCoroutine(Server_AssumeOwnershipAfterSeconds(projectile.GONetParticipant, GONetMain.valueBlendingBufferLeadSeconds));
                 GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
             }
         }
     }
 
-    private IEnumerator Server_AssumeOwnershipAfterSeconds(GONetParticipant gonetParticipant, float seconds)
+    public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
     {
-        yield return new WaitForSecondsRealtime(seconds);
+        base.OnGONetParticipantDisabled(gonetParticipant);
 
-        GONetMain.Server_AssumeAuthorityOver(gonetParticipant);
+        projectiles.Remove(gonetParticipant.GetComponent<Projectile>());
     }
 
     private void Update()
@@ -60,8 +58,19 @@ public class ProjectileSpawner : GONetBehaviour
         {
             if (projectile.GONetParticipant.IsMine)
             {
+                Vector3 previousPosition = projectile.transform.position;
+
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
                 projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
+
+                /*
+                 * float magnitude = (projectile.transform.position - previousPosition).magnitude;
+                double totalSeconds = Time.deltaTime;
+                const string m = "ACTUHADI-------magnitude: ";
+                const string s = " / ";
+                const string e = " = ";
+                GONetLog.Debug(string.Concat(m, magnitude, s, totalSeconds, e, magnitude / totalSeconds));
+                */
             }
         }
     }

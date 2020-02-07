@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace GONet.Utils
@@ -71,13 +72,16 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    float valueDiffBetweenLastTwo = newestValue - justBeforeNewest.numericValue.System_Single;
+                                    float justBeforeNewest_numericValue = justBeforeNewest.numericValue.System_Single;
+                                    float valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
                                     long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
                                     float extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                     float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
-                                    blendedValue = Mathf.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
+
+                                    float bezierTime = 0.5f + (interpolationTime / 2f);
+                                    blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                 }
                                 else
@@ -135,6 +139,15 @@ namespace GONet.Utils
             }
 
             return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static float GetQuadraticBezierValue(float p0, float p1, float p2, float t)
+        {
+            float u = 1 - t;
+            float uSquared = u * u;
+            float tSquared = t * t;
+            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
         }
 
         static bool GetBlendedValue_Quaternion(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
@@ -268,13 +281,16 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest.numericValue.UnityEngine_Vector3;
+                                    Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
+                                    Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
                                     long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
                                     Vector3 extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
                                     float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
-                                    blendedValue = Vector3.Lerp(newestValue, extrapolated_ValueNew, interpolationTime);
+
+                                    float bezierTime = 0.5f + (interpolationTime / 2f);
+                                    blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                 }
                                 else
@@ -332,6 +348,15 @@ namespace GONet.Utils
             }
 
             return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static Vector3 GetQuadraticBezierValue(Vector3 p0, Vector3 p1, Vector3 p2, float t)
+        {
+            float u = 1 - t;
+            float uSquared = u * u;
+            float tSquared = t * t;
+            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
         }
     }
 }
