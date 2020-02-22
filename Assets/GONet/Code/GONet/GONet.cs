@@ -2096,6 +2096,22 @@ namespace GONet
                 //LogBufferContentsIfAppropriate();
             }
 
+            internal bool TryGetMostRecentChangeAtTime(long elapsedTicksAtChange, out GONetSyncableValue value)
+            {
+                for (int i = 0; i < mostRecentChanges_usedSize; ++i)
+                {
+                    var item = mostRecentChanges[i];
+                    if (item.elapsedTicksAtChange == elapsedTicksAtChange)
+                    {
+                        value = item.numericValue;
+                        return true;
+                    }
+                }
+
+                value = default;
+                return false;
+            }
+
             long lastLogBufferContentsTicks;
 
             private void LogBufferContentsIfAppropriate()

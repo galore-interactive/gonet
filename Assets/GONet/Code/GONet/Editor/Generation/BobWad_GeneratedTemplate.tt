@@ -320,11 +320,20 @@ namespace GONet.Generation
 #>
                             case <#=iOverall#>:
 								{
-								<# if (singleMember.animatorControllerParameterId == 0) { #>
-									var valueNew = companion.<#=uniqueSnap.componentTypeName#>.<#=singleMember.memberName#>;
-								<# } else { #>
-									<#=memberTypeFullName#> valueNew = companion.<#=uniqueSnap.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
-								<# } #>
+									<#=memberTypeFullName#> valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.<#=memberTypeFullName.Replace(".", "_")#>;
+									}
+									else
+									{
+									<# if (singleMember.animatorControllerParameterId == 0) { #>
+										valueNew = companion.<#=uniqueSnap.componentTypeName#>.<#=singleMember.memberName#>;
+									<# } else { #>
+										valueNew = companion.<#=uniqueSnap.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
+									<# } #>
+									}
 <#
 									const string SYNC_EV = "SyncEvent_";
 									const string UNDIE = "_";
