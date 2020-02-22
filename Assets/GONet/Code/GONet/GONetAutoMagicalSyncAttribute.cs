@@ -471,23 +471,48 @@ namespace GONet
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
-            uint z;
-            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
+            bool areFloatsFullSized = bitsPerComponent == 32;
+            if (areFloatsFullSized) // i.e., nothing to unquantize
+            {
+                float x;
+                bitStream_readFrom.ReadFloat(out x);
+                float y;
+                bitStream_readFrom.ReadFloat(out y);
+                float z;
+                bitStream_readFrom.ReadFloat(out z);
 
-            return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
+                return new Vector3(x, y, z);
+            }
+            else
+            {
+                uint x;
+                bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+                uint y;
+                bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+                uint z;
+                bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
+
+                return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
+            }
         }
 
         public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
         {
             Vector3 vector3 = value.UnityEngine_Vector3;
 
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
+            bool areFloatsFullSized = bitsPerComponent == 32;
+            if (areFloatsFullSized) // i.e., nothing to quantize
+            {
+                bitStream_appendTo.WriteFloat(vector3.x);
+                bitStream_appendTo.WriteFloat(vector3.y);
+                bitStream_appendTo.WriteFloat(vector3.z);
+            }
+            else
+            {
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
+            }
         }
     }
 
