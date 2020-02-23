@@ -51,6 +51,7 @@ public class ProjectileSpawner : GONetBehaviour
     {
         if (GONetMain.IsClient && projectilPrefab != null)
         {
+            #region check keys and touches states
             bool shouldInstantiateBasedOnInput = Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.B);
             if (!shouldInstantiateBasedOnInput)
             {
@@ -67,6 +68,7 @@ public class ProjectileSpawner : GONetBehaviour
                     }
                 }
             }
+            #endregion
 
             if (shouldInstantiateBasedOnInput)
             {

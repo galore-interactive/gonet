@@ -24,6 +24,7 @@ public class ProjectileSceneUI : MonoBehaviour
     public TMPro.TextMeshProUGUI time;
     public TMPro.TextMeshProUGUI isServer;
     public TMPro.TextMeshProUGUI isClient;
+    bool wasServerSpawned;
 
     private void Update()
     {
@@ -34,7 +35,11 @@ public class ProjectileSceneUI : MonoBehaviour
 
         if (isServer)
         {
-            isServer.text = GONetMain.IsServer ? YES : NO;
+            const string ALT_S = "<press left Alt+S>";
+            const string SERVER_GO = "GONetSampleServer(Clone)";
+            wasServerSpawned |= GameObject.Find(SERVER_GO);
+
+            isServer.text = GONetMain.IsServer ? (wasServerSpawned ? YES : ALT_S) : NO;
         }
 
         if (isClient)

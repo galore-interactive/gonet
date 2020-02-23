@@ -125,8 +125,8 @@ namespace GONet.Sample
 
             Vector3 interpolatedPosition;
             if (GetBlendedValue_Vector3(
-                    sentPositionBuffer.Reverse().ToArray(), 
-                    sentTimeInTicksBuffer.Reverse().ToArray(), 
+                    sentPositionBuffer.Reverse().ToArray(), // IMPORTANT: This is BAD news for GC....just here for quick testing...do not put this in production game!
+                    sentTimeInTicksBuffer.Reverse().ToArray(), // IMPORTANT: This is BAD news for GC....just here for quick testing...do not put this in production game!
                     sentPositionBuffer.Count,
                     
                     //simulatedNonAuthorityTime.ElapsedTicks - GONetMain.valueBlendingBufferLeadTicks,
