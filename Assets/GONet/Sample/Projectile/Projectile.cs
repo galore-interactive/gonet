@@ -90,7 +90,7 @@ namespace GONet.Sample
             float syncPositionEverySeconds = 1 / 30f;
             int buffer_calcdSize = syncPositionEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / syncPositionEverySeconds) * 2.5f) : 0;
             buffer_capacitySize = Math.Max(buffer_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
-            GONetLog.Debug("buffer capacity: " + buffer_capacitySize);
+            //GONetLog.Debug("buffer capacity: " + buffer_capacitySize);
         }
 
         protected override void Start()
@@ -252,7 +252,7 @@ namespace GONet.Sample
                                             Vector3 olderer_numericValue = sentPositionBuffer[i + 1]; // olderer is the item immediately older than the one we call older
                                             long olderer_elapsedTicksAtChange = sentTimeInTicksBuffer[i + 1];
 
-                                            /*
+                                            /* this is the acceleration-based impl that the bezier curve replaced
                                             Vector3 older_velocity = (older_numericValue - olderer_numericValue) / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
                                             Vector3 newer_velocity = (newer_numericValue - older_numericValue) / time_newerOlder;
                                             Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;

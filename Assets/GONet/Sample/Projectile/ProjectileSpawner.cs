@@ -49,28 +49,37 @@ public class ProjectileSpawner : GONetBehaviour
 
     private void Update()
     {
-        if (GONetMain.IsClient && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.B) && projectilPrefab != null)
+        if (GONetMain.IsClient && projectilPrefab != null)
         {
-            Instantiate(projectilPrefab, transform.position, transform.rotation);
+            bool shouldInstantiateBasedOnInput = Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.B);
+            if (!shouldInstantiateBasedOnInput)
+            {
+                shouldInstantiateBasedOnInput = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+                if (!shouldInstantiateBasedOnInput)
+                {
+                    foreach (Touch touch in Input.touches)
+                    {
+                        if (touch.phase == TouchPhase.Began)
+                        {
+                            shouldInstantiateBasedOnInput = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (shouldInstantiateBasedOnInput)
+            {
+                Instantiate(projectilPrefab, transform.position, transform.rotation);
+            }
         }
 
         foreach (var projectile in projectiles)
         {
             if (projectile.GONetParticipant.IsMine)
             {
-                Vector3 previousPosition = projectile.transform.position;
-
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
                 projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
-
-                /*
-                 * float magnitude = (projectile.transform.position - previousPosition).magnitude;
-                double totalSeconds = Time.deltaTime;
-                const string m = "ACTUHADI-------magnitude: ";
-                const string s = " / ";
-                const string e = " = ";
-                GONetLog.Debug(string.Concat(m, magnitude, s, totalSeconds, e, magnitude / totalSeconds));
-                */
             }
         }
     }

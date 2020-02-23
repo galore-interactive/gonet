@@ -13,17 +13,33 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet;
 using UnityEngine;
 
 public class ProjectileSceneUI : MonoBehaviour
 {
+    private const string YES = "Yes";
+    private const string NO = "No";
+
     public TMPro.TextMeshProUGUI time;
+    public TMPro.TextMeshProUGUI isServer;
+    public TMPro.TextMeshProUGUI isClient;
 
     private void Update()
     {
         if (time)
         {
-            time.text = GONet.GONetMain.Time.ElapsedSeconds.ToString();
+            time.text = GONetMain.Time.ElapsedSeconds.ToString();
+        }
+
+        if (isServer)
+        {
+            isServer.text = GONetMain.IsServer ? YES : NO;
+        }
+
+        if (isClient)
+        {
+            isClient.text = GONetMain.IsClient ? YES : NO;
         }
     }
 }

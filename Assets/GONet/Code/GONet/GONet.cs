@@ -158,11 +158,11 @@ namespace GONet
         const string SGUID = "SGUID";
         const string MOAId = "MOAId";
         const string DB_EXT = ".mpb";
-        const string DATABASE_PATH_RELATIVE = "database/";
+        const string DATABASE_PATH_RELATIVE = "database";
         private static void InitPersistence()
         {
-            persistenceFilePath = string.Concat(DATABASE_PATH_RELATIVE, Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), TRIPU, SGUID, TRIPU, MOAId, DB_EXT);
-            Directory.CreateDirectory(DATABASE_PATH_RELATIVE);
+            persistenceFilePath = Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE, string.Concat(Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), TRIPU, SGUID, TRIPU, MOAId, DB_EXT));
+            Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE));
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
 
             IEnumerable<Type> syncEventTypes = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.GetAllUniqueSyncEventTypes();
