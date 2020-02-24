@@ -62,8 +62,9 @@ namespace Org.BouncyCastle.Asn1.Pkcs
 
 		public static readonly DerObjectIdentifier DesEde3Cbc	= new DerObjectIdentifier(EncryptionAlgorithm + ".7");
         public static readonly DerObjectIdentifier RC2Cbc		= new DerObjectIdentifier(EncryptionAlgorithm + ".2");
+        public static readonly DerObjectIdentifier rc4          = new DerObjectIdentifier(EncryptionAlgorithm + ".4");
 
-		//
+        //
         // object identifiers for digests
         //
         public const string DigestAlgorithm = "1.2.840.113549.2";
@@ -158,6 +159,17 @@ namespace Org.BouncyCastle.Asn1.Pkcs
          */
         public static readonly DerObjectIdentifier IdRsaKem = IdAlg.Branch("14");
 
+        /**
+         * <pre>
+         * id-alg-AEADChaCha20Poly1305 OBJECT IDENTIFIER ::=
+         * { iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1)
+         *    pkcs9(9) smime(16) alg(3) 18 }
+         *
+         * AEADChaCha20Poly1305Nonce ::= OCTET STRING (SIZE(12))
+         * </pre>
+         */
+        public static readonly DerObjectIdentifier IdAlgAeadChaCha20Poly1305 = IdAlg.Branch("18");
+
         //
         // SMIME capability sub oids.
         //
@@ -235,10 +247,10 @@ namespace Org.BouncyCastle.Asn1.Pkcs
 		public static readonly DerObjectIdentifier IdAAEtsCertCrlTimestamp = new DerObjectIdentifier(IdAA + ".26");
 		public static readonly DerObjectIdentifier IdAAEtsArchiveTimestamp = new DerObjectIdentifier(IdAA + ".27");
 
-        /** PKCS#9: 1.2.840.113549.1.9.16.6.2.37 - <a href="https://tools.ietf.org/html/rfc4108#section-2.2.5">RFC 4108</a> */
+        /** PKCS#9: 1.2.840.113549.1.9.16.2.37 - <a href="https://tools.ietf.org/html/rfc4108#section-2.2.5">RFC 4108</a> */
         public static readonly DerObjectIdentifier IdAADecryptKeyID = IdAAOid.Branch("37");
 
-        /** PKCS#9: 1.2.840.113549.1.9.16.6.2.38 - <a href="https://tools.ietf.org/html/rfc4108#section-2.2.6">RFC 4108</a> */
+        /** PKCS#9: 1.2.840.113549.1.9.16.2.38 - <a href="https://tools.ietf.org/html/rfc4108#section-2.2.6">RFC 4108</a> */
         public static readonly DerObjectIdentifier IdAAImplCryptoAlgs = IdAAOid.Branch("38");
 
         /** PKCS#9: 1.2.840.113549.1.9.16.2.54 <a href="https://tools.ietf.org/html/rfc7030">RFC7030</a>*/

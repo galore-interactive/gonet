@@ -79,7 +79,7 @@ namespace NetcodeIO.NET
 			{
                 encryptionMapEntry encryptionMapping = encryptionMappings[i];
                 if (!encryptionMapping.IsReset
-                    && MiscUtils.AddressEqual(encryptionMapping.Address, address)
+                    && MiscUtils.AreEndPointsEqual(encryptionMapping.Address, address)
 					&& (
                             (encryptionMapping.TimeoutAfterSeconds > 0 && (encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds) >= currentSeconds)
                             || (encryptionMapping.ExpiresAtSeconds > 0.0 && encryptionMapping.ExpiresAtSeconds < currentSeconds)
@@ -128,7 +128,7 @@ namespace NetcodeIO.NET
 
 			for (int i = 0; i < encyrptionMappings_totalCount; i++)
 			{
-                if (!encryptionMappings[i].IsReset && MiscUtils.AddressEqual(encryptionMappings[i].Address, address))
+                if (!encryptionMappings[i].IsReset && MiscUtils.AreEndPointsEqual(encryptionMappings[i].Address, address))
 				{
                     encryptionMappings[i].Reset();
                     --encyrptionMappings_usedCount;
@@ -176,7 +176,7 @@ namespace NetcodeIO.NET
 			if (index < 0 || index >= encyrptionMappings_usedCount)
 				throw new IndexOutOfRangeException(nameof(index));
 
-            if (!MiscUtils.AddressEqual(encryptionMappings[index].Address, address))
+            if (!MiscUtils.AreEndPointsEqual(encryptionMappings[index].Address, address))
 				return false;
 
             encryptionMappings[index].LastAccessedAtSeconds = currentSeconds;
@@ -198,7 +198,7 @@ namespace NetcodeIO.NET
 			{
                 encryptionMapEntry encryptionMapping = encryptionMappings[i];
                 if (!encryptionMapping.IsReset &&
-                    MiscUtils.AddressEqual(encryptionMapping.Address, address) &&
+                    MiscUtils.AreEndPointsEqual(encryptionMapping.Address, address) &&
 					((encryptionMapping.LastAccessedAtSeconds + encryptionMapping.TimeoutAfterSeconds) >= currentSeconds || encryptionMapping.TimeoutAfterSeconds <= 0) &&
 					(encryptionMapping.ExpiresAtSeconds <= 0.0 || encryptionMapping.ExpiresAtSeconds >= currentSeconds))
 				{

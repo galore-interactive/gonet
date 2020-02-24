@@ -20,15 +20,26 @@ namespace NetcodeIO.NET.Utils
 		}
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static bool AddressEqual(EndPoint lhs, EndPoint rhs)
+		public static bool AreEndPointsEqual(EndPoint lhs, EndPoint rhs)
 		{
             IPEndPoint lhsIP = lhs as IPEndPoint;
             IPEndPoint rhsIP = rhs as IPEndPoint;
 
             return lhsIP == null
                 ? false
-                : (rhsIP == null ? (lhs == null ? false : lhs.Equals(rhs)) : CompareAddress(lhsIP, rhsIP));
+                : (rhsIP == null ? (lhs == null ? false : lhs.Equals(rhs)) : CompareEndpoint(lhsIP, rhsIP, rhsIP.Port));
 		}
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AddressEqual(EndPoint lhs, EndPoint rhs)
+        {
+            IPEndPoint lhsIP = lhs as IPEndPoint;
+            IPEndPoint rhsIP = rhs as IPEndPoint;
+
+            return lhsIP == null
+                ? false
+                : (rhsIP == null ? (lhs == null ? false : lhs.Equals(rhs)) : CompareAddress(lhsIP, rhsIP));
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool MatchChars(char[] chars, string match)

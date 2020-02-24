@@ -134,6 +134,7 @@ namespace Org.BouncyCastle.Math
         public static readonly BigInteger One;
         public static readonly BigInteger Two;
         public static readonly BigInteger Three;
+        public static readonly BigInteger Four;
         public static readonly BigInteger Ten;
 
         //private readonly static byte[] BitCountTable =
@@ -207,6 +208,7 @@ namespace Org.BouncyCastle.Math
             One = SMALL_CONSTANTS[1];
             Two = SMALL_CONSTANTS[2];
             Three = SMALL_CONSTANTS[3];
+            Four = SMALL_CONSTANTS[4];
             Ten = SMALL_CONSTANTS[10];
 
             radix2 = ValueOf(2);
@@ -247,7 +249,7 @@ namespace Org.BouncyCastle.Math
             return (nBits + BitsPerByte - 1) / BitsPerByte;
         }
 
-        internal static BigInteger Arbitrary(int sizeInBits)
+        public static BigInteger Arbitrary(int sizeInBits)
         {
             return new BigInteger(sizeInBits, RandomSource);
         }
@@ -1330,6 +1332,17 @@ namespace Org.BouncyCastle.Math
             }
         }
 
+        public int IntValueExact
+        {
+            get
+            {
+                if (BitLength > 31)
+                    throw new ArithmeticException("BigInteger out of int range");
+
+                return IntValue;
+            }
+        }
+
         /**
          * return whether or not a BigInteger is probably prime with a
          * probability of 1 - (1/2)**certainty.
@@ -1583,6 +1596,17 @@ namespace Org.BouncyCastle.Math
                 }
 
                 return sign < 0 ? -v : v;
+            }
+        }
+
+        public long LongValueExact
+        {
+            get
+            {
+                if (BitLength > 63)
+                    throw new ArithmeticException("BigInteger out of long range");
+
+                return LongValue;
             }
         }
 
@@ -3269,39 +3293,47 @@ namespace Org.BouncyCastle.Math
                     break;
                 }
 
-                // Based on algorithm 1a from chapter 4.4 in Seminumerical Algorithms (Knuth)
-
-                // Work out the largest power of 'rdx' that is a positive 64-bit integer
-                // TODO possibly cache power/exponent against radix?
-                long limit = Int64.MaxValue / radix;
-                long power = radix;
-                int exponent = 1;
-                while (power <= limit)
+                // TODO Could cache the moduli for each radix (soft reference?)
+                IList moduli = Platform.CreateArrayList();
+                BigInteger R = BigInteger.ValueOf(radix);
+                while (R.CompareTo(q) <= 0)
                 {
-                    power *= radix;
-                    ++exponent;
+                    moduli.Add(R);
+                    R = R.Square();
                 }
 
-                BigInteger bigPower = BigInteger.ValueOf(power);
+                int scale = moduli.Count;
+                sb.EnsureCapacity(sb.Length + (1 << scale));
 
-                IList S = Platform.CreateArrayList();
-                while (q.CompareTo(bigPower) >= 0)
-                {
-                    BigInteger[] qr = q.DivideAndRemainder(bigPower);
-                    S.Add(Convert.ToString(qr[1].LongValue, radix));
-                    q = qr[0];
-                }
+                ToString(sb, radix, moduli, scale, q);
 
-                sb.Append(Convert.ToString(q.LongValue, radix));
-                for (int i = S.Count - 1; i >= 0; --i)
-                {
-                    AppendZeroExtendedString(sb, (string)S[i], exponent);
-                }
                 break;
             }
             }
 
             return sb.ToString();
+        }
+
+        private static void ToString(StringBuilder sb, int radix, IList moduli, int scale, BigInteger pos)
+        {
+            if (pos.BitLength < 64)
+            {
+                string s = Convert.ToString(pos.LongValue, radix);
+                if (sb.Length > 1 || (sb.Length == 1 && sb[0] != '-'))
+                {
+                    AppendZeroExtendedString(sb, s, 1 << scale);
+                }
+                else if (pos.SignValue != 0)
+                {
+                    sb.Append(s);
+                }
+                return;
+            }
+
+            BigInteger[] qr = pos.DivideAndRemainder((BigInteger)moduli[--scale]);
+
+            ToString(sb, radix, moduli, scale, qr[0]);
+            ToString(sb, radix, moduli, scale, qr[1]);
         }
 
         private static void AppendZeroExtendedString(StringBuilder sb, string s, int minLength)

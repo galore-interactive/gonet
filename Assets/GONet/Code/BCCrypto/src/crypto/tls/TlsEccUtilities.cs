@@ -26,7 +26,7 @@ namespace Org.BouncyCastle.Crypto.Tls
 
         public static void AddSupportedEllipticCurvesExtension(IDictionary extensions, int[] namedCurves)
         {
-            extensions[ExtensionType.elliptic_curves] = CreateSupportedEllipticCurvesExtension(namedCurves);
+            extensions[ExtensionType.supported_groups] = CreateSupportedEllipticCurvesExtension(namedCurves);
         }
 
         public static void AddSupportedPointFormatsExtension(IDictionary extensions, byte[] ecPointFormats)
@@ -36,7 +36,7 @@ namespace Org.BouncyCastle.Crypto.Tls
 
         public static int[] GetSupportedEllipticCurvesExtension(IDictionary extensions)
         {
-            byte[] extensionData = TlsUtilities.GetExtensionData(extensions, ExtensionType.elliptic_curves);
+            byte[] extensionData = TlsUtilities.GetExtensionData(extensions, ExtensionType.supported_groups);
             return extensionData == null ? null : ReadSupportedEllipticCurvesExtension(extensionData);
         }
 
@@ -246,16 +246,6 @@ namespace Org.BouncyCastle.Crypto.Tls
             case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
-
-            /*
-             * draft-zauner-tls-aes-ocb-04
-             */
-            case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_AES_256_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_AES_256_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_AES_256_OCB:
 
                 return true;
 

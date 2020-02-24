@@ -161,6 +161,31 @@ namespace Org.BouncyCastle.Math.Raw
             return (uint)c;
         }
 
+        public static uint AddTo(int len, uint[] x, int xOff, uint[] z, int zOff, uint cIn)
+        {
+            ulong c = cIn;
+            for (int i = 0; i < len; ++i)
+            {
+                c += (ulong)x[xOff + i] + z[zOff + i];
+                z[zOff + i] = (uint)c;
+                c >>= 32;
+            }
+            return (uint)c;
+        }
+
+        public static uint AddToEachOther(int len, uint[] u, int uOff, uint[] v, int vOff)
+        {
+            ulong c = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                c += (ulong)u[uOff + i] + v[vOff + i];
+                u[uOff + i] = (uint)c;
+                v[vOff + i] = (uint)c;
+                c >>= 32;
+            }
+            return (uint)c;
+        }
+
         public static uint AddWordAt(int len, uint x, uint[] z, int zPos)
         {
             Debug.Assert(zPos <= (len - 1));
@@ -195,6 +220,64 @@ namespace Org.BouncyCastle.Math.Raw
             return c == 0 ? 0 : IncAt(len, z, zOff, 1);
         }
 
+        public static uint CAdd(int len, int mask, uint[] x, uint[] y, uint[] z)
+        {
+            uint MASK = (uint)-(mask & 1);
+
+            ulong c = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                c += (ulong)x[i] + (y[i] & MASK);
+                z[i] = (uint)c;
+                c >>= 32;
+            }
+            return (uint)c;
+        }
+
+        public static void CMov(int len, int mask, uint[] x, int xOff, uint[] z, int zOff)
+        {
+            uint MASK = (uint)-(mask & 1);
+
+            for (int i = 0; i < len; ++i)
+            {
+                uint z_i = z[zOff + i], diff = z_i ^ x[xOff + i];
+                z_i ^= (diff & MASK);
+                z[zOff + i] = z_i;
+            }
+
+            //uint half = 0x55555555U, rest = half << (-(int)MASK);
+
+            //for (int i = 0; i < len; ++i)
+            //{
+            //    uint z_i = z[zOff + i], diff = z_i ^ x[xOff + i];
+            //    z_i ^= (diff & half);
+            //    z_i ^= (diff & rest);
+            //    z[zOff + i] = z_i;
+            //}
+        }
+
+        public static void CMov(int len, int mask, int[] x, int xOff, int[] z, int zOff)
+        {
+            mask = -(mask & 1);
+
+            for (int i = 0; i < len; ++i)
+            {
+                int z_i = z[zOff + i], diff = z_i ^ x[xOff + i];
+                z_i ^= (diff & mask);
+                z[zOff + i] = z_i;
+            }
+
+            //int half = 0x55555555, rest = half << (-mask);
+
+            //for (int i = 0; i < len; ++i)
+            //{
+            //    int z_i = z[zOff + i], diff = z_i ^ x[xOff + i];
+            //    z_i ^= (diff & half);
+            //    z_i ^= (diff & rest);
+            //    z[zOff + i] = z_i;
+            //}
+        }
+
         public static void Copy(int len, uint[] x, uint[] z)
         {
             Array.Copy(x, 0, z, 0, len);
@@ -207,6 +290,28 @@ namespace Org.BouncyCastle.Math.Raw
             return z;
         }
 
+        public static void Copy(int len, uint[] x, int xOff, uint[] z, int zOff)
+        {
+            Array.Copy(x, xOff, z, zOff, len);
+        }
+
+        public static ulong[] Copy64(int len, ulong[] x)
+        {
+            ulong[] z = new ulong[len];
+            Array.Copy(x, 0, z, 0, len);
+            return z;
+        }
+
+        public static void Copy64(int len, ulong[] x, ulong[] z)
+        {
+            Array.Copy(x, 0, z, 0, len);
+        }
+
+        public static void Copy64(int len, ulong[] x, int xOff, ulong[] z, int zOff)
+        {
+            Array.Copy(x, xOff, z, zOff, len);
+        }
+
         public static uint[] Create(int len)
         {
             return new uint[len];
@@ -215,6 +320,32 @@ namespace Org.BouncyCastle.Math.Raw
         public static ulong[] Create64(int len)
         {
             return new ulong[len];
+        }
+
+        public static int CSub(int len, int mask, uint[] x, uint[] y, uint[] z)
+        {
+            long MASK = (uint)-(mask & 1);
+            long c = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                c += (long)x[i] - (y[i] & MASK);
+                z[i] = (uint)c;
+                c >>= 32;
+            }
+            return (int)c;
+        }
+
+        public static int CSub(int len, int mask, uint[] x, int xOff, uint[] y, int yOff, uint[] z, int zOff)
+        {
+            long MASK = (uint)-(mask & 1);
+            long c = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                c += (long)x[xOff + i] - (y[yOff + i] & MASK);
+                z[zOff + i] = (uint)c;
+                c >>= 32;
+            }
+            return (int)c;
         }
 
         public static int Dec(int len, uint[] z)
@@ -300,6 +431,22 @@ namespace Org.BouncyCastle.Math.Raw
             {
                 z[i++] = (uint)x.IntValue;
                 x = x.ShiftRight(32);
+            }
+            return z;
+        }
+
+        public static ulong[] FromBigInteger64(int bits, BigInteger x)
+        {
+            if (x.SignValue < 0 || x.BitLength > bits)
+                throw new ArgumentException();
+
+            int len = (bits + 63) >> 6;
+            ulong[] z = Create64(len);
+            int i = 0;
+            while (x.SignValue != 0)
+            {
+                z[i++] = (ulong)x.LongValue;
+                x = x.ShiftRight(64);
             }
             return z;
         }
@@ -425,22 +572,59 @@ namespace Org.BouncyCastle.Math.Raw
 
         public static void Mul(int len, uint[] x, uint[] y, uint[] zz)
         {
-            zz[len] = (uint)MulWord(len, x[0], y, zz);
+            zz[len] = MulWord(len, x[0], y, zz);
 
             for (int i = 1; i < len; ++i)
             {
-                zz[i + len] = (uint)MulWordAddTo(len, x[i], y, 0, zz, i);
+                zz[i + len] = MulWordAddTo(len, x[i], y, 0, zz, i);
             }
         }
 
         public static void Mul(int len, uint[] x, int xOff, uint[] y, int yOff, uint[] zz, int zzOff)
         {
-            zz[zzOff + len] = (uint)MulWord(len, x[xOff], y, yOff, zz, zzOff);
+            zz[zzOff + len] = MulWord(len, x[xOff], y, yOff, zz, zzOff);
 
             for (int i = 1; i < len; ++i)
             {
-                zz[zzOff + i + len] = (uint)MulWordAddTo(len, x[xOff + i], y, yOff, zz, zzOff + i);
+                zz[zzOff + i + len] = MulWordAddTo(len, x[xOff + i], y, yOff, zz, zzOff + i);
             }
+        }
+
+        public static void Mul(uint[] x, int xOff, int xLen, uint[] y, int yOff, int yLen, uint[] zz, int zzOff)
+        {
+            zz[zzOff + yLen] = MulWord(yLen, x[xOff], y, yOff, zz, zzOff);
+
+            for (int i = 1; i < xLen; ++i)
+            {
+                zz[zzOff + i + yLen] = MulWordAddTo(yLen, x[xOff + i], y, yOff, zz, zzOff + i);
+            }
+        }
+
+        public static uint MulAddTo(int len, uint[] x, uint[] y, uint[] zz)
+        {
+            ulong zc = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                zc += MulWordAddTo(len, x[i], y, 0, zz, i) & M;
+                zc += zz[i + len] & M;
+                zz[i + len] = (uint)zc;
+                zc >>= 32;
+            }
+            return (uint)zc;
+        }
+
+        public static uint MulAddTo(int len, uint[] x, int xOff, uint[] y, int yOff, uint[] zz, int zzOff)
+        {
+            ulong zc = 0;
+            for (int i = 0; i < len; ++i)
+            {
+                zc += MulWordAddTo(len, x[xOff + i], y, yOff, zz, zzOff) & M;
+                zc += zz[zzOff + len] & M;
+                zz[zzOff + len] = (uint)zc;
+                zc >>= 32;
+                ++zzOff;
+            }
+            return (uint)zc;
         }
 
         public static uint Mul31BothAdd(int len, uint a, uint[] x, uint b, uint[] y, uint[] z, int zOff)
@@ -769,11 +953,18 @@ namespace Org.BouncyCastle.Math.Raw
             }
             while (j > 0);
 
+            ulong d = 0UL;
+            int zzPos = 2;
+
             for (int i = 1; i < len; ++i)
             {
-                c = SquareWordAdd(x, i, zz);
-                AddWordAt(extLen, c, zz, i << 1);
+                d += SquareWordAddTo(x, i, zz);
+                d += zz[zzPos];
+                zz[zzPos++] = (uint)d; d >>= 32;
+                d += zz[zzPos];
+                zz[zzPos++] = (uint)d; d >>= 32;
             }
+            Debug.Assert(0UL == d);
 
             ShiftUpBit(extLen, zz, x[0] << 31);
         }
@@ -793,15 +984,23 @@ namespace Org.BouncyCastle.Math.Raw
             }
             while (j > 0);
 
+            ulong d = 0UL;
+            int zzPos = zzOff + 2;
+
             for (int i = 1; i < len; ++i)
             {
-                c = SquareWordAdd(x, xOff, i, zz, zzOff);
-                AddWordAt(extLen, c, zz, zzOff, i << 1);
+                d += SquareWordAddTo(x, xOff, i, zz, zzOff);
+                d += zz[zzPos];
+                zz[zzPos++] = (uint)d; d >>= 32;
+                d += zz[zzPos];
+                zz[zzPos++] = (uint)d; d >>= 32;
             }
+            Debug.Assert(0UL == d);
 
             ShiftUpBit(extLen, zz, zzOff, x[xOff] << 31);
         }
 
+        [Obsolete("Use 'SquareWordAddTo' instead")]
         public static uint SquareWordAdd(uint[] x, int xPos, uint[] z)
         {
             ulong c = 0, xVal = (ulong)x[xPos];
@@ -816,7 +1015,37 @@ namespace Org.BouncyCastle.Math.Raw
             return (uint)c;
         }
 
+        [Obsolete("Use 'SquareWordAddTo' instead")]
         public static uint SquareWordAdd(uint[] x, int xOff, int xPos, uint[] z, int zOff)
+        {
+            ulong c = 0, xVal = (ulong)x[xOff + xPos];
+            int i = 0;
+            do
+            {
+                c += xVal * (x[xOff + i] & M) + (z[xPos + zOff] & M);
+                z[xPos + zOff] = (uint)c;
+                c >>= 32;
+                ++zOff;
+            }
+            while (++i < xPos);
+            return (uint)c;
+        }
+
+        public static uint SquareWordAddTo(uint[] x, int xPos, uint[] z)
+        {
+            ulong c = 0, xVal = (ulong)x[xPos];
+            int i = 0;
+            do
+            {
+                c += xVal * x[i] + z[xPos + i];
+                z[xPos + i] = (uint)c;
+                c >>= 32;
+            }
+            while (++i < xPos);
+            return (uint)c;
+        }
+
+        public static uint SquareWordAddTo(uint[] x, int xOff, int xPos, uint[] z, int zOff)
         {
             ulong c = 0, xVal = (ulong)x[xOff + xPos];
             int i = 0;

@@ -5,19 +5,27 @@ namespace Org.BouncyCastle.Asn1.Pkcs
     public class CertBag
         : Asn1Encodable
     {
-//		private readonly Asn1Sequence seq;
+        public static CertBag GetInstance(object obj)
+        {
+            if (obj is CertBag)
+                return (CertBag)obj;
+            if (obj == null)
+                return null;
+            return new CertBag(Asn1Sequence.GetInstance(obj));
+        }
+
         private readonly DerObjectIdentifier certID;
         private readonly Asn1Object certValue;
 
+        [Obsolete("Use 'GetInstance' instead")]
 		public CertBag(
             Asn1Sequence seq)
         {
 			if (seq.Count != 2)
 				throw new ArgumentException("Wrong number of elements in sequence", "seq");
 
-//			this.seq = seq;
             this.certID = DerObjectIdentifier.GetInstance(seq[0]);
-            this.certValue = DerTaggedObject.GetInstance(seq[1]).GetObject();
+            this.certValue = Asn1TaggedObject.GetInstance(seq[1]).GetObject();
         }
 
 		public CertBag(
@@ -28,12 +36,12 @@ namespace Org.BouncyCastle.Asn1.Pkcs
             this.certValue = certValue;
         }
 
-		public DerObjectIdentifier CertID
+		public virtual DerObjectIdentifier CertID
 		{
 			get { return certID; }
 		}
 
-		public Asn1Object CertValue
+		public virtual Asn1Object CertValue
 		{
 			get { return certValue; }
 		}

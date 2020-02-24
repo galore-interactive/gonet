@@ -35,7 +35,7 @@ namespace Org.BouncyCastle.Security
                         SecureRandom sr = master[0] = GetInstance("SHA256PRNG", false);
 
                         // Even though Ticks has at most 8 or 14 bits of entropy, there's no harm in adding it.
-                        sr.SetSeed(DateTime.UtcNow.Ticks);
+                        sr.SetSeed(DateTime.Now.Ticks);
 
                         // 32 will be enough when ThreadedSeedGenerator is fixed.  Until then, ThreadedSeedGenerator returns low
                         // entropy, and this is not sufficient to be secure. http://www.bouncycastle.org/csharpdevmailarchive/msg00814.html

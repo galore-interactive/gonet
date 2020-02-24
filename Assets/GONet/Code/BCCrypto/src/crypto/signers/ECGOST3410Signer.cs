@@ -6,6 +6,7 @@ using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Math.EC;
 using Org.BouncyCastle.Math.EC.Multiplier;
 using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities;
 
 namespace Org.BouncyCastle.Crypto.Signers
 {
@@ -13,20 +14,23 @@ namespace Org.BouncyCastle.Crypto.Signers
      * GOST R 34.10-2001 Signature Algorithm
      */
     public class ECGost3410Signer
-        : IDsa
+        : IDsaExt
     {
         private ECKeyParameters key;
         private SecureRandom random;
+        private bool forSigning;
 
         public virtual string AlgorithmName
         {
-            get { return "ECGOST3410"; }
+            get { return key.AlgorithmName; }
         }
 
         public virtual void Init(
             bool				forSigning,
             ICipherParameters	parameters)
         {
+            this.forSigning = forSigning;
+
             if (forSigning)
             {
                 if (parameters is ParametersWithRandom)
@@ -55,6 +59,11 @@ namespace Org.BouncyCastle.Crypto.Signers
             }
         }
 
+        public virtual BigInteger Order
+        {
+            get { return key.Parameters.N; }
+        }
+
         /**
          * generate a signature for the given message using the key we were
          * initialised with. For conventional GOST3410 the message should be a GOST3411
@@ -65,12 +74,12 @@ namespace Org.BouncyCastle.Crypto.Signers
         public virtual BigInteger[] GenerateSignature(
             byte[] message)
         {
-            byte[] mRev = new byte[message.Length]; // conversion is little-endian
-            for (int i = 0; i != mRev.Length; i++)
+            if (!forSigning)
             {
-                mRev[i] = message[mRev.Length - 1 - i];
+                throw new InvalidOperationException("not initialized for signing");
             }
 
+            byte[] mRev = Arrays.Reverse(message); // conversion is little-endian
             BigInteger e = new BigInteger(1, mRev);
 
             ECDomainParameters ec = key.Parameters;
@@ -115,12 +124,12 @@ namespace Org.BouncyCastle.Crypto.Signers
             BigInteger	r,
             BigInteger	s)
         {
-            byte[] mRev = new byte[message.Length]; // conversion is little-endian
-            for (int i = 0; i != mRev.Length; i++)
+            if (forSigning)
             {
-                mRev[i] = message[mRev.Length - 1 - i];
+                throw new InvalidOperationException("not initialized for verification");
             }
 
+            byte[] mRev = Arrays.Reverse(message); // conversion is little-endian
             BigInteger e = new BigInteger(1, mRev);
             BigInteger n = key.Parameters.N;
 

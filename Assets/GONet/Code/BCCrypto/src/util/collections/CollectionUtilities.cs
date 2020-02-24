@@ -39,25 +39,28 @@ namespace Org.BouncyCastle.Utilities.Collections
             return new UnmodifiableSetProxy(s);
         }
 
+        public static object RequireNext(IEnumerator e)
+        {
+            if (!e.MoveNext())
+                throw new InvalidOperationException();
+
+            return e.Current;
+        }
+
         public static string ToString(IEnumerable c)
         {
-            StringBuilder sb = new StringBuilder("[");
-
             IEnumerator e = c.GetEnumerator();
+            if (!e.MoveNext())
+                return "[]";
 
-            if (e.MoveNext())
+            StringBuilder sb = new StringBuilder("[");
+            sb.Append(e.Current.ToString());
+            while (e.MoveNext())
             {
+                sb.Append(", ");
                 sb.Append(e.Current.ToString());
-
-                while (e.MoveNext())
-                {
-                    sb.Append(", ");
-                    sb.Append(e.Current.ToString());
-                }
             }
-
             sb.Append(']');
-
             return sb.ToString();
         }
     }

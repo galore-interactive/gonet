@@ -50,6 +50,8 @@ namespace Org.BouncyCastle.Asn1.Misc
         public static readonly string				Entrust					= "1.2.840.113533.7";
         public static readonly DerObjectIdentifier EntrustVersionExtension = new DerObjectIdentifier(Entrust + ".65.0");
 
+        public static readonly DerObjectIdentifier cast5CBC = new DerObjectIdentifier(Entrust+ ".66.10");
+
         //
         // Ascom
         //
@@ -75,5 +77,14 @@ namespace Org.BouncyCastle.Asn1.Misc
         public static readonly DerObjectIdentifier id_blake2b256 = blake2.Branch("1.8");
         public static readonly DerObjectIdentifier id_blake2b384 = blake2.Branch("1.12");
         public static readonly DerObjectIdentifier id_blake2b512 = blake2.Branch("1.16");
+
+        public static readonly DerObjectIdentifier id_blake2s128 = blake2.Branch("2.4");
+        public static readonly DerObjectIdentifier id_blake2s160 = blake2.Branch("2.5");
+        public static readonly DerObjectIdentifier id_blake2s224 = blake2.Branch("2.7");
+        public static readonly DerObjectIdentifier id_blake2s256 = blake2.Branch("2.8");
+
+        //
+        // Scrypt
+        public static readonly DerObjectIdentifier id_scrypt = new DerObjectIdentifier("1.3.6.1.4.1.11591.4.11");
     }
 }

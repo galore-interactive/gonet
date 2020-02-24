@@ -138,7 +138,7 @@ namespace Org.BouncyCastle.Crypto.Modes
             }
         }
 
-		protected byte CalculateByte(byte b)
+        protected byte CalculateByte(byte b)
         {
             if (byteCount == 0)
             {

@@ -2,12 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Text;
-using System.IO;
 using System.Linq;
-using System.Collections.Generic;
-
-using Org.BouncyCastle.Crypto.TlsExt;
 
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
@@ -544,7 +539,7 @@ namespace NetcodeIO.NET
 		{
 			if (checkReplay(header, sender))
 			{
-                log("Detected replay in keep-alive", NetcodeLogLevel.Debug);
+                log("Detected replay in keep-alive", NetcodeLogLevel.Error);
 				return;
 			}
 
@@ -552,7 +547,7 @@ namespace NetcodeIO.NET
 			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
-				log("No crytpo key for sender", NetcodeLogLevel.Debug);
+				log("No crytpo key for sender", NetcodeLogLevel.Error);
 				return;
 			}
 
@@ -562,25 +557,25 @@ namespace NetcodeIO.NET
 			var keepAlivePacket = new NetcodeKeepAlivePacket() { Header = header };
 			if (!keepAlivePacket.Read(reader, size - (int)reader.ReadPosition, decryptKey, protocolID))
 			{
-				log("Failed to decrypt", NetcodeLogLevel.Debug);
+				log(string.Concat("Failed to decrypt..sender: ", sender.ToString()), NetcodeLogLevel.Error);
 				return;
 			}
 
 			if (keepAlivePacket.ClientIndex >= maxSlots)
 			{
-				log("Invalid client index", NetcodeLogLevel.Debug);
+				log("Invalid client index", NetcodeLogLevel.Error);
 				return;
 			}
 
 			var client = this.clientSlots[(int)keepAlivePacket.ClientIndex];
             if (client == null) {
-                log("Failed to find client for endpoint", NetcodeLogLevel.Debug);
+                log("Failed to find client for endpoint", NetcodeLogLevel.Error);
                 return;
             }
 
 			if (!client.RemoteEndpoint.Equals(sender))
 			{
-				log("Client does not match sender", NetcodeLogLevel.Debug);
+				log("Client does not match sender", NetcodeLogLevel.Error);
 				return;
 			}
 
@@ -603,13 +598,13 @@ namespace NetcodeIO.NET
 		// process an incoming connection response packet
 		private void processConnectionResponse(ByteArrayReaderWriter reader, NetcodePacketHeader header, int size, EndPoint sender)
 		{
-			log("Got connection response", NetcodeLogLevel.Debug);
+			log("Got connection response from sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 
 			// encryption mapping was not registered, so don't bother
 			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
-				log("No crytpo key for sender", NetcodeLogLevel.Debug);
+				log("No crytpo key for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
 				return;
 			}
 
@@ -619,14 +614,14 @@ namespace NetcodeIO.NET
 			var connectionResponsePacket = new NetcodeConnectionChallengeResponsePacket() { Header = header };
 			if (!connectionResponsePacket.Read(reader, size - (int)reader.ReadPosition, decryptKey, protocolID))
 			{
-				log("Failed to decrypt packet", NetcodeLogLevel.Debug);
+				log("Failed to decrypt packet for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				return;
 			}
 
 			var challengeToken = new NetcodeChallengeToken();
 			if (!challengeToken.Read(connectionResponsePacket.ChallengeTokenBytes, connectionResponsePacket.ChallengeTokenSequence, challengeKey))
 			{
-				log("Failed to read challenge token", NetcodeLogLevel.Debug);
+				log("Failed to read challenge token for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionResponsePacket.Release();
 				return;
 			}
@@ -649,7 +644,7 @@ namespace NetcodeIO.NET
 			int nextSlot = getFreeClientSlot();
 			if (nextSlot == -1)
 			{
-				log("Server full, denying connection", NetcodeLogLevel.Info);
+				log("Server full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 				denyConnection(sender, encryptionManager.GetSendKey(cryptIdx));
 				return;
 			}
@@ -683,19 +678,19 @@ namespace NetcodeIO.NET
 		// process an incoming connection request packet
 		private void processConnectionRequest(ByteArrayReaderWriter reader, int size, EndPoint sender)
 		{
-			log("Got connection request", NetcodeLogLevel.Debug);
+			log("Got connection request for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 
 			var connectionRequestPacket = new NetcodeConnectionRequestPacket();
 			if (!connectionRequestPacket.Read(reader, size - (int)reader.ReadPosition, protocolID))
 			{
-				log("Failed to read request", NetcodeLogLevel.Debug);
+				log("Failed to read request for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				return;
 			}
 
 			// expiration timestamp should be greater than current timestamp
 			if (connectionRequestPacket.Expiration <= (ulong)Math.Truncate(totalSeconds))
 			{
-				log("Connect token expired", NetcodeLogLevel.Debug);
+				log("Connect token expired for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionRequestPacket.Release();
 				return;
 			}
@@ -703,7 +698,7 @@ namespace NetcodeIO.NET
 			var privateConnectToken = new NetcodePrivateConnectToken();
 			if (!privateConnectToken.Read(connectionRequestPacket.ConnectTokenBytes, privateKey, protocolID, connectionRequestPacket.Expiration, connectionRequestPacket.TokenSequenceNum))
 			{
-				log("Failed to read private token", NetcodeLogLevel.Debug);
+				log("Failed to read private token for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionRequestPacket.Release();
 				return;
 			}
@@ -737,7 +732,7 @@ namespace NetcodeIO.NET
 			System.Array.Copy(connectionRequestPacket.ConnectTokenBytes, Defines.NETCODE_CONNECT_TOKEN_PRIVATE_BYTES - Defines.MAC_SIZE, token_mac, 0, Defines.MAC_SIZE);
 			if (!findOrAddConnectToken(sender, token_mac, totalSeconds))
 			{
-				log("Token already used", NetcodeLogLevel.Debug);
+				log("Token already used for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				BufferPool.ReturnBuffer(token_mac);
 				return;
 			}
@@ -749,7 +744,7 @@ namespace NetcodeIO.NET
 			if (nextSlot == -1)
 			{
 				denyConnection(sender, privateConnectToken.ServerToClientKey);
-				log("Server is full, denying connection", NetcodeLogLevel.Info);
+				log("Server is full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 				return;
 			}
 
@@ -767,7 +762,7 @@ namespace NetcodeIO.NET
 				    privateConnectToken.TimeoutAfterSeconds,
 				    0))
 			{
-				log("Failed to add encryption mapping", NetcodeLogLevel.Error);
+				log("Failed to add encryption mapping for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
 				return;
 			}
 

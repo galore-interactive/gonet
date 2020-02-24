@@ -67,13 +67,19 @@ namespace Org.BouncyCastle.Math.EC
             this.m_withCompression = withCompression;
         }
 
-        protected internal bool SatisfiesCofactor()
-        {
-            BigInteger h = Curve.Cofactor;
-            return h == null || h.Equals(BigInteger.One) || !ECAlgorithms.ReferenceMultiply(this, h).IsInfinity;
-        }
-
         protected abstract bool SatisfiesCurveEquation();
+
+        protected virtual bool SatisfiesOrder()
+        {
+            if (BigInteger.One.Equals(Curve.Cofactor))
+                return true;
+
+            BigInteger n = Curve.Order;
+
+            // TODO Require order to be available for all curves
+
+            return n == null || ECAlgorithms.ReferenceMultiply(this, n).IsInfinity;
+        }
 
         public ECPoint GetDetachedPoint()
         {
@@ -94,30 +100,6 @@ namespace Org.BouncyCastle.Math.EC
                 // Cope with null curve, most commonly used by implicitlyCa
                 return null == m_curve ? ECCurve.COORD_AFFINE : m_curve.CoordinateSystem;
             }
-        }
-
-        /**
-         * Normalizes this point, and then returns the affine x-coordinate.
-         * 
-         * Note: normalization can be expensive, this method is deprecated in favour
-         * of caller-controlled normalization.
-         */
-        [Obsolete("Use AffineXCoord, or Normalize() and XCoord, instead")]
-        public virtual ECFieldElement X
-        {
-            get { return Normalize().XCoord; }
-        }
-
-        /**
-         * Normalizes this point, and then returns the affine y-coordinate.
-         * 
-         * Note: normalization can be expensive, this method is deprecated in favour
-         * of caller-controlled normalization.
-         */
-        [Obsolete("Use AffineYCoord, or Normalize() and YCoord, instead")]
-        public virtual ECFieldElement Y
-        {
-            get { return Normalize().YCoord; }
         }
 
         /**
@@ -299,22 +281,22 @@ namespace Org.BouncyCastle.Math.EC
 
         public bool IsValid()
         {
+            return ImplIsValid(false, true);
+        }
+
+        internal bool IsValidPartial()
+        {
+            return ImplIsValid(false, false);
+        }
+
+        internal bool ImplIsValid(bool decompressed, bool checkOrder)
+        {
             if (IsInfinity)
                 return true;
 
-            // TODO Sanity-check the field elements
-
-            ECCurve curve = Curve;
-            if (curve != null)
-            {
-                if (!SatisfiesCurveEquation())
-                    return false;
-
-                if (!SatisfiesCofactor())
-                    return false;
-            }
-
-            return true;
+            ValidityCallback callback = new ValidityCallback(this, decompressed, checkOrder);
+            ValidityPreCompInfo validity = (ValidityPreCompInfo)Curve.Precompute(this, ValidityPreCompInfo.PRECOMP_NAME, callback);
+            return !validity.HasFailed();
         }
 
         public virtual ECPoint ScaleX(ECFieldElement scale)
@@ -324,11 +306,25 @@ namespace Org.BouncyCastle.Math.EC
                 : Curve.CreateRawPoint(RawXCoord.Multiply(scale), RawYCoord, RawZCoords, IsCompressed);
         }
 
+        public virtual ECPoint ScaleXNegateY(ECFieldElement scale)
+        {
+            return IsInfinity
+                ? this
+                : Curve.CreateRawPoint(RawXCoord.Multiply(scale), RawYCoord.Negate(), RawZCoords, IsCompressed);
+        }
+
         public virtual ECPoint ScaleY(ECFieldElement scale)
         {
             return IsInfinity
                 ? this
                 : Curve.CreateRawPoint(RawXCoord, RawYCoord.Multiply(scale), RawZCoords, IsCompressed);
+        }
+
+        public virtual ECPoint ScaleYNegateX(ECFieldElement scale)
+        {
+            return IsInfinity
+                ? this
+                : Curve.CreateRawPoint(RawXCoord.Negate(), RawYCoord.Multiply(scale), RawZCoords, IsCompressed);
         }
 
         public override bool Equals(object obj)
@@ -461,6 +457,52 @@ namespace Org.BouncyCastle.Math.EC
         public virtual ECPoint ThreeTimes()
         {
             return TwicePlus(this);
+        }
+
+        private class ValidityCallback
+            : IPreCompCallback
+        {
+            private readonly ECPoint m_outer;
+            private readonly bool m_decompressed, m_checkOrder;
+
+            internal ValidityCallback(ECPoint outer, bool decompressed, bool checkOrder)
+            {
+                this.m_outer = outer;
+                this.m_decompressed = decompressed;
+                this.m_checkOrder = checkOrder;
+            }
+
+            public PreCompInfo Precompute(PreCompInfo existing)
+            {
+                ValidityPreCompInfo info = existing as ValidityPreCompInfo;
+                if (info == null)
+                {
+                    info = new ValidityPreCompInfo();
+                }
+
+                if (info.HasFailed())
+                    return info;
+
+                if (!info.HasCurveEquationPassed())
+                {
+                    if (!m_decompressed && !m_outer.SatisfiesCurveEquation())
+                    {
+                        info.ReportFailed();
+                        return info;
+                    }
+                    info.ReportCurveEquationPassed();
+                }
+                if (m_checkOrder && !info.HasOrderPassed())
+                {
+                    if (!m_outer.SatisfiesOrder())
+                    {
+                        info.ReportFailed();
+                        return info;
+                    }
+                    info.ReportOrderPassed();
+                }
+                return info;
+            }
         }
     }
 
@@ -608,6 +650,7 @@ namespace Org.BouncyCastle.Math.EC
          * @param x affine x co-ordinate
          * @param y affine y co-ordinate
          */
+        [Obsolete("Use ECCurve.CreatePoint to construct points")]
         public FpPoint(ECCurve curve, ECFieldElement x, ECFieldElement y)
             : this(curve, x, y, false)
         {
@@ -621,6 +664,7 @@ namespace Org.BouncyCastle.Math.EC
          * @param y affine y co-ordinate
          * @param withCompression if true encode with point compression
          */
+        [Obsolete("Per-point compression property will be removed, see GetEncoded(bool)")]
         public FpPoint(ECCurve curve, ECFieldElement x, ECFieldElement y, bool withCompression)
             : base(curve, x, y, withCompression)
         {
@@ -635,7 +679,7 @@ namespace Org.BouncyCastle.Math.EC
 
         protected override ECPoint Detach()
         {
-            return new FpPoint(null, AffineXCoord, AffineYCoord);
+            return new FpPoint(null, AffineXCoord, AffineYCoord, false);
         }
 
         public override ECFieldElement GetZCoord(int index)
@@ -1384,6 +1428,56 @@ namespace Org.BouncyCastle.Math.EC
             return lhs.Equals(rhs);
         }
 
+        protected override bool SatisfiesOrder()
+        {
+            ECCurve curve = Curve;
+            BigInteger cofactor = curve.Cofactor;
+            if (BigInteger.Two.Equals(cofactor))
+            {
+                /*
+                 * Check that 0 == Tr(X + A); then there exists a solution to L^2 + L = X + A, and
+                 * so a halving is possible, so this point is the double of another.
+                 * 
+                 * Note: Tr(A) == 1 for cofactor 2 curves.
+                 */
+                ECPoint N = this.Normalize();
+                ECFieldElement X = N.AffineXCoord;
+                return 0 != ((AbstractF2mFieldElement)X).Trace();
+            }
+            if (BigInteger.ValueOf(4).Equals(cofactor))
+            {
+                /*
+                 * Solve L^2 + L = X + A to find the half of this point, if it exists (fail if not).
+                 * 
+                 * Note: Tr(A) == 0 for cofactor 4 curves.
+                 */
+                ECPoint N = this.Normalize();
+                ECFieldElement X = N.AffineXCoord;
+                ECFieldElement L = ((AbstractF2mCurve)curve).SolveQuadraticEquation(X.Add(curve.A));
+                if (null == L)
+                    return false;
+
+                /*
+                 * A solution exists, therefore 0 == Tr(X + A) == Tr(X).
+                 */
+                ECFieldElement Y = N.AffineYCoord;
+                ECFieldElement T = X.Multiply(L).Add(Y);
+
+                /*
+                 * Either T or (T + X) is the square of a half-point's x coordinate (hx). In either
+                 * case, the half-point can be halved again when 0 == Tr(hx + A).
+                 * 
+                 * Note: Tr(hx + A) == Tr(hx) == Tr(hx^2) == Tr(T) == Tr(T + X)
+                 *
+                 * Check that 0 == Tr(T); then there exists a solution to L^2 + L = hx + A, and so a
+                 * second halving is possible and this point is four times some other.
+                 */
+                return 0 == ((AbstractF2mFieldElement)T).Trace();
+            }
+
+            return base.SatisfiesOrder();
+        }
+
         public override ECPoint ScaleX(ECFieldElement scale)
         {
             if (this.IsInfinity)
@@ -1420,6 +1514,11 @@ namespace Org.BouncyCastle.Math.EC
             }
         }
 
+        public override ECPoint ScaleXNegateY(ECFieldElement scale)
+        {
+            return ScaleX(scale);
+        }
+
         public override ECPoint ScaleY(ECFieldElement scale)
         {
             if (this.IsInfinity)
@@ -1442,6 +1541,11 @@ namespace Org.BouncyCastle.Math.EC
                 return base.ScaleY(scale);
             }
             }
+        }
+
+        public override ECPoint ScaleYNegateX(ECFieldElement scale)
+        {
+            return ScaleY(scale);
         }
 
         public override ECPoint Subtract(ECPoint b)
@@ -1529,6 +1633,7 @@ namespace Org.BouncyCastle.Math.EC
          * @param x x point
          * @param y y point
          */
+        [Obsolete("Use ECCurve.CreatePoint to construct points")]
         public F2mPoint(
             ECCurve			curve,
             ECFieldElement	x,
@@ -1543,6 +1648,7 @@ namespace Org.BouncyCastle.Math.EC
          * @param y y point
          * @param withCompression true if encode with point compression.
          */
+        [Obsolete("Per-point compression property will be removed, see GetEncoded(bool)")]
         public F2mPoint(
             ECCurve			curve,
             ECFieldElement	x,
@@ -1573,19 +1679,9 @@ namespace Org.BouncyCastle.Math.EC
         {
         }
 
-        /**
-         * Constructor for point at infinity
-         */
-        [Obsolete("Use ECCurve.Infinity property")]
-        public F2mPoint(
-            ECCurve curve)
-            : this(curve, null, null)
-        {
-        }
-
         protected override ECPoint Detach()
         {
-            return new F2mPoint(null, AffineXCoord, AffineYCoord);
+            return new F2mPoint(null, AffineXCoord, AffineYCoord, false);
         }
 
         public override ECFieldElement YCoord

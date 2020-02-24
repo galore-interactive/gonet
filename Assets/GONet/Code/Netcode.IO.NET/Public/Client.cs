@@ -418,7 +418,7 @@ namespace NetcodeIO.NET
 
 		private void processDatagram(Datagram datagram)
 		{
-			if (!MiscUtils.AddressEqual(datagram.sender, currentServerEndpoint))
+			if (!MiscUtils.AreEndPointsEqual(datagram.sender, currentServerEndpoint))
 				return;
 
 			using (var reader = ByteArrayReaderWriter.Get(datagram.payload))
