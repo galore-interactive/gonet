@@ -111,10 +111,24 @@ namespace Org.BouncyCastle.Math.Raw
             z[3] = x[3];
         }
 
+        public static void Copy(uint[] x, int xOff, uint[] z, int zOff)
+        {
+            z[zOff + 0] = x[xOff + 0];
+            z[zOff + 1] = x[xOff + 1];
+            z[zOff + 2] = x[xOff + 2];
+            z[zOff + 3] = x[xOff + 3];
+        }
+
         public static void Copy64(ulong[] x, ulong[] z)
         {
             z[0] = x[0];
             z[1] = x[1];
+        }
+
+        public static void Copy64(ulong[] x, int xOff, ulong[] z, int zOff)
+        {
+            z[zOff + 0] = x[xOff + 0];
+            z[zOff + 1] = x[xOff + 1];
         }
 
         public static uint[] Create()
@@ -408,9 +422,10 @@ namespace Org.BouncyCastle.Math.Raw
                 c += x_i * y_3 + zz[i + 3];
                 zz[i + 3] = (uint)c;
                 c >>= 32;
-                c += zc + zz[i + 4];
-                zz[i + 4] = (uint)c;
-                zc = c >> 32;
+
+                zc += c + zz[i + 4];
+                zz[i + 4] = (uint)zc;
+                zc >>= 32;
             }
             return (uint)zc;
         }
@@ -438,9 +453,10 @@ namespace Org.BouncyCastle.Math.Raw
                 c += x_i * y_3 + zz[zzOff + 3];
                 zz[zzOff + 3] = (uint)c;
                 c >>= 32;
-                c += zc + zz[zzOff + 4];
-                zz[zzOff + 4] = (uint)c;
-                zc = c >> 32;
+
+                zc += c + zz[zzOff + 4];
+                zz[zzOff + 4] = (uint)zc;
+                zc >>= 32;
                 ++zzOff;
             }
             return (uint)zc;

@@ -33,6 +33,12 @@ namespace Org.BouncyCastle.Asn1.Crmf
             return new OptionalValidity(Asn1Sequence.GetInstance(obj));
         }
 
+        public OptionalValidity(Time notBefore, Time notAfter)
+        {
+            this.notBefore = notBefore;
+            this.notAfter = notAfter;
+        }
+
         public virtual Time NotBefore
         {
             get { return notBefore; }
@@ -54,17 +60,8 @@ namespace Org.BouncyCastle.Asn1.Crmf
         public override Asn1Object ToAsn1Object()
         {
             Asn1EncodableVector v = new Asn1EncodableVector();
-
-            if (notBefore != null)
-            {
-                v.Add(new DerTaggedObject(true, 0, notBefore));
-            }
-
-            if (notAfter != null)
-            {
-                v.Add(new DerTaggedObject(true, 1, notAfter));
-            }
-
+            v.AddOptionalTagged(true, 0, notBefore);
+            v.AddOptionalTagged(true, 1, notAfter);
             return new DerSequence(v);
         }
     }

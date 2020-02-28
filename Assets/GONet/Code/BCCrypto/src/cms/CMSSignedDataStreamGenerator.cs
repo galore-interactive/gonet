@@ -732,7 +732,7 @@ namespace Org.BouncyCastle.Cms
 			{
 				SignerInfo s = SignerInfo.GetInstance(si.ToSignerInfo());
 
-				if (s.Version.Value.IntValue == 3)
+				if (s.Version.IntValueExact == 3)
 				{
 					return true;
 				}
@@ -746,7 +746,7 @@ namespace Org.BouncyCastle.Cms
 			Stream result = s;
 			foreach (IDigest digest in digests)
 			{
-				result = GetSafeTeeOutputStream(result, new DigOutputStream(digest));
+				result = GetSafeTeeOutputStream(result, new DigestSink(digest));
 			}
 			return result;
 		}
@@ -838,14 +838,18 @@ namespace Org.BouncyCastle.Cms
 
 				if (outer._certs.Count > 0)
 				{
-					Asn1Set certs = CmsUtilities.CreateBerSetFromList(outer._certs);
+					Asn1Set certs = outer.UseDerForCerts
+                        ?   CmsUtilities.CreateDerSetFromList(outer._certs)
+                        :   CmsUtilities.CreateBerSetFromList(outer._certs);
 
 					WriteToGenerator(_sigGen, new BerTaggedObject(false, 0, certs));
 				}
 
 				if (outer._crls.Count > 0)
 				{
-					Asn1Set crls = CmsUtilities.CreateBerSetFromList(outer._crls);
+                    Asn1Set crls = outer.UseDerForCrls
+                        ?   CmsUtilities.CreateDerSetFromList(outer._crls)
+                        :   CmsUtilities.CreateBerSetFromList(outer._crls);
 
 					WriteToGenerator(_sigGen, new BerTaggedObject(false, 1, crls));
 				}

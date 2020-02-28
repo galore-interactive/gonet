@@ -98,19 +98,6 @@ namespace Org.BouncyCastle.Crypto.Tls
             return output;
         }
 
-		public virtual byte[] EncodePlaintext(long seqNo, byte[] plaintext, int offset, int len, byte[] additionalData)
-		{
-			KeyParameter macKey = InitRecord(encryptCipher, true, seqNo, encryptIV);
-
-			byte[] output = new byte[len + 16];
-			encryptCipher.ProcessBytes(plaintext, offset, len, output, 0);
-			
-			byte[] mac = CalculateRecordMac(macKey, additionalData, output, 0, len);
-			Array.Copy(mac, 0, output, len, mac.Length);
-
-			return output;
-		}
-
         /// <exception cref="IOException"></exception>
         public virtual byte[] DecodeCiphertext(long seqNo, byte type, byte[] ciphertext, int offset, int len)
         {
@@ -133,27 +120,7 @@ namespace Org.BouncyCastle.Crypto.Tls
             return output;
         }
 
-		public virtual byte[] DecodeCiphertext(long seqNo, byte[] ciphertext, int offset, int len, byte[] additionalData)
-		{
-			if (GetPlaintextLimit(len) < 0)
-				throw new TlsFatalAlert(AlertDescription.decode_error);
-
-			KeyParameter macKey = InitRecord(decryptCipher, false, seqNo, decryptIV);
-
-			int plaintextLength = len - 16;
-			
-			byte[] calculatedMac = CalculateRecordMac(macKey, additionalData, ciphertext, offset, plaintextLength);
-			byte[] receivedMac = Arrays.CopyOfRange(ciphertext, offset + plaintextLength, offset + len);
-
-			if (!Arrays.ConstantTimeAreEqual(calculatedMac, receivedMac))
-				throw new TlsFatalAlert(AlertDescription.bad_record_mac);
-
-			byte[] output = new byte[plaintextLength];
-			decryptCipher.ProcessBytes(ciphertext, offset, plaintextLength, output, 0);
-			return output;
-		}
-
-		protected virtual KeyParameter InitRecord(IStreamCipher cipher, bool forEncryption, long seqNo, byte[] iv)
+        protected virtual KeyParameter InitRecord(IStreamCipher cipher, bool forEncryption, long seqNo, byte[] iv)
         {
             byte[] nonce = CalculateNonce(seqNo, iv);
             cipher.Init(forEncryption, new ParametersWithIV(null, nonce));

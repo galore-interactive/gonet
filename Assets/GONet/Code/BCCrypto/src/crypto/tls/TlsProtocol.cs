@@ -9,6 +9,7 @@ using Org.BouncyCastle.Utilities;
 namespace Org.BouncyCastle.Crypto.Tls
 {
     public abstract class TlsProtocol
+        : TlsCloseable
     {
         /*
          * Our Connection states
@@ -288,6 +289,7 @@ namespace Org.BouncyCastle.Crypto.Tls
                         this.mSessionParameters = new SessionParameters.Builder()
                             .SetCipherSuite(this.mSecurityParameters.CipherSuite)
                             .SetCompressionAlgorithm(this.mSecurityParameters.CompressionAlgorithm)
+                            .SetExtendedMasterSecret(this.mSecurityParameters.IsExtendedMasterSecret)
                             .SetMasterSecret(this.mSecurityParameters.MasterSecret)
                             .SetPeerCertificate(this.mPeerCertificate)
                             .SetPskIdentity(this.mSecurityParameters.PskIdentity)
@@ -391,31 +393,30 @@ namespace Org.BouncyCastle.Crypto.Tls
                 if (queue.Available < totalLength)
                     break;
 
-                CheckReceivedChangeCipherSpec(mConnectionState == CS_END || type == HandshakeType.finished);
-
                 /*
                  * RFC 2246 7.4.9. The value handshake_messages includes all handshake messages
                  * starting at client hello up to, but not including, this finished message.
                  * [..] Note: [Also,] Hello Request messages are omitted from handshake hashes.
                  */
-                switch (type)
+                if (HandshakeType.hello_request != type)
                 {
-                case HandshakeType.hello_request:
-                    break;
-                case HandshakeType.finished:
-                default:
-                {
-                    TlsContext ctx = Context;
-                    if (type == HandshakeType.finished
-                        && this.mExpectedVerifyData == null
-                        && ctx.SecurityParameters.MasterSecret != null)
+                    if (HandshakeType.finished == type)
                     {
-                        this.mExpectedVerifyData = CreateVerifyData(!ctx.IsServer);
+                        CheckReceivedChangeCipherSpec(true);
+
+                        TlsContext ctx = Context;
+                        if (this.mExpectedVerifyData == null
+                            && ctx.SecurityParameters.MasterSecret != null)
+                        {
+                            this.mExpectedVerifyData = CreateVerifyData(!ctx.IsServer);
+                        }
+                    }
+                    else
+                    {
+                        CheckReceivedChangeCipherSpec(mConnectionState == CS_END);
                     }
 
                     queue.CopyTo(mRecordStream.HandshakeHashUpdater, totalLength);
-                    break;
-                }
                 }
 
                 queue.RemoveData(4);
@@ -729,10 +730,18 @@ namespace Org.BouncyCastle.Crypto.Tls
         }
 
         /**
+         * Equivalent to <code>OfferInput(input, 0, input.length)</code>
+         * @see TlsProtocol#OfferInput(byte[], int, int)
+         * @param input The input buffer to offer
+         * @throws IOException If an error occurs while decrypting or processing a record
+         */
+        public virtual void OfferInput(byte[] input)
+        {
+            OfferInput(input, 0, input.Length);
+        }
+
+        /**
          * Offer input from an arbitrary source. Only allowed in non-blocking mode.<br/>
-         * <br/>
-         * After this method returns, the input buffer is "owned" by this object. Other code
-         * must not attempt to do anything with it.<br/>
          * <br/>
          * This method will decrypt and process all records that are fully available.
          * If only part of a record is available, the buffer will be retained until the
@@ -744,16 +753,18 @@ namespace Org.BouncyCastle.Crypto.Tls
          * You should always check to see if there is any available output after calling
          * this method by calling {@link #getAvailableOutputBytes()}.
          * @param input The input buffer to offer
+         * @param inputOff The offset within the input buffer that input begins
+         * @param inputLen The number of bytes of input being offered
          * @throws IOException If an error occurs while decrypting or processing a record
          */
-        public virtual void OfferInput(byte[] input)
+        public virtual void OfferInput(byte[] input, int inputOff, int inputLen)
         {
             if (mBlocking)
                 throw new InvalidOperationException("Cannot use OfferInput() in blocking mode! Use Stream instead.");
             if (mClosed)
                 throw new IOException("Connection is closed, cannot accept any more input");
 
-            mInputBuffers.Write(input);
+            mInputBuffers.Write(input, inputOff, inputLen);
 
             // loop while there are enough bytes to read the length of the next record
             while (mInputBuffers.Available >= RecordStream.TLS_HEADER_SIZE)
@@ -1252,24 +1263,19 @@ namespace Org.BouncyCastle.Crypto.Tls
             case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA256:
             case CipherSuite.TLS_DHE_PSK_WITH_AES_128_CCM:
             case CipherSuite.TLS_DHE_PSK_WITH_AES_128_GCM_SHA256:
-            case CipherSuite.DRAFT_TLS_DHE_PSK_WITH_AES_128_OCB:
             case CipherSuite.TLS_DHE_PSK_WITH_AES_256_CCM:
-            case CipherSuite.DRAFT_TLS_DHE_PSK_WITH_AES_256_OCB:
             case CipherSuite.TLS_DHE_PSK_WITH_CAMELLIA_128_GCM_SHA256:
             case CipherSuite.DRAFT_TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA256:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CCM:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CCM_8:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256:
-            case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_AES_128_OCB:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA256:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CCM:
             case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CCM_8:
-            case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_AES_256_OCB:
             case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA256:
             case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_128_GCM_SHA256:
             case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256:
-            case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256:
             case CipherSuite.TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256:
             case CipherSuite.TLS_ECDH_ECDSA_WITH_CAMELLIA_128_CBC_SHA256:
@@ -1282,20 +1288,14 @@ namespace Org.BouncyCastle.Crypto.Tls
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
-            case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_AES_128_OCB:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CCM:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8:
-            case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_AES_256_OCB:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_CBC_SHA256:
             case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_GCM_SHA256:
             case CipherSuite.DRAFT_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:
-            case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_AES_256_OCB:
             case CipherSuite.DRAFT_TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:
             case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
-            case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_AES_256_OCB:
             case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_128_CBC_SHA256:
             case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_128_GCM_SHA256:
             case CipherSuite.DRAFT_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
@@ -1304,10 +1304,8 @@ namespace Org.BouncyCastle.Crypto.Tls
             case CipherSuite.TLS_PSK_WITH_AES_128_CCM:
             case CipherSuite.TLS_PSK_WITH_AES_128_CCM_8:
             case CipherSuite.TLS_PSK_WITH_AES_128_GCM_SHA256:
-            case CipherSuite.DRAFT_TLS_PSK_WITH_AES_128_OCB:
             case CipherSuite.TLS_PSK_WITH_AES_256_CCM:
             case CipherSuite.TLS_PSK_WITH_AES_256_CCM_8:
-            case CipherSuite.DRAFT_TLS_PSK_WITH_AES_256_OCB:
             case CipherSuite.TLS_PSK_WITH_CAMELLIA_128_GCM_SHA256:
             case CipherSuite.DRAFT_TLS_PSK_WITH_CHACHA20_POLY1305_SHA256:
             case CipherSuite.TLS_RSA_PSK_WITH_AES_128_GCM_SHA256:

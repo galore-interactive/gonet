@@ -1,3 +1,5 @@
+using System;
+
 using Org.BouncyCastle.Asn1;
 
 namespace Org.BouncyCastle.Asn1.Pkcs
@@ -5,6 +7,15 @@ namespace Org.BouncyCastle.Asn1.Pkcs
     public class SafeBag
         : Asn1Encodable
     {
+        public static SafeBag GetInstance(object obj)
+        {
+            if (obj is SafeBag)
+                return (SafeBag)obj;
+            if (obj == null)
+                return null;
+            return new SafeBag(Asn1Sequence.GetInstance(obj));
+        }
+
         private readonly DerObjectIdentifier bagID;
         private readonly Asn1Object bagValue;
         private readonly Asn1Set bagAttributes;
@@ -28,14 +39,15 @@ namespace Org.BouncyCastle.Asn1.Pkcs
             this.bagAttributes = bagAttributes;
         }
 
+        [Obsolete("Use 'GetInstance' instead")]
 		public SafeBag(
             Asn1Sequence seq)
         {
-            this.bagID = (DerObjectIdentifier) seq[0];
-            this.bagValue = ((DerTaggedObject) seq[1]).GetObject();
+            this.bagID = (DerObjectIdentifier)seq[0];
+            this.bagValue = ((DerTaggedObject)seq[1]).GetObject();
             if (seq.Count == 3)
             {
-                this.bagAttributes = (Asn1Set) seq[2];
+                this.bagAttributes = (Asn1Set)seq[2];
             }
         }
 
@@ -54,17 +66,11 @@ namespace Org.BouncyCastle.Asn1.Pkcs
 			get { return bagAttributes; }
 		}
 
-		public override Asn1Object ToAsn1Object()
+        public override Asn1Object ToAsn1Object()
         {
-            Asn1EncodableVector v = new Asn1EncodableVector(
-				bagID, new DerTaggedObject(0, bagValue));
-
-			if (bagAttributes != null)
-            {
-                v.Add(bagAttributes);
-            }
-
-			return new DerSequence(v);
+            Asn1EncodableVector v = new Asn1EncodableVector(bagID, new DerTaggedObject(0, bagValue));
+            v.AddOptional(bagAttributes);
+            return new DerSequence(v);
         }
     }
 }

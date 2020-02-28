@@ -103,7 +103,7 @@ namespace Org.BouncyCastle.Bcpg
         private static readonly string    footerStart = "-----END PGP ";
         private static readonly string    footerTail = "-----";
 
-        private static readonly string Version = "BCPG C# v1.8.1.0";
+        private static readonly string Version = "BCPG C# v" + AssemblyInfo.Version;
 
         private readonly IDictionary headers;
 
@@ -147,13 +147,13 @@ namespace Org.BouncyCastle.Bcpg
          */
         public void ResetHeaders()
         {
-            string version = (string)headers[HeaderVersion];
+            string existingVersion = (string)headers[HeaderVersion];
 
             headers.Clear();
 
-            if (version != null)
+            if (existingVersion != null)
             {
-                headers[HeaderVersion] = Version;
+                headers.Add(HeaderVersion, existingVersion);
             }
         }
 

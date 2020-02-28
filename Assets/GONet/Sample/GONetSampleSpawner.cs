@@ -30,7 +30,14 @@ public class GONetSampleSpawner : MonoBehaviour
 
     private void Start()
     {
-        ProcessCmdLine();
+        if (Application.platform == RuntimePlatform.Android) // NOTE: for sample's sake, this check and inner block will make all android machines clients...change as your needs dictate!
+        {
+            InstantiateClientIfNotAlready();
+        }
+        else
+        { // now that platform support is expanding, this below really probably only applies to PC/Windows (via BAT script) and Mac/Linux (via shell script)...not sure
+            ProcessCmdLine();
+        }
     }
 
     void ProcessCmdLine()

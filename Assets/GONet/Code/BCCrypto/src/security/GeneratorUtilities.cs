@@ -2,12 +2,14 @@ using System.Collections;
 
 using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.CryptoPro;
+using Org.BouncyCastle.Asn1.EdEC;
 using Org.BouncyCastle.Asn1.Iana;
 using Org.BouncyCastle.Asn1.Kisa;
 using Org.BouncyCastle.Asn1.Nist;
 using Org.BouncyCastle.Asn1.Ntt;
 using Org.BouncyCastle.Asn1.Oiw;
 using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Asn1.Rosstandart;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Generators;
@@ -70,6 +72,11 @@ namespace Org.BouncyCastle.Security
             AddKgAlgorithm("CAST5",
                 "1.2.840.113533.7.66.10");
             AddKgAlgorithm("CAST6");
+            AddKgAlgorithm("CHACHA");
+            AddKgAlgorithm("CHACHA7539",
+                "CHACHA20",
+                "CHACHA20-POLY1305",
+                PkcsObjectIdentifiers.IdAlgAeadChaCha20Poly1305);
             AddKgAlgorithm("DES",
                 OiwObjectIdentifiers.DesCbc,
                 OiwObjectIdentifiers.DesCfb,
@@ -108,6 +115,7 @@ namespace Org.BouncyCastle.Security
                 KisaObjectIdentifiers.IdSeedCbc);
             AddKgAlgorithm("SERPENT");
             AddKgAlgorithm("SKIPJACK");
+            AddKgAlgorithm("SM4");
             AddKgAlgorithm("TEA");
             AddKgAlgorithm("THREEFISH-256");
             AddKgAlgorithm("THREEFISH-512");
@@ -138,17 +146,28 @@ namespace Org.BouncyCastle.Security
                 PkcsObjectIdentifiers.IdHmacWithSha512);
             AddHMacKeyGenerator("SHA512/224");
             AddHMacKeyGenerator("SHA512/256");
-            AddHMacKeyGenerator("SHA3-224");
-            AddHMacKeyGenerator("SHA3-256");
-            AddHMacKeyGenerator("SHA3-384");
-            AddHMacKeyGenerator("SHA3-512");
+            AddHMacKeyGenerator("KECCAK224");
+            AddHMacKeyGenerator("KECCAK256");
+            AddHMacKeyGenerator("KECCAK288");
+            AddHMacKeyGenerator("KECCAK384");
+            AddHMacKeyGenerator("KECCAK512");
+            AddHMacKeyGenerator("SHA3-224",
+                NistObjectIdentifiers.IdHMacWithSha3_224);
+            AddHMacKeyGenerator("SHA3-256",
+                NistObjectIdentifiers.IdHMacWithSha3_256);
+            AddHMacKeyGenerator("SHA3-384",
+                NistObjectIdentifiers.IdHMacWithSha3_384);
+            AddHMacKeyGenerator("SHA3-512",
+                NistObjectIdentifiers.IdHMacWithSha3_512);
             AddHMacKeyGenerator("RIPEMD128");
             AddHMacKeyGenerator("RIPEMD160",
                 IanaObjectIdentifiers.HmacRipeMD160);
             AddHMacKeyGenerator("TIGER",
                 IanaObjectIdentifiers.HmacTiger);
-
-
+            AddHMacKeyGenerator("GOST3411-2012-256",
+                RosstandartObjectIdentifiers.id_tc26_hmac_gost_3411_12_256);
+            AddHMacKeyGenerator("GOST3411-2012-512",
+                RosstandartObjectIdentifiers.id_tc26_hmac_gost_3411_12_512);
 
             //
             // key pair generators.
@@ -168,26 +187,39 @@ namespace Org.BouncyCastle.Security
             AddKpgAlgorithm("ECGOST3410",
                 "ECGOST-3410",
                 "GOST-3410-2001");
+            AddKpgAlgorithm("Ed25519",
+                "Ed25519ctx",
+                "Ed25519ph",
+                EdECObjectIdentifiers.id_Ed25519);
+            AddKpgAlgorithm("Ed448",
+                "Ed448ph",
+                EdECObjectIdentifiers.id_Ed448);
             AddKpgAlgorithm("ELGAMAL");
             AddKpgAlgorithm("GOST3410",
                 "GOST-3410",
                 "GOST-3410-94");
             AddKpgAlgorithm("RSA",
                 "1.2.840.113549.1.1.1");
+            AddKpgAlgorithm("X25519",
+                EdECObjectIdentifiers.id_X25519);
+            AddKpgAlgorithm("X448",
+                EdECObjectIdentifiers.id_X448);
 
             AddDefaultKeySizeEntries(64, "DES");
             AddDefaultKeySizeEntries(80, "SKIPJACK");
-            AddDefaultKeySizeEntries(128, "AES128", "BLOWFISH", "CAMELLIA128", "CAST5", "DESEDE",
+            AddDefaultKeySizeEntries(128, "AES128", "BLOWFISH", "CAMELLIA128", "CAST5", "CHACHA", "DESEDE",
                 "HC128", "HMACMD2", "HMACMD4", "HMACMD5", "HMACRIPEMD128", "IDEA", "NOEKEON",
-                "RC2", "RC4", "RC5", "SALSA20", "SEED", "TEA", "XTEA", "VMPC", "VMPC-KSA3");
+                "RC2", "RC4", "RC5", "SALSA20", "SEED", "SM4", "TEA", "XTEA", "VMPC", "VMPC-KSA3");
             AddDefaultKeySizeEntries(160, "HMACRIPEMD160", "HMACSHA1");
             AddDefaultKeySizeEntries(192, "AES", "AES192", "CAMELLIA192", "DESEDE3", "HMACTIGER",
                 "RIJNDAEL", "SERPENT", "TNEPRES");
-            AddDefaultKeySizeEntries(224, "HMACSHA224", "HMACSHA512/224");
-            AddDefaultKeySizeEntries(256, "AES256", "CAMELLIA", "CAMELLIA256", "CAST6", "GOST28147",
-                "HC256", "HMACSHA256", "HMACSHA512/256", "RC5-64", "RC6", "THREEFISH-256", "TWOFISH");
-            AddDefaultKeySizeEntries(384, "HMACSHA384");
-            AddDefaultKeySizeEntries(512, "HMACSHA512", "THREEFISH-512");
+            AddDefaultKeySizeEntries(224, "HMACSHA3-224", "HMACKECCAK224", "HMACSHA224", "HMACSHA512/224");
+            AddDefaultKeySizeEntries(256, "AES256", "CAMELLIA", "CAMELLIA256", "CAST6", "CHACHA7539", "GOST28147",
+                "HC256", "HMACGOST3411-2012-256", "HMACSHA3-256", "HMACKECCAK256", "HMACSHA256", "HMACSHA512/256",
+                "RC5-64", "RC6", "THREEFISH-256", "TWOFISH");
+            AddDefaultKeySizeEntries(288, "HMACKECCAK288");
+            AddDefaultKeySizeEntries(384, "HMACSHA3-384", "HMACKECCAK384", "HMACSHA384");
+            AddDefaultKeySizeEntries(512, "HMACGOST3411-2012-512", "HMACSHA3-512", "HMACKECCAK512", "HMACSHA512", "THREEFISH-512");
             AddDefaultKeySizeEntries(1024, "THREEFISH-1024");
         }
 
@@ -203,11 +235,11 @@ namespace Org.BouncyCastle.Security
             string			canonicalName,
             params object[] aliases)
         {
-            kgAlgorithms[canonicalName] = canonicalName;
+            kgAlgorithms[Platform.ToUpperInvariant(canonicalName)] = canonicalName;
 
             foreach (object alias in aliases)
             {
-                kgAlgorithms[alias.ToString()] = canonicalName;
+                kgAlgorithms[Platform.ToUpperInvariant(alias.ToString())] = canonicalName;
             }
         }
 
@@ -215,11 +247,11 @@ namespace Org.BouncyCastle.Security
             string			canonicalName,
             params object[] aliases)
         {
-            kpgAlgorithms[canonicalName] = canonicalName;
+            kpgAlgorithms[Platform.ToUpperInvariant(canonicalName)] = canonicalName;
 
             foreach (object alias in aliases)
             {
-                kpgAlgorithms[alias.ToString()] = canonicalName;
+                kpgAlgorithms[Platform.ToUpperInvariant(alias.ToString())] = canonicalName;
             }
         }
 
@@ -235,7 +267,7 @@ namespace Org.BouncyCastle.Security
 
             foreach (object alias in aliases)
             {
-                kgAlgorithms[alias.ToString()] = mainName;
+                kgAlgorithms[Platform.ToUpperInvariant(alias.ToString())] = mainName;
             }
         }
 
@@ -305,6 +337,12 @@ namespace Org.BouncyCastle.Security
             if (Platform.StartsWith(canonicalName, "EC"))
                 return new ECKeyPairGenerator(canonicalName);
 
+            if (canonicalName == "Ed25519")
+                return new Ed25519KeyPairGenerator();
+
+            if (canonicalName == "Ed448")
+                return new Ed448KeyPairGenerator();
+
             if (canonicalName == "ELGAMAL")
                 return new ElGamalKeyPairGenerator();
 
@@ -313,6 +351,12 @@ namespace Org.BouncyCastle.Security
 
             if (canonicalName == "RSA")
                 return new RsaKeyPairGenerator();
+
+            if (canonicalName == "X25519")
+                return new X25519KeyPairGenerator();
+
+            if (canonicalName == "X448")
+                return new X448KeyPairGenerator();
 
             throw new SecurityUtilityException("KeyPairGenerator " + algorithm
                 + " (" + canonicalName + ") not supported.");

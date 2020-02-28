@@ -94,6 +94,8 @@ namespace Org.BouncyCastle.Crypto.Tls
             this.mTlsServer.Init(mTlsServerContext);
             this.mRecordStream.Init(mTlsServerContext);
 
+            tlsServer.NotifyCloseHandle(this);
+
             this.mRecordStream.SetRestrictReadVersion(false);
 
             BlockForHandshake();
@@ -359,10 +361,10 @@ namespace Org.BouncyCastle.Crypto.Tls
                     if (this.mExpectSessionTicket)
                     {
                         SendNewSessionTicketMessage(mTlsServer.GetNewSessionTicket());
-                        SendChangeCipherSpecMessage();
                     }
                     this.mConnectionState = CS_SERVER_SESSION_TICKET;
 
+                    SendChangeCipherSpecMessage();
                     SendFinishedMessage();
                     this.mConnectionState = CS_SERVER_FINISHED;
 
@@ -388,37 +390,31 @@ namespace Org.BouncyCastle.Crypto.Tls
 
         protected override void HandleAlertWarningMessage(byte alertDescription)
         {
-            base.HandleAlertWarningMessage(alertDescription);
-
-            switch (alertDescription)
+            /*
+             * SSL 3.0 If the server has sent a certificate request Message, the client must send
+             * either the certificate message or a no_certificate alert.
+             */
+            if (AlertDescription.no_certificate == alertDescription && null != mCertificateRequest
+                && TlsUtilities.IsSsl(mTlsServerContext))
             {
-            case AlertDescription.no_certificate:
-            {
-                /*
-                 * SSL 3.0 If the server has sent a certificate request Message, the client must send
-                 * either the certificate message or a no_certificate alert.
-                 */
-                if (TlsUtilities.IsSsl(Context) && this.mCertificateRequest != null)
+                switch (mConnectionState)
                 {
-                    switch (this.mConnectionState)
+                case CS_SERVER_HELLO_DONE:
+                case CS_CLIENT_SUPPLEMENTAL_DATA:
+                {
+                    if (mConnectionState < CS_CLIENT_SUPPLEMENTAL_DATA)
                     {
-                    case CS_SERVER_HELLO_DONE:
-                    case CS_CLIENT_SUPPLEMENTAL_DATA:
-                    {
-                        if (mConnectionState < CS_CLIENT_SUPPLEMENTAL_DATA)
-                        {
-                            mTlsServer.ProcessClientSupplementalData(null);
-                        }
+                        mTlsServer.ProcessClientSupplementalData(null);
+                    }
 
-                        NotifyClientCertificate(Certificate.EmptyChain);
-                        this.mConnectionState = CS_CLIENT_CERTIFICATE;
-                        return;
-                    }
-                    }
+                    NotifyClientCertificate(Certificate.EmptyChain);
+                    this.mConnectionState = CS_CLIENT_CERTIFICATE;
+                    return;
                 }
-                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+                }
             }
-            } 
+
+            base.HandleAlertWarningMessage(alertDescription);
         }
 
         protected virtual void NotifyClientCertificate(Certificate clientCertificate)
@@ -560,12 +556,18 @@ namespace Org.BouncyCastle.Crypto.Tls
             this.mClientExtensions = ReadExtensions(buf);
 
             /*
-             * TODO[session-hash]
-             * 
-             * draft-ietf-tls-session-hash-04 4. Clients and servers SHOULD NOT accept handshakes
-             * that do not use the extended master secret [..]. (and see 5.2, 5.3)
+             * TODO[resumption] Check RFC 7627 5.4. for required behaviour 
+             */
+
+            /*
+             * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
+             * master secret [..]. (and see 5.2, 5.3)
              */
             this.mSecurityParameters.extendedMasterSecret = TlsExtensionsUtilities.HasExtendedMasterSecretExtension(mClientExtensions);
+            if (!mSecurityParameters.IsExtendedMasterSecret && mTlsServer.RequiresExtendedMasterSecret())
+            {
+                throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            }
 
             ContextAdmin.SetClientVersion(client_version);
 
@@ -647,11 +649,6 @@ namespace Org.BouncyCastle.Crypto.Tls
             }
 
             mRecordStream.SetPendingConnectionState(Peer.GetCompression(), Peer.GetCipher());
-
-            if (!mExpectSessionTicket)
-            {
-                SendChangeCipherSpecMessage();
-            }
         }
 
         protected virtual void SendCertificateRequestMessage(CertificateRequest certificateRequest)
@@ -729,7 +726,7 @@ namespace Org.BouncyCastle.Crypto.Tls
             TlsUtilities.WriteUint16(selectedCipherSuite, message);
             TlsUtilities.WriteUint8(selectedCompressionMethod, message);
 
-            this.mServerExtensions = mTlsServer.GetServerExtensions();
+            this.mServerExtensions = TlsExtensionsUtilities.EnsureExtensionsInitialised(mTlsServer.GetServerExtensions());
 
             /*
              * RFC 5746 3.6. Server Behavior: Initial Handshake
@@ -753,14 +750,16 @@ namespace Org.BouncyCastle.Crypto.Tls
                      * If the secure_renegotiation flag is set to TRUE, the server MUST include an empty
                      * "renegotiation_info" extension in the ServerHello message.
                      */
-                    this.mServerExtensions = TlsExtensionsUtilities.EnsureExtensionsInitialised(mServerExtensions);
                     this.mServerExtensions[ExtensionType.renegotiation_info] = CreateRenegotiationInfo(TlsUtilities.EmptyBytes);
                 }
             }
 
-            if (mSecurityParameters.extendedMasterSecret)
+            if (TlsUtilities.IsSsl(mTlsServerContext))
             {
-                this.mServerExtensions = TlsExtensionsUtilities.EnsureExtensionsInitialised(mServerExtensions);
+                mSecurityParameters.extendedMasterSecret = false;
+            }
+            else if (mSecurityParameters.IsExtendedMasterSecret)
+            {
                 TlsExtensionsUtilities.AddExtendedMasterSecretExtension(mServerExtensions);
             }
 
@@ -770,7 +769,7 @@ namespace Org.BouncyCastle.Crypto.Tls
              * extensions.
              */
 
-            if (this.mServerExtensions != null)
+            if (this.mServerExtensions.Count > 0)
             {
                 this.mSecurityParameters.encryptThenMac = TlsExtensionsUtilities.HasEncryptThenMacExtension(mServerExtensions);
 

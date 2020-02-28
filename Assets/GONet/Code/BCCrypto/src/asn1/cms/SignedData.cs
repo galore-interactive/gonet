@@ -25,16 +25,13 @@ namespace Org.BouncyCastle.Asn1.Cms
         private readonly bool			certsBer;
         private readonly bool		    crlsBer;
 
-        public static SignedData GetInstance(
-            object obj)
+        public static SignedData GetInstance(object obj)
         {
             if (obj is SignedData)
-                return (SignedData) obj;
-
-            if (obj is Asn1Sequence)
-                return new SignedData((Asn1Sequence) obj);
-
-            throw new ArgumentException("Unknown object in factory: " + Platform.GetTypeName(obj), "obj");
+                return (SignedData)obj;
+            if (obj == null)
+                return null;
+            return new SignedData(Asn1Sequence.GetInstance(obj));
         }
 
         public SignedData(
@@ -150,7 +147,7 @@ namespace Org.BouncyCastle.Asn1.Cms
             {
                 SignerInfo s = SignerInfo.GetInstance(obj);
 
-                if (s.Version.Value.IntValue == 3)
+                if (s.Version.IntValueExact == 3)
                 {
                     return true;
                 }

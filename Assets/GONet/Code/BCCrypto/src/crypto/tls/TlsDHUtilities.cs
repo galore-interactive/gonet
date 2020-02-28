@@ -21,7 +21,7 @@ namespace Org.BouncyCastle.Crypto.Tls
          */
         private static BigInteger FromHex(String hex)
         {
-            return new BigInteger(1, Hex.Decode(hex));
+            return new BigInteger(1, Hex.DecodeStrict(hex));
         }
 
         private static DHParameters FromSafeP(String hexP)
@@ -359,12 +359,23 @@ namespace Org.BouncyCastle.Crypto.Tls
             case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
 
             /*
-             * draft-zauner-tls-aes-ocb-04
+             * DH_anon cipher suites are consider ephemeral DH 
              */
-            case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_DHE_RSA_WITH_AES_256_OCB:
-            case CipherSuite.DRAFT_TLS_DHE_PSK_WITH_AES_128_OCB:
-            case CipherSuite.DRAFT_TLS_DHE_PSK_WITH_AES_256_OCB:
+            case CipherSuite.TLS_DH_anon_WITH_3DES_EDE_CBC_SHA:
+            case CipherSuite.TLS_DH_anon_WITH_AES_128_CBC_SHA:
+            case CipherSuite.TLS_DH_anon_WITH_AES_128_CBC_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_AES_128_GCM_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_AES_256_CBC_SHA:
+            case CipherSuite.TLS_DH_anon_WITH_AES_256_CBC_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_AES_256_GCM_SHA384:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_128_GCM_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256:
+            case CipherSuite.TLS_DH_anon_WITH_CAMELLIA_256_GCM_SHA384:
+            case CipherSuite.TLS_DH_anon_WITH_RC4_128_MD5:
+            case CipherSuite.TLS_DH_anon_WITH_SEED_CBC_SHA:
 
                 return true;
 
@@ -417,36 +428,10 @@ namespace Org.BouncyCastle.Crypto.Tls
             AsymmetricCipherKeyPair kp = GenerateDHKeyPair(random, dhParams);
 
             DHPublicKeyParameters dhPublic = (DHPublicKeyParameters)kp.Public;
-            new ServerDHParams(dhPublic).Encode(output);
+            WriteDHParameters(dhParams, output);
+            WriteDHParameter(dhPublic.Y, output);
 
             return (DHPrivateKeyParameters)kp.Private;
-        }
-
-        public static DHParameters ValidateDHParameters(DHParameters parameters)
-        {
-            BigInteger p = parameters.P;
-            BigInteger g = parameters.G;
-
-            if (!p.IsProbablePrime(2))
-                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-            if (g.CompareTo(Two) < 0 || g.CompareTo(p.Subtract(Two)) > 0)
-                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-
-
-            return parameters;
-        }
-
-        public static DHPublicKeyParameters ValidateDHPublicKey(DHPublicKeyParameters key)
-        {
-            DHParameters parameters = ValidateDHParameters(key.Parameters);
-
-            BigInteger Y = key.Y;
-            if (Y.CompareTo(Two) < 0 || Y.CompareTo(parameters.P.Subtract(Two)) > 0)
-                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-
-            // TODO See RFC 2631 for more discussion of Diffie-Hellman validation
-
-            return key;
         }
 
         public static BigInteger ReadDHParameter(Stream input)
@@ -454,9 +439,32 @@ namespace Org.BouncyCastle.Crypto.Tls
             return new BigInteger(1, TlsUtilities.ReadOpaque16(input));
         }
 
+        public static DHParameters ReadDHParameters(Stream input)
+        {
+            BigInteger p = ReadDHParameter(input);
+            BigInteger g = ReadDHParameter(input);
+
+            return new DHParameters(p, g);
+        }
+
+        public static DHParameters ReceiveDHParameters(TlsDHVerifier dhVerifier, Stream input)
+        {
+            DHParameters dhParameters = ReadDHParameters(input);
+            if (!dhVerifier.Accept(dhParameters))
+                throw new TlsFatalAlert(AlertDescription.insufficient_security);
+
+            return dhParameters;
+        }
+
         public static void WriteDHParameter(BigInteger x, Stream output)
         {
             TlsUtilities.WriteOpaque16(BigIntegers.AsUnsignedByteArray(x), output);
+        }
+
+        public static void WriteDHParameters(DHParameters dhParameters, Stream output)
+        {
+            WriteDHParameter(dhParameters.P, output);
+            WriteDHParameter(dhParameters.G, output);
         }
     }
 }
