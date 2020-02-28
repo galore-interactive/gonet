@@ -83,28 +83,28 @@ namespace Org.BouncyCastle.Security
             algorithms["1.3.14.3.2.26"] = "PBEWITHHMACSHA1";
         }
 
-//		/// <summary>
-//		/// Returns a ObjectIdentifier for a given digest mechanism.
-//		/// </summary>
-//		/// <param name="mechanism">A string representation of the digest meanism.</param>
-//		/// <returns>A DerObjectIdentifier, null if the Oid is not available.</returns>
-//		public static DerObjectIdentifier GetObjectIdentifier(
-//			string mechanism)
-//		{
-//			mechanism = (string) algorithms[Platform.ToUpperInvariant(mechanism)];
-//
-//			if (mechanism != null)
-//			{
-//				return (DerObjectIdentifier)oids[mechanism];
-//			}
-//
-//			return null;
-//		}
+        //		/// <summary>
+        //		/// Returns a ObjectIdentifier for a given digest mechanism.
+        //		/// </summary>
+        //		/// <param name="mechanism">A string representation of the digest meanism.</param>
+        //		/// <returns>A DerObjectIdentifier, null if the Oid is not available.</returns>
+        //		public static DerObjectIdentifier GetObjectIdentifier(
+        //			string mechanism)
+        //		{
+        //			mechanism = (string) algorithms[Platform.ToUpperInvariant(mechanism)];
+        //
+        //			if (mechanism != null)
+        //			{
+        //				return (DerObjectIdentifier)oids[mechanism];
+        //			}
+        //
+        //			return null;
+        //		}
 
-//		public static ICollection Algorithms
-//		{
-//			get { return oids.Keys; }
-//		}
+        //		public static ICollection Algorithms
+        //		{
+        //			get { return oids.Keys; }
+        //		}
 
         public static IMac GetMac(
             DerObjectIdentifier id)
@@ -255,6 +255,11 @@ namespace Org.BouncyCastle.Security
             byte[] b = new byte[mac.GetMacSize()];
             mac.DoFinal(b, 0);
             return b;
+        }
+
+        public static void DoFinal(IMac macIn, byte[] macOut, int macSize)
+        {
+            macIn.DoFinal(macOut, 0);
         }
 
         public static byte[] DoFinal(IMac mac, byte[] input)
