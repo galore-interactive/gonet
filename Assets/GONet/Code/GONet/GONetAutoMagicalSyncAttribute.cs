@@ -270,7 +270,7 @@ namespace GONet
         public bool IsReadonlyInEditor = false;
 
         /// <summary>
-        /// Only applicable to primitive numeric data types, mainly float.
+        /// Only applicable to primitive numeric data types, currently float and Vector2/3/4.
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
         /// If value is 1, the result will be the quantized value can only represnt <see cref="QuantizeLowerBound"/> or <see cref="QuantizeUpperBound"/> and the one represented will be dictated by which of the two the original value is closest to.
         /// </summary>
