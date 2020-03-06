@@ -344,7 +344,58 @@ namespace GONet
             }
         }
 
-        static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer>(25);
+        internal struct CustomSerializerLookupKey : IEquatable<CustomSerializerLookupKey>
+        {
+            internal Type serializedType;
+
+            //{ // what we want, but in this block is what is easiest for now: QuantizerSettingsGroup quantizationSettings;
+            internal byte quantizeDownToBitCount;
+            internal float quantizeLowerBound;
+            internal float quantizeUpperBound;
+            //}
+
+            internal CustomSerializerLookupKey(Type serializedType, byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
+            {
+                this.serializedType = serializedType;
+                this.quantizeDownToBitCount = quantizeDownToBitCount;
+                this.quantizeLowerBound = quantizeLowerBound;
+                this.quantizeUpperBound = quantizeUpperBound;
+            }
+
+            public bool Equals(CustomSerializerLookupKey other)
+            {
+                return serializedType == other.serializedType
+                    && quantizeDownToBitCount == other.quantizeDownToBitCount
+                    && quantizeLowerBound == other.quantizeLowerBound
+                    && quantizeUpperBound == other.quantizeUpperBound;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (!(obj is CustomSerializerLookupKey))
+                {
+                    return false;
+                }
+
+                var key = (CustomSerializerLookupKey)obj;
+                return serializedType == key.serializedType
+                    && quantizeDownToBitCount == key.quantizeDownToBitCount
+                    && quantizeLowerBound == key.quantizeLowerBound
+                    && quantizeUpperBound == key.quantizeUpperBound;
+            }
+
+            public override int GetHashCode()
+            {
+                var hashCode = -1886448105;
+                hashCode = hashCode * -1521134295 + EqualityComparer<Type>.Default.GetHashCode(serializedType);
+                hashCode = hashCode * -1521134295 + quantizeDownToBitCount.GetHashCode();
+                hashCode = hashCode * -1521134295 + quantizeLowerBound.GetHashCode();
+                hashCode = hashCode * -1521134295 + quantizeUpperBound.GetHashCode();
+                return hashCode;
+            }
+        }
+
+        static readonly Dictionary<CustomSerializerLookupKey, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<CustomSerializerLookupKey, IGONetAutoMagicalSync_CustomSerializer>(25);
         IGONetAutoMagicalSync_CustomSerializer customSerialize_Instance = null;
         /// <summary>
         /// IMPORTANT: Do NOT use this.
@@ -361,24 +412,38 @@ namespace GONet
                     TypeUtils.IsTypeAInstanceOfTypeB(CustomSerialize_Type, typeof(IGONetAutoMagicalSync_CustomSerializer)) &&
                     !CustomSerialize_Type.IsAbstract)
                 { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
-                    if (!customSerializerInstanceByTypeMap.TryGetValue(CustomSerialize_Type, out customSerialize_Instance))
+                    CustomSerializerLookupKey key = new CustomSerializerLookupKey(CustomSerialize_Type, QuantizeDownToBitCount, QuantizeLowerBound, QuantizeUpperBound);
+                    if (!customSerializerInstanceByTypeMap.TryGetValue(key, out customSerialize_Instance))
                     {
                         customSerialize_Instance = (IGONetAutoMagicalSync_CustomSerializer)Activator.CreateInstance(CustomSerialize_Type);
-                        customSerializerInstanceByTypeMap[CustomSerialize_Type] = customSerialize_Instance;
+                        customSerialize_Instance.InitQuantizationSettings(key.quantizeDownToBitCount, key.quantizeLowerBound, key.quantizeUpperBound);
+
+                        customSerializerInstanceByTypeMap[key] = customSerialize_Instance;
                     }
                 }
                 return customSerialize_Instance;
             }
         }
 
+        /// <summary>
+        /// Get/Create the "No quantization" option
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public static T GetCustomSerializer<T>() where T : IGONetAutoMagicalSync_CustomSerializer
+        {
+            return GetCustomSerializer<T>(0, 0, 0); // the first 0 for quantize down to bit count causes no quantization
+        }
+
+        public static T GetCustomSerializer<T>(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound) where T : IGONetAutoMagicalSync_CustomSerializer
         {
             T customSerializer = default(T);
             Type typeofT = typeof(T);
             if (!typeofT.IsAbstract)
             { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
                 IGONetAutoMagicalSync_CustomSerializer customSerializer_raw;
-                if (customSerializerInstanceByTypeMap.TryGetValue(typeofT, out customSerializer_raw))
+                CustomSerializerLookupKey key = new CustomSerializerLookupKey(typeofT, quantizeDownToBitCount, quantizeLowerBound, quantizeUpperBound);
+                if (customSerializerInstanceByTypeMap.TryGetValue(key, out customSerializer_raw))
                 {
                     if (customSerializer_raw.GetType() == typeofT) // just double checking...probabaly overkill since we ensure this is true through other steps
                     {
@@ -388,7 +453,9 @@ namespace GONet
                 else
                 {
                     customSerializer = Activator.CreateInstance<T>();
-                    customSerializerInstanceByTypeMap[typeofT] = customSerializer;
+                    customSerializer.InitQuantizationSettings(key.quantizeDownToBitCount, key.quantizeLowerBound, key.quantizeUpperBound);
+
+                    customSerializerInstanceByTypeMap[key] = customSerializer;
                 }
             }
             return customSerializer;
@@ -410,6 +477,8 @@ namespace GONet
 
     public interface IGONetAutoMagicalSync_CustomSerializer
     {
+        void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound);
+
         /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
         void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value);
 
@@ -422,15 +491,26 @@ namespace GONet
         public const float DEFAULT_MAX_VALUE = 10000f;
         public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
 
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
+        bool isQuantizationInitialized = false;
+        Quantizer quantizer;
+        byte bitsPerComponent = DEFAULT_BITS_PER_COMPONENT;
 
-        public Vector2Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+        public Vector2Serializer() { }
 
-        public Vector2Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
         {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+            if (quantizeDownToBitCount > 0)
+            {
+                if (isQuantizationInitialized)
+                {
+                    throw new InvalidOperationException("Quantization is already initialized for this custom serializer.");
+                }
+
+                bitsPerComponent = quantizeDownToBitCount;
+                quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerComponent, true);
+
+                isQuantizationInitialized = true;
+            }
         }
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
@@ -458,15 +538,24 @@ namespace GONet
         public const float DEFAULT_MAX_VALUE = 10000f;
         public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
 
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
+        bool isQuantizationInitialized = false;
+        Quantizer quantizer;
+        byte bitsPerComponent = DEFAULT_BITS_PER_COMPONENT;
 
-        public Vector3Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+        public Vector3Serializer() { }
 
-        public Vector3Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
         {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+            if (quantizeDownToBitCount > 0)
+            {
+                if (isQuantizationInitialized)
+                {
+                    throw new InvalidOperationException("Quantization is already initialized for this custom serializer.");
+                }
+
+                bitsPerComponent = quantizeDownToBitCount;
+                quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerComponent, true);
+            }
         }
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
@@ -522,15 +611,24 @@ namespace GONet
         public const float DEFAULT_MAX_VALUE = 10000f;
         public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
 
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
+        bool isQuantizationInitialized = false;
+        Quantizer quantizer;
+        byte bitsPerComponent = DEFAULT_BITS_PER_COMPONENT;
 
-        public Vector4Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
+        public Vector4Serializer() { }
 
-        public Vector4Serializer(float minValue, float maxValue, byte bitsPerComponent)
+        public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
         {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
+            if (quantizeDownToBitCount > 0)
+            {
+                if (isQuantizationInitialized)
+                {
+                    throw new InvalidOperationException("Quantization is already initialized for this custom serializer.");
+                }
+
+                bitsPerComponent = quantizeDownToBitCount;
+                quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerComponent, true);
+            }
         }
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
@@ -564,8 +662,9 @@ namespace GONet
         static readonly float QuatValueMinimum = -1.0f / SQUARE_ROOT_OF_2;
         static readonly float QuatValueMaximum = +1.0f / SQUARE_ROOT_OF_2;
 
+        bool isQuantizationInitialized = false;
         Quantizer quantizer;
-        byte bitsPerSmallestThreeItem;
+        byte bitsPerSmallestThreeItem = DEFAULT_BITS_PER_SMALLEST_THREE;
 
         public const byte DEFAULT_BITS_PER_SMALLEST_THREE = 9;
 
@@ -575,6 +674,20 @@ namespace GONet
         {
             this.bitsPerSmallestThreeItem = bitsPerSmallestThreeItem;
             quantizer = new Quantizer(QuatValueMinimum, QuatValueMaximum, bitsPerSmallestThreeItem, true);
+        }
+
+        public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
+        {
+            if (quantizeDownToBitCount > 0)
+            {
+                if (isQuantizationInitialized)
+                {
+                    throw new InvalidOperationException("Quantization is already initialized for this custom serializer.");
+                }
+
+                bitsPerSmallestThreeItem = quantizeDownToBitCount;
+                quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerSmallestThreeItem, true);
+            }
         }
 
         /// <returns>a <see cref="Quaternion"/></returns>

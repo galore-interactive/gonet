@@ -205,7 +205,7 @@ namespace GONet.Generation
             {
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -288,28 +288,28 @@ namespace GONet.Generation
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector2).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector3).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector4).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Quaternion).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
@@ -344,7 +344,7 @@ namespace GONet.Generation
             {
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -427,28 +427,28 @@ namespace GONet.Generation
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector2).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector3).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector4).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Quaternion).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
 <#
 				}
@@ -494,7 +494,7 @@ namespace GONet.Generation
             {
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -624,28 +624,28 @@ namespace GONet.Generation
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
 				{
 #>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector2).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
 				{
 #>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector3).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
 				{
 #>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector4).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Quaternion).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
@@ -684,7 +684,7 @@ namespace GONet.Generation
             {
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -794,28 +794,28 @@ namespace GONet.Generation
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector2).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector3).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Vector4).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=typeof(UnityEngine.Quaternion).Name + "Serializer"#>>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
 <#
 				}

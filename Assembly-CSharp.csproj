@@ -1675,7 +1675,6 @@
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetAutoMagicalSyncAttribute.cs" />

@@ -151,7 +151,7 @@ namespace GONet.Generation
 			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support5.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support5.syncAttribute_ShouldSkipSync);
-			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
+			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 		
             int support5_mostRecentChanges_calcdSize = support5.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support5.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support5.mostRecentChanges_capacitySize = Math.Max(support5_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
@@ -222,11 +222,11 @@ namespace GONet.Generation
 				bitStream_appendTo.WriteUShort(GONetParticipant.OwnerAuthorityId);
 			}
 			{ // Transform.rotation
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 			}
 			{ // Transform.position
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f); // TODO need to cache this locally instead of having to lookup each time
 				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position);
 			}
         }
@@ -237,7 +237,7 @@ namespace GONet.Generation
 			{
 				case 0:
 				{ // GONetParticipant.GONetId
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, GONetParticipant.GONetId);
 				}
 				break;
@@ -262,14 +262,14 @@ namespace GONet.Generation
 
 				case 4:
 				{ // Transform.rotation
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 				}
 				break;
 
 				case 5:
 				{ // Transform.position
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f); // TODO need to cache this locally instead of having to lookup each time
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position);
 				}
 				break;
@@ -300,11 +300,11 @@ namespace GONet.Generation
 				GONetParticipant.OwnerAuthorityId = value;
 			}
 			{ // Transform.rotation
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 				Transform.rotation = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
 			}
 			{ // Transform.position
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f); // TODO need to cache this locally instead of having to lookup each time
 				Transform.position = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 			}
         }
@@ -319,7 +319,7 @@ namespace GONet.Generation
 			{
 				case 0:
 				{ // GONetParticipant.GONetId
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).System_UInt32;
 
 									GONetParticipant.GONetId = value;
@@ -355,7 +355,7 @@ namespace GONet.Generation
 
 				case 4:
 				{ // Transform.rotation
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
 
 					valuesChangesSupport[4].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
@@ -364,7 +364,7 @@ namespace GONet.Generation
 
 				case 5:
 				{ // Transform.position
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(); // TODO need to cache this locally instead of having to lookup each time
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f); // TODO need to cache this locally instead of having to lookup each time
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 
 					valuesChangesSupport[5].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there

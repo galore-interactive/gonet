@@ -17,9 +17,9 @@ MonoBehaviour:
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
-  QuantizeDownToBitCount: 0
-  QuantizeLowerBound: -5000
-  QuantizeUpperBound: 5000
+  QuantizeDownToBitCount: 18
+  QuantizeLowerBound: -125
+  QuantizeUpperBound: 125
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides:

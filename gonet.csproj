@@ -2282,6 +2282,7 @@
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
+    <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />

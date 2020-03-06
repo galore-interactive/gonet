@@ -490,6 +490,11 @@ namespace GONet
                 uint gonetId = value.System_UInt32;
                 bitStream_appendTo.WriteUInt(gonetId);
             }
+
+            public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
+            {
+                // do nothing!  TODO consider supporting quantizing even this, but not making sense right now and still want to keep this interface/API
+            }
         }
     }
 }

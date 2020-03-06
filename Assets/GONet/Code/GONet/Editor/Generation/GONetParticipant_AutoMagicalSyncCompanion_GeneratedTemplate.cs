@@ -841,8 +841,29 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 208 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 208 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 208 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 209 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1229,16 +1250,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 291 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector2).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 291 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 291 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 291 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 292 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1263,16 +1305,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector3).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 298 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 299 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1297,16 +1360,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 305 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector4).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 305 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 305 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 305 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 306 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1331,16 +1415,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 312 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Quaternion).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 312 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 312 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 312 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 313 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1425,16 +1530,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 347 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 347 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 347 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 347 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 348 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1821,16 +1947,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 430 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector2).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 430 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 430 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 430 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 431 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1855,16 +2002,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 437 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector3).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 437 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 437 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 437 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 438 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1889,16 +2057,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 444 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector4).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 444 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 444 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 444 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 445 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -1923,16 +2112,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 451 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Quaternion).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
+            this.Write(">(");
+            
+            #line 451 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 451 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 451 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
             #line 452 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2032,8 +2242,29 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t");
+            this.Write(">(");
+            
+            #line 497 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 497 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 497 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t");
             
             #line 498 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2511,12 +2742,33 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "cAttribute.GetCustomSerializer<");
             
             #line 627 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector2).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t");
+            this.Write(">(");
+            
+            #line 627 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 627 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 627 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t");
             
             #line 628 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2552,12 +2804,33 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "cAttribute.GetCustomSerializer<");
             
             #line 634 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector3).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t");
+            this.Write(">(");
+            
+            #line 634 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 634 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 634 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t");
             
             #line 635 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2593,12 +2866,33 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "cAttribute.GetCustomSerializer<");
             
             #line 641 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector4).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t");
+            this.Write(">(");
+            
+            #line 641 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 641 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 641 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t");
             
             #line 642 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2634,12 +2928,33 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "cAttribute.GetCustomSerializer<");
             
             #line 648 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Quaternion).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t");
+            this.Write(">(");
+            
+            #line 648 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 648 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 648 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t");
             
             #line 649 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
@@ -2739,16 +3054,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 687 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
+            this.Write(">(");
+            
+            #line 687 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 687 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 687 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 688 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
@@ -2924,16 +3260,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 797 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector2).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
+            this.Write(">(");
+            
+            #line 797 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 797 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 797 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 798 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
@@ -2951,16 +3308,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 804 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector3).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
+            this.Write(">(");
+            
+            #line 804 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 804 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 804 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 805 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
@@ -2978,16 +3356,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 811 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Vector4).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
+            this.Write(">(");
+            
+            #line 811 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 811 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 811 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 812 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
@@ -3005,16 +3404,37 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             
             #line default
             #line hidden
-            this.Write("\t\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagicalSy" +
-                    "ncAttribute.GetCustomSerializer<");
+            this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = GONetAutoMagica" +
+                    "lSyncAttribute.GetCustomSerializer<");
             
             #line 818 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(typeof(UnityEngine.Quaternion).Name + "Serializer"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
-            this.Write(">(); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t" +
-                    "\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
+            this.Write(">(");
+            
+            #line 818 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
+            
+            #line default
+            #line hidden
+            this.Write(", ");
+            
+            #line 818 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f, ");
+            
+            #line 818 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
+            
+            #line default
+            #line hidden
+            this.Write("f); // TODO need to cache this locally instead of having to lookup each time\r\n\t\t\t" +
+                    "\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
             #line 819 "C:\projects\unity\gonet\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));

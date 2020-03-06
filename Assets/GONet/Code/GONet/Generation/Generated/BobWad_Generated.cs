@@ -621,7 +621,7 @@ namespace GONet.Generation
 			var item_codeGenerationId1_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember0);
 
-			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
+			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember1);
 
 			return settings;
