@@ -1983,6 +1983,8 @@ namespace GONet
             internal QuantizerSettingsGroup syncAttribute_QuantizerSettingsGroup;
             #endregion
 
+            internal GONetSyncableValue baselineValue_current;
+
             internal GONetSyncableValue lastKnownValue;
             internal GONetSyncableValue lastKnownValue_previous;
 

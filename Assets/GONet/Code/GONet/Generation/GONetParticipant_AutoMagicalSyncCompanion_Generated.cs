@@ -54,6 +54,10 @@ namespace GONet.Generation
 
         internal GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue[] valuesChangesSupport;
 
+        protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomSerializer> cachedCustomSerializersArrayPool =
+            new ArrayPool<IGONetAutoMagicalSync_CustomSerializer>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        protected IGONetAutoMagicalSync_CustomSerializer[] cachedCustomSerializers;
+
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
         internal abstract byte CodeGenerationId { get; }
@@ -66,6 +70,7 @@ namespace GONet.Generation
         public void Dispose()
         {
             lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
+            cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
 
             for (int i = 0; i < valuesCount; ++i)
             {
