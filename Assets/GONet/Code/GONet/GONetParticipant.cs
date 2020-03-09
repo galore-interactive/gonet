@@ -268,8 +268,6 @@ namespace GONet
         {
             GONetId = instantiateEvent.GONetIdAtInstantiation;
             GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
-
-            GONetLog.Debug(string.Concat("gonetId@instantiation...expected(from event): ", instantiateEvent.GONetIdAtInstantiation, " actual(after assignments): ", GONetIdAtInstantiation));
         }
 
         [GONetAutoMagicalSync]

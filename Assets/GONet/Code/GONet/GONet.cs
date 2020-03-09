@@ -1372,7 +1372,6 @@ namespace GONet
                 {
                     try
                     {
-                        if (@event is ValueMonitoringSupport_BaselineExpiredEvent) GONetLog.Debug("DREETS about to publish...type: " + @event.GetType().FullName);
                         EventBus.Publish(@event);
                     }
                     catch (Exception e)
@@ -1998,8 +1997,6 @@ namespace GONet
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 int returnBytesUsedCount;
-
-                GONetLog.Debug("new baseline count: " + persistentEventsThisSession.Count(x => TypeUtils.IsTypeAInstanceOfTypeB(x.GetType(), typeof(ValueMonitoringSupport_NewBaselineEvent))));
 
                 byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
                 SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);

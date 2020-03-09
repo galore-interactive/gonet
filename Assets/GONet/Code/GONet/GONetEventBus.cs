@@ -160,7 +160,7 @@ namespace GONet
                     throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
                 }
 
-                HashSet<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
+                List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
                 if (handlersForType != null)
                 {
                     int handlerCount = handlersForType.Count;
@@ -355,6 +355,7 @@ namespace GONet
         }
 
         readonly HashSet<EventHandlerAndFilterer> specificTypeHandlers_tmp = new HashSet<EventHandlerAndFilterer>();
+        readonly List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = new List<EventHandlerAndFilterer>(100);
 
         /// <summary>
         /// TODO inline this method for performance...it is called all the time with <see cref="Publish{T}(T)"/>!
@@ -368,7 +369,7 @@ namespace GONet
         /// if true, any observers registered for a base class type (<typeparam name="T"/>) and the event being published is of a child class, it will be processed for that observer
         /// if false, only observers registered for the exact class type (<typeparam name="T"/>) will be returned
         /// </param>
-        private HashSet<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
+        private List<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
         {
             specificTypeHandlers_tmp.Clear();
 
@@ -382,7 +383,7 @@ namespace GONet
                     if (handlersByEventType_IncludingChildren.TryGetValue(eventTypeCurrent, out handlers))
                     {
                         //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
-                        { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                        { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
                             int handlerCount = handlers.Count;
                             for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
                             {
@@ -404,7 +405,7 @@ namespace GONet
                         if (handlersByEventType_IncludingChildren.TryGetValue(eventInterface, out handlers))
                         {
                             //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
-                            { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                            { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
                                 int handlerCount = handlers.Count;
                                 for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
                                 {
@@ -416,13 +417,24 @@ namespace GONet
                     }
                 }
 
-                return specificTypeHandlers_tmp;
+                { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
+                    specificTypeHandlers_tmpList.Clear();
+                    using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
+                    {
+                        while (enumerator.MoveNext())
+                        {
+                            specificTypeHandlers_tmpList.Add(enumerator.Current);
+                        }
+                    }
+                    specificTypeHandlers_tmpList.Sort(EventHandlerAndFilterer.SubscriptionPriorityComparer);
+                }
+                return specificTypeHandlers_tmpList;
             }
             else
             {
                 if (handlersByEventType_SpecificOnly.TryGetValue(eventType, out handlers))
                 {
-                    { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                    { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
                         int handlerCount = handlers.Count;
                         for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
                         {
@@ -430,7 +442,18 @@ namespace GONet
                         }
                     }
 
-                    return specificTypeHandlers_tmp;
+                    { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
+                        specificTypeHandlers_tmpList.Clear();
+                        using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
+                        {
+                            while (enumerator.MoveNext())
+                            {
+                                specificTypeHandlers_tmpList.Add(enumerator.Current);
+                            }
+                        }
+                        specificTypeHandlers_tmpList.Sort(EventHandlerAndFilterer.SubscriptionPriorityComparer);
+                    }
+                    return specificTypeHandlers_tmpList;
                 }
             }
 
