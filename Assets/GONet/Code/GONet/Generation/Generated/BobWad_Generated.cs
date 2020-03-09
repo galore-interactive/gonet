@@ -47,6 +47,22 @@ namespace GONet
 		[MessagePack.Union(17, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
 		[MessagePack.Union(18, typeof(GONet.SyncEvent_Transform_position))]
 		[MessagePack.Union(19, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(20, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
+		[MessagePack.Union(21, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+		[MessagePack.Union(22, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+		[MessagePack.Union(23, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+		[MessagePack.Union(24, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+		[MessagePack.Union(25, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+		[MessagePack.Union(26, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+		[MessagePack.Union(27, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+		[MessagePack.Union(28, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+		[MessagePack.Union(29, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+		[MessagePack.Union(30, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+		[MessagePack.Union(31, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+		[MessagePack.Union(32, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+		[MessagePack.Union(33, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+		[MessagePack.Union(34, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+		[MessagePack.Union(35, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
 		public partial interface IGONetEvent { }
 
 
@@ -73,6 +89,22 @@ namespace GONet
 	[MessagePack.Union(0, typeof(GONet.DestroyGONetParticipantEvent))]
 		[MessagePack.Union(1, typeof(GONet.InstantiateGONetParticipantEvent))]
 		[MessagePack.Union(2, typeof(GONet.OwnerAuthorityIdAssignmentEvent))]
+		[MessagePack.Union(3, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
+		[MessagePack.Union(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+		[MessagePack.Union(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+		[MessagePack.Union(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+		[MessagePack.Union(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+		[MessagePack.Union(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+		[MessagePack.Union(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+		[MessagePack.Union(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+		[MessagePack.Union(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+		[MessagePack.Union(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+		[MessagePack.Union(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+		[MessagePack.Union(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+		[MessagePack.Union(15, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+		[MessagePack.Union(16, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+		[MessagePack.Union(17, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+		[MessagePack.Union(18, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
 		public partial interface IPersistentEvent : IGONetEvent { }
 
 		[MessagePack.Union(0, typeof(GONet.SyncEvent_GONetParticipant_GONetId))]
@@ -599,6 +631,22 @@ namespace GONet.Generation
 				typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority),
 				typeof(GONet.SyncEvent_Transform_position),
 				typeof(GONet.SyncEvent_Transform_rotation),
+				typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4),
 			};
 		}
 
@@ -621,7 +669,7 @@ namespace GONet.Generation
 			var item_codeGenerationId1_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember0);
 
-			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-6f, 6f, 18, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember1);
 
 			return settings;

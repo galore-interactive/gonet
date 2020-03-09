@@ -160,7 +160,7 @@ namespace GONet
                     throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
                 }
 
-                List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
+                HashSet<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
                 if (handlersForType != null)
                 {
                     int handlerCount = handlersForType.Count;
@@ -169,22 +169,25 @@ namespace GONet
                     GONetEventEnvelope<IGONetEvent> genericEnvelope = genericEnvelopes_publishCallDepthIndex[genericEnvelope_publishCallDepth];
                     genericEnvelope.Init(@event, sourceAuthorityId);
 
-                    for (int i = 0; i < handlerCount; ++i)
+                    using (var handlerEnumerator = handlersForType.GetEnumerator())
                     {
-                        EventHandlerAndFilterer handlerForType = handlersForType[i];
-                        if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
+                        while (handlerEnumerator.MoveNext())
                         {
-                            try // try-catch to disallow a single handler blowing things up for the rest of them!
+                            EventHandlerAndFilterer handlerForType = handlerEnumerator.Current;
+                            if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
                             {
-                                handlerForType.Handler(genericEnvelope);
-                            }
-                            catch (Exception error)
-                            {
-                                const string EventType = "(GONetEventBus handler error) Event Type: ";
-                                const string GenericEventType = "\n(GONetEventBus handler error) Event Published as generic Type: ";
-                                const string Event = "\n(GONetEventBus handler error) Error Event: ";
-                                const string StackTrace = "\n(GONetEventBus handler error)  Error Stack Trace: ";
-                                GONetLog.Error(string.Concat(EventType, @event.GetType().FullName, GenericEventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
+                                try // try-catch to disallow a single handler blowing things up for the rest of them!
+                                {
+                                    handlerForType.Handler(genericEnvelope);
+                                }
+                                catch (Exception error)
+                                {
+                                    const string EventType = "(GONetEventBus handler error) Event Type: ";
+                                    const string GenericEventType = "\n(GONetEventBus handler error) Event Published as generic Type: ";
+                                    const string Event = "\n(GONetEventBus handler error) Error Event: ";
+                                    const string StackTrace = "\n(GONetEventBus handler error)  Error Stack Trace: ";
+                                    GONetLog.Error(string.Concat(EventType, @event.GetType().FullName, GenericEventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
+                                }
                             }
                         }
                     }
@@ -351,6 +354,8 @@ namespace GONet
             }
         }
 
+        readonly HashSet<EventHandlerAndFilterer> specificTypeHandlers_tmp = new HashSet<EventHandlerAndFilterer>();
+
         /// <summary>
         /// TODO inline this method for performance...it is called all the time with <see cref="Publish{T}(T)"/>!
         /// if no specific observable streams exist for the type - null
@@ -363,8 +368,10 @@ namespace GONet
         /// if true, any observers registered for a base class type (<typeparam name="T"/>) and the event being published is of a child class, it will be processed for that observer
         /// if false, only observers registered for the exact class type (<typeparam name="T"/>) will be returned
         /// </param>
-        private List<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
+        private HashSet<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
         {
+            specificTypeHandlers_tmp.Clear();
+
             List<EventHandlerAndFilterer> handlers = null;
 
             if (includeChildClasses)
@@ -374,7 +381,14 @@ namespace GONet
                 {
                     if (handlersByEventType_IncludingChildren.TryGetValue(eventTypeCurrent, out handlers))
                     {
-                        return handlers;
+                        //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
+                        { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                            int handlerCount = handlers.Count;
+                            for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
+                            {
+                                specificTypeHandlers_tmp.Add(handlers[iHandler]);
+                            }
+                        }
                     }
                     eventTypeCurrent = eventTypeCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
                 }
@@ -382,24 +396,41 @@ namespace GONet
                 Type eventInterface;
                 Type[] eventInterfaces = GetInterfaces(eventType);
                 int length = eventInterfaces.Length;
-                for (int i = 0; i < length; ++i)
+                for (int i = length - 1; i >= 0; --i) // somehow iterating backward is very important for success in how we stored/manage this information....so just go with it and all is well
                 {
                     eventInterface = eventInterfaces[i];
                     while (eventInterface != null)
                     {
                         if (handlersByEventType_IncludingChildren.TryGetValue(eventInterface, out handlers))
                         {
-                            return handlers;
+                            //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
+                            { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                                int handlerCount = handlers.Count;
+                                for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
+                                {
+                                    specificTypeHandlers_tmp.Add(handlers[iHandler]);
+                                }
+                            }
                         }
                         eventInterface = eventInterface.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
                     }
                 }
+
+                return specificTypeHandlers_tmp;
             }
             else
             {
                 if (handlersByEventType_SpecificOnly.TryGetValue(eventType, out handlers))
                 {
-                    return handlers;
+                    { // this block is the GC friendly version of: handlers.ForEach(h => insane.Add(h));
+                        int handlerCount = handlers.Count;
+                        for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
+                        {
+                            specificTypeHandlers_tmp.Add(handlers[iHandler]);
+                        }
+                    }
+
+                    return specificTypeHandlers_tmp;
                 }
             }
 

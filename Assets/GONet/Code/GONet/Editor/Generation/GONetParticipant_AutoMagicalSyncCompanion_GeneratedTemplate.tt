@@ -73,6 +73,9 @@ namespace GONet.Generation
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
+			
+            doesBaselineValueNeedAdjusting = doesBaselineValueNeedAdjustingArrayPool.Borrow((int)valuesCount);
+            Array.Clear(doesBaselineValueNeedAdjusting, 0, doesBaselineValueNeedAdjusting.Length);
 
 			valuesChangesSupport = valuesChangesSupportArrayPool.Borrow((int)valuesCount);
 			
@@ -215,7 +218,11 @@ namespace GONet.Generation
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#> - valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>);
+<#					} else {#>
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					}#>
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -294,32 +301,18 @@ namespace GONet.Generation
 				}
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#> - valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>);
+<#					} else {#>
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					}#>
 <#
 				}
 			}#>
@@ -354,7 +347,11 @@ namespace GONet.Generation
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#> - valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>);
+<#					} else {#>
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					}#>
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -433,32 +430,18 @@ namespace GONet.Generation
 					}
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#> - valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>);
+<#					} else {#>
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, <#=single.componentTypeName#>.<#=singleMember.memberName#>);
+<#					}#>
 <#
 				}
 			}#>
@@ -504,7 +487,11 @@ namespace GONet.Generation
 				if (singleMember.attribute.CustomSerialize_Instance != null)
                 {#>
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#> + valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					} else {#>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					}#>
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -630,32 +617,18 @@ namespace GONet.Generation
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = BitConverter.ToDouble(bytes, 0);
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#> + valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					} else {#>
 				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
-				{
-#>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
-				{
-#>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-				{
-#>
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-				<#=single.componentTypeName#>.<#=singleMember.memberName#> = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					}#>
 <#
 				}
 			}#>
@@ -695,6 +668,9 @@ namespace GONet.Generation
                 {#>
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					value += valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					}#>
 <#              }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -800,32 +776,17 @@ namespace GONet.Generation
 					var value = BitConverter.ToDouble(bytes, 0);
 <#
 				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
 				{
 #>
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
 					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
-<#
-				}
-                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-				{
-#>
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
-					var value = customSerializer.Deserialize(bitStream_readFrom).<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					if (singleMember.attribute.QuantizeDownToBitCount > 0) {#>
+					value += valuesChangesSupport[<#=iOverall#>].baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#					}#>
 <#
 				}
 			}#>
@@ -885,5 +846,101 @@ namespace GONet.Generation
 	}
 #>
 		}
-    }
-}
+
+		internal override bool IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange(byte singleIndex, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport)
+		{
+			switch (singleIndex)
+			{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall#>:
+				{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {#>
+<#				if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
+				{#>
+                    System.Single diff = valueChangeSupport.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> - valueChangeSupport.baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
+					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
+                    bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = diff < componentLimitLower || diff > componentLimitUpper;
+					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
+<#				}
+				else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+				{#>
+                    UnityEngine.Vector3 diff = valueChangeSupport.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> - valueChangeSupport.baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
+					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
+                    bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = 
+						diff.x < componentLimitLower || diff.x > componentLimitUpper ||
+						diff.y < componentLimitLower || diff.y > componentLimitUpper ||
+						diff.z < componentLimitLower || diff.z > componentLimitUpper;
+					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
+<#				}
+				else
+				{#>
+					// this type not supported for this functionality
+<#				}#>
+<#			}#>
+				}
+				break;
+
+<#			++iOverall;
+		}
+	}
+#>
+			}<# /* end switch */ #>
+
+			return false;
+		}
+
+        internal override ValueMonitoringSupport_NewBaselineEvent CreateNewBaselineValueEvent(uint gonetId, byte singleIndex, GONetSyncableValue newBaselineValue)
+		{
+			switch (singleIndex)
+			{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall#>:
+				{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {#>
+					return new ValueMonitoringSupport_NewBaselineEvent_<#=singleMember.memberTypeFullName.Replace(".", "_")#>() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#>
+					};
+<#			}#>
+				}
+				break;
+
+<#			++iOverall;
+		}
+	}
+#>
+			}<# /* end switch */ #>
+
+			return null;
+		}<# /* end CreateNewBaselineValueEvent() */ #>
+    }<# /* end class */ #>
+}<# /* end namespace */ #>

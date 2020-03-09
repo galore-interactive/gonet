@@ -206,9 +206,14 @@ namespace GONet
         public static uint GetGONetIdAtInstantiation(uint currentGONetId)
         {
             GONetParticipant gonetParticipant;
+            uint gonetIdAtInstantiation;
             if (gonetParticipantByGONetIdMap.TryGetValue(currentGONetId, out gonetParticipant))
             {
                 return gonetParticipant.GONetIdAtInstantiation;
+            }
+            else if (recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.TryGetValue(currentGONetId, out gonetIdAtInstantiation))
+            {
+                return gonetIdAtInstantiation;
             }
             else
             {
@@ -358,17 +363,18 @@ namespace GONet
         static readonly Dictionary<Type, SyncEventsSaveSupport> syncEventsToSaveQueueByEventType = new Dictionary<Type, SyncEventsSaveSupport>(100);
 
         /// <summary>
-        /// The keys are only added from main unity thread...the value queues are only added to on the other thread
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread.
+        /// At last time of updating this declaration, this will be used to store <see cref="SyncEvent_ValueChangeProcessed"/>, <see cref="ValueMonitoringSupport_BaselineExpiredEvent"/> and <see cref="ValueMonitoringSupport_NewBaselineEvent"/> child classes.
         /// </summary>
-        static readonly Dictionary<Thread, Queue<SyncEvent_ValueChangeProcessed>> syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap = new Dictionary<Thread, Queue<SyncEvent_ValueChangeProcessed>>(12);
+        static readonly Dictionary<Thread, Queue<IGONetEvent>> events_AwaitingSendToOthersQueue_ByThreadMap = new Dictionary<Thread, Queue<IGONetEvent>>(12);
 
         /// <summary>
-        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="events_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
         /// </summary>
-        static readonly Dictionary<Thread, ConcurrentQueue<SyncEvent_ValueChangeProcessed>> syncValueChanges_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, ConcurrentQueue<SyncEvent_ValueChangeProcessed>>(12);
+        static readonly Dictionary<Thread, ConcurrentQueue<IGONetEvent>> events_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, ConcurrentQueue<IGONetEvent>>(12);
 
         /// <summary>
-        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
+        /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="events_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
         /// </summary>
         static readonly Queue<SyncEvent_ValueChangeProcessed> syncValueChanges_ReceivedFromOtherQueue = new Queue<SyncEvent_ValueChangeProcessed>(100);
 
@@ -409,6 +415,7 @@ namespace GONet
         }
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
+        internal static readonly Dictionary<uint, uint> recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map = new Dictionary<uint, uint>(1000);
 
         public const ushort OwnerAuthorityId_Unset = 0;
         public const ushort OwnerAuthorityId_Server = unchecked((ushort)(ushort.MaxValue << GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED)) >> GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED;
@@ -596,6 +603,36 @@ namespace GONet
             ////GONetLog.Debug("DREETS pork");
 
             OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
+
+            OnGONetIdChanged_UpdatePersistentInstantiationEvents(eventEnvelope);
+        }
+
+        private unsafe static void OnGONetIdChanged_UpdatePersistentInstantiationEvents(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
+        {
+            LinkedListNode<IPersistentEvent> current = persistentEventsThisSession.First;
+
+            while (current != null)
+            {
+                var persistentEvent = current.Value;
+                if (persistentEvent is InstantiateGONetParticipantEvent)
+                {
+                    InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)persistentEvent;
+                    SyncEvent_GONetParticipant_GONetId newGONetIdEvent = eventEnvelope.Event;
+                    if (instantiationEvent.GONetId == newGONetIdEvent.valuePrevious)
+                    {
+                        instantiationEvent.GONetId = newGONetIdEvent.valueNew;
+                        
+                        // this is a struct and the copy over of the value is not going to stick inside the persistentEventsThisSession...so we do linked list stuffities to replace old
+
+                        persistentEventsThisSession.AddBefore(current, instantiationEvent);
+                        persistentEventsThisSession.Remove(current);
+
+                        break;
+                    }
+                }
+
+                current = current.Next;
+            }
         }
 
         /// <summary>
@@ -663,13 +700,71 @@ namespace GONet
             EventBus.Subscribe<PersistentEvents_Bundle>(OnPersistentEventsBundle_ProcessAll_Remote, envelope => envelope.IsSourceRemote);
             EventBus.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent_Remote, envelope => envelope.IsSourceRemote);
 
-            var subscription = EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyEvent_Remote, envelope => envelope.IsSourceRemote);
+            EventBus.Subscribe<GONetParticipantDisabledEvent>(OnDisabledGNPEvent);
+
+            var subscription = EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyGNPEvent_Remote, envelope => envelope.IsSourceRemote);
             subscription.SetSubscriptionPriority_INTERNAL(int.MinValue); // process internally LAST since the GO will be destroyed and other subscribers may want to do something just prior to it being destroyed
 
             EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
 
             EventBus.Subscribe<SyncEvent_GONetParticipant_GONetId>(OnGONetIdChanged);
             EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnOwnerAuthorityIdChanged);
+
+            EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
+        }
+
+        private static void OnNewBaselineValue_Remote(GONetEventEnvelope<ValueMonitoringSupport_NewBaselineEvent> eventEnvelope)
+        {
+            ValueMonitoringSupport_NewBaselineEvent @event = eventEnvelope.Event;
+            ApplyNewBaselineValue_Remote(@event);
+        }
+
+        private static void ApplyNewBaselineValue_Remote(ValueMonitoringSupport_NewBaselineEvent @event)
+        {
+            GONetParticipant gnp;
+            if (gonetParticipantByGONetIdMap.TryGetValue(@event.GONetId, out gnp)
+                || gonetParticipantByGONetIdMap.TryGetValue(GetGONetIdAtInstantiation(@event.GONetId), out gnp)) // IMPORTANT: this is here because a newly connecting client will process this new baseline with all the other persistent events, but it is done before the new gonetId assignment is made for gnps that were assumed authority by server and have a new gonetId
+            {
+                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gnp.codeGenerationId][gnp];
+
+                AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = syncCompanion.valuesChangesSupport[@event.ValueIndex];
+                //GONetSyncableValue baselineValue_previous = valueChangeSupport.baselineValue_current;
+
+                if (@event is ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3) // most common first
+                {
+                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3)@event).NewBaselineValue;
+                }
+                else if (@event is ValueMonitoringSupport_NewBaselineEvent_System_Single)
+                {
+                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_System_Single)@event).NewBaselineValue;
+                }
+                else if (@event is ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2)
+                {
+                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2)@event).NewBaselineValue;
+                }
+                else if (@event is ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4)
+                {
+                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4)@event).NewBaselineValue;
+                }
+                else if (@event is ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion)
+                {
+                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion)@event).NewBaselineValue;
+                }
+                else
+                {
+                    const string NEW = "New baseline value is of type not yet accounted for.  type: ";
+                    GONetLog.Warning(string.Concat(NEW, @event.GetType().FullName));
+                }
+
+                const string APPLIED = "New baseline value applied for type: ";
+                GONetLog.Debug(string.Concat(APPLIED, @event.GetType().FullName));
+            }
+            else
+            {
+                const string GNID = "Unable to find GONetParticipant for GONetId: ";
+                const string POSSI = ", which is possibly due to it being destroyed and this event came at a bad time just after destroy processed....like was the case during testing with ProjectileTest.unity";
+                GONetLog.Warning(string.Concat(GNID, @event.GONetId, POSSI));
+            }
         }
 
         private static void OnSyncValueChangeProcessed_Persist_Local(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
@@ -701,15 +796,19 @@ namespace GONet
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
-            ////GONetLog.Debug("DREETS pork");
-
-            foreach (var item in eventEnvelope.Event.PersistentEvents)
-            {
-                persistentEventsThisSession.AddLast(item);
-
-                if (item is InstantiateGONetParticipantEvent)
+            { // TODO why not just publish each one of these so all the handlers kick in and process??????   otherwise, we are left with this piecemeal processing below....error prone and problematic for sure!
+                foreach (var item in eventEnvelope.Event.PersistentEvents)
                 {
-                    Instantiate_Remote((InstantiateGONetParticipantEvent)item);
+                    persistentEventsThisSession.AddLast(item);
+
+                    if (item is InstantiateGONetParticipantEvent)
+                    {
+                        Instantiate_Remote((InstantiateGONetParticipantEvent)item);
+                    }
+                    else if (item is ValueMonitoringSupport_NewBaselineEvent)
+                    {
+                        ApplyNewBaselineValue_Remote((ValueMonitoringSupport_NewBaselineEvent)item);
+                    }
                 }
             }
         }
@@ -720,8 +819,6 @@ namespace GONet
         /// </summary>
         private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(GONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
-            ////GONetLog.Debug("DREETS pork");
-
             if (eventEnvelope.Event is ILocalOnlyPublish)
             {
                 return;
@@ -755,34 +852,37 @@ namespace GONet
             }
         }
 
+        private static readonly List<IPersistentEvent> persistentEventsCancelledOut = new List<IPersistentEvent>(100);
+
         private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
-            ////GONetLog.Debug("DREETS pork");
-
-            bool doesCurrentEventCancelOutPreviousEvent = false;
-
-            IPersistentEvent lastConsideredEvent = null;
             ICancelOutOtherEvents iCancelOthers = eventEnvelope.Event as ICancelOutOtherEvents;
+            persistentEventsCancelledOut.Clear();
             if (iCancelOthers != null)
             {
                 var enumerator = persistentEventsThisSession.GetEnumerator(); // TODO consider narrowing down to just the items in there that match iCancelOthers.OtherEventTypeCancelledOut, but Linq is not desired...not sure how best to do this
-                while (!doesCurrentEventCancelOutPreviousEvent && enumerator.MoveNext())
+                while (enumerator.MoveNext())
                 {
-                    lastConsideredEvent = enumerator.Current;
-                    if (lastConsideredEvent.GetType() == iCancelOthers.OtherEventTypeCancelledOut && iCancelOthers.DoesCancelOutOtherEvent(lastConsideredEvent))
+                    IPersistentEvent consideredEvent = enumerator.Current;
+                    if (TypeUtils.IsTypeAInstanceOfAnyTypesB(consideredEvent.GetType(), iCancelOthers.OtherEventTypesCancelledOut) && iCancelOthers.DoesCancelOutOtherEvent(consideredEvent))
                     {
-                        doesCurrentEventCancelOutPreviousEvent = true;
+                        persistentEventsCancelledOut.Add(consideredEvent);
                     }
                 }
             }
 
-            if (doesCurrentEventCancelOutPreviousEvent)
+            int count = persistentEventsCancelledOut.Count;
+            if (count == 0)
             {
-                persistentEventsThisSession.Remove(lastConsideredEvent); // remove the cancelled out earlier event
+                persistentEventsThisSession.AddLast(eventEnvelope.Event);
             }
             else
             {
-                persistentEventsThisSession.AddLast(eventEnvelope.Event);
+                for (int i = 0; i < count; ++i)
+                {
+                    IPersistentEvent cancelledEvent = persistentEventsCancelledOut[i];
+                    persistentEventsThisSession.Remove(cancelledEvent); // remove the cancelled out earlier event
+                }
             }
         }
 
@@ -841,11 +941,17 @@ namespace GONet
             }
         }
 
-        private static void OnDestroyEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
+        private static void OnDisabledGNPEvent(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
+        {
+            GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
+            recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map[gonetParticipant.GONetId] = gonetParticipant.GONetIdAtInstantiation;
+        }
+
+        private static void OnDestroyGNPEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
             ////GONetLog.Debug("DREETS pork");
 
-            GONetParticipant gonetParticipant;
+            GONetParticipant gonetParticipant = null;
             if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
             {
                 gonetIdsDestroyedViaPropagation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
@@ -1139,7 +1245,7 @@ namespace GONet
                 }
             }
 
-            PublishEvents_SyncValueChanges_SentToOthers();
+            PublishEvents_SentToOthers();
             PublishEvents_SyncValueChanges_ReceivedFromOthers();
             SaveEventsInQueueASAP_IfAppropriate();
 
@@ -1177,6 +1283,8 @@ namespace GONet
                     }
                 }
             }
+
+            recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
         }
 
         private static void SaveEventsInQueueASAP_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
@@ -1252,23 +1360,24 @@ namespace GONet
             }
         }
 
-        private static void PublishEvents_SyncValueChanges_SentToOthers()
+        private static void PublishEvents_SentToOthers()
         {
-            var eventDictionaryEnumerator = syncValueChanges_SendToOthersQueue_ByThreadMap.GetEnumerator();
+            var eventDictionaryEnumerator = events_SendToOthersQueue_ByThreadMap.GetEnumerator();
             while (eventDictionaryEnumerator.MoveNext())
             {
-                ConcurrentQueue<SyncEvent_ValueChangeProcessed> eventQueue = eventDictionaryEnumerator.Current.Value;
+                ConcurrentQueue<IGONetEvent> eventQueue = eventDictionaryEnumerator.Current.Value;
                 int count = eventQueue.Count;
-                SyncEvent_ValueChangeProcessed @event;
+                IGONetEvent @event;
                 while (count > 0 && eventQueue.TryDequeue(out @event))
                 {
                     try
                     {
+                        if (@event is ValueMonitoringSupport_BaselineExpiredEvent) GONetLog.Debug("DREETS about to publish...type: " + @event.GetType().FullName);
                         EventBus.Publish(@event);
                     }
                     catch (Exception e)
                     {
-                        const string BOO = "Boo.  Publishing this sync value change event failed.  Error.Message: ";
+                        const string BOO = "Boo.  Publishing this event failed.  Error.Message: ";
                         GONetLog.Error(string.Concat(BOO, e.Message));
                     }
                     finally
@@ -1859,7 +1968,7 @@ namespace GONet
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
             if (instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
             {
-                instance.GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
+                instance.SetGONetIdFromRemoteInstantiation(instantiateEvent);
             }
             remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
@@ -1889,6 +1998,9 @@ namespace GONet
             {
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 int returnBytesUsedCount;
+
+                GONetLog.Debug("new baseline count: " + persistentEventsThisSession.Count(x => TypeUtils.IsTypeAInstanceOfTypeB(x.GetType(), typeof(ValueMonitoringSupport_NewBaselineEvent))));
+
                 byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
                 SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
                 SerializationUtils.ReturnByteArray(bytes);
@@ -1983,6 +2095,9 @@ namespace GONet
             internal QuantizerSettingsGroup syncAttribute_QuantizerSettingsGroup;
             #endregion
 
+            /// <summary>
+            /// similar to keeping track of initial value, but it could change over time due to some new rules to support increased quantization/compression
+            /// </summary>
             internal GONetSyncableValue baselineValue_current;
 
             internal GONetSyncableValue lastKnownValue;
@@ -2565,8 +2680,8 @@ namespace GONet
 
                     thread = new Thread(ContinuallyProcess_NotMainThread);
 
-                    syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
-                    syncValueChanges_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
+                    events_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
+                    events_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<IGONetEvent>(); // we're on main thread, safe to deal with regular dict here
 
                     isThreadRunning = true;
                     thread.Start();
@@ -2575,10 +2690,10 @@ namespace GONet
                 {
                     myThread_Time = Time; // if running on main thread, no need to use a different instance that will already be used on the main thread
 
-                    if (!syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
+                    if (!events_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
                     {
-                        syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<SyncEvent_ValueChangeProcessed>(100); // we're on main thread, safe to deal with regular dict here
-                        syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new ConcurrentQueue<SyncEvent_ValueChangeProcessed>(); // we're on main thread, safe to deal with regular dict here
+                        events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
+                        events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new ConcurrentQueue<IGONetEvent>(); // we're on main thread, safe to deal with regular dict here
                     }
                 }
             }
@@ -2666,6 +2781,7 @@ namespace GONet
                         monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                         if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck(uniqueGrouping)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                         {
+                            monitoringSupport.AnnotateMyBaselineValuesNeedingAdjustment();
                             monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                             monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                         }
@@ -2703,17 +2819,43 @@ namespace GONet
                             myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                         }
                     }
-
-                    PublishEvents_SyncValueChangesSentToOthers_ASAP();
                 }
+
+                { // all this to call ApplyAnnotatedBaselineValueAdjustments()
+                    Queue<IGONetEvent> baselineAdjustmentsEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                    enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
+                    while (enumeratorOuter.MoveNext())
+                    {
+                        Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                        if (currentMap == null)
+                        {
+                            GONetLog.Error("currentMap == null");
+                        }
+
+                        var enumeratorInner = currentMap.GetEnumerator();
+                        while (enumeratorInner.MoveNext())
+                        {
+                            GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                            if (monitoringSupport == null)
+                            {
+                                GONetLog.Error("monitoringSupport == null");
+                            }
+
+                            monitoringSupport.ApplyAnnotatedBaselineValueAdjustments(baselineAdjustmentsEventQueue); // we figured out when this needs to get called....and it is now, AFTER the send of the changes accumulated herein to avoid using new baseline incorrectly 
+                        }
+                    }
+                }
+
+                PublishEvents_SyncValueChangesSentToOthers_ASAP();
             }
+
             /// <summary>
             /// Promote Local Thread Events To Main Thread For Publishing since calling <see cref="GONetEventBus.Publish{T}(T, uint?)"/> is not to be called from multiple threads!
             /// </summary>
             private void PublishEvents_SyncValueChangesSentToOthers_ASAP()
             {
-                Queue<SyncEvent_ValueChangeProcessed> queueAwaiting = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
-                ConcurrentQueue<SyncEvent_ValueChangeProcessed> queueSend = syncValueChanges_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                Queue<IGONetEvent> queueAwaiting = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                ConcurrentQueue<IGONetEvent> queueSend = events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
                 while (queueAwaiting.Count > 0)
                 {
                     var @event = queueAwaiting.Dequeue();
@@ -2920,7 +3062,7 @@ namespace GONet
             bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
             //GONetLog.AppendLine(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
 
-            Queue<SyncEvent_ValueChangeProcessed> syncEventQueue = syncValueChanges_Serialized_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+            Queue<IGONetEvent> syncEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
             for (int i = 0; i < countTotal; ++i)
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];

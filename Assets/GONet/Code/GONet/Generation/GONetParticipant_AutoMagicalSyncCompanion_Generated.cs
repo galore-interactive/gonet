@@ -33,7 +33,10 @@ namespace GONet.Generation
         const int EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN = 5;
         const int EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX = 30;
 
-        protected static readonly ArrayPool<bool> lastKnownValuesChangedArrayPool = 
+        protected static readonly ArrayPool<bool> lastKnownValuesChangedArrayPool =
+            new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+
+        protected static readonly ArrayPool<bool> doesBaselineValueNeedAdjustingArrayPool =
             new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
         /// <summary>
@@ -51,6 +54,7 @@ namespace GONet.Generation
         internal byte valuesCount;
 
         protected bool[] lastKnownValueChangesSinceLastCheck;
+        protected bool[] doesBaselineValueNeedAdjusting;
 
         internal GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue[] valuesChangesSupport;
 
@@ -70,6 +74,7 @@ namespace GONet.Generation
         public void Dispose()
         {
             lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
+            doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
 
             for (int i = 0; i < valuesCount; ++i)
@@ -148,6 +153,7 @@ namespace GONet.Generation
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             float valueAsFloat = value.System_Single;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
+            valueAsFloat -= valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
             uint valueQuantized = Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
@@ -159,7 +165,7 @@ namespace GONet.Generation
             uint valueQuantized;
             bitStream_readFrom.ReadUInt(out valueQuantized, quantizeSettings.quantizeToBitCount);
             float valueUnquantized = Quantizer.LookupQuantizer(quantizeSettings).Unquantize(valueQuantized);
-            return valueUnquantized;
+            return valueUnquantized + valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
         }
 
         internal abstract void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value);
@@ -201,6 +207,66 @@ namespace GONet.Generation
                 }
             }
         }
+
+        /// <summary>
+        /// PRE: <see cref="lastKnownValueChangesSinceLastCheck"/> still has true values in it and has not been reset via <see cref="OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping)"/>
+        /// POST: <see cref="doesBaselineValueNeedAdjusting"/> is updated with true values for the baseline values needing adjustment, but adjustment is not applied until <see cref="ApplyAnnotatedBaselineValueAdjustments"/> is called later
+        /// </summary>
+        internal void AnnotateMyBaselineValuesNeedingAdjustment()
+        {
+            if (gonetParticipant.IsMine)
+            {
+                for (int i = 0; i < valuesCount; ++i)
+                {
+                    if (lastKnownValueChangesSinceLastCheck[i])
+                    {
+                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+
+                        bool isAppropriate =
+                            valueChangeSupport.syncAttribute_QuantizerSettingsGroup.quantizeToBitCount > 0 &&
+                            IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange((byte)i, valueChangeSupport);
+
+                        if (isAppropriate)
+                        {
+                            doesBaselineValueNeedAdjusting[i] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// POST: If appropriate, baseline values updated and <paramref name="baselineAdjustmentsEventQueue"/> has one of 
+        ///       each of the following enqueued for sending later at right time/thread: 
+        ///       1) <see cref="ValueMonitoringSupport_BaselineExpiredEvent"/>
+        ///       2) <see cref="ValueMonitoringSupport_NewBaselineEvent"/>
+        /// </summary>
+        /// <param name="baselineAdjustmentsEventQueue"></param>
+        internal void ApplyAnnotatedBaselineValueAdjustments(Queue<IGONetEvent> baselineAdjustmentsEventQueue)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                if (doesBaselineValueNeedAdjusting[i])
+                {
+                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                    valueChangeSupport.baselineValue_current = valueChangeSupport.lastKnownValue;
+
+                    { // queue up for later (i.e., in proper thread): fire reliable events to everyone that the baseline changed so everyone adjusts accordingly so the networking will work 
+                        var expirationEvent = new ValueMonitoringSupport_BaselineExpiredEvent() { GONetId = gonetParticipant.GONetId, ValueIndex = (byte)i };
+                        baselineAdjustmentsEventQueue.Enqueue(expirationEvent); //used to directly do the following, but cannot because of threading limitations and now will delay to do this until in proper thread: GONetMain.EventBus.Publish(expirationEvent);
+
+                        ValueMonitoringSupport_NewBaselineEvent newBaselineEvent = CreateNewBaselineValueEvent(gonetParticipant.GONetId, (byte)i, valueChangeSupport.baselineValue_current);
+                        baselineAdjustmentsEventQueue.Enqueue(newBaselineEvent); //used to directly do the following, but cannot because of threading limitations and now will delay to do this until in proper thread: GONetMain.EventBus.Publish(newBaselineEvent);
+                    }
+
+                    doesBaselineValueNeedAdjusting[i] = false;
+                }
+            }
+        }
+
+        internal abstract bool IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange(byte index, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport);
+
+        internal abstract ValueMonitoringSupport_NewBaselineEvent CreateNewBaselineValueEvent(uint gonetId, byte index, GONetSyncableValue newBaselineValue);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)

@@ -64,6 +64,9 @@ namespace GONet.Generation
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
+			
+            doesBaselineValueNeedAdjusting = doesBaselineValueNeedAdjustingArrayPool.Borrow((int)valuesCount);
+            Array.Clear(doesBaselineValueNeedAdjusting, 0, doesBaselineValueNeedAdjusting.Length);
 
 			valuesChangesSupport = valuesChangesSupportArrayPool.Borrow((int)valuesCount);
 			
@@ -166,9 +169,9 @@ namespace GONet.Generation
 			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support5.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support5.syncAttribute_ShouldSkipSync);
-			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-6f, 6f, 18, true);
 
-			cachedCustomSerializers[5] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedCustomSerializers[5] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -6f, 6f);
 		
             int support5_mostRecentChanges_calcdSize = support5.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support5.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support5.mostRecentChanges_capacitySize = Math.Max(support5_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
@@ -240,11 +243,11 @@ namespace GONet.Generation
 			}
 			{ // Transform.rotation
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[4];
-				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 			}
 			{ // Transform.position
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
-				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position);
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[5].baselineValue_current.UnityEngine_Vector3);
 			}
         }
 
@@ -287,7 +290,7 @@ namespace GONet.Generation
 				case 5:
 				{ // Transform.position
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position);
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[5].baselineValue_current.UnityEngine_Vector3);
 				}
 				break;
 
@@ -322,7 +325,7 @@ namespace GONet.Generation
 			}
 			{ // Transform.position
 				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
-				Transform.position = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
+				Transform.position = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3 + valuesChangesSupport[5].baselineValue_current.UnityEngine_Vector3;
 			}
         }
 
@@ -383,6 +386,7 @@ namespace GONet.Generation
 				{ // Transform.position
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
+					value += valuesChangesSupport[5].baselineValue_current.UnityEngine_Vector3;
 
 					valuesChangesSupport[5].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
 				}
@@ -442,5 +446,122 @@ namespace GONet.Generation
 								}
 
 		}
-    }
-}
+
+		internal override bool IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange(byte singleIndex, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport)
+		{
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 4:
+				{ // Transform.rotation
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 5:
+				{ // Transform.position
+                    UnityEngine.Vector3 diff = valueChangeSupport.lastKnownValue.UnityEngine_Vector3 - valueChangeSupport.baselineValue_current.UnityEngine_Vector3;
+					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
+					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
+                    bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = 
+						diff.x < componentLimitLower || diff.x > componentLimitUpper ||
+						diff.y < componentLimitLower || diff.y > componentLimitUpper ||
+						diff.z < componentLimitLower || diff.z > componentLimitUpper;
+					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
+				}
+				break;
+
+			}
+			return false;
+		}
+
+        internal override ValueMonitoringSupport_NewBaselineEvent CreateNewBaselineValueEvent(uint gonetId, byte singleIndex, GONetSyncableValue newBaselineValue)
+		{
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+					return new ValueMonitoringSupport_NewBaselineEvent_System_UInt32() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_UInt32
+					};
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					return new ValueMonitoringSupport_NewBaselineEvent_System_Boolean() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_Boolean
+					};
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					return new ValueMonitoringSupport_NewBaselineEvent_System_Boolean() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_Boolean
+					};
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					return new ValueMonitoringSupport_NewBaselineEvent_System_UInt16() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_UInt16
+					};
+				}
+				break;
+
+				case 4:
+				{ // Transform.rotation
+					return new ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.UnityEngine_Quaternion
+					};
+				}
+				break;
+
+				case 5:
+				{ // Transform.position
+					return new ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.UnityEngine_Vector3
+					};
+				}
+				break;
+
+			}
+			return null;
+		}    }}

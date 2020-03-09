@@ -179,6 +179,23 @@ namespace GONet.Utils
             return toCheckTypes.Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeB); // TODO using Linq here is not good
         }
 
+        public static bool IsTypeAInstanceOfAnyTypesB(Type typeA, Type[] typesB)
+        {
+            if (typesB != null)
+            {
+                int length = typesB.Length;
+                for (int i = 0; i < length; ++i)
+                {
+                    if (IsTypeAInstanceOfTypeB(typeA, typesB[i]))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         static List<Type> uniqueSyncEventTypes;
         internal static List<Type> GetAllTypesInheritingFrom<T>(bool isConcreteClassRequired)
         {

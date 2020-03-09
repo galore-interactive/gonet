@@ -222,7 +222,7 @@ namespace GONet
             }
             */
 
-                    if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
+            if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
             {
                 //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
 
@@ -263,6 +263,14 @@ namespace GONet
         }
 
         public uint GONetIdAtInstantiation { get; private set; }
+
+        internal void SetGONetIdFromRemoteInstantiation(InstantiateGONetParticipantEvent instantiateEvent)
+        {
+            GONetId = instantiateEvent.GONetIdAtInstantiation;
+            GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
+
+            GONetLog.Debug(string.Concat("gonetId@instantiation...expected(from event): ", instantiateEvent.GONetIdAtInstantiation, " actual(after assignments): ", GONetIdAtInstantiation));
+        }
 
         [GONetAutoMagicalSync]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
