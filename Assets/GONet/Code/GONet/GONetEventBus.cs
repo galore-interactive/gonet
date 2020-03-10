@@ -109,11 +109,6 @@ namespace GONet
         }
     }
 
-    public interface IHasPriority
-    {
-        int Priority { get; }
-    }
-
     #endregion
 
     /// <summary>
@@ -426,7 +421,7 @@ namespace GONet
                             specificTypeHandlers_tmpList.Add(enumerator.Current);
                         }
                     }
-                    specificTypeHandlers_tmpList.Sort(EventHandlerAndFilterer.SubscriptionPriorityComparer);
+                    GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
                 }
                 return specificTypeHandlers_tmpList;
             }
@@ -451,7 +446,7 @@ namespace GONet
                                 specificTypeHandlers_tmpList.Add(enumerator.Current);
                             }
                         }
-                        specificTypeHandlers_tmpList.Sort(EventHandlerAndFilterer.SubscriptionPriorityComparer);
+                        GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
                     }
                     return specificTypeHandlers_tmpList;
                 }
@@ -475,9 +470,9 @@ namespace GONet
             return interfaces;
         }
 
-        public class EventHandlerAndFilterer : IHasPriority
+        public class EventHandlerAndFilterer
         {
-            public static readonly PriorityComparer SubscriptionPriorityComparer = new PriorityComparer();
+            public static readonly EventHandlerAndFilterer_PriorityComparer SubscriptionPriorityComparer = new EventHandlerAndFilterer_PriorityComparer();
 
             internal HandleEventDelegate<IGONetEvent> Handler;
 
@@ -493,9 +488,9 @@ namespace GONet
             }
         }
 
-        public class PriorityComparer : IComparer<IHasPriority>
+        public class EventHandlerAndFilterer_PriorityComparer : IComparer<EventHandlerAndFilterer>
         {
-            public int Compare(IHasPriority a, IHasPriority b)
+            public int Compare(EventHandlerAndFilterer a, EventHandlerAndFilterer b)
             {
                 return a.Priority.CompareTo(b.Priority);
             }

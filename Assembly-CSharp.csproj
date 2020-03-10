@@ -1700,6 +1700,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\FileBackedDictionary.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FileUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FunctionalComparer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\GCLessAlgorithms.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\GONetLog.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\GUID.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\HierarchyUtils.cs" />
