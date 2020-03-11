@@ -131,29 +131,34 @@ namespace GONet
             for (int i = 0; i < genericEnvelopes_publishCallDepthIndex.Length; ++i)
             {
                 genericEnvelopes_publishCallDepthIndex[i] = new GONetEventEnvelope<IGONetEvent>();
+                specificTypeHandlers_tmp_publishCallDepthIndex[i] = new HashSet<EventHandlerAndFilterer>();
+                specificTypeHandlers_tmpList_publishCallDepthIndex[i] = new List<EventHandlerAndFilterer>(100);
             }
         }
 
+        private const int MAX_PUBLISH_CALL_DEPTH = 256;
         /// <summary>
         /// IMPORTANT: since we only allow calls to <see cref="Publish{T}(T, uint?)"/> from one thread (i.e., <see cref="GONetMain.mainUnityThread"/>), we are sure everything is serial calls and only one of these little temporary pass through guys is needed!  The calls to <see cref="GONetEventEnvelope{T}.Borrow(T, uint)"/> is called in the publish bit for each one individually to get the properly typed instance that is automatically returned to its pool after being processed
         /// </summary>
-        readonly GONetEventEnvelope<IGONetEvent>[] genericEnvelopes_publishCallDepthIndex = new GONetEventEnvelope<IGONetEvent>[256];
+        readonly GONetEventEnvelope<IGONetEvent>[] genericEnvelopes_publishCallDepthIndex = new GONetEventEnvelope<IGONetEvent>[MAX_PUBLISH_CALL_DEPTH];
+        readonly HashSet<EventHandlerAndFilterer>[] specificTypeHandlers_tmp_publishCallDepthIndex = new HashSet<EventHandlerAndFilterer>[MAX_PUBLISH_CALL_DEPTH];
+        readonly List<EventHandlerAndFilterer>[] specificTypeHandlers_tmpList_publishCallDepthIndex = new List<EventHandlerAndFilterer>[MAX_PUBLISH_CALL_DEPTH];
 
         int genericEnvelope_publishCallDepth;
 
         /// <summary>
         /// IMPORTANT: Only call this from the main Unity thread!
         /// </summary>
-        public void Publish<T>(T @event, ushort? remoteSourceAuthorityId = default) where T : IGONetEvent
+        /// <returns>0 if all went well, otherwise the number of failures/exceptions occurred during individual subscription/handler processing</returns>
+        public int Publish<T>(T @event, ushort? remoteSourceAuthorityId = default) where T : IGONetEvent
         {
-            ++genericEnvelope_publishCallDepth;
+            int exceptionsThrown = 0;
+
+            ++genericEnvelope_publishCallDepth; // GONetLog.Debug("genericEnvelope_publishCallDepth incremented to: " + genericEnvelope_publishCallDepth);
 
             try
             {
-                if (!GONetMain.IsUnityMainThread)
-                {
-                    throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
-                }
+                GONetMain.EnsureMainThread();
 
                 List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
                 if (handlersForType != null)
@@ -164,25 +169,25 @@ namespace GONet
                     GONetEventEnvelope<IGONetEvent> genericEnvelope = genericEnvelopes_publishCallDepthIndex[genericEnvelope_publishCallDepth];
                     genericEnvelope.Init(@event, sourceAuthorityId);
 
-                    using (var handlerEnumerator = handlersForType.GetEnumerator())
+                    for (int i = 0; i < handlerCount; ++i)
                     {
-                        while (handlerEnumerator.MoveNext())
+                        EventHandlerAndFilterer handlerForType = handlersForType[i];
+                        if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
                         {
-                            EventHandlerAndFilterer handlerForType = handlerEnumerator.Current;
-                            if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
+                            try // try-catch to disallow a single handler blowing things up for the rest of them!
                             {
-                                try // try-catch to disallow a single handler blowing things up for the rest of them!
-                                {
-                                    handlerForType.Handler(genericEnvelope);
-                                }
-                                catch (Exception error)
-                                {
-                                    const string EventType = "(GONetEventBus handler error) Event Type: ";
-                                    const string GenericEventType = "\n(GONetEventBus handler error) Event Published as generic Type: ";
-                                    const string Event = "\n(GONetEventBus handler error) Error Event: ";
-                                    const string StackTrace = "\n(GONetEventBus handler error)  Error Stack Trace: ";
-                                    GONetLog.Error(string.Concat(EventType, @event.GetType().FullName, GenericEventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
-                                }
+                                handlerForType.Handler(genericEnvelope);
+                            }
+                            catch (Exception error)
+                            {
+                                ++exceptionsThrown;
+
+                                const string EventType = "(GONetEventBus handler error) Event Type: ";
+                                const string GenericEventType = "\n(GONetEventBus handler error) Event Published as generic Type: ";
+                                const string Event = "\n(GONetEventBus handler error) Error Event: ";
+                                const string StackTrace = "\n(GONetEventBus handler error)  Error Stack Trace: ";
+                                const string Depth = "\n(GONetEventBus handler error) genericEnvelope_publishCallDepth: ";
+                                GONetLog.Error(string.Concat(EventType, @event.GetType().FullName, GenericEventType, typeof(T).FullName, Event, error.Message, StackTrace, error.StackTrace, Depth, genericEnvelope_publishCallDepth)); // NOTE: adding in the stack trace is important to see exactly where things went wrong...or else that info is lost
                             }
                         }
                     }
@@ -200,12 +205,19 @@ namespace GONet
             }
             catch (Exception e)
             {
-                GONetLog.Warning(e.Message);
+                ++exceptionsThrown;
+
+                const string Event = "(GONetEventBus Publish error) Error Event: ";
+                const string StackTrace = "\n(GONetEventBus Publish error)  Error Stack Trace: ";
+                const string Depth = "\n(GONetEventBus Publish error) genericEnvelope_publishCallDepth: ";
+                GONetLog.Warning(string.Concat(Event, e.Message, StackTrace, e.StackTrace, Depth, genericEnvelope_publishCallDepth));
             }
             finally
             {
-                --genericEnvelope_publishCallDepth;
+                --genericEnvelope_publishCallDepth; // GONetLog.Debug("genericEnvelope_publishCallDepth decremented to: " + genericEnvelope_publishCallDepth);
             }
+
+            return exceptionsThrown;
         }
 
         /// <summary>
@@ -214,10 +226,7 @@ namespace GONet
         /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
         {
-            if (!GONetMain.IsUnityMainThread)
-            {
-                throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
-            }
+            GONetMain.EnsureMainThread();
 
             if (handler == null)
             {
@@ -324,10 +333,7 @@ namespace GONet
         /// </summary>
         internal void SetSubscriptionPriority(EventHandlerAndFilterer subscriber, int priority)
         {
-            if (!GONetMain.IsUnityMainThread)
-            {
-                throw new InvalidOperationException(GONetMain.REQUIRED_CALL_UNITY_MAIN_THREAD);
-            }
+            GONetMain.EnsureMainThread();
 
             subscriber.Priority = priority;
 
@@ -349,10 +355,9 @@ namespace GONet
             }
         }
 
-        readonly HashSet<EventHandlerAndFilterer> specificTypeHandlers_tmp = new HashSet<EventHandlerAndFilterer>();
-        readonly List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = new List<EventHandlerAndFilterer>(100);
-
         /// <summary>
+        /// IMPORTANT: This method is no longer "fully cached" as advertised.  TODO FIXME: get things back to where it is fully cached and additional lists building does not occur.
+        /// 
         /// TODO inline this method for performance...it is called all the time with <see cref="Publish{T}(T)"/>!
         /// if no specific observable streams exist for the type - null
         /// otherwise - list of specific observable streams for the type
@@ -366,6 +371,7 @@ namespace GONet
         /// </param>
         private List<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
         {
+            HashSet<EventHandlerAndFilterer> specificTypeHandlers_tmp = specificTypeHandlers_tmp_publishCallDepthIndex[genericEnvelope_publishCallDepth];
             specificTypeHandlers_tmp.Clear();
 
             List<EventHandlerAndFilterer> handlers = null;
@@ -413,6 +419,7 @@ namespace GONet
                 }
 
                 { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
+                    List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = specificTypeHandlers_tmpList_publishCallDepthIndex[genericEnvelope_publishCallDepth];
                     specificTypeHandlers_tmpList.Clear();
                     using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
                     {
@@ -422,8 +429,9 @@ namespace GONet
                         }
                     }
                     GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
+
+                    return specificTypeHandlers_tmpList;
                 }
-                return specificTypeHandlers_tmpList;
             }
             else
             {
@@ -438,6 +446,7 @@ namespace GONet
                     }
 
                     { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
+                        List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = specificTypeHandlers_tmpList_publishCallDepthIndex[genericEnvelope_publishCallDepth];
                         specificTypeHandlers_tmpList.Clear();
                         using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
                         {
@@ -447,8 +456,9 @@ namespace GONet
                             }
                         }
                         GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
+
+                        return specificTypeHandlers_tmpList;
                     }
-                    return specificTypeHandlers_tmpList;
                 }
             }
 
@@ -510,11 +520,11 @@ namespace GONet
 
             public void Handle(GONetEventEnvelope eventEnvelope)
             {
-                //GONetLog.Debug("DREETS  pre borrow...eventEnvelope.EventUntyped.type: " + eventEnvelope.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
+                // GONetLog.Debug("DREETS  pre borrow...eventEnvelope.EventUntyped.type: " + eventEnvelope.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
 
                 GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
 
-                //GONetLog.Debug("DREETS  POST borrow..envelopeTyped.EventUntyped.type: " + envelopeTyped.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
+                // GONetLog.Debug("DREETS  POST borrow..envelopeTyped.EventUntyped.type: " + envelopeTyped.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
                 wrappedHandler(envelopeTyped);
 
                 GONetEventEnvelope<T>.Return(envelopeTyped);

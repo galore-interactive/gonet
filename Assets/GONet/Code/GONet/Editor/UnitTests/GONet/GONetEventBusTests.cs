@@ -242,6 +242,13 @@ namespace GONet
                     Assert.IsFalse(enumerator.MoveNext());
                 }
             }
+
+            subscription1.Unsubscribe();
+            subscription2.Unsubscribe();
+            subscription3.Unsubscribe();
+            subscription4.Unsubscribe();
+            subscription5.Unsubscribe();
+            subscription6.Unsubscribe();
         }
 
         [Test]
@@ -256,12 +263,12 @@ namespace GONet
 
             // TODO GONetEventBus.Instance.ResetAll or UnsubscribeAll
 
-            GONetEventBus.Instance.Subscribe<IGONetEvent>(OnIGONetEvent);
-            GONetEventBus.Instance.Subscribe<IPersistentEvent>(OnIPersistentEvent);
-            GONetEventBus.Instance.Subscribe<ITransientEvent>(OnITransientEvent);
-            GONetEventBus.Instance.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent);
-            GONetEventBus.Instance.Subscribe<SyncEvent_GONetParticipant_IsRotationSyncd>(OnIsRotEvent);
-            GONetEventBus.Instance.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncEvent);
+            var s1 = GONetEventBus.Instance.Subscribe<IGONetEvent>(OnIGONetEvent);
+            var s2 = GONetEventBus.Instance.Subscribe<IPersistentEvent>(OnIPersistentEvent);
+            var s3 = GONetEventBus.Instance.Subscribe<ITransientEvent>(OnITransientEvent);
+            var s4 = GONetEventBus.Instance.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent);
+            var s5 = GONetEventBus.Instance.Subscribe<SyncEvent_GONetParticipant_IsRotationSyncd>(OnIsRotEvent);
+            var s6 = GONetEventBus.Instance.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncEvent);
             
             IGONetEvent iGONetEvent = new InstantiateGONetParticipantEvent();
             GONetEventBus.Instance.Publish(iGONetEvent); // +1 persistent, +1 iGONet, +1 instantiation
@@ -296,6 +303,38 @@ namespace GONet
             Assert.AreEqual(6, iTransientEventSubscriptionsFulfilled);
             Assert.AreEqual(3, iPersistentEventSubscriptionsFulfilled);
             Assert.AreEqual(6, syncSubscriptionsFulfilled);
+
+            s1.Unsubscribe();
+            s2.Unsubscribe();
+            s3.Unsubscribe();
+            s4.Unsubscribe();
+            s5.Unsubscribe();
+            s6.Unsubscribe();
+        }
+
+        [Test]
+        public void PublishCallDepth()
+        {
+            // TODO GONetEventBus.Instance.ResetAll or UnsubscribeAll
+
+            var s1 = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled);
+            var s2 = GONetMain.EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyGNP);
+
+            IGONetEvent ev = new DestroyGONetParticipantEvent();
+            Assert.AreEqual(0, GONetMain.EventBus.Publish(ev));
+
+            s1.Unsubscribe();
+            s2.Unsubscribe();
+        }
+
+        private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
+        {
+            Assert.AreEqual(0, GONetMain.EventBus.Publish(new GONetParticipantDisabledEvent()));
+        }
+
+        private void OnGNPDisabled(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
+        {
+            //throw new NotImplementedException();
         }
 
         private void OnSyncEvent(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)

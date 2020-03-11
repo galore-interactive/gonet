@@ -264,6 +264,18 @@ namespace GONet
         private static Thread mainUnityThread;
         public static bool IsUnityMainThread => mainUnityThread == Thread.CurrentThread;
 
+        /// <summary>
+        /// Throws an exception if not called from main Unity thread (see <see cref="IsUnityMainThread"/>).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void EnsureMainThread()
+        {
+            if (!IsUnityMainThread)
+            {
+                throw new InvalidOperationException(REQUIRED_CALL_UNITY_MAIN_THREAD);
+            }
+        }
+
         public static bool IsUnityApplicationEditor { get; private set; } = false;
 
         /// <summary>

@@ -9,6 +9,7 @@ namespace GONet.Utils
     public static class GCLessAlgorithms
     {
         #region quick sort
+
         static readonly Stack<ValueTuple<int, int>> quickSortStack = new Stack<ValueTuple<int, int>>(50000);
         
         /// <summary>
@@ -75,6 +76,7 @@ namespace GONet.Utils
 
             return iStore;
         }
+
         #endregion
     }
 }
