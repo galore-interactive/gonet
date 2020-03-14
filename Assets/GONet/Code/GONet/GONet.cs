@@ -268,9 +268,9 @@ namespace GONet
         /// Throws an exception if not called from main Unity thread (see <see cref="IsUnityMainThread"/>).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void EnsureMainThread()
+        public static void EnsureMainThread_IfPlaying()
         {
-            if (!IsUnityMainThread)
+            if (Application.isPlaying && !IsUnityMainThread)
             {
                 throw new InvalidOperationException(REQUIRED_CALL_UNITY_MAIN_THREAD);
             }

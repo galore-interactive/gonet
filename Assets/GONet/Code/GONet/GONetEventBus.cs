@@ -158,7 +158,7 @@ namespace GONet
 
             try
             {
-                GONetMain.EnsureMainThread();
+                GONetMain.EnsureMainThread_IfPlaying();
 
                 List<EventHandlerAndFilterer> handlersForType = LookupSpecificTypeHandlers_FULLY_CACHED(@event.GetType());
                 if (handlersForType != null)
@@ -226,7 +226,7 @@ namespace GONet
         /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
         {
-            GONetMain.EnsureMainThread();
+            GONetMain.EnsureMainThread_IfPlaying();
 
             if (handler == null)
             {
@@ -333,7 +333,7 @@ namespace GONet
         /// </summary>
         internal void SetSubscriptionPriority(EventHandlerAndFilterer subscriber, int priority)
         {
-            GONetMain.EnsureMainThread();
+            GONetMain.EnsureMainThread_IfPlaying();
 
             subscriber.Priority = priority;
 
