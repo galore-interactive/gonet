@@ -233,7 +233,7 @@ namespace GONet.Utils
                     GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
                     if ((object)gonetParticipant == null || (gonetParticipant.GONetIdAtInstantiation != gonetIdAtInstantiation && !GONetMain.WasDefinedInScene(gonetParticipant)))
                     {
-                        GONetLog.Warning("Slicky little Ricky..... uniqueFullPath: " + uniqueFullPath + " gonetParticipant.GONetIdAtInstantiation: " + ((object)gonetParticipant == null ? "<null>" : gonetParticipant.GONetIdAtInstantiation.ToString()));
+                        GONetLog.Warning("We found the wrong GNP or did not find one at all.  uniqueFullPath: " + uniqueFullPath + " gonetParticipant.GONetIdAtInstantiation: " + ((object)gonetParticipant == null ? "<null>" : gonetParticipant.GONetIdAtInstantiation.ToString()));
                     }
                 }
             }
