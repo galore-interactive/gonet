@@ -85,9 +85,12 @@ namespace NetcodeIO.NET.Internal
             UpdateRecordMacLength(_mac, additionalData.Length);
             UpdateRecordMacLength(_mac, len);
 
-            byte[] finalMac = MacUtilities.DoFinal(_mac);
+            int macSize = _mac.GetMacSize();
+            byte[] finalMac = BufferPool.GetBuffer(macSize);
+            MacUtilities.DoFinal(_mac, finalMac, macSize);
             int finalMacLength = finalMac.Length;
             Buffer.BlockCopy(finalMac, 0, outMac, 0, finalMacLength);
+            BufferPool.ReturnBuffer(finalMac);
             return finalMacLength;
         }
 

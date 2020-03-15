@@ -222,7 +222,7 @@ namespace GONet
             }
             */
 
-                    if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
+            if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
             {
                 //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
 
@@ -263,6 +263,12 @@ namespace GONet
         }
 
         public uint GONetIdAtInstantiation { get; private set; }
+
+        internal void SetGONetIdFromRemoteInstantiation(InstantiateGONetParticipantEvent instantiateEvent)
+        {
+            GONetId = instantiateEvent.GONetIdAtInstantiation;
+            GONetId = instantiateEvent.GONetId; // TODO when/if replay support is added, this might overwrite what will automatically be done in OnEnable_AssignGONetId_IfAppropriate...maybe that one should be prevented..going to comment there now too
+        }
 
         [GONetAutoMagicalSync]
         public bool IsPositionSyncd = false; // TODO Maybe change to PositionSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
@@ -447,18 +453,19 @@ namespace GONet
                 }
                 else
                 {
-                    string fullUniquePath;
-                    bitStream_readFrom.ReadString(out fullUniquePath);
-
-                    GameObject gonetParticipantGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath);
-                    if ((object)gonetParticipantGO == null)
+                    bool wasDefinedInScene;
+                    bitStream_readFrom.ReadBit(out wasDefinedInScene);
+                    if (wasDefinedInScene)
                     {
-                        GONetLog.Warning("If this is a client " + (GONetMain.IsClient ? "(and it is)" : "(and...I'll be, it's not and this is the SERVER and you have some worrying to do)") + ", it is possible that the server sent over the GONetId assignment prior to sending over the InstantiateGONetParticipantEvent; HOWEVER, things will work themselves out just fine momentarily when that event arrives here and is processed, because it will contain the GONetId and it will be set at that point.");
+                        string fullUniquePath;
+                        bitStream_readFrom.ReadString(out fullUniquePath);
+                        GameObject gnpGO = HierarchyUtils.FindByFullUniquePath(fullUniquePath); // with current implementation where all spawns/instantiations at runtime get immediately assigned a gonetId, the only time remaining where a full unique path is required to uniquely identify things is stuff defined in scenes TODO FIXME just auto assign things in the scene a "unique scene UID" and use that here instead....less info to send and fool proof unlike this hierarchy util thing!!!
+                        if (gnpGO != null)
+                        {
+                            gonetParticipant = gnpGO.GetComponent<GONetParticipant>();
+                        }
                     }
-                    else
-                    {
-                        gonetParticipant = gonetParticipantGO.GetComponent<GONetParticipant>();
-                    }
+                    // else gonetParticipant will be null and the gonetId will be read below and then nothing else done as there is nothing else to do here
                 }
 
                 uint gonetId = GONetId_Unset;
@@ -466,6 +473,8 @@ namespace GONet
 
                 if ((object)gonetParticipant != null)
                 {
+                    //GONetLog.Debug("************ initial assignment of id......what is the value prior to assignment?  authority_id: " + gonetParticipant.OwnerAuthorityId + " raw: " + gonetParticipant.gonetId_raw + " full: " + gonetParticipant.GONetId + "..........newly assigned: " + gonetId);
+
                     gonetParticipant.GONetId = gonetId;
                 }
 
@@ -483,12 +492,22 @@ namespace GONet
                 }
                 else
                 {
-                    string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
-                    bitStream_appendTo.WriteString(fullUniquePath);
+                    bool wasDefinedInScene = GONetMain.WasDefinedInScene(gonetParticipant);
+                    bitStream_appendTo.WriteBit(wasDefinedInScene);
+                    if (wasDefinedInScene)
+                    {
+                        string fullUniquePath = HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject);
+                        bitStream_appendTo.WriteString(fullUniquePath);
+                    }
                 }
 
                 uint gonetId = value.System_UInt32;
                 bitStream_appendTo.WriteUInt(gonetId);
+            }
+
+            public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
+            {
+                // do nothing!  TODO consider supporting quantizing even this, but not making sense right now and still want to keep this interface/API
             }
         }
     }

@@ -49,7 +49,7 @@ namespace GONet
 
     /// <summary>
     /// This is something that would only apply to event class that implement <see cref="IPersistentEvent"/> that get queued up on server and sent to newly connecting clients.
-    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypeCancelledOut"/> and see if they cancel one another out 
+    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypesCancelledOut"/> and see if they cancel one another out 
     /// so these messages can be removed from consideration in pairs as to not send these events anywhere.
     /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DestroyGONetParticipantEvent"/>.
     /// </summary>
@@ -58,10 +58,10 @@ namespace GONet
         /// <summary>
         /// At time of writing, this should only be types that implement <see cref="IPersistentEvent"/>.
         /// </summary>
-        Type OtherEventTypeCancelledOut { get; }
+        Type[] OtherEventTypesCancelledOut { get; }
 
         /// <summary>
-        /// This will only get called when <paramref name="otherEvent"/> is of the type <see cref="OtherEventTypeCancelledOut"/>.
+        /// This will only get called when <paramref name="otherEvent"/> is of the type <see cref="OtherEventTypesCancelledOut"/>.
         /// </summary>
         bool DoesCancelOutOtherEvent(IGONetEvent otherEvent);
     }
@@ -198,6 +198,9 @@ namespace GONet
         [Key(6)]
         public string ParentFullUniquePath;
 
+        [Key(7)]
+        public uint GONetIdAtInstantiation;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
@@ -207,6 +210,7 @@ namespace GONet
             @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
 
             @event.Position = gonetParticipant.transform.position;
@@ -225,6 +229,7 @@ namespace GONet
             @event.DesignTimeLocation = nonAuthorityAlternate_designTimeLocation;
 
             @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
 
             @event.Position = gonetParticipant.transform.position;
@@ -248,15 +253,206 @@ namespace GONet
         [Key(0)]
         public uint GONetId;
 
-        static readonly Type otherEventTypeCancelledOut = typeof(InstantiateGONetParticipantEvent);
+        static readonly Type[] otherEventsTypeCancelledOut = new[] {
+            typeof(InstantiateGONetParticipantEvent),
+            typeof(ValueMonitoringSupport_NewBaselineEvent),
+            typeof(ValueMonitoringSupport_BaselineExpiredEvent)
+        };
 
         [IgnoreMember]
-        public Type OtherEventTypeCancelledOut => otherEventTypeCancelledOut;
+        public Type[] OtherEventTypesCancelledOut => otherEventsTypeCancelledOut;
 
         public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
         {
-            InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
-            return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId);
+            if (otherEvent is InstantiateGONetParticipantEvent)
+            {
+                InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
+                return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && 
+                    (instantiationEvent.GONetId == GONetId || instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId));
+            }
+            else if (otherEvent is ValueMonitoringSupport_NewBaselineEvent)
+            {
+                ValueMonitoringSupport_NewBaselineEvent newBaselineEvent = (ValueMonitoringSupport_NewBaselineEvent)otherEvent;
+                return newBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && newBaselineEvent.GONetId == GONetId;
+            }
+            else if (otherEvent is ValueMonitoringSupport_BaselineExpiredEvent)
+            {
+                ValueMonitoringSupport_BaselineExpiredEvent expiredBaselineEvent = (ValueMonitoringSupport_BaselineExpiredEvent)otherEvent;
+                return expiredBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && expiredBaselineEvent.GONetId == GONetId;
+            }
+
+            return false;
+        }
+    }
+
+    [MessagePack.Union(0, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+    [MessagePack.Union(1, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+    [MessagePack.Union(2, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+    [MessagePack.Union(3, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
+    [MessagePack.Union(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+    [MessagePack.Union(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+    [MessagePack.Union(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+    [MessagePack.Union(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+    [MessagePack.Union(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+    [MessagePack.Union(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+    [MessagePack.Union(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+    [MessagePack.Union(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+    [MessagePack.Union(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+    [MessagePack.Union(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+    [MessagePack.Union(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+    [MessagePackObject]
+    public abstract class ValueMonitoringSupport_NewBaselineEvent : IPersistentEvent
+    {
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(0)]
+        public uint GONetId { get; set; }
+
+        [Key(1)]
+        public byte ValueIndex { get; set; }
+    }
+
+    #region ValueMonitoringSupport_NewBaselineEvent child classes for each supported type
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Single : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Single NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector2 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector3 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector4 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Quaternion NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Boolean : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Boolean NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Byte : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Byte NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_SByte : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.SByte NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int16 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int16 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt16 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt16 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int32 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int32 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt32 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt32 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int64 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int64 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt64 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt64 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Double : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Double NewBaselineValue { get; set; }
+    }
+    #endregion
+
+    /// <summary>
+    /// <para>
+    /// This class uses a feature of the <see cref="ICancelOutOtherEvents"/> processing to allow us to only send newly connecting clients just
+    /// the most recent <see cref="ValueMonitoringSupport_NewBaselineEvent"/> instead of the entire history along the way of the game.
+    /// </para>
+    /// <para>
+    /// IMPORTANT: The semantics of this class and how GONet promises to use it is: for every instance of this class/event published, it is 
+    /// immediately followed by publishing a corresponding instance of <see cref="ValueMonitoringSupport_NewBaselineEvent"/>.
+    /// </para>
+    /// </summary>
+    [MessagePackObject]
+    public struct ValueMonitoringSupport_BaselineExpiredEvent : IPersistentEvent, ICancelOutOtherEvents
+    {
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(0)]
+        public uint GONetId { get; set; }
+
+        [Key(1)]
+        public byte ValueIndex { get; set; }
+
+        static readonly Type[] otherEventTypesCancelledOut = new[] { typeof(ValueMonitoringSupport_NewBaselineEvent) };
+
+        [IgnoreMember]
+        public Type[] OtherEventTypesCancelledOut => otherEventTypesCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            ValueMonitoringSupport_NewBaselineEvent newBaselineEvent = (ValueMonitoringSupport_NewBaselineEvent)otherEvent;
+            return newBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && newBaselineEvent.GONetId == GONetId
+                && newBaselineEvent.ValueIndex == ValueIndex
+                ; // TODO && depending on if the evaluation order is important or not may need to check if this is the one immediately after the new baseline but only if OccurredAtElapsedTicks value is populated and reliable to reference for this
         }
     }
 

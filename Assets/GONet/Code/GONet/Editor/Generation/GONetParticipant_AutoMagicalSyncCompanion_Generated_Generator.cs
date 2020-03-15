@@ -213,7 +213,7 @@ namespace GONet.Generation
 
         private static void GONetParticipant_EditorOnlyDefaultContructor(GONetParticipant gonetParticipant)
         {
-
+            //Debug.Log("Schmicks EDITOR beast!  go:" + gonetParticipant.gameObject);
         }
 
         internal static bool IsInstantiationOfPrefab(UnityEngine.Object @object)

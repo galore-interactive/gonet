@@ -36,11 +36,11 @@ namespace GONet
         public bool ShouldBlendBetweenValuesReceived = false;
 
         /// <summary>
-        /// Only applicable to primitive numeric data types, mainly float.
+        /// Only applicable to primitive numeric data types, currently float and Vector2/3/4.
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
         /// If value is 1, the result will be the quantized value can only represnt <see cref="QuantizeLowerBound"/> or <see cref="QuantizeUpperBound"/> and the one represented will be dictated by which of the two the original value is closest to.
         /// </summary>
-        [Tooltip("Only applicable to primitive numeric data types, mainly float.\n*MUST be set less than 32.\n*If set to 0, no quantizing will occur.\n*If set to 1, the result will be the quantized value can only represnt " + nameof(QuantizeLowerBound)+" or "+nameof(QuantizeUpperBound)+" and the one represented will be dictated by which of the two the original value is closest to.")]
+        [Tooltip("Only applicable to primitive numeric data types, currently float and Vector2/3/4.\n*MUST be set less than 32.\n*If set to 0, no quantizing will occur.\n*If set to 1, the result will be the quantized value can only represnt " + nameof(QuantizeLowerBound)+" or "+nameof(QuantizeUpperBound)+" and the one represented will be dictated by which of the two the original value is closest to.")]
         [Range(0, 31)]
         public byte QuantizeDownToBitCount = 0;
 

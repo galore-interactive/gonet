@@ -59,6 +59,22 @@ namespace GONet
 		[MessagePack.Union(29, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
 		[MessagePack.Union(30, typeof(GONet.SyncEvent_Transform_position))]
 		[MessagePack.Union(31, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(32, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
+		[MessagePack.Union(33, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+		[MessagePack.Union(34, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+		[MessagePack.Union(35, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+		[MessagePack.Union(36, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+		[MessagePack.Union(37, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+		[MessagePack.Union(38, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+		[MessagePack.Union(39, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+		[MessagePack.Union(40, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+		[MessagePack.Union(41, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+		[MessagePack.Union(42, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+		[MessagePack.Union(43, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+		[MessagePack.Union(44, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+		[MessagePack.Union(45, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+		[MessagePack.Union(46, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+		[MessagePack.Union(47, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
 		public partial interface IGONetEvent { }
 
 
@@ -97,6 +113,22 @@ namespace GONet
 	[MessagePack.Union(0, typeof(GONet.DestroyGONetParticipantEvent))]
 		[MessagePack.Union(1, typeof(GONet.InstantiateGONetParticipantEvent))]
 		[MessagePack.Union(2, typeof(GONet.OwnerAuthorityIdAssignmentEvent))]
+		[MessagePack.Union(3, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
+		[MessagePack.Union(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+		[MessagePack.Union(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+		[MessagePack.Union(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+		[MessagePack.Union(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+		[MessagePack.Union(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+		[MessagePack.Union(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+		[MessagePack.Union(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+		[MessagePack.Union(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+		[MessagePack.Union(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+		[MessagePack.Union(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+		[MessagePack.Union(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+		[MessagePack.Union(15, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+		[MessagePack.Union(16, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+		[MessagePack.Union(17, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+		[MessagePack.Union(18, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
 		public partial interface IPersistentEvent : IGONetEvent { }
 
 		[MessagePack.Union(0, typeof(GONet.SyncEvent_AnimatorCharacterController_parameters_Aim))]
@@ -1607,6 +1639,22 @@ namespace GONet.Generation
 				typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority),
 				typeof(GONet.SyncEvent_Transform_position),
 				typeof(GONet.SyncEvent_Transform_rotation),
+				typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3),
+				typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4),
 			};
 		}
 
@@ -1629,7 +1677,7 @@ namespace GONet.Generation
 			var item_codeGenerationId1_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember0);
 
-			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
+			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember1);
 
 			var item_codeGenerationId2_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
@@ -1647,8 +1695,23 @@ namespace GONet.Generation
 			var item_codeGenerationId2_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId2_single1_singleMember0);
 
-			var item_codeGenerationId2_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
-			settings.Add(item_codeGenerationId2_single1_singleMember1);
+			var item_codeGenerationId2_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember0);
+
+			var item_codeGenerationId2_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember1);
+
+			var item_codeGenerationId2_single2_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-10f, 10f, 16, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember2);
+
+			var item_codeGenerationId2_single2_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember3);
+
+			var item_codeGenerationId2_single3_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single3_singleMember0);
+
+			var item_codeGenerationId2_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			settings.Add(item_codeGenerationId2_single3_singleMember1);
 
 			var item_codeGenerationId3_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId3_single0_singleMember0);
@@ -1668,137 +1731,29 @@ namespace GONet.Generation
 			var item_codeGenerationId3_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId3_single2_singleMember0);
 
-			var item_codeGenerationId3_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			var item_codeGenerationId3_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId3_single2_singleMember1);
-
-			var item_codeGenerationId3_single2_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-10f, 10f, 16, true);
-			settings.Add(item_codeGenerationId3_single2_singleMember2);
-
-			var item_codeGenerationId3_single2_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId3_single2_singleMember3);
 
 			var item_codeGenerationId3_single3_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId3_single3_singleMember0);
 
-			var item_codeGenerationId3_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
+			var item_codeGenerationId3_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId3_single3_singleMember1);
 
-			var item_codeGenerationId4_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single0_singleMember0);
+			var item_codeGenerationId3_single3_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId3_single3_singleMember2);
 
-			var item_codeGenerationId4_single0_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single0_singleMember1);
+			var item_codeGenerationId3_single3_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId3_single3_singleMember3);
 
-			var item_codeGenerationId4_single0_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single0_singleMember2);
+			var item_codeGenerationId3_single3_singleMember4 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId3_single3_singleMember4);
 
-			var item_codeGenerationId4_single0_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single0_singleMember3);
+			var item_codeGenerationId3_single3_singleMember5 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId3_single3_singleMember5);
 
-			var item_codeGenerationId4_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single1_singleMember0);
-
-			var item_codeGenerationId4_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single2_singleMember0);
-
-			var item_codeGenerationId4_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
-			settings.Add(item_codeGenerationId4_single2_singleMember1);
-
-			var item_codeGenerationId4_single3_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember0);
-
-			var item_codeGenerationId4_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember1);
-
-			var item_codeGenerationId4_single3_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember2);
-
-			var item_codeGenerationId4_single3_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember3);
-
-			var item_codeGenerationId4_single3_singleMember4 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember4);
-
-			var item_codeGenerationId4_single3_singleMember5 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember5);
-
-			var item_codeGenerationId4_single3_singleMember6 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId4_single3_singleMember6);
-
-			var item_codeGenerationId5_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single0_singleMember0);
-
-			var item_codeGenerationId5_single0_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single0_singleMember1);
-
-			var item_codeGenerationId5_single0_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single0_singleMember2);
-
-			var item_codeGenerationId5_single0_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single0_singleMember3);
-
-			var item_codeGenerationId5_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single1_singleMember0);
-
-			var item_codeGenerationId5_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single2_singleMember0);
-
-			var item_codeGenerationId5_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single2_singleMember1);
-
-			var item_codeGenerationId5_single2_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-10f, 10f, 16, true);
-			settings.Add(item_codeGenerationId5_single2_singleMember2);
-
-			var item_codeGenerationId5_single2_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single2_singleMember3);
-
-			var item_codeGenerationId5_single3_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId5_single3_singleMember0);
-
-			var item_codeGenerationId5_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
-			settings.Add(item_codeGenerationId5_single3_singleMember1);
-
-			var item_codeGenerationId6_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single0_singleMember0);
-
-			var item_codeGenerationId6_single0_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single0_singleMember1);
-
-			var item_codeGenerationId6_single0_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single0_singleMember2);
-
-			var item_codeGenerationId6_single0_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single0_singleMember3);
-
-			var item_codeGenerationId6_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single1_singleMember0);
-
-			var item_codeGenerationId6_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single2_singleMember0);
-
-			var item_codeGenerationId6_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-5000f, 5000f, 0, true);
-			settings.Add(item_codeGenerationId6_single2_singleMember1);
-
-			var item_codeGenerationId6_single3_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember0);
-
-			var item_codeGenerationId6_single3_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember1);
-
-			var item_codeGenerationId6_single3_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember2);
-
-			var item_codeGenerationId6_single3_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember3);
-
-			var item_codeGenerationId6_single3_singleMember4 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember4);
-
-			var item_codeGenerationId6_single3_singleMember5 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember5);
-
-			var item_codeGenerationId6_single3_singleMember6 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
-			settings.Add(item_codeGenerationId6_single3_singleMember6);
+			var item_codeGenerationId3_single3_singleMember6 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId3_single3_singleMember6);
 
 			return settings;
 		}
@@ -1813,12 +1768,6 @@ namespace GONet.Generation
 					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_2(gonetParticipant);
 				case 3:
 					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_3(gonetParticipant);
-				case 4:
-					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_4(gonetParticipant);
-				case 5:
-					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_5(gonetParticipant);
-				case 6:
-					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_6(gonetParticipant);
 			}
 
 			return null;
@@ -1997,6 +1946,81 @@ namespace GONet.Generation
 								}
                             case 4:
 								{
+									System.Single valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
+									}
+									else
+									{
+																			valueNew = companion.DestroyIfMineOnKeyPress.willHeUpdate;
+																		}
+									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 5:
+								{
+									UnityEngine.Vector3 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
+									}
+									else
+									{
+																			valueNew = companion.FieldChangeTest.color;
+																		}
+									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_FieldChangeTest_color.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 6:
+								{
+									UnityEngine.Vector3 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
+									}
+									else
+									{
+																			valueNew = companion.FieldChangeTest.color_dosientos;
+																		}
+									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 7:
+								{
+									System.Single valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
+									}
+									else
+									{
+																			valueNew = companion.FieldChangeTest.nada;
+																		}
+									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_FieldChangeTest_nada.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 8:
+								{
+									System.Int16 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Int16;
+									}
+									else
+									{
+																			valueNew = companion.FieldChangeTest.shortie;
+																		}
+									System.Int16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Int16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Int16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_FieldChangeTest_shortie.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 9:
+								{
 									UnityEngine.Quaternion valueNew;
 									GONetSyncableValue valueNew_mostRecentChangeAtTime;
 									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
@@ -2010,7 +2034,7 @@ namespace GONet.Generation
 									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
 									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
 								}
-                            case 5:
+                            case 10:
 								{
 									UnityEngine.Vector3 valueNew;
 									GONetSyncableValue valueNew_mostRecentChangeAtTime;
@@ -2113,66 +2137,6 @@ namespace GONet.Generation
 								}
                             case 5:
 								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.color;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_color.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 6:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.color_dosientos;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 7:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.nada;
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_nada.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 8:
-								{
-									System.Int16 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Int16;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.shortie;
-																		}
-									System.Int16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Int16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Int16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_shortie.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 9:
-								{
 									UnityEngine.Quaternion valueNew;
 									GONetSyncableValue valueNew_mostRecentChangeAtTime;
 									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
@@ -2186,7 +2150,7 @@ namespace GONet.Generation
 									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
 									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
-                            case 10:
+                            case 6:
 								{
 									UnityEngine.Vector3 valueNew;
 									GONetSyncableValue valueNew_mostRecentChangeAtTime;
@@ -2201,122 +2165,6 @@ namespace GONet.Generation
 									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
 									return SyncEvent_Transform_position.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
-						
-						}
-					}
-					break;
-
-				case 4:
-					{
-						GONetParticipant_AutoMagicalSyncCompanion_Generated_4 companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_4)syncCompanion;
-                        switch (syncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									System.UInt32 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt32;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.GONetId;
-																		}
-									System.UInt32 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt32 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt32; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_GONetId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 1:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsPositionSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 2:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsRotationSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 3:
-								{
-									System.UInt16 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt16;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.OwnerAuthorityId;
-																		}
-									System.UInt16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 4:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.DestroyIfMineOnKeyPress.willHeUpdate;
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 5:
-								{
-									UnityEngine.Quaternion valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Quaternion;
-									}
-									else
-									{
-																			valueNew = companion.Transform.rotation;
-																		}
-									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 6:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.Transform.position;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_position.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
                             case 7:
 								{
 									System.Single valueNew;
@@ -2330,7 +2178,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetFloat(-823668238);
 																		}
 									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Speed.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_Speed.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 8:
 								{
@@ -2345,7 +2193,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetBool(125937960);
 																		}
 									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Jump.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_Jump.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 9:
 								{
@@ -2360,7 +2208,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetBool(1808254291);
 																		}
 									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Fly.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_Fly.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 10:
 								{
@@ -2375,7 +2223,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetBool(153482222);
 																		}
 									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Aim.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_Aim.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 11:
 								{
@@ -2390,7 +2238,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetFloat(-1442503121);
 																		}
 									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_H.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_H.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 12:
 								{
@@ -2405,7 +2253,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetFloat(1342839628);
 																		}
 									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_V.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_V.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
                             case 13:
 								{
@@ -2420,404 +2268,7 @@ namespace GONet.Generation
 																			valueNew = companion.Animator.GetBool(862969536);
 																		}
 									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Grounded.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 4, syncMemberIndex, valuePrevious, valueNew);
-								}
-						
-						}
-					}
-					break;
-
-				case 5:
-					{
-						GONetParticipant_AutoMagicalSyncCompanion_Generated_5 companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_5)syncCompanion;
-                        switch (syncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									System.UInt32 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt32;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.GONetId;
-																		}
-									System.UInt32 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt32 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt32; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_GONetId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 1:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsPositionSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 2:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsRotationSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 3:
-								{
-									System.UInt16 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt16;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.OwnerAuthorityId;
-																		}
-									System.UInt16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 4:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.DestroyIfMineOnKeyPress.willHeUpdate;
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 5:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.color;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_color.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 6:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.color_dosientos;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 7:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.nada;
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_nada.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 8:
-								{
-									System.Int16 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Int16;
-									}
-									else
-									{
-																			valueNew = companion.FieldChangeTest.shortie;
-																		}
-									System.Int16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Int16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Int16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_FieldChangeTest_shortie.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 9:
-								{
-									UnityEngine.Quaternion valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Quaternion;
-									}
-									else
-									{
-																			valueNew = companion.Transform.rotation;
-																		}
-									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 10:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.Transform.position;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_position.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 5, syncMemberIndex, valuePrevious, valueNew);
-								}
-						
-						}
-					}
-					break;
-
-				case 6:
-					{
-						GONetParticipant_AutoMagicalSyncCompanion_Generated_6 companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_6)syncCompanion;
-                        switch (syncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									System.UInt32 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt32;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.GONetId;
-																		}
-									System.UInt32 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt32 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt32; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_GONetId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 1:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsPositionSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 2:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.IsRotationSyncd;
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 3:
-								{
-									System.UInt16 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_UInt16;
-									}
-									else
-									{
-																			valueNew = companion.GONetParticipant.OwnerAuthorityId;
-																		}
-									System.UInt16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 4:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.DestroyIfMineOnKeyPress.willHeUpdate;
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 5:
-								{
-									UnityEngine.Quaternion valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Quaternion;
-									}
-									else
-									{
-																			valueNew = companion.Transform.rotation;
-																		}
-									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 6:
-								{
-									UnityEngine.Vector3 valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
-									}
-									else
-									{
-																			valueNew = companion.Transform.position;
-																		}
-									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_Transform_position.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 7:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetFloat(-823668238);
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Speed.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 8:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetBool(125937960);
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Jump.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 9:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetBool(1808254291);
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Fly.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 10:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetBool(153482222);
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Aim.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 11:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetFloat(-1442503121);
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_H.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 12:
-								{
-									System.Single valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Single;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetFloat(1342839628);
-																		}
-									System.Single valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Single : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Single; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_V.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
-								}
-                            case 13:
-								{
-									System.Boolean valueNew;
-									GONetSyncableValue valueNew_mostRecentChangeAtTime;
-									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
-									{
-										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
-									}
-									else
-									{
-																			valueNew = companion.Animator.GetBool(862969536);
-																		}
-									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
-									return SyncEvent_AnimatorCharacterController_parameters_Grounded.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 6, syncMemberIndex, valuePrevious, valueNew);
+									return SyncEvent_AnimatorCharacterController_parameters_Grounded.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 3, syncMemberIndex, valuePrevious, valueNew);
 								}
 						
 						}
@@ -2900,10 +2351,35 @@ namespace GONet.Generation
 								}
                             case 4:
 								{
+									SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate originalTyped = (SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate)original;
+									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 5:
+								{
+									SyncEvent_FieldChangeTest_color originalTyped = (SyncEvent_FieldChangeTest_color)original;
+									return SyncEvent_FieldChangeTest_color.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 6:
+								{
+									SyncEvent_FieldChangeTest_color_dosientos originalTyped = (SyncEvent_FieldChangeTest_color_dosientos)original;
+									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 7:
+								{
+									SyncEvent_FieldChangeTest_nada originalTyped = (SyncEvent_FieldChangeTest_nada)original;
+									return SyncEvent_FieldChangeTest_nada.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 8:
+								{
+									SyncEvent_FieldChangeTest_shortie originalTyped = (SyncEvent_FieldChangeTest_shortie)original;
+									return SyncEvent_FieldChangeTest_shortie.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 9:
+								{
 									SyncEvent_Transform_rotation originalTyped = (SyncEvent_Transform_rotation)original;
 									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
 								}
-                            case 5:
+                            case 10:
 								{
 									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
 									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
@@ -2914,216 +2390,6 @@ namespace GONet.Generation
 					break;
 
 				case 3:
-					{
-                        switch (original.SyncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									SyncEvent_GONetParticipant_GONetId originalTyped = (SyncEvent_GONetParticipant_GONetId)original;
-									return SyncEvent_GONetParticipant_GONetId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 1:
-								{
-									SyncEvent_GONetParticipant_IsPositionSyncd originalTyped = (SyncEvent_GONetParticipant_IsPositionSyncd)original;
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 2:
-								{
-									SyncEvent_GONetParticipant_IsRotationSyncd originalTyped = (SyncEvent_GONetParticipant_IsRotationSyncd)original;
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 3:
-								{
-									SyncEvent_GONetParticipant_OwnerAuthorityId originalTyped = (SyncEvent_GONetParticipant_OwnerAuthorityId)original;
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 4:
-								{
-									SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate originalTyped = (SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate)original;
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 5:
-								{
-									SyncEvent_FieldChangeTest_color originalTyped = (SyncEvent_FieldChangeTest_color)original;
-									return SyncEvent_FieldChangeTest_color.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 6:
-								{
-									SyncEvent_FieldChangeTest_color_dosientos originalTyped = (SyncEvent_FieldChangeTest_color_dosientos)original;
-									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 7:
-								{
-									SyncEvent_FieldChangeTest_nada originalTyped = (SyncEvent_FieldChangeTest_nada)original;
-									return SyncEvent_FieldChangeTest_nada.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 8:
-								{
-									SyncEvent_FieldChangeTest_shortie originalTyped = (SyncEvent_FieldChangeTest_shortie)original;
-									return SyncEvent_FieldChangeTest_shortie.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 9:
-								{
-									SyncEvent_Transform_rotation originalTyped = (SyncEvent_Transform_rotation)original;
-									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 10:
-								{
-									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
-									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-						
-						}
-					}
-					break;
-
-				case 4:
-					{
-                        switch (original.SyncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									SyncEvent_GONetParticipant_GONetId originalTyped = (SyncEvent_GONetParticipant_GONetId)original;
-									return SyncEvent_GONetParticipant_GONetId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 1:
-								{
-									SyncEvent_GONetParticipant_IsPositionSyncd originalTyped = (SyncEvent_GONetParticipant_IsPositionSyncd)original;
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 2:
-								{
-									SyncEvent_GONetParticipant_IsRotationSyncd originalTyped = (SyncEvent_GONetParticipant_IsRotationSyncd)original;
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 3:
-								{
-									SyncEvent_GONetParticipant_OwnerAuthorityId originalTyped = (SyncEvent_GONetParticipant_OwnerAuthorityId)original;
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 4:
-								{
-									SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate originalTyped = (SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate)original;
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 5:
-								{
-									SyncEvent_Transform_rotation originalTyped = (SyncEvent_Transform_rotation)original;
-									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 6:
-								{
-									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
-									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 7:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_Speed originalTyped = (SyncEvent_AnimatorCharacterController_parameters_Speed)original;
-									return SyncEvent_AnimatorCharacterController_parameters_Speed.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 8:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_Jump originalTyped = (SyncEvent_AnimatorCharacterController_parameters_Jump)original;
-									return SyncEvent_AnimatorCharacterController_parameters_Jump.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 9:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_Fly originalTyped = (SyncEvent_AnimatorCharacterController_parameters_Fly)original;
-									return SyncEvent_AnimatorCharacterController_parameters_Fly.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 10:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_Aim originalTyped = (SyncEvent_AnimatorCharacterController_parameters_Aim)original;
-									return SyncEvent_AnimatorCharacterController_parameters_Aim.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 11:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_H originalTyped = (SyncEvent_AnimatorCharacterController_parameters_H)original;
-									return SyncEvent_AnimatorCharacterController_parameters_H.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 12:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_V originalTyped = (SyncEvent_AnimatorCharacterController_parameters_V)original;
-									return SyncEvent_AnimatorCharacterController_parameters_V.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 13:
-								{
-									SyncEvent_AnimatorCharacterController_parameters_Grounded originalTyped = (SyncEvent_AnimatorCharacterController_parameters_Grounded)original;
-									return SyncEvent_AnimatorCharacterController_parameters_Grounded.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-						
-						}
-					}
-					break;
-
-				case 5:
-					{
-                        switch (original.SyncMemberIndex)
-                        {
-
-                            case 0:
-								{
-									SyncEvent_GONetParticipant_GONetId originalTyped = (SyncEvent_GONetParticipant_GONetId)original;
-									return SyncEvent_GONetParticipant_GONetId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 1:
-								{
-									SyncEvent_GONetParticipant_IsPositionSyncd originalTyped = (SyncEvent_GONetParticipant_IsPositionSyncd)original;
-									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 2:
-								{
-									SyncEvent_GONetParticipant_IsRotationSyncd originalTyped = (SyncEvent_GONetParticipant_IsRotationSyncd)original;
-									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 3:
-								{
-									SyncEvent_GONetParticipant_OwnerAuthorityId originalTyped = (SyncEvent_GONetParticipant_OwnerAuthorityId)original;
-									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 4:
-								{
-									SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate originalTyped = (SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate)original;
-									return SyncEvent_DestroyIfMineOnKeyPress_willHeUpdate.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 5:
-								{
-									SyncEvent_FieldChangeTest_color originalTyped = (SyncEvent_FieldChangeTest_color)original;
-									return SyncEvent_FieldChangeTest_color.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 6:
-								{
-									SyncEvent_FieldChangeTest_color_dosientos originalTyped = (SyncEvent_FieldChangeTest_color_dosientos)original;
-									return SyncEvent_FieldChangeTest_color_dosientos.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 7:
-								{
-									SyncEvent_FieldChangeTest_nada originalTyped = (SyncEvent_FieldChangeTest_nada)original;
-									return SyncEvent_FieldChangeTest_nada.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 8:
-								{
-									SyncEvent_FieldChangeTest_shortie originalTyped = (SyncEvent_FieldChangeTest_shortie)original;
-									return SyncEvent_FieldChangeTest_shortie.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 9:
-								{
-									SyncEvent_Transform_rotation originalTyped = (SyncEvent_Transform_rotation)original;
-									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-                            case 10:
-								{
-									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
-									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
-								}
-						
-						}
-					}
-					break;
-
-				case 6:
 					{
                         switch (original.SyncMemberIndex)
                         {
