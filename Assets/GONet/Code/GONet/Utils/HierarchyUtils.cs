@@ -231,7 +231,7 @@ namespace GONet.Utils
                 if (hasGONetIdAtInstantiation && gameObject != null)
                 {
                     GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
-                    if ((object)gonetParticipant == null || gonetParticipant.GONetIdAtInstantiation != gonetIdAtInstantiation)
+                    if ((object)gonetParticipant == null || (gonetParticipant.GONetIdAtInstantiation != gonetIdAtInstantiation && !GONetMain.WasDefinedInScene(gonetParticipant)))
                     {
                         GONetLog.Warning("Slicky little Ricky..... uniqueFullPath: " + uniqueFullPath + " gonetParticipant.GONetIdAtInstantiation: " + ((object)gonetParticipant == null ? "<null>" : gonetParticipant.GONetIdAtInstantiation.ToString()));
                     }
