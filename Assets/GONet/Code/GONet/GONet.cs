@@ -224,7 +224,7 @@ namespace GONet
         public static uint GetCurrentGONetIdByIdAtInstantiation(uint gonetIdAtInstantiation)
         {
             GONetParticipant gonetParticipant = null;
-            if (gonetParticipant_by_gonetIdAtInstantiation.TryGetValue(gonetIdAtInstantiation, out gonetParticipant))
+            if (gonetParticipantByGONetIdAtInstantiationMap.TryGetValue(gonetIdAtInstantiation, out gonetParticipant))
             {
                 return gonetParticipant.GONetId;
             }
@@ -427,6 +427,7 @@ namespace GONet
         }
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
+        internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdAtInstantiationMap = new Dictionary<uint, GONetParticipant>(5000);
         internal static readonly Dictionary<uint, uint> recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map = new Dictionary<uint, uint>(1000);
 
         public const ushort OwnerAuthorityId_Unset = 0;
@@ -582,13 +583,11 @@ namespace GONet
             }
         }
 
-        internal static readonly Dictionary<uint, GONetParticipant> gonetParticipant_by_gonetIdAtInstantiation = new Dictionary<uint, GONetParticipant>(5000);
-
         internal static void OnGONetIdAboutToBeSet(uint gonetId_new, uint gonetId_raw_new, ushort ownerAuthorityId_new, GONetParticipant gonetParticipant)
         {
             if (gonetId_new == gonetParticipant.GONetIdAtInstantiation)
             {
-                gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+                gonetParticipantByGONetIdAtInstantiationMap[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
                 gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant;
             }
             else
@@ -602,7 +601,7 @@ namespace GONet
 
                 if (areAllComponentsChanging)
                 {
-                    gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+                    gonetParticipantByGONetIdAtInstantiationMap[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
 
                     gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                     gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
@@ -669,7 +668,7 @@ namespace GONet
 
                     if (areAllComponentsChanging)
                     {
-                        gonetParticipant_by_gonetIdAtInstantiation[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
+                        gonetParticipantByGONetIdAtInstantiationMap[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
 
                         gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                         gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
@@ -1059,12 +1058,16 @@ namespace GONet
         #endregion
 
         /// <summary>
-        /// Returns null if not found.
+        /// Searches for <see cref="GONetParticipant"/> by <paramref name="gonetId"/> and checks against <see cref="GONetParticipant.GONetId"/> and <see cref="GONetParticipant.GONetIdAtInstantiation"/>.
         /// </summary>
+        /// <returns>null if not found</returns>
         public static GONetParticipant GetGONetParticipantById(uint gonetId)
         {
             GONetParticipant gonetParticipant = null;
-            gonetParticipantByGONetIdMap.TryGetValue(gonetId, out gonetParticipant);
+            if (!gonetParticipantByGONetIdMap.TryGetValue(gonetId, out gonetParticipant))
+            {
+                gonetParticipantByGONetIdAtInstantiationMap.TryGetValue(gonetId, out gonetParticipant);
+            }
             return gonetParticipant;
         }
 
