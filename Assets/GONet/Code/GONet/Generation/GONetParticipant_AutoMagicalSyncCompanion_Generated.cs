@@ -264,9 +264,15 @@ namespace GONet.Generation
             }
         }
 
-        internal abstract bool IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange(byte index, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport);
+        /// <summary>
+        /// The only reason this method is virtual instead of abstract is due to how the upgrade from 1.0.3 to 1.0.4 will break people's project (i.e., not compile without some fixing)...so there.
+        /// </summary>
+        internal virtual bool IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange(byte index, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport) { return default; }
 
-        internal abstract ValueMonitoringSupport_NewBaselineEvent CreateNewBaselineValueEvent(uint gonetId, byte index, GONetSyncableValue newBaselineValue);
+        /// <summary>
+        /// The only reason this method is virtual instead of abstract is due to how the upgrade from 1.0.3 to 1.0.4 will break people's project (i.e., not compile without some fixing)...so there.
+        /// </summary>
+        internal virtual ValueMonitoringSupport_NewBaselineEvent CreateNewBaselineValueEvent(uint gonetId, byte index, GONetSyncableValue newBaselineValue) { return default; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)

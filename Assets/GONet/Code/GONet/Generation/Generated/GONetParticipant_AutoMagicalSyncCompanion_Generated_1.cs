@@ -71,10 +71,10 @@ namespace GONet.Generation
 			valuesChangesSupport = valuesChangesSupportArrayPool.Borrow((int)valuesCount);
 			
 			var support0 = valuesChangesSupport[0] = valueChangeSupportArrayPool.Borrow();
-		            support0.baselineValue_current.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support0.baselineValue_current.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue_previous.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support0.syncCompanion = this;
+			support0.syncCompanion = this;
 			support0.index = 0;
 			support0.syncAttribute_MustRunOnUnityMainThread = true;
 			support0.syncAttribute_ProcessingPriority = 0;
@@ -88,10 +88,10 @@ namespace GONet.Generation
 			cachedCustomSerializers[0] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f);
 
 			var support1 = valuesChangesSupport[1] = valueChangeSupportArrayPool.Borrow();
-		            support1.baselineValue_current.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support1.baselineValue_current.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue_previous.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support1.syncCompanion = this;
+			support1.syncCompanion = this;
 			support1.index = 1;
 			support1.syncAttribute_MustRunOnUnityMainThread = true;
 			support1.syncAttribute_ProcessingPriority = 0;
@@ -104,10 +104,10 @@ namespace GONet.Generation
 
 
 			var support2 = valuesChangesSupport[2] = valueChangeSupportArrayPool.Borrow();
-		            support2.baselineValue_current.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support2.baselineValue_current.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue_previous.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support2.syncCompanion = this;
+			support2.syncCompanion = this;
 			support2.index = 2;
 			support2.syncAttribute_MustRunOnUnityMainThread = true;
 			support2.syncAttribute_ProcessingPriority = 0;
@@ -120,10 +120,10 @@ namespace GONet.Generation
 
 
 			var support3 = valuesChangesSupport[3] = valueChangeSupportArrayPool.Borrow();
-		            support3.baselineValue_current.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support3.baselineValue_current.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue_previous.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support3.syncCompanion = this;
+			support3.syncCompanion = this;
 			support3.index = 3;
 			support3.syncAttribute_MustRunOnUnityMainThread = true;
 			support3.syncAttribute_ProcessingPriority = 0;
@@ -136,10 +136,10 @@ namespace GONet.Generation
 
 
 			var support4 = valuesChangesSupport[4] = valueChangeSupportArrayPool.Borrow();
-		            support4.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support4.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue_previous.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support4.syncCompanion = this;
+			support4.syncCompanion = this;
 			support4.index = 4;
 			support4.syncAttribute_MustRunOnUnityMainThread = true;
 			support4.syncAttribute_ProcessingPriority = 0;
@@ -157,10 +157,10 @@ namespace GONet.Generation
 			support4.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support4.mostRecentChanges_capacitySize);
 
 			var support5 = valuesChangesSupport[5] = valueChangeSupportArrayPool.Borrow();
-		            support5.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support5.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue_previous.UnityEngine_Vector3 = Transform.position; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-					support5.syncCompanion = this;
+			support5.syncCompanion = this;
 			support5.index = 5;
 			support5.syncAttribute_MustRunOnUnityMainThread = true;
 			support5.syncAttribute_ProcessingPriority = 0;
@@ -510,7 +510,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.System_UInt32
 					};
 				}
-				break;
 
 				case 1:
 				{ // GONetParticipant.IsPositionSyncd
@@ -520,7 +519,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.System_Boolean
 					};
 				}
-				break;
 
 				case 2:
 				{ // GONetParticipant.IsRotationSyncd
@@ -530,7 +528,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.System_Boolean
 					};
 				}
-				break;
 
 				case 3:
 				{ // GONetParticipant.OwnerAuthorityId
@@ -540,7 +537,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.System_UInt16
 					};
 				}
-				break;
 
 				case 4:
 				{ // Transform.rotation
@@ -550,7 +546,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.UnityEngine_Quaternion
 					};
 				}
-				break;
 
 				case 5:
 				{ // Transform.position
@@ -560,7 +555,6 @@ namespace GONet.Generation
 						NewBaselineValue = newBaselineValue.UnityEngine_Vector3
 					};
 				}
-				break;
 
 			}
 			return null;

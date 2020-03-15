@@ -8,7 +8,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <RootNamespace></RootNamespace>
+    <RootNamespace>
+    </RootNamespace>
     <ProjectGuid>{1428A281-B8EC-1A48-A3FC-ADA631CCFF73}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -64,8 +65,11 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+    </Compile>
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GNPListCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
@@ -76,7 +80,10 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
-    <None Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />
+    <None Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs</LastGenOutput>
+    </None>
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>C:/projects/unity/gonet/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>
@@ -725,6 +732,9 @@
       <Project>{B08D0803-4D3E-61BD-032A-5135CCCC3D91}</Project>
       <Name>Assembly-CSharp</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateTargetFrameworkMonikerAttribute" />
