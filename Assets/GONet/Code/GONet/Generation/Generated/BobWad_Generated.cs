@@ -44,25 +44,33 @@ namespace GONet
 		[MessagePack.Union(14, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
 		[MessagePack.Union(15, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
 		[MessagePack.Union(16, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
-		[MessagePack.Union(17, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
-		[MessagePack.Union(18, typeof(GONet.SyncEvent_Transform_position))]
-		[MessagePack.Union(19, typeof(GONet.SyncEvent_Transform_rotation))]
-		[MessagePack.Union(20, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
-		[MessagePack.Union(21, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
-		[MessagePack.Union(22, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
-		[MessagePack.Union(23, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
-		[MessagePack.Union(24, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
-		[MessagePack.Union(25, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
-		[MessagePack.Union(26, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
-		[MessagePack.Union(27, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
-		[MessagePack.Union(28, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
-		[MessagePack.Union(29, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
-		[MessagePack.Union(30, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
-		[MessagePack.Union(31, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
-		[MessagePack.Union(32, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
-		[MessagePack.Union(33, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
-		[MessagePack.Union(34, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
-		[MessagePack.Union(35, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
+		[MessagePack.Union(17, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_A))]
+		[MessagePack.Union(18, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_D))]
+		[MessagePack.Union(19, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_DownArrow))]
+		[MessagePack.Union(20, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_LeftArrow))]
+		[MessagePack.Union(21, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_RightArrow))]
+		[MessagePack.Union(22, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_S))]
+		[MessagePack.Union(23, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_UpArrow))]
+		[MessagePack.Union(24, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_W))]
+		[MessagePack.Union(25, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
+		[MessagePack.Union(26, typeof(GONet.SyncEvent_Transform_position))]
+		[MessagePack.Union(27, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(28, typeof(GONet.ValueMonitoringSupport_BaselineExpiredEvent))]
+		[MessagePack.Union(29, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+		[MessagePack.Union(30, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+		[MessagePack.Union(31, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+		[MessagePack.Union(32, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+		[MessagePack.Union(33, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+		[MessagePack.Union(34, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+		[MessagePack.Union(35, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+		[MessagePack.Union(36, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+		[MessagePack.Union(37, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+		[MessagePack.Union(38, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+		[MessagePack.Union(39, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+		[MessagePack.Union(40, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+		[MessagePack.Union(41, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+		[MessagePack.Union(42, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+		[MessagePack.Union(43, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
 		public partial interface IGONetEvent { }
 
 
@@ -80,9 +88,17 @@ namespace GONet
 		[MessagePack.Union(11, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
 		[MessagePack.Union(12, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
 		[MessagePack.Union(13, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
-		[MessagePack.Union(14, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
-		[MessagePack.Union(15, typeof(GONet.SyncEvent_Transform_position))]
-		[MessagePack.Union(16, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(14, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_A))]
+		[MessagePack.Union(15, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_D))]
+		[MessagePack.Union(16, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_DownArrow))]
+		[MessagePack.Union(17, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_LeftArrow))]
+		[MessagePack.Union(18, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_RightArrow))]
+		[MessagePack.Union(19, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_S))]
+		[MessagePack.Union(20, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_UpArrow))]
+		[MessagePack.Union(21, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_W))]
+		[MessagePack.Union(22, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
+		[MessagePack.Union(23, typeof(GONet.SyncEvent_Transform_position))]
+		[MessagePack.Union(24, typeof(GONet.SyncEvent_Transform_rotation))]
 		public partial interface ITransientEvent : IGONetEvent { }
 
 
@@ -111,8 +127,16 @@ namespace GONet
 		[MessagePack.Union(1, typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd))]
 		[MessagePack.Union(2, typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd))]
 		[MessagePack.Union(3, typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId))]
-		[MessagePack.Union(4, typeof(GONet.SyncEvent_Transform_position))]
-		[MessagePack.Union(5, typeof(GONet.SyncEvent_Transform_rotation))]
+		[MessagePack.Union(4, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_A))]
+		[MessagePack.Union(5, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_D))]
+		[MessagePack.Union(6, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_DownArrow))]
+		[MessagePack.Union(7, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_LeftArrow))]
+		[MessagePack.Union(8, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_RightArrow))]
+		[MessagePack.Union(9, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_S))]
+		[MessagePack.Union(10, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_UpArrow))]
+		[MessagePack.Union(11, typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_W))]
+		[MessagePack.Union(12, typeof(GONet.SyncEvent_Transform_position))]
+		[MessagePack.Union(13, typeof(GONet.SyncEvent_Transform_rotation))]
 		public abstract partial class SyncEvent_ValueChangeProcessed { }
 
     
@@ -595,6 +619,646 @@ namespace GONet
         }
     }
 
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_A : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_A> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_A>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_A() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_A)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_A Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_A autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_A borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_D : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_D> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_D>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_D() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_D)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_D Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_D autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_D borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_DownArrow : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_DownArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_DownArrow>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_DownArrow() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_DownArrow)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_DownArrow Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_DownArrow autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_DownArrow borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_LeftArrow : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_LeftArrow() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_LeftArrow)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_LeftArrow Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_LeftArrow autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_LeftArrow borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_RightArrow : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_RightArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_RightArrow>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_RightArrow() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_RightArrow)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_RightArrow Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_RightArrow autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_RightArrow borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_S : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_S> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_S>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_S() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_S)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_S Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_S autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_S borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_UpArrow : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_UpArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_UpArrow>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_UpArrow() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_UpArrow)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_UpArrow Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_UpArrow autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_UpArrow borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
+    
+	
+    /// <summary>
+    /// <para>This represents that a sync value change has been processed.  Use the class name to determine the related value/type/context.</para>
+	/// <para>Two major occassions this event will occur (use this.<see cref="SyncEvent_ValueChangeProcessed.Explanation"/> to know which of the two occasions this represents):</para>
+    /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
+    /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
+    /// </summary>
+    [MessagePack.MessagePackObject]
+    public sealed class SyncEvent_GONetSampleInputSync_GetKey_W : SyncEvent_ValueChangeProcessed
+    {
+		[MessagePack.Key(6)] public System.Boolean valuePrevious;
+		[MessagePack.Key(7)] public System.Boolean valueNew;
+
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_W> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_W>();
+        static System.Threading.Thread borrowThread;
+
+        /// <summary>
+        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, System.Boolean, System.Boolean)"/>.
+        /// </summary>
+        public SyncEvent_GONetSampleInputSync_GetKey_W() { }
+
+        /// <summary>
+        /// IMPORTANT: It is the caller's responsibility to ensure the instance returned from this method is also returned back
+        ///            here (i.e., to private object pool) via <see cref="Return(SyncEvent_GONetSampleInputSync_GetKey_W)"/> when no longer needed!
+        /// </summary>
+        public static SyncEvent_GONetSampleInputSync_GetKey_W Borrow(SyncEvent_ValueChangeProcessedExplanation explanation, long occurredAtElapsedTicks, ushort relatedOwnerAuthorityId, uint gonetId, byte codeGenerationId, byte syncMemberIndex, System.Boolean valuePrevious, System.Boolean valueNew)
+		{
+            if (borrowThread == null)
+            {
+                borrowThread = System.Threading.Thread.CurrentThread;
+            }
+            else if (borrowThread != System.Threading.Thread.CurrentThread)
+            {
+                const string REQUIRED_CALL_SAME_BORROW_THREAD = "Not allowed to call this from more than one thread.  So, ensure Borrow() is called from the same exact thread for this specific event type.  NOTE: Each event type can have its' Borrow() called from a different thread from one another.";
+                throw new InvalidOperationException(REQUIRED_CALL_SAME_BORROW_THREAD);
+            }
+
+            int autoReturnCount = returnQueue_onceOnBorrowThread.Count;
+            SyncEvent_GONetSampleInputSync_GetKey_W autoReturn;
+            while (returnQueue_onceOnBorrowThread.TryDequeue(out autoReturn) && autoReturnCount > 0)
+            {
+                Return(autoReturn);
+                ++autoReturnCount;
+            }
+
+            var @event = pool.Borrow();
+            
+            @event.Explanation = explanation;
+            @event.OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            @event.RelatedOwnerAuthorityId = relatedOwnerAuthorityId;
+            @event.GONetId = gonetId;
+			@event.CodeGenerationId = codeGenerationId;
+            @event.SyncMemberIndex = syncMemberIndex;
+			@event.valuePrevious = valuePrevious;
+            @event.valueNew = valueNew;
+
+            return @event;
+		}
+
+        public override void Return()
+		{
+			Return(this);
+		}
+
+        public static void Return(SyncEvent_GONetSampleInputSync_GetKey_W borrowed)
+        {
+            if (borrowThread == System.Threading.Thread.CurrentThread)
+            {
+                pool.Return(borrowed);
+            }
+            else
+            {
+                returnQueue_onceOnBorrowThread.Enqueue(borrowed);
+            }
+        }
+    }
+
 }
 
 namespace GONet.Generation
@@ -628,6 +1292,14 @@ namespace GONet.Generation
 				typeof(GONet.SyncEvent_GONetParticipant_IsPositionSyncd),
 				typeof(GONet.SyncEvent_GONetParticipant_IsRotationSyncd),
 				typeof(GONet.SyncEvent_GONetParticipant_OwnerAuthorityId),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_A),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_D),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_DownArrow),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_LeftArrow),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_RightArrow),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_S),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_UpArrow),
+				typeof(GONet.SyncEvent_GONetSampleInputSync_GetKey_W),
 				typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority),
 				typeof(GONet.SyncEvent_Transform_position),
 				typeof(GONet.SyncEvent_Transform_rotation),
@@ -672,6 +1344,48 @@ namespace GONet.Generation
 			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember1);
 
+			var item_codeGenerationId2_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single0_singleMember0);
+
+			var item_codeGenerationId2_single0_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single0_singleMember1);
+
+			var item_codeGenerationId2_single0_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single0_singleMember2);
+
+			var item_codeGenerationId2_single0_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single0_singleMember3);
+
+			var item_codeGenerationId2_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember0);
+
+			var item_codeGenerationId2_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember1);
+
+			var item_codeGenerationId2_single1_singleMember2 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember2);
+
+			var item_codeGenerationId2_single1_singleMember3 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember3);
+
+			var item_codeGenerationId2_single1_singleMember4 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember4);
+
+			var item_codeGenerationId2_single1_singleMember5 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember5);
+
+			var item_codeGenerationId2_single1_singleMember6 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember6);
+
+			var item_codeGenerationId2_single1_singleMember7 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single1_singleMember7);
+
+			var item_codeGenerationId2_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember0);
+
+			var item_codeGenerationId2_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			settings.Add(item_codeGenerationId2_single2_singleMember1);
+
 			return settings;
 		}
 
@@ -681,6 +1395,8 @@ namespace GONet.Generation
 			{
 				case 1:
 					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_1(gonetParticipant);
+				case 2:
+					return new GONetParticipant_AutoMagicalSyncCompanion_Generated_2(gonetParticipant);
 			}
 
 			return null;
@@ -791,6 +1507,227 @@ namespace GONet.Generation
 					}
 					break;
 
+				case 2:
+					{
+						GONetParticipant_AutoMagicalSyncCompanion_Generated_2 companion = (GONetParticipant_AutoMagicalSyncCompanion_Generated_2)syncCompanion;
+                        switch (syncMemberIndex)
+                        {
+
+                            case 0:
+								{
+									System.UInt32 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_UInt32;
+									}
+									else
+									{
+																			valueNew = companion.GONetParticipant.GONetId;
+																		}
+									System.UInt32 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt32 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt32; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetParticipant_GONetId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 1:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetParticipant.IsPositionSyncd;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 2:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetParticipant.IsRotationSyncd;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 3:
+								{
+									System.UInt16 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_UInt16;
+									}
+									else
+									{
+																			valueNew = companion.GONetParticipant.OwnerAuthorityId;
+																		}
+									System.UInt16 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_UInt16 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_UInt16; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 4:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_A;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_A.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 5:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_D;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_D.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 6:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_DownArrow;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_DownArrow.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 7:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_LeftArrow;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_LeftArrow.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 8:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_RightArrow;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_RightArrow.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 9:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_S;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_S.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 10:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_UpArrow;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_UpArrow.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 11:
+								{
+									System.Boolean valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.System_Boolean;
+									}
+									else
+									{
+																			valueNew = companion.GONetSampleInputSync.GetKey_W;
+																		}
+									System.Boolean valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.System_Boolean : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.System_Boolean; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_GONetSampleInputSync_GetKey_W.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 12:
+								{
+									UnityEngine.Quaternion valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Quaternion;
+									}
+									else
+									{
+																			valueNew = companion.Transform.rotation;
+																		}
+									UnityEngine.Quaternion valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Quaternion : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Quaternion; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_Transform_rotation.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+                            case 13:
+								{
+									UnityEngine.Vector3 valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.UnityEngine_Vector3;
+									}
+									else
+									{
+																			valueNew = companion.Transform.position;
+																		}
+									UnityEngine.Vector3 valuePrevious = explanation == SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers ? companion.valuesChangesSupport[syncMemberIndex].lastKnownValue_previous.UnityEngine_Vector3 : companion.valuesChangesSupport[syncMemberIndex].lastKnownValue.UnityEngine_Vector3; // because of order of operations and state of affairs at the time of publishing this event being different for the in/out direction, there is a different value to pull from that represents the previous value
+									return SyncEvent_Transform_position.Borrow(explanation, elapsedTicks, filterUsingOwnerAuthorityId, syncCompanion.gonetParticipant.GONetId, 2, syncMemberIndex, valuePrevious, valueNew);
+								}
+						
+						}
+					}
+					break;
+
             }
 
             return default;
@@ -831,6 +1768,86 @@ namespace GONet.Generation
 									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
 								}
                             case 5:
+								{
+									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
+									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+						
+						}
+					}
+					break;
+
+				case 2:
+					{
+                        switch (original.SyncMemberIndex)
+                        {
+
+                            case 0:
+								{
+									SyncEvent_GONetParticipant_GONetId originalTyped = (SyncEvent_GONetParticipant_GONetId)original;
+									return SyncEvent_GONetParticipant_GONetId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 1:
+								{
+									SyncEvent_GONetParticipant_IsPositionSyncd originalTyped = (SyncEvent_GONetParticipant_IsPositionSyncd)original;
+									return SyncEvent_GONetParticipant_IsPositionSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 2:
+								{
+									SyncEvent_GONetParticipant_IsRotationSyncd originalTyped = (SyncEvent_GONetParticipant_IsRotationSyncd)original;
+									return SyncEvent_GONetParticipant_IsRotationSyncd.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 3:
+								{
+									SyncEvent_GONetParticipant_OwnerAuthorityId originalTyped = (SyncEvent_GONetParticipant_OwnerAuthorityId)original;
+									return SyncEvent_GONetParticipant_OwnerAuthorityId.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 4:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_A originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_A)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_A.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 5:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_D originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_D)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_D.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 6:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_DownArrow originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_DownArrow)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_DownArrow.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 7:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_LeftArrow originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_LeftArrow)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_LeftArrow.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 8:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_RightArrow originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_RightArrow)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_RightArrow.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 9:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_S originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_S)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_S.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 10:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_UpArrow originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_UpArrow)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_UpArrow.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 11:
+								{
+									SyncEvent_GONetSampleInputSync_GetKey_W originalTyped = (SyncEvent_GONetSampleInputSync_GetKey_W)original;
+									return SyncEvent_GONetSampleInputSync_GetKey_W.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 12:
+								{
+									SyncEvent_Transform_rotation originalTyped = (SyncEvent_Transform_rotation)original;
+									return SyncEvent_Transform_rotation.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);
+								}
+                            case 13:
 								{
 									SyncEvent_Transform_position originalTyped = (SyncEvent_Transform_position)original;
 									return SyncEvent_Transform_position.Borrow(original.Explanation, original.OccurredAtElapsedTicks, original.RelatedOwnerAuthorityId, original.GONetId, original.CodeGenerationId, original.SyncMemberIndex, originalTyped.valuePrevious, originalTyped.valueNew);

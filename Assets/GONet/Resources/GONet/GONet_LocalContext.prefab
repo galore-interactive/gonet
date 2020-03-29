@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 813501420998215093}
   - component: {fileID: 5118336138822136954}
   - component: {fileID: 6351736879446647969}
+  - component: {fileID: 7643086083297997714}
   m_Layer: 0
   m_Name: GONet_LocalContext
   m_TagString: Untagged
@@ -45,7 +46,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 1
+  codeGenerationId: 2
   animatorSyncSupport:
     keys: []
     values: []
@@ -76,5 +77,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4036bcecddd421947a85c833702a01b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &7643086083297997714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1664306667400202712}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a371f9581286c9046aa358e6ce54eac4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 

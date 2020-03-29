@@ -13,6 +13,8 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -24,8 +26,58 @@ namespace GONet
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
-    public class GONetLocal : GONetParticipantCompanionBehaviour
+    public class GONetLocal : GONetParticipantCompanionBehaviour, IEnumerable<KeyValuePair<ushort, GONetLocal>>
     {
+        private static readonly Dictionary<ushort, GONetLocal> localsByAuthorityId = new Dictionary<ushort, GONetLocal>(1024);
+
+        private static GONetLocal lookupByAuthorityId;
+        /// <summary>
+        /// This is only to be used as a means by which to statically use the indexer in order to look up the instance of this class that "belongs to" the authority id passed in as the index.
+        /// </summary>
+        public static GONetLocal LookupByAuthorityId => lookupByAuthorityId;
+
+        public GONetLocal this[ushort authorityId]
+        {
+            get
+            {
+                GONetLocal local;
+                if (localsByAuthorityId.TryGetValue(authorityId, out local))
+                {
+                    Dictionary<ushort, GONetLocal>.Enumerator enumerator = localsByAuthorityId.GetEnumerator();
+                    return local;
+                }
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// This will enumerator over all <see cref="GONetLocal"/> instances in the game (i.e., from server and each client connected).
+        /// </summary>
+        public static IEnumerator<KeyValuePair<ushort, GONetLocal>> GetEnumerator_AllGONetLocals()
+        {
+            return LookupByAuthorityId.GetEnumerator();
+        }
+
+        #region IEnumerable impl
+
+        /// <summary>
+        /// This will enumerator over all <see cref="GONetLocal"/> instances in the game (i.e., from server and each client connected).
+        /// </summary>
+        public IEnumerator<KeyValuePair<ushort, GONetLocal>> GetEnumerator()
+        {
+            return localsByAuthorityId.GetEnumerator();
+        }
+
+        /// <summary>
+        /// This will enumerator over all <see cref="GONetLocal"/> instances in the game (i.e., from server and each client connected).
+        /// </summary>
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return localsByAuthorityId.GetEnumerator();
+        }
+
+        #endregion
+
         public ushort OwnerAuthorityId => gonetParticipant.OwnerAuthorityId;
 
         private readonly List<GONetParticipant> myEnabledGONetParticipants = new List<GONetParticipant>(200);
@@ -35,6 +87,14 @@ namespace GONet
         /// <para>Do NOT attempt to modify this collection as to avoid creating issues for yourself/others.</para>
         /// </summary>
         public IEnumerable<GONetParticipant> MyEnabledGONetParticipants => myEnabledGONetParticipants;
+
+        public GONetLocal()
+        {
+            if ((object)lookupByAuthorityId == null)
+            {
+                lookupByAuthorityId = this;
+            }
+        }
 
         protected override void Awake()
         {
@@ -48,6 +108,25 @@ namespace GONet
             }
 
             GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnGNPAuthorityChanged_CheckIfStilllMine);
+
+            StartCoroutine(AddToLookupOnceAuthorityIdKnown(this));
+        }
+
+        private IEnumerator AddToLookupOnceAuthorityIdKnown(GONetLocal gonetLocal)
+        {
+            while (gonetLocal.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset)
+            {
+                yield return null;
+            }
+
+            localsByAuthorityId[gonetLocal.OwnerAuthorityId] = gonetLocal;
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+
+            localsByAuthorityId.Remove(OwnerAuthorityId);
         }
 
         public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
