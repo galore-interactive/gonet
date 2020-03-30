@@ -372,23 +372,26 @@ namespace GONet
 
         private void Start()
         {
-            //const string GNPS = "GNP.Start() name: ";
-            //const string WAS = " WasInstantiated: ";
-            //GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
-
-            if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
+            if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
-                IsOKToStartAutoMagicalProcessing = true;
-            }
+                //const string GNPS = "GNP.Start() name: ";
+                //const string WAS = " WasInstantiated: ";
+                //GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
 
-            GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
+                if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
+                {
+                    IsOKToStartAutoMagicalProcessing = true;
+                }
 
-            if ((myRigidBody = GetComponent<Rigidbody>()) != null)
-            {
-                myRigidbodySettingsAtStart.isKinematic = myRigidBody.isKinematic;
-                myRigidbodySettingsAtStart.useGravity = myRigidBody.useGravity;
+                GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
 
-                SetRigidBodySettingsConsideringOwner();
+                if ((myRigidBody = GetComponent<Rigidbody>()) != null)
+                {
+                    myRigidbodySettingsAtStart.isKinematic = myRigidBody.isKinematic;
+                    myRigidbodySettingsAtStart.useGravity = myRigidBody.useGravity;
+
+                    SetRigidBodySettingsConsideringOwner();
+                }
             }
         }
 

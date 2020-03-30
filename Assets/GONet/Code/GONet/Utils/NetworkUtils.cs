@@ -54,9 +54,13 @@ namespace GONet.Utils
                 {
                     socket.Bind(endpoint);
                 }
-                catch (SocketException)
+                catch (SocketException socketException)
                 {
-                    return true;
+                    const string IN_USE = "Address already in use";
+                    if (socketException.ErrorCode == (int)SocketError.AddressAlreadyInUse || socketException.Message == IN_USE)
+                    {
+                        return true;
+                    }
                 }
                 finally
                 {
