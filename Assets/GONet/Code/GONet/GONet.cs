@@ -163,6 +163,10 @@ namespace GONet
         {
             persistenceFilePath = Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE, string.Concat(Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), TRIPU, SGUID, TRIPU, MOAId, DB_EXT));
             Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE));
+            if (File.Exists(persistenceFilePath))
+            {
+                persistenceFilePath = persistenceFilePath.Replace(DB_EXT, string.Concat(GUID.Generate().AsInt64(), DB_EXT)); // Appending a guid to ensure the file is unique....this should only be a problem when running multiple instances on a single machine during development/testing
+            }
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
 
             IEnumerable<Type> syncEventTypes = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.GetAllUniqueSyncEventTypes();
