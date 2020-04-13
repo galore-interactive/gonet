@@ -636,7 +636,7 @@ namespace GONet
                     if (instantiationEvent.GONetId == newGONetIdEvent.valuePrevious)
                     {
                         instantiationEvent.GONetId = newGONetIdEvent.valueNew;
-                        
+
                         // this is a struct and the copy over of the value is not going to stick inside the persistentEventsThisSession...so we do linked list stuffities to replace old
 
                         persistentEventsThisSession.AddBefore(current, instantiationEvent);
@@ -2648,7 +2648,7 @@ namespace GONet
             volatile bool isThreadRunning;
 
             volatile bool shouldProcessInSeparateThreadASAP = false;
-            long lastProcessCompleteTicks;
+            long lastScheduledProcessAtTicks;
 
             static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS).Ticks;
 
@@ -2738,15 +2738,14 @@ namespace GONet
                     }
                     else
                     {
+                        lastScheduledProcessAtTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
                         Process();
                         shouldProcessInSeparateThreadASAP = false; // reset this
 
                         if (!doesRequireManualProcessInitiation)
                         { // (auto sync) frequency control:
-                            long nextProcessStartTicks = lastProcessCompleteTicks + scheduleFrequencyTicks;
                             long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
-                            lastProcessCompleteTicks = nowTicks;
-                            long ticksToSleep = nextProcessStartTicks - nowTicks;
+                            long ticksToSleep = nowTicks - lastScheduledProcessAtTicks - scheduleFrequencyTicks;
                             if (ticksToSleep > 0)
                             {
                                 Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
@@ -2897,11 +2896,11 @@ namespace GONet
                     else
                     {
                         long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
-                        bool isASAPNow = (nowTicks - lastProcessCompleteTicks) > scheduleFrequencyTicks;
+                        bool isASAPNow = (nowTicks - lastScheduledProcessAtTicks) > scheduleFrequencyTicks;
                         if (isASAPNow)
                         {
                             Process();
-                            lastProcessCompleteTicks = nowTicks;
+                            lastScheduledProcessAtTicks += scheduleFrequencyTicks;
                         }
                     }
                 }
