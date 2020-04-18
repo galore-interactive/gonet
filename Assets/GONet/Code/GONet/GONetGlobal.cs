@@ -167,7 +167,7 @@ namespace GONet
 
         private void Update()
         {
-            GONetMain.Update();
+            GONetMain.Update(this);
         }
 
         private void OnApplicationQuit()

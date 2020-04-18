@@ -157,6 +157,11 @@ namespace GONet
             myEnabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
 
+        private void LateUpdate()
+        {
+            GONetMain.Update_DoTheHeavyLifting_IfAppropriate(this, true);
+        }
+
         /// <summary>
         /// PRE: <paramref name="someGNP"/> known to not be null!
         /// </summary>
