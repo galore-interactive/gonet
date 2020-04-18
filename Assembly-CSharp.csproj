@@ -1829,6 +1829,7 @@
     <Compile Include="Assets\GONet\Sample\DestroyIfMineOnKeyPress.cs" />
     <Compile Include="Assets\GONet\Sample\FieldChangeTest.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetSampleInputSync.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
     <Compile Include="Assets\GONet\Sample\PendulumJalou.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />

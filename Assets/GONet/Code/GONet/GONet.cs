@@ -163,6 +163,10 @@ namespace GONet
         {
             persistenceFilePath = Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE, string.Concat(Math.Abs(Application.productName.GetHashCode()), TRIPU, DateTime.Now.ToString(DATE_FORMAT), TRIPU, SGUID, TRIPU, MOAId, DB_EXT));
             Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, DATABASE_PATH_RELATIVE));
+            if (File.Exists(persistenceFilePath))
+            {
+                persistenceFilePath = persistenceFilePath.Replace(DB_EXT, string.Concat(GUID.Generate().AsInt64(), DB_EXT)); // Appending a guid to ensure the file is unique....this should only be a problem when running multiple instances on a single machine during development/testing
+            }
             persistenceFileStream = new FileStream(persistenceFilePath, FileMode.Append);
 
             IEnumerable<Type> syncEventTypes = GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.GetAllUniqueSyncEventTypes();
@@ -632,7 +636,7 @@ namespace GONet
                     if (instantiationEvent.GONetId == newGONetIdEvent.valuePrevious)
                     {
                         instantiationEvent.GONetId = newGONetIdEvent.valueNew;
-                        
+
                         // this is a struct and the copy over of the value is not going to stick inside the persistentEventsThisSession...so we do linked list stuffities to replace old
 
                         persistentEventsThisSession.AddBefore(current, instantiationEvent);
@@ -1215,91 +1219,116 @@ namespace GONet
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/>
         /// </summary>
-        internal static void Update()
+        internal static void Update(GONetBehaviour coroutineManager)
         {
-            Time.Update();
+            Time.Update(); // This is the important thing to execute as early in a frame as possible (hence the -32000 setting in Script Execution Order) to get more accurate network timing to match Unity's frame time as it relates to values changing
 
-            ProcessIncomingBytes_QueuedNetworkData_MainThread();
-
-            AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable itemsToProcessEveryFrame;
-            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_reliable, out itemsToProcessEveryFrame))
+            if (myLocal == null) // NOTE: This check is important since it will eventually call Update_DoTheHeavyLifting_IfAppropriate, which is also called regularly from MyLocal.LateUpdate and we only want to process this during the time MyLocal is not present (i.e., since it is instantiated after start-up)
             {
-                itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+                coroutineManager.StartCoroutine(Update_EndOfFrame());
             }
-            if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_unreliable, out itemsToProcessEveryFrame))
-            {
-                itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
-            }
+        }
 
-            int mainThreadSupportCount = autoSyncProcessingSupports_UnityMainThread.Count;
-            for (int i = 0; i < mainThreadSupportCount; ++i)
-            {
-                AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable autoSyncProcessingSupport_mainThread = autoSyncProcessingSupports_UnityMainThread[i];
-                autoSyncProcessingSupport_mainThread.ProcessASAP();
-            }
+        private static IEnumerator Update_EndOfFrame()
+        {
+            yield return new WaitForEndOfFrame();
 
-            var enumerator_activeAutoSyncCompanionsMapByCodeGenerationId = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
-            while (enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.MoveNext())
-            {
-                var kvp_activeAutoSyncCompanionsMapForCodeGenerationId = enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.Current;
+            Update_DoTheHeavyLifting_IfAppropriate(null, false);
+        }
 
-                var enumerator_activeAutoSyncCompanionsMap = kvp_activeAutoSyncCompanionsMapForCodeGenerationId.Value.GetEnumerator();
-                while (enumerator_activeAutoSyncCompanionsMap.MoveNext())
+        static int lastCalledFrame_Update_DoTheHeavyLifting = -1;
+
+        internal static void Update_DoTheHeavyLifting_IfAppropriate(GONetLocal gonetLocalCaller, bool shouldCheckGONetLocalArgument)
+        {
+            bool isAppropriate = (!shouldCheckGONetLocalArgument || gonetLocalCaller == myLocal)
+                && lastCalledFrame_Update_DoTheHeavyLifting < UnityEngine.Time.frameCount; // avoid accidentally calling this multiple times a frame since it is called from two possible places
+
+            if (isAppropriate)
+            {
+                lastCalledFrame_Update_DoTheHeavyLifting = UnityEngine.Time.frameCount;
+
+                ProcessIncomingBytes_QueuedNetworkData_MainThread();
+
+                AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable itemsToProcessEveryFrame;
+                if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_reliable, out itemsToProcessEveryFrame))
                 {
-                    var kvp_activeAutoSyncCompanion = enumerator_activeAutoSyncCompanionsMap.Current;
-                    var activeAutoSyncCompanion = kvp_activeAutoSyncCompanion.Value;
-                    int length_valueChangesSupport = activeAutoSyncCompanion.valuesChangesSupport.Length;
-                    for (int i = 0; i < length_valueChangesSupport; ++i)
+                    itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+                }
+                if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_endOfFrame_unreliable, out itemsToProcessEveryFrame))
+                {
+                    itemsToProcessEveryFrame.ProcessASAP(); // this one requires manual initiation of processing
+                }
+
+                int mainThreadSupportCount = autoSyncProcessingSupports_UnityMainThread.Count;
+                for (int i = 0; i < mainThreadSupportCount; ++i)
+                {
+                    AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable autoSyncProcessingSupport_mainThread = autoSyncProcessingSupports_UnityMainThread[i];
+                    autoSyncProcessingSupport_mainThread.ProcessASAP();
+                }
+
+                var enumerator_activeAutoSyncCompanionsMapByCodeGenerationId = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
+                while (enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.MoveNext())
+                {
+                    var kvp_activeAutoSyncCompanionsMapForCodeGenerationId = enumerator_activeAutoSyncCompanionsMapByCodeGenerationId.Current;
+
+                    var enumerator_activeAutoSyncCompanionsMap = kvp_activeAutoSyncCompanionsMapForCodeGenerationId.Value.GetEnumerator();
+                    while (enumerator_activeAutoSyncCompanionsMap.MoveNext())
                     {
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = activeAutoSyncCompanion.valuesChangesSupport[i];
-                        if (valueChangeSupport != null)
+                        var kvp_activeAutoSyncCompanion = enumerator_activeAutoSyncCompanionsMap.Current;
+                        var activeAutoSyncCompanion = kvp_activeAutoSyncCompanion.Value;
+                        int length_valueChangesSupport = activeAutoSyncCompanion.valuesChangesSupport.Length;
+                        for (int i = 0; i < length_valueChangesSupport; ++i)
                         {
-                            valueChangeSupport.ApplyValueBlending_IfAppropriate(valueBlendingBufferLeadTicks);
+                            AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = activeAutoSyncCompanion.valuesChangesSupport[i];
+                            if (valueChangeSupport != null)
+                            {
+                                valueChangeSupport.ApplyValueBlending_IfAppropriate(valueBlendingBufferLeadTicks);
+                            }
                         }
                     }
                 }
-            }
 
-            PublishEvents_SentToOthers();
-            PublishEvents_SyncValueChanges_ReceivedFromOthers();
-            SaveEventsInQueueASAP_IfAppropriate();
+                PublishEvents_SentToOthers();
+                PublishEvents_SyncValueChanges_ReceivedFromOthers();
+                SaveEventsInQueueASAP_IfAppropriate();
 
-            if (endOfLineSendAndSaveThread == null)
-            {
-                isRunning_endOfTheLineSendAndSave_Thread = true;
-                endOfLineSendAndSaveThread = new Thread(SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread);
-                endOfLineSendAndSaveThread.Start();
-            }
-
-            if (IsServer)
-            {
-                gonetServer?.Update();
-            }
-
-            if (IsClient)
-            {
-                Client_SyncTimeWithServer_Initiate_IfAppropriate();
-                GONetClient?.Update();
-            }
-
-            foreach (var gnp in gnpsAwaitingCompanion)
-            {
-                if (gnp != null)
+                if (endOfLineSendAndSaveThread == null)
                 {
-                    GONetLog.Debug("gnp now not unity null...gnp.gonetId: " + gnp.GONetId);
+                    isRunning_endOfTheLineSendAndSave_Thread = true;
+                    endOfLineSendAndSaveThread = new Thread(SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread);
+                    endOfLineSendAndSaveThread.Start();
+                }
 
-                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap;
-                    if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out companionMap))
+                if (IsServer)
+                {
+                    gonetServer?.Update();
+                }
+
+                if (IsClient)
+                {
+                    Client_SyncTimeWithServer_Initiate_IfAppropriate();
+                    GONetClient?.Update();
+                }
+
+                foreach (var gnp in gnpsAwaitingCompanion)
+                {
+                    if (gnp != null)
                     {
-                        if (companionMap.ContainsKey(gnp))
+                        GONetLog.Debug("gnp now not unity null...gnp.gonetId: " + gnp.GONetId);
+
+                        Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap;
+                        if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out companionMap))
                         {
-                            GONetLog.Debug("gnp also now in map.....can now proceed with processing the remaining bytes!");
+                            if (companionMap.ContainsKey(gnp))
+                            {
+                                GONetLog.Debug("gnp also now in map.....can now proceed with processing the remaining bytes!");
+                            }
                         }
                     }
                 }
-            }
 
-            recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
+                recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
+            }
         }
 
         private static void SaveEventsInQueueASAP_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
@@ -2644,7 +2673,7 @@ namespace GONet
             volatile bool isThreadRunning;
 
             volatile bool shouldProcessInSeparateThreadASAP = false;
-            long lastProcessCompleteTicks;
+            long lastScheduledProcessAtTicks;
 
             static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS).Ticks;
 
@@ -2734,15 +2763,14 @@ namespace GONet
                     }
                     else
                     {
+                        lastScheduledProcessAtTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
                         Process();
                         shouldProcessInSeparateThreadASAP = false; // reset this
 
                         if (!doesRequireManualProcessInitiation)
                         { // (auto sync) frequency control:
-                            long nextProcessStartTicks = lastProcessCompleteTicks + scheduleFrequencyTicks;
                             long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
-                            lastProcessCompleteTicks = nowTicks;
-                            long ticksToSleep = nextProcessStartTicks - nowTicks;
+                            long ticksToSleep = nowTicks - lastScheduledProcessAtTicks - scheduleFrequencyTicks;
                             if (ticksToSleep > 0)
                             {
                                 Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
@@ -2893,11 +2921,11 @@ namespace GONet
                     else
                     {
                         long nowTicks = DateTime.UtcNow.Ticks;// NOTE: avoiding using high resolution as follows because that class is not thread-safe (yet): HighResolutionTimeUtils.Now.Ticks;
-                        bool isASAPNow = (nowTicks - lastProcessCompleteTicks) > scheduleFrequencyTicks;
+                        bool isASAPNow = (nowTicks - lastScheduledProcessAtTicks) > scheduleFrequencyTicks;
                         if (isASAPNow)
                         {
                             Process();
-                            lastProcessCompleteTicks = nowTicks;
+                            lastScheduledProcessAtTicks += scheduleFrequencyTicks;
                         }
                     }
                 }

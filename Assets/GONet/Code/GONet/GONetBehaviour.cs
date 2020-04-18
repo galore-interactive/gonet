@@ -87,6 +87,7 @@ namespace GONet
     /// reference that.  This is helpful when some game logic is present in children that is relevant to networking stuffs and you want to keep it that way.
     /// </para>
     /// </summary>
+    [RequireComponent(typeof(GONetParticipant))]
     public abstract class GONetParticipantCompanionBehaviour : GONetBehaviour
     {
         public GONetParticipant GONetParticipant => gonetParticipant;

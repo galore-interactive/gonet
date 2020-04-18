@@ -192,16 +192,25 @@ namespace GONet
     }
 
     /// <summary>
-    /// IMPORTANT: Ensure this is placed on a field on a <see cref="MonoBehaviour"/>
+    /// <para>
+    /// IMPORTANT: Ensure this is placed on a public field/property on a <see cref="MonoBehaviour"/>
     ///            and the aforementioned <see cref="MonoBehaviour"/> is placed on a 
     ///            <see cref="GameObject"/> with a <see cref="GONetParticipant"/>
     ///            placed on it as well!
-    /// 
+    /// </para>
+    /// <para>
+    /// IMPORTANT: There is a hard GONet limit of 256 of these maximum for a single <see cref="GONetParticipant"/> and that is collectively
+    ///            from *ALL* the <see cref="MonoBehaviour"/> instances installed on the same <see cref="GameObject"/> as the GNP.
+    /// </para>
+    /// <para>
     /// This is akin to [SyncVar] from old/legacy unity networking.....change sent at end of frame; HOWEVER, changes are
     /// monitored on both server (like [SyncVar]) ***AND*** client (UNlike [SyncVar]).
-    /// TODO have to figure out network ownership and whatnot!
-    /// 
-    /// As a reminder, here is the Unity 2017.4 documentation for SyncVar (taken from: https://docs.unity3d.com/2017.4/Documentation/ScriptReference/Networking.SyncVarAttribute.html):
+    /// </para>
+    /// <para>
+    /// See <see cref="GONetSyncableValueTypes"/> for a list of supported types this attribute can be placed on.
+    /// </para>
+    /// <para>
+    /// Also, as a reminder, here is the Unity 2017.4 documentation for SyncVar (taken from: https://docs.unity3d.com/2017.4/Documentation/ScriptReference/Networking.SyncVarAttribute.html):
     ///     [SyncVar] is an attribute that can be put on member variables of NetworkBehaviour classes. These variables will
     ///     have their values sychronized from the server to clients in the game that are in the ready state.
     ///     Setting the value of a[SyncVar] marks it as dirty, so it will be sent to clients at the end of the current frame.
@@ -210,6 +219,7 @@ namespace GONet
     ///     • Basic type(byte, int, float, string, UInt64, etc)
     ///     • Built-in Unity math type(Vector3, Quaternion, etc), 
     ///     • Structs containing allowable types.
+    /// </para>
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public class GONetAutoMagicalSyncAttribute : Attribute
