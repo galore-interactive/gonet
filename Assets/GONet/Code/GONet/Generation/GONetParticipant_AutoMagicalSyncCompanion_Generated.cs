@@ -36,6 +36,12 @@ namespace GONet.Generation
         protected static readonly ArrayPool<bool> lastKnownValuesChangedArrayPool =
             new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
+        protected static readonly ArrayPool<byte> lastKnownValueAtRestBitsArrayPool =
+            new ArrayPool<byte>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+
+        protected static readonly ArrayPool<long> lastKnownValueChangedAtElapsedTicksArrayPool =
+            new ArrayPool<long>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+
         protected static readonly ArrayPool<bool> doesBaselineValueNeedAdjustingArrayPool =
             new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
@@ -54,7 +60,13 @@ namespace GONet.Generation
         internal byte valuesCount;
 
         protected bool[] lastKnownValueChangesSinceLastCheck;
+        protected long[] lastKnownValueChangedAtElapsedTicks;
+        protected byte[] lastKnownValueAtRestBits;
         protected bool[] doesBaselineValueNeedAdjusting;
+
+        protected const byte LAST_KNOWN_VALUE_NOT_AT_REST = 0;
+        protected const byte LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST = 1;
+        protected const byte LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED = byte.MaxValue;
 
         internal GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue[] valuesChangesSupport;
 
@@ -73,7 +85,10 @@ namespace GONet.Generation
 
         public void Dispose()
         {
+            lastKnownValueAtRestBitsArrayPool.Return(lastKnownValueAtRestBits);
             lastKnownValuesChangedArrayPool.Return(lastKnownValueChangesSinceLastCheck);
+            lastKnownValueChangedAtElapsedTicksArrayPool.Return(lastKnownValueChangedAtElapsedTicks);
+
             doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
 
@@ -106,11 +121,22 @@ namespace GONet.Generation
             return mine;
         }
 
+        internal bool IsValueAtRest(byte index)
+        {
+            return lastKnownValueAtRestBits[index] != LAST_KNOWN_VALUE_NOT_AT_REST;
+        }
+
+        internal void IndicateAtRestBroadcasted(byte index)
+        {
+            lastKnownValueAtRestBits[index] = LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED;
+        }
+
         /// <summary>
-        /// POST: lastKnownValueChangesSinceLastCheck updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.
-        /// IMPORTANT: If <see cref="gonetParticipant"/> has a value of false for <see cref="GONetParticipant.IsOKToStartAutoMagicalProcessing"/>, then this will return false no matter what!
+        /// <para>POST: <see cref="lastKnownValueChangesSinceLastCheck"/> updated with true of false to indicate which value indices inside <see cref="lastKnownValues"/> represent new/changed values.</para>
+        /// <para>POST: <see cref="lastKnownValueAtRestBits"/> updated with one of the following: <see cref="LAST_KNOWN_VALUE_NOT_AT_REST"/>, <see cref="LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED"/> or <see cref="LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST"/></para>
+        /// <para>IMPORTANT: If <see cref="gonetParticipant"/> has a value of false for <see cref="GONetParticipant.IsOKToStartAutoMagicalProcessing"/>, then this will return false no matter what!</para>
         /// </summary>
-        internal bool HaveAnyValuesChangedSinceLastCheck(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
+        internal bool HaveAnyValuesChangedSinceLastCheck_AppendNewlyAtRest(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches, long nowElapsedTicks, List<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valuesAtRestToBroadcast)
         {
             bool hasChange = false;
 
@@ -120,11 +146,32 @@ namespace GONet.Generation
                 {
                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
                     if (DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches) &&
-                        valueChangeSupport.lastKnownValue != valueChangeSupport.lastKnownValue_previous &&
                         !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
                     {
-                        lastKnownValueChangesSinceLastCheck[i] = true;
-                        hasChange = true;
+                        if (valueChangeSupport.lastKnownValue == valueChangeSupport.lastKnownValue_previous)
+                        {
+                            if (nowElapsedTicks - lastKnownValueChangedAtElapsedTicks[i] > TimeSpan.FromSeconds(0.5).Ticks) // TOTO make this configurable and even if not make this a const!
+                            {
+                                lastKnownValueAtRestBits[i] |= LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST; // or in this value instead of assign because it might already be the value of LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED and we do not want to change that!
+
+                                if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                                {
+                                    valuesAtRestToBroadcast.Add(valueChangeSupport);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                            {
+                                GONetLog.Warning("Value was 'At Rest' but it was not broadcasted!  And now the value has changed so that last at rest will not get broadcast, which is really probably will not be noticed, but it should have been broadcast...why not?  hmmmm...");
+                            }
+
+                            lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_NOT_AT_REST;
+                            lastKnownValueChangesSinceLastCheck[i] = true;
+                            lastKnownValueChangedAtElapsedTicks[i] = nowElapsedTicks;
+                            hasChange = true;
+                        }
                     }
                 }
             }
