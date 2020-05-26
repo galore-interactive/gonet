@@ -1084,6 +1084,22 @@ namespace GONet
         }
 
         /// <summary>
+        /// As the server, send <paramref name="messageBytes"/> over <paramref name="channelId"/> to all connected clients except the one represented by <paramref name="sourceClientConnection"/>.
+        /// </summary>
+        private static void Server_SendBytesToNonSourceClients(byte[] messageBytes, int bytesUsedCount, GONetConnection sourceClientConnection, byte channelId)
+        {
+            uint count = _gonetServer.numConnections;
+            for (int i = 0; i < count; ++i)
+            {
+                GONetConnection_ServerToClient remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
+                if (remoteClientConnection.OwnerAuthorityId != sourceClientConnection.OwnerAuthorityId)
+                {
+                    SendBytesToRemoteConnection(remoteClientConnection, messageBytes, bytesUsedCount, channelId);
+                }
+            }
+        }
+
+        /// <summary>
         /// This can be called from multiple threads....the final send will be done on yet another thread - <see cref="SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread"/>
         /// </summary>
         private static void SendBytesToRemoteConnection(GONetConnection sendToConnection, byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
@@ -1903,9 +1919,25 @@ namespace GONet
                         //GONetLog.Debug("received something....networkData.bytesUsedCount: " + networkData.bytesUsedCount);
 
                         {  // body:
-                            if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) || messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
+                            if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                             {
                                 DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
+                            }
+                            else if (messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
+                            {
+                                DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
+                                if (IsServer)
+                                {
+                                    /*
+                                     * When dealing with client -> server -> client experience, which is to say the server needs to re broadcast this "values now at rest bundle" 
+                                     * since we piggy backed this "at rest" impl off of the value change impl where the re broadcast pretty much happens automatically through the 
+                                     * changed value, but things are a little different for "at rest" seeing as how the server receiving the initiating client's "at rest" message 
+                                     * could already have that same "at rest" value as its latest in the buffer prior to receiving the "at rest" message when it clears out the buffer 
+                                     * except for the at rest value and that means the server would not realize or have a mechanism to turn around and send "at rest" to other clients, 
+                                     * which is the remaining issue in long drawn out Shaun speak.
+                                     */
+                                    Server_SendBytesToNonSourceClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.relatedConnection, networkData.channelId);
+                                }
                             }
                             else if (messageType == typeof(RequestMessage))
                             {
@@ -2239,6 +2271,7 @@ namespace GONet
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
                             ++mostRecentChanges_usedSize;
+                            //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
                         }
                         //LogBufferContentsIfAppropriate();
                         return;
@@ -2249,6 +2282,7 @@ namespace GONet
                 {
                     mostRecentChanges[mostRecentChanges_usedSize] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                     ++mostRecentChanges_usedSize;
+                    //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
                 }
 
                 //LogBufferContentsIfAppropriate();
@@ -2315,7 +2349,8 @@ namespace GONet
             /// </summary>
             internal void ClearMostRecentChanges()
             {
-                mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here!
+                mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here, but this is functional.
+                //GONetLog.Debug("Cleared most recent changes...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
             }
         }
 
@@ -2694,7 +2729,7 @@ namespace GONet
             /// </summary>
             readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesToSend = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
 
-            readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valuesAtRestToBroadcast = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
+            readonly List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valuesNowAtRestToBroadcast = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000);
 
             readonly ArrayPool<byte> myThread_valueChangeSerializationArrayPool;
 
@@ -2803,7 +2838,7 @@ namespace GONet
                 long myTicks = myThread_Time.ElapsedTicks;
                 // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
                 syncValuesToSend.Clear();
-                valuesAtRestToBroadcast.Clear();
+                valuesNowAtRestToBroadcast.Clear();
 
                 var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
                 while (enumeratorOuter.MoveNext())
@@ -2824,7 +2859,7 @@ namespace GONet
 
                         // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
                         monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                        if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck_AppendNewlyAtRest(uniqueGrouping, myTicks, valuesAtRestToBroadcast)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                        if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck_AppendNewlyAtRest(uniqueGrouping, myTicks, valuesNowAtRestToBroadcast)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
                         {
                             monitoringSupport.AnnotateMyBaselineValuesNeedingAdjustment();
                             monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
@@ -2834,7 +2869,7 @@ namespace GONet
                 }
 
                 SendSyncValueBundlesToRelevantParties_IfAppropriate(syncValuesToSend, myTicks, typeof(AutoMagicalSync_ValueChanges_Message));
-                SendSyncValueBundlesToRelevantParties_IfAppropriate(valuesAtRestToBroadcast, myTicks, typeof(AutoMagicalSync_ValuesNowAtRest_Message));
+                SendSyncValueBundlesToRelevantParties_IfAppropriate(valuesNowAtRestToBroadcast, myTicks, typeof(AutoMagicalSync_ValuesNowAtRest_Message));
 
                 { // all this to call ApplyAnnotatedBaselineValueAdjustments()
                     Queue<IGONetEvent> baselineAdjustmentsEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
@@ -2900,14 +2935,14 @@ namespace GONet
                             myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                         }
                     }
-                }
 
-                if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
-                {
-                    for (int i = 0; i < count; ++i)
+                    if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
                     {
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport = syncValuesForBundles[i];
-                        valueMonitoringSupport.syncCompanion.IndicateAtRestBroadcasted(valueMonitoringSupport.index);
+                        for (int i = 0; i < count; ++i)
+                        {
+                            AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport = syncValuesForBundles[i];
+                            valueMonitoringSupport.syncCompanion.IndicateAtRestBroadcasted(valueMonitoringSupport.index);
+                        }
                     }
                 }
             }
@@ -3177,7 +3212,7 @@ namespace GONet
                 (IsServer
                     ? (gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
                         (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change except for changes back to the owner itself
-                            // TODO try to make this work as an option: || IsThisChangeTheMomentOfInception(change)
+                                                                                                               // TODO try to make this work as an option: || IsThisChangeTheMomentOfInception(change)
                             || change.index == GONetParticipant.ASSumed_GONetId_INDEX)) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
@@ -3297,6 +3332,7 @@ namespace GONet
                         if (syncCompanion.valuesChangesSupport[index].syncAttribute_ShouldBlendBetweenValuesReceived)
                         {
                             syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges(); // this effectively ensures that the new value at rest value is the one applied and no blending will occur since this is the only value in the blending buffer....neat trick to not need additional code to make sure we apply this new value at rest now!
+                            //GONetLog.Debug("just cleared most recent changes due to at rest....initial time sent: " + TimeSpan.FromTicks(elapsedTicksAtSend).TotalSeconds);
                         }
                         syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
