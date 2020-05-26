@@ -149,19 +149,23 @@ namespace GONet.Generation
                         !ShouldSkipSync(valueChangeSupport, i)) // TODO examine eval order and performance...should this be first or last?
                     {
                         if (valueChangeSupport.lastKnownValue == valueChangeSupport.lastKnownValue_previous)
-                        { // if the value is the same, we need to check if this is (newly) considered 'at rest' or not and act accordingly (i.e., signal that further action needs to be taken to tell others)
-                            bool isConsideredAtRest =
-                                (nowElapsedTicks - lastKnownValueChangedAtElapsedTicks[i])
-                                >
-                                (TimeSpan.FromSeconds(valueChangeSupport.syncAttribute_SyncChangesEverySeconds).Ticks << 1); // TODO make this configurable and even if not still need to precalculate (via adding new value set during generation)
+                        {
+                            bool doesAtRestEvenApply = valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
+                            if (doesAtRestEvenApply)
+                            { // if the value is the same and our at rest stuff applies here, we need to check if this is (newly) considered 'at rest' or not and act accordingly (i.e., signal that further action needs to be taken to tell others)
+                                bool isConsideredAtRest =
+                                    (nowElapsedTicks - lastKnownValueChangedAtElapsedTicks[i])
+                                    >
+                                    (TimeSpan.FromSeconds(valueChangeSupport.syncAttribute_SyncChangesEverySeconds).Ticks << 1); // TODO make this configurable and even if not still need to precalculate (via adding new value set during generation)
 
-                            if (isConsideredAtRest)
-                            {
-                                lastKnownValueAtRestBits[i] |= LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST; // or in this value instead of assign because it might already be the value of LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED and we do not want to change that!
-
-                                if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                                if (isConsideredAtRest)
                                 {
-                                    valuesAtRestToBroadcast.Add(valueChangeSupport);
+                                    lastKnownValueAtRestBits[i] |= LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST; // or in this value instead of assign because it might already be the value of LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED and we do not want to change that!
+
+                                    if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                                    {
+                                        valuesAtRestToBroadcast.Add(valueChangeSupport);
+                                    }
                                 }
                             }
                         }
