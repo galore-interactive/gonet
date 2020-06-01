@@ -2692,8 +2692,11 @@ namespace GONet
         }
 
         /// <summary>
-        /// For every unique value encountered for <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, an instance of this 
-        /// class will be created and used to process only those fields/properties set to be sync'd on that frequency.
+        /// For every unique combination encountered of the following values: 
+        ///     <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/>, 
+        ///     <see cref="GONetAutoMagicalSyncAttribute.MustRunOnUnityMainThread"/> and 
+        ///     <see cref="GONetAutoMagicalSyncAttribute.Reliability"/> (i.e., as encapsulated in <see cref="SyncBundleUniqueGrouping"/>), 
+        /// an instance of this class will be created and used to process only those fields/properties set to be sync'd on that frequency.
         /// </summary>
         internal sealed class AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable : IDisposable
         {
