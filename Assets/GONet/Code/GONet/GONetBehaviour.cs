@@ -75,7 +75,7 @@ namespace GONet
 
     /// <summary>
     /// <para>
-    /// For <see cref="GameObject"/>s that have a <see cref="GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can 
+    /// For <see cref="GameObject"/>s that have a <see cref="GONet.GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can 
     /// optionally extend this class to automatically have a reference to the <see cref="GONetParticipant"/> instance to reference it when making decisions
     /// on what to execute.  The most common example is to use <see cref="GONetParticipant.IsMine"/> to know whether or not to execute some game logic or not so that
     /// the logic is only executed on the owner's machine and the networking will handle the rest so the other machines will see the results of the game logic being

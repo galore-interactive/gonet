@@ -77,10 +77,9 @@ namespace GONet.Utils
 
             if (iSmallestFit == -1) // if no fit found, we'll have to create/add one and identify that one as the smallest fit!
             {
-                const string SMALLEST = "Smallest fit not found.  Requested size is: ";
-                const string TOTAL = " total pool count: ";
-                const string CHECKED_OUT = " checked out count: ";
-                GONetLog.Debug(string.Concat(SMALLEST, currentMinimumSizeToBorrow, TOTAL, poolCapacity, CHECKED_OUT, nextAvailableIndex));
+                const string OP = "[";
+                const string DI = "] array of that size or larger not available to borrow. Debug Info: ";
+                GONetLog.Debug(string.Concat(typeof(T).Name, OP, currentMinimumSizeToBorrow, DI, ToString()));
 
                 int arraySizeMinimum_original = arraySizeMinimum;
                 int arraySizeMaximum_original = arraySizeMaximum;
