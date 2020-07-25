@@ -50,6 +50,18 @@ namespace GONet.Generation
         internal const string GENERATED_FILE_PATH = GENERATION_FILE_PATH + "Generated/";
         const string FILE_SUFFIX = ".cs";
 
+        public static int LastPlayModeStateChange_frameCount { get; private set; } = -1;
+        static PlayModeStateChange? lastPlayModeStateChange;
+        public static PlayModeStateChange? LastPlayModeStateChange
+        {
+            get => lastPlayModeStateChange;
+            private set
+            {
+                lastPlayModeStateChange = value;
+                LastPlayModeStateChange_frameCount = Time.frameCount;
+            }
+        }
+
         static GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator()
         {
             EditorApplication.playModeStateChanged += OnEditorPlayModeStateChanged;
@@ -170,6 +182,8 @@ namespace GONet.Generation
 
         private static void OnEditorPlayModeStateChanged(PlayModeStateChange state)
         {
+            LastPlayModeStateChange = state;
+
             bool canASSume_GoingFrom_Editer_To_Play = !EditorApplication.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode; // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
             if (canASSume_GoingFrom_Editer_To_Play)
             {
