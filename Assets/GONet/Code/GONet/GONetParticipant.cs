@@ -512,6 +512,11 @@ namespace GONet
             {
                 // do nothing!  TODO consider supporting quantizing even this, but not making sense right now and still want to keep this interface/API
             }
+
+            public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+            {
+                return valueA.System_UInt32 == valueB.System_UInt32;
+            }
         }
     }
 }

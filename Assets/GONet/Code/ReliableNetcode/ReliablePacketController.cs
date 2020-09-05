@@ -128,7 +128,7 @@ namespace ReliableNetcode
                 uint baseSequence = (uint)((sentPackets.sequence - config.SentPacketBufferSize + 1) + 0xFFFF);
 
                 int numDropped = 0;
-                int numSamples = config.SentPacketBufferSize / 2;
+                int numSamples = config.SentPacketBufferSize >> 1; // config.SentPacketBufferSize / 2;
                 for (int i = 0; i < numSamples; i++) {
                     ushort sequence = (ushort)(baseSequence + i);
                     var sentPacketData = sentPackets.Find(sequence);
@@ -137,6 +137,10 @@ namespace ReliableNetcode
                 }
 
                 float packetLoss = (float)numDropped / (float)numSamples;
+                if (float.IsNaN(packetLoss) || float.IsInfinity(packetLoss))
+                {
+                    packetLoss = 0;
+                }
                 if (Math.Abs(this.packetLoss - packetLoss) > 0.00001f) {
                     this.packetLoss += (packetLoss - this.packetLoss) * config.PacketLossSmoothingFactor;
                 }
@@ -165,6 +169,10 @@ namespace ReliableNetcode
 
                 if (startTime != double.MaxValue && finishTime != 0.0) {
                     float sentBandwidth = (float)bytesSent / (float)(finishTime - startTime) * 8f / 1000f;
+                    if (float.IsNaN(sentBandwidth) || float.IsInfinity(sentBandwidth))
+                    {
+                        sentBandwidth = 0;
+                    }
                     if (Math.Abs(this.sentBandwidthKBPS - sentBandwidth) > 0.00001f) {
                         this.sentBandwidthKBPS += (sentBandwidth - this.sentBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
@@ -195,6 +203,10 @@ namespace ReliableNetcode
 
                 if (startTime != double.MaxValue && finishTime != 0.0) {
                     float receivedBandwidth = (float)bytesReceived / (float)(finishTime - startTime) * 8f / 1000f;
+                    if (float.IsNaN(receivedBandwidth) || float.IsInfinity(receivedBandwidth))
+                    {
+                        receivedBandwidth = 0;
+                    }
                     if (Math.Abs(this.receivedBandwidthKBPS - receivedBandwidth) > 0.00001f) {
                         this.receivedBandwidthKBPS += (receivedBandwidth - this.receivedBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
@@ -224,6 +236,10 @@ namespace ReliableNetcode
 
                 if (startTime != double.MaxValue && finishTime != 0.0) {
                     float ackedBandwidth = (float)bytesSent / (float)(finishTime - startTime) * 8f / 1000f;
+                    if (float.IsNaN(ackedBandwidth) || float.IsInfinity(ackedBandwidth))
+                    {
+                        ackedBandwidth = 0;
+                    }
                     if (Math.Abs(this.ackedBandwidthKBPS - ackedBandwidth) > 0.00001f) {
                         this.ackedBandwidthKBPS += (ackedBandwidth - this.ackedBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
@@ -232,6 +248,8 @@ namespace ReliableNetcode
                     }
                 }
             }
+
+            //GONet.GONetLog.Info("hashCode[" + GetHashCode() + "] statistics: " + GetUsageStatistics());
         }
 
         public void SendAck(byte channelID)

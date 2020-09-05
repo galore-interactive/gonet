@@ -17,6 +17,7 @@ using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
@@ -121,7 +122,7 @@ namespace GONet.Generation
             return mine;
         }
 
-        internal bool IsValueAtRest(byte index)
+        public bool IsValueAtRest(byte index)
         {
             return lastKnownValueAtRestBits[index] != LAST_KNOWN_VALUE_NOT_AT_REST;
         }
@@ -171,15 +172,19 @@ namespace GONet.Generation
                         }
                         else
                         {
-                            if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                            // need to consider quantization here so we do not consider the value changed if the quanitized value is the same even though the actual value is changed
+                            if (!AreEqualConsideringQuantization(valueChangeSupport, valueChangeSupport.lastKnownValue, valueChangeSupport.lastKnownValue_previous))
                             {
-                                GONetLog.Warning("Value was 'At Rest' but it was not broadcasted!  And now the value has changed so that last at rest will not get broadcast, which is really probably will not be noticed, but it should have been broadcast...why not?  hmmmm...");
-                            }
+                                if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                                {
+                                    GONetLog.Warning("Value was 'At Rest' but it was not broadcasted!  And now the value has changed so that last at rest will not get broadcast, which is really probably will not be noticed, but it should have been broadcast...why not?  hmmmm...");
+                                }
 
-                            lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_NOT_AT_REST;
-                            lastKnownValueChangesSinceLastCheck[i] = true;
-                            lastKnownValueChangedAtElapsedTicks[i] = nowElapsedTicks;
-                            hasChange = true;
+                                lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_NOT_AT_REST;
+                                lastKnownValueChangesSinceLastCheck[i] = true;
+                                lastKnownValueChangedAtElapsedTicks[i] = nowElapsedTicks;
+                                hasChange = true;
+                            }
                         }
                     }
                 }
@@ -187,6 +192,23 @@ namespace GONet.Generation
 
             return hasChange;
         }
+
+        private bool AreEqualConsideringQuantization(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            bool areEqual = valueA == valueB;
+            if (!areEqual // if they are equal unquantized, then ASSume they will also be the same after quantization since that process is supposed to be deterministic!
+                /* && valueChangeSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization */) // IMPORTANT: we had to remove this since the custom serializer ones would have this as false!
+            {
+                areEqual = AreEqualQuantized(valueChangeSupport.index, valueA, valueB);
+            }
+            return areEqual;
+        }
+
+        /// <summary>
+        /// PRE: value at <paramref name="singleIndex"/> is known to be configured to be quantized
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        protected virtual bool AreEqualQuantized(byte singleIndex, GONetSyncableValue valueA, GONetSyncableValue valueB) { return false; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool ShouldSkipSync(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, int index)
@@ -205,13 +227,20 @@ namespace GONet.Generation
             }
         }
 
-        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, GONetSyncableValue value)
+        internal uint QuantizeSingle(byte singleIndex, GONetSyncableValue value)
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             float valueAsFloat = value.System_Single;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
             valueAsFloat -= valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
-            uint valueQuantized = Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
+            return Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
+        }
+
+        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, GONetSyncableValue value)
+        {
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
+            QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
+            uint valueQuantized = QuantizeSingle(singleIndex, value);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
 
@@ -237,6 +266,13 @@ namespace GONet.Generation
 
         internal abstract void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex);
 
+        public bool TryGetIndexByMemberName(string memberName, out byte index)
+        {
+            var valueChangeSupport = valuesChangesSupport.FirstOrDefault(x => x != null && x.memberName == memberName);
+            index = valueChangeSupport != null ? valueChangeSupport.index : default;
+            return valueChangeSupport != null;
+        }
+
         /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
@@ -249,6 +285,11 @@ namespace GONet.Generation
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
         internal abstract void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
+
+        /// <summary>
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        internal virtual void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex) { }
 
         internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches);
 

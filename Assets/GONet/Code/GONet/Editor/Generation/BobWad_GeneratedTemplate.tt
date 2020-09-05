@@ -156,7 +156,7 @@ namespace GONet
 		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valuePrevious;
 		[MessagePack.Key(7)] public <#=memberKVP.Value.Item1#> valueNew;
 
-        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<<#=className#>> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<<#=className#>>();
         static System.Threading.Thread borrowThread;
 

@@ -79,7 +79,7 @@ namespace GONet.Utils
             {
                 const string OP = "[";
                 const string DI = "] array of that size or larger not available to borrow. Debug Info: ";
-                GONetLog.Debug(string.Concat(typeof(T).Name, OP, currentMinimumSizeToBorrow, DI, ToString()));
+                // commenting out since we may get to the point where pools need to grow like this and log flood will make things SLOOOOOW: GONetLog.Debug(string.Concat(typeof(T).Name, OP, currentMinimumSizeToBorrow, DI, ToString()));
 
                 int arraySizeMinimum_original = arraySizeMinimum;
                 int arraySizeMaximum_original = arraySizeMaximum;
@@ -89,8 +89,10 @@ namespace GONet.Utils
                 iSmallestFit = poolCapacity; // this will be valid after we add the new instances below..it will point to the first new instance
                 CreateAdditionalInstances(growByCount);
 
+                /* avoid going back to the smaller/original settings since we are getting requests for larger....just keep it larger and hope we are not gobbling up too much more memory as a result
                 arraySizeMinimum = arraySizeMinimum_original;
                 arraySizeMaximum = arraySizeMaximum_original;
+                */
             }
 
             // NOTE: by now, iSmallestFit is guaranteed to be valid, but just double check that pure luck did not end up where the next available is the right one to serve up before doing a swap!

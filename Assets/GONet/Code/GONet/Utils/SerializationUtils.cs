@@ -27,8 +27,8 @@ namespace GONet.Utils
     public static class SerializationUtils
     {
         public const int MTU = 1400;
-        private const int MTU_x8 = MTU << 3;
-        private const int MTU_x32 = MTU << 5;
+        public const int MTU_x8 = MTU << 3;
+        public const int MTU_x32 = MTU << 5;
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 

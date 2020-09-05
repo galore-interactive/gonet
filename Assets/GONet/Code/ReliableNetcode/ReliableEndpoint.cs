@@ -135,6 +135,8 @@ namespace ReliableNetcode
 		/// </summary>
 		public void ReceivePacket(byte[] buffer, int bufferLength)
 		{
+			//GONet.GONetLog.Debug("received length: " + bufferLength);
+
 			int channel = buffer[1];
 			messageChannels[channel].ReceivePacket(buffer, bufferLength);
 		}

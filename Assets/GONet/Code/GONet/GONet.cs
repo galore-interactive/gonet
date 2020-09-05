@@ -791,6 +791,7 @@ namespace GONet
 
         private static void OnSyncValueChangeProcessed_Persist_Local(SyncEvent_ValueChangeProcessed @event, bool doesRequireCopy = true)
         {
+#if PROCESS_SYNC_EVENTS
             SyncEvent_ValueChangeProcessed instanceToEnqueue;
             if (doesRequireCopy)
             {
@@ -807,6 +808,7 @@ namespace GONet
 
             SyncEventsSaveSupport syncEventsToSaveQueue = syncEventsToSaveQueueByEventType[@event.GetType()];
             syncEventsToSaveQueue.queue_needsSavingASAP.Enqueue(instanceToEnqueue); // NOTE: instanceToEnqueu will get returned to its pool when this queue is processed!
+#endif
         }
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
@@ -1193,6 +1195,7 @@ namespace GONet
                         }
                         else
                         {
+                            //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                             networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                         }
 
@@ -1203,6 +1206,7 @@ namespace GONet
                     }
                 }
 
+#if PROCESS_SYNC_EVENTS
                 { // Do save stuffs
                     var syncvEventsEnumerator = syncEventsToSaveQueueByEventType.GetEnumerator();
                     while (syncvEventsEnumerator.MoveNext())
@@ -1218,6 +1222,7 @@ namespace GONet
                         }
                     }
                 }
+#endif
 
                 ++tickCount_endOfTheLineSendAndSave_Thread;
             }
@@ -1305,7 +1310,9 @@ namespace GONet
                 }
 
                 PublishEvents_SentToOthers();
+#if PROCESS_SYNC_EVENTS
                 PublishEvents_SyncValueChanges_ReceivedFromOthers();
+#endif
                 SaveEventsInQueueASAP_IfAppropriate();
 
                 if (endOfLineSendAndSaveThread == null)
@@ -1816,7 +1823,7 @@ namespace GONet
             ArrayPool<byte> pool;
             if (!netThread_incomingNetworkDataArrayPool_ThreadMap.TryGetValue(Thread.CurrentThread, out pool))
             {
-                pool = new ArrayPool<byte>(1000, 10, 1024, 2048);
+                pool = new ArrayPool<byte>(1000, 10, SerializationUtils.MTU, SerializationUtils.MTU_x8);
                 netThread_incomingNetworkDataArrayPool_ThreadMap[Thread.CurrentThread] = pool;
             }
 
@@ -2125,10 +2132,25 @@ namespace GONet
         static readonly List<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable> autoSyncProcessingSupports_UnityMainThread =
             new List<AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable>(5);
 
+        // TODO FIXME make internal just for editor!
+        public static GONetParticipant_AutoMagicalSyncCompanion_Generated GetSyncCompanionByGNP(GONetParticipant gnp)
+        {
+            GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = null;
+
+            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> collection;
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out collection))
+            {
+                collection.TryGetValue(gnp, out syncCompanion);
+            }
+
+            return syncCompanion;
+        }
+
         internal class AutoMagicalSync_ValueMonitoringSupport_ChangedValue
         {
             internal byte index;
             internal GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
+            internal string memberName;
 
             #region properties copied off of GONetAutoMagicalSyncAttribute
             /// <summary>
@@ -2834,49 +2856,21 @@ namespace GONet
             /// </summary>
             private void Process()
             {
-                if (myThread_Time != Time) // avoid updating time if the local time instance is the same as GONetMain instance since it will be updated already
+                long startTicks = DateTime.UtcNow.Ticks; // avoiding high resolution timer usage here as it is not thread safe and this can be called by different threads
+                int bundleFragmentsMadeCount = 0;
+
+                try
                 {
-                    myThread_Time.Update();
-                }
-                long myTicks = myThread_Time.ElapsedTicks;
-                // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
-                syncValuesToSend.Clear();
-                valuesNowAtRestToBroadcast.Clear();
-
-                var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
-                while (enumeratorOuter.MoveNext())
-                {
-                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
-                    if (currentMap == null)
+                    if (myThread_Time != Time) // avoid updating time if the local time instance is the same as GONetMain instance since it will be updated already
                     {
-                        GONetLog.Error("currentMap == null");
+                        myThread_Time.Update();
                     }
-                    var enumeratorInner = currentMap.GetEnumerator();
-                    while (enumeratorInner.MoveNext())
-                    {
-                        GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
-                        if (monitoringSupport == null)
-                        {
-                            GONetLog.Error("monitoringSupport == null");
-                        }
+                    long myTicks = myThread_Time.ElapsedTicks;
+                    // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
+                    syncValuesToSend.Clear();
+                    valuesNowAtRestToBroadcast.Clear();
 
-                        // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
-                        monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                        if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck_AppendNewlyAtRest(uniqueGrouping, myTicks, valuesNowAtRestToBroadcast)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                        {
-                            monitoringSupport.AnnotateMyBaselineValuesNeedingAdjustment();
-                            monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                            monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
-                        }
-                    }
-                }
-
-                SendSyncValueBundlesToRelevantParties_IfAppropriate(syncValuesToSend, myTicks, typeof(AutoMagicalSync_ValueChanges_Message));
-                SendSyncValueBundlesToRelevantParties_IfAppropriate(valuesNowAtRestToBroadcast, myTicks, typeof(AutoMagicalSync_ValuesNowAtRest_Message));
-
-                { // all this to call ApplyAnnotatedBaselineValueAdjustments()
-                    Queue<IGONetEvent> baselineAdjustmentsEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
-                    enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
+                    var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
                     while (enumeratorOuter.MoveNext())
                     {
                         Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
@@ -2884,7 +2878,6 @@ namespace GONet
                         {
                             GONetLog.Error("currentMap == null");
                         }
-
                         var enumeratorInner = currentMap.GetEnumerator();
                         while (enumeratorInner.MoveNext())
                         {
@@ -2894,16 +2887,60 @@ namespace GONet
                                 GONetLog.Error("monitoringSupport == null");
                             }
 
-                            monitoringSupport.ApplyAnnotatedBaselineValueAdjustments(baselineAdjustmentsEventQueue); // we figured out when this needs to get called....and it is now, AFTER the send of the changes accumulated herein to avoid using new baseline incorrectly 
+                            // need to call this for every single one to keep track of changes, BUT we only want to consider/process ones that match the current frequency:
+                            monitoringSupport.UpdateLastKnownValues(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                            if (monitoringSupport.HaveAnyValuesChangedSinceLastCheck_AppendNewlyAtRest(uniqueGrouping, myTicks, valuesNowAtRestToBroadcast)) // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                            {
+                                monitoringSupport.AnnotateMyBaselineValuesNeedingAdjustment();
+                                monitoringSupport.AppendListWithChangesSinceLastCheck(syncValuesToSend, uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                                monitoringSupport.OnValueChangeCheck_Reset(uniqueGrouping); // IMPORTANT: passing in the frequency here narrows down what gets appended to only ones with frequency match
+                            }
                         }
                     }
+
+                    bundleFragmentsMadeCount += SendSyncValueBundlesToRelevantParties_IfAppropriate(syncValuesToSend, myTicks, typeof(AutoMagicalSync_ValueChanges_Message));
+                    bundleFragmentsMadeCount += SendSyncValueBundlesToRelevantParties_IfAppropriate(valuesNowAtRestToBroadcast, myTicks, typeof(AutoMagicalSync_ValuesNowAtRest_Message));
+
+                    { // all this to call ApplyAnnotatedBaselineValueAdjustments()
+                        Queue<IGONetEvent> baselineAdjustmentsEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                        enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator();
+                        while (enumeratorOuter.MoveNext())
+                        {
+                            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                            if (currentMap == null)
+                            {
+                                GONetLog.Error("currentMap == null");
+                            }
+
+                            var enumeratorInner = currentMap.GetEnumerator();
+                            while (enumeratorInner.MoveNext())
+                            {
+                                GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+                                if (monitoringSupport == null)
+                                {
+                                    GONetLog.Error("monitoringSupport == null");
+                                }
+
+                                monitoringSupport.ApplyAnnotatedBaselineValueAdjustments(baselineAdjustmentsEventQueue); // we figured out when this needs to get called....and it is now, AFTER the send of the changes accumulated herein to avoid using new baseline incorrectly 
+                            }
+                        }
+                    }
+
+                    PublishEvents_SyncValueChangesSentToOthers_ASAP();
+                }
+                catch (Exception e)
+                {
+                    GONetLog.Error(e.Message);
                 }
 
-                PublishEvents_SyncValueChangesSentToOthers_ASAP();
+                //long endTicks = DateTime.UtcNow.Ticks; // avoiding high resolution timer usage here as it is not thread safe and this can be called by different threads
+                //GONetLog.Debug("[DREETS] bundleFragmentsMadeCount: " + bundleFragmentsMadeCount + " duration(ms): " + TimeSpan.FromTicks(endTicks - startTicks).TotalMilliseconds);
             }
 
-            private void SendSyncValueBundlesToRelevantParties_IfAppropriate(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesForBundles, long relatedElapsedTicks, Type chosenBundleType)
+            /// <returns>The number of bundle fragments made</returns>
+            private int SendSyncValueBundlesToRelevantParties_IfAppropriate(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> syncValuesForBundles, long relatedElapsedTicks, Type chosenBundleType)
             {
+                int bundleFragmentsMadeCount = 0;
                 int count = syncValuesForBundles.Count;
                 if (count > 0)
                 {
@@ -2916,27 +2953,53 @@ namespace GONet
                         // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
                         if (gonetServer != null)
                         {
-                            for (int iConnection = 0; iConnection < gonetServer.numConnections; ++iConnection)
+                            WholeBundleOfChoiceFragments bundleFragments;
+                            
+                            ushort no_filtering_since_server_now_sends_same_to_all_clients_and_they_disregard_their_own_for_performance_reasons = OwnerAuthorityId_Unset;
+                            ushort noFilter = no_filtering_since_server_now_sends_same_to_all_clients_and_they_disregard_their_own_for_performance_reasons;
+                            
+                            SerializeWhole_BundleOfChoice(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, noFilter, relatedElapsedTicks, chosenBundleType, out bundleFragments);
+                            
+                            const int SIMULATE_CLIENT_COUNT = 100; // TODO FIXME REMOVE this test code
+
+                            for (int iConnection = 0; iConnection < SIMULATE_CLIENT_COUNT; ++iConnection)
                             {
-                                GONetConnection_ServerToClient gONetConnection_ServerToClient = gonetServer.remoteClients[iConnection].ConnectionToClient;
-                                byte[] changesSerialized_clientSpecific = SerializeWhole_BundleOfChoice(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, gONetConnection_ServerToClient.OwnerAuthorityId, relatedElapsedTicks, chosenBundleType);
-                                if (changesSerialized_clientSpecific != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                                bool isPartOfClientSimulation = iConnection >= gonetServer.numConnections; // TODO FIXME REMOVE this test code
+
+                                GONetConnection_ServerToClient gONetConnection_ServerToClient = isPartOfClientSimulation ? null : gonetServer.remoteClients[iConnection].ConnectionToClient;
+                                for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
                                 {
                                     //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this. bytesUsedCount: " + bytesUsedCount);  /////////////////////////// DREETS!
-                                    SendBytesToRemoteConnection(gONetConnection_ServerToClient, changesSerialized_clientSpecific, bytesUsedCount, useThisChannelId);
-                                    myThread_valueChangeSerializationArrayPool.Return(changesSerialized_clientSpecific);
+                                    if (!isPartOfClientSimulation)
+                                    {
+                                        if (gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId).IsInitializedWithServer) // only send to client initialized with server!
+                                        {
+                                            SendBytesToRemoteConnection(gONetConnection_ServerToClient, bundleFragments.fragmentBytes[iFragment], bundleFragments.fragmentBytesUsedCount[iFragment], useThisChannelId);
+                                        }
+                                    }
                                 }
                             }
+
+                            for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
+                            {
+                                myThread_valueChangeSerializationArrayPool.Return(bundleFragments.fragmentBytes[iFragment]);
+                            }
+
+                            bundleFragmentsMadeCount += bundleFragments.fragmentCount;
                         }
                     }
                     else
                     {
-                        byte[] changesSerialized = SerializeWhole_ChangesBundle(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, out bytesUsedCount, MyAuthorityId, relatedElapsedTicks);
-                        if (changesSerialized != EMPTY_CHANGES_BUNDLE && bytesUsedCount > 0)
+                        WholeBundleOfChoiceFragments bundleFragments;
+                        SerializeWhole_ChangesBundle(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, out bundleFragments);
+                        for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
                         {
-                            SendBytesToRemoteConnections(changesSerialized, bytesUsedCount, useThisChannelId);
+                            byte[] changesSerialized = bundleFragments.fragmentBytes[iFragment];
+                            SendBytesToRemoteConnections(changesSerialized, bundleFragments.fragmentBytesUsedCount[iFragment], useThisChannelId);
                             myThread_valueChangeSerializationArrayPool.Return(changesSerialized);
                         }
+
+                        bundleFragmentsMadeCount += bundleFragments.fragmentCount;
                     }
 
                     if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
@@ -2948,6 +3011,8 @@ namespace GONet
                         }
                     }
                 }
+
+                return bundleFragmentsMadeCount;
             }
 
             /// <summary>
@@ -3048,47 +3113,88 @@ namespace GONet
         /// <para>POST: return a serialized packet with only the stuff that excludes <paramref name="filterUsingOwnerAuthorityId"/> as to not send to them (i.e., likely because they are the one who owns this data in the first place and already know this change occurred!)</para>
         /// <para>IMPORTANT: The caller is responsible for returning the returned byte[] to <paramref name="byteArrayPool"/></para>
         /// </summary>
-        private static byte[] SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
+        private static void SerializeWhole_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture, out WholeBundleOfChoiceFragments bundleFragments)
         {
-            return SerializeWhole_BundleOfChoice(changes, byteArrayPool, out bytesUsedCount, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, typeof(AutoMagicalSync_ValueChanges_Message));
+            SerializeWhole_BundleOfChoice(changes, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, typeof(AutoMagicalSync_ValueChanges_Message), out bundleFragments);
         }
 
-        private static byte[] SerializeWhole_NowAtRestBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture)
+        private static void SerializeWhole_NowAtRestBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture, out WholeBundleOfChoiceFragments bundleFragments)
         {
-            return SerializeWhole_BundleOfChoice(changes, byteArrayPool, out bytesUsedCount, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, typeof(AutoMagicalSync_ValuesNowAtRest_Message));
+            SerializeWhole_BundleOfChoice(changes, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, typeof(AutoMagicalSync_ValuesNowAtRest_Message), out bundleFragments);
         }
 
-        private static byte[] SerializeWhole_BundleOfChoice(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, out int bytesUsedCount, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture, Type chosenBundleType)
+
+        internal class WholeBundleOfChoiceFragments
         {
-            if (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset)
+            public const int FRAGMENT_MAX_COUNT = 256;
+
+            internal int fragmentCount;
+            internal readonly byte[][] fragmentBytes;
+            internal readonly int[] fragmentBytesUsedCount;
+
+            internal WholeBundleOfChoiceFragments()
             {
-                throw new ArgumentOutOfRangeException(nameof(filterUsingOwnerAuthorityId));
+                fragmentCount = 0;
+                fragmentBytes = new byte[FRAGMENT_MAX_COUNT][];
+                fragmentBytesUsedCount = new int[FRAGMENT_MAX_COUNT];
+            }
+        }
+
+        static readonly ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments> wholeBundleOfChoiceBuffersByThread = new ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments>(4, 4);
+
+        /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
+        private static void SerializeWhole_BundleOfChoice(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture, Type chosenBundleType, out WholeBundleOfChoiceFragments bundleFragments)
+        {
+            if (!wholeBundleOfChoiceBuffersByThread.TryGetValue(Thread.CurrentThread, out bundleFragments))
+            {
+                wholeBundleOfChoiceBuffersByThread[Thread.CurrentThread] = bundleFragments = new WholeBundleOfChoiceFragments();
             }
 
-            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
+            int countTotal = changes.Count;
+            int countFiltered = SerializeBody_ChangesBundle_PRE_OrderAndCountFiltered(changes, filterUsingOwnerAuthorityId);
+            int individualChangesCountRemaining = countFiltered;
+            bundleFragments.fragmentCount = 0;
+
+            if (countFiltered == 0)
             {
-                { // header...just message type/id...well, and now time 
-                    uint messageID = messageTypeToMessageIDMap[chosenBundleType];
-                    bitStream.WriteUInt(messageID);
+                return;
+            }
 
-                    bitStream.WriteLong(elapsedTicksAtCapture);
-                }
+            int lastIndexUsed = 0;
 
-                int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId); // body
-                if (changesInBundleCount > 0)
+            while (individualChangesCountRemaining > 0)
+            {
+                using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
                 {
-                    bitStream.WriteCurrentPartialByte();
+                    { // header...just message type/id...well, and now time 
+                        uint messageID = messageTypeToMessageIDMap[chosenBundleType];
+                        bitStream.WriteUInt(messageID);
 
-                    bytesUsedCount = bitStream.Length_WrittenBytes;
-                    byte[] bytes = byteArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+                        bitStream.WriteLong(elapsedTicksAtCapture);
+                    }
 
-                    return bytes;
-                }
-                else
-                {
-                    bytesUsedCount = 0;
-                    return EMPTY_CHANGES_BUNDLE;
+                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed); // body
+                    if (changesInBundleCount > 0)
+                    {
+                        bitStream.WriteCurrentPartialByte();
+
+                        var byteCount = bitStream.Length_WrittenBytes;
+                        bundleFragments.fragmentBytesUsedCount[bundleFragments.fragmentCount] = byteCount;
+                        byte[] bytes = byteArrayPool.Borrow(byteCount);
+                        Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, byteCount);
+                        bundleFragments.fragmentBytes[bundleFragments.fragmentCount] = bytes;
+
+                        individualChangesCountRemaining -= changesInBundleCount;
+                        bundleFragments.fragmentCount++;
+                    }
+                    else
+                    {
+                        if (individualChangesCountRemaining > 0)
+                        {
+                            GONetLog.Warning("Why mismatch in remaining expected versus actual.  This could be serious!");
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -3137,13 +3243,15 @@ namespace GONet
         }
 
         /// <summary>
-        /// Returns the number of changes actually included in/added to the <paramref name="bitStream_headerAlreadyWritten"/> AFTER any filtering this method does (e.g., checking <paramref name="filterUsingOwnerAuthorityId"/>).
+        /// This is to be called only ONCE prior to possible multiple calls to <see cref="SerializeBody_ChangesBundle(List{AutoMagicalSync_ValueMonitoringSupport_ChangedValue}, BitByBitByteArrayBuilder, ushort)"/>
+        /// since ordering and filtering count only needs to be done once.
+        /// POST: <paramref name="changes"/> are ordered in place
         /// </summary>
-        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId)
+        /// <returns>the filtered count of items in <paramref name="changes"/> using <paramref name="filterUsingOwnerAuthorityId"/> as the filtering out criteria</returns>
+        /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
+        private static int SerializeBody_ChangesBundle_PRE_OrderAndCountFiltered(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ushort filterUsingOwnerAuthorityId)
         {
-            int countTotal = changes.Count;
-            int countMinus1 = countTotal - 1;
-
+            int countMinus1 = changes.Count - 1;
             int countFiltered = 0;
             for (int iSort = 0; iSort < countMinus1; ++iSort) // manual sort to avoid GC
             {
@@ -3170,11 +3278,21 @@ namespace GONet
                 return 0; // <<<<<<<<<<<============================================================================  bail out early if there is nothing to add to bundle!!!!
             }
 
-            bitStream_headerAlreadyWritten.WriteUShort((ushort)countFiltered);
-            //GONetLog.AppendLine(string.Concat("about to send changes bundle...countFiltered: " + countFiltered));
+            return countFiltered;
+        }
+
+        /// <summary>
+        /// Returns the number of changes actually included in/added to the <paramref name="bitStream_headerAlreadyWritten"/> AFTER any filtering this method does (e.g., checking <paramref name="filterUsingOwnerAuthorityId"/>).
+        /// </summary>
+        /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
+        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId, ref int lastIndexUsed)
+        {
+            int countTotal = changes.Count;
+            int changesInBundle = 0;
 
             Queue<IGONetEvent> syncEventQueue = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
-            for (int i = 0; i < countTotal; ++i)
+            const int CUTOFF = SerializationUtils.MTU; // TODO we can go higher when compression used
+            for (int i = lastIndexUsed; i < countTotal && bitStream_headerAlreadyWritten.Length_WrittenBytes < CUTOFF; ++i) // only keep going on this if under MTU so the bundle does not get turned into fragments inside the low level networking layer...we handle at higher level in gonet now
             {
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
                 if (!ShouldSendChange(change, filterUsingOwnerAuthorityId))
@@ -3182,7 +3300,12 @@ namespace GONet
                     continue; // skip this guy (i.e., apply the "filter")
                 }
 
-                syncEventQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
+                lastIndexUsed = i;
+                ++changesInBundle;
+
+#if PROCESS_SYNC_EVENTS
+               syncEventQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.OutboundToOthers, Time.ElapsedTicks, filterUsingOwnerAuthorityId, change.syncCompanion, change.index));
+#endif
 
                 if (change.syncCompanion.gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset)
                 {
@@ -3204,19 +3327,23 @@ namespace GONet
             }
             //GONetLog.Append_FlushDebug();
 
-            return countFiltered;
+            bitStream_headerAlreadyWritten.WriteUInt(GONetParticipant.GONetId_Unset); // indicates end of bundle!  we write regardless of if changes added up top or not...no real harm
+
+            return changesInBundle;
         }
 
+        /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ShouldSendChange(AutoMagicalSync_ValueMonitoringSupport_ChangedValue change, ushort filterUsingOwnerAuthorityId)
         {
             return
                 change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
                 (IsServer
-                    ? (gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
+                    ? (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset || // the unset value is now possible to send here to incidate no filtering!
+                       (gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
                         (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change except for changes back to the owner itself
                                                                                                                // TODO try to make this work as an option: || IsThisChangeTheMomentOfInception(change)
-                            || change.index == GONetParticipant.ASSumed_GONetId_INDEX)) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
+                            || change.index == GONetParticipant.ASSumed_GONetId_INDEX))) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
                     : change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId); // clients should only send out changes it owns
         }
 
@@ -3272,13 +3399,16 @@ namespace GONet
 
         private static void DeserializeBody_BundleOfChoice(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend, Type chosenBundleType)
         {
-            ushort count;
-            bitStream_headerAlreadyRead.ReadUShort(out count);
-            //GONetLog.AppendLine(string.Concat("about to read changes bundle...count: " + count));
-            for (int i = 0; i < count; ++i)
+            while (true)
             {
                 uint gonetIdAtInstantiation;
                 bitStream_headerAlreadyRead.ReadUInt(out gonetIdAtInstantiation);
+
+                if (gonetIdAtInstantiation == GONetParticipant.GONetId_Unset) // unset is the signal that no more to read!
+                {
+                    break;
+                }
+
                 //GONetLog.Append(gonetIdAtInstantiation + ", ");
 
                 uint gonetId = GetCurrentGONetIdByIdAtInstantiation(gonetIdAtInstantiation);
@@ -3293,7 +3423,8 @@ namespace GONet
                         const string GLAD = "Reliable changes bundle being process and GONetParticipant NOT FOUND by GONetId: ";
                         const string INST = " gonetId@instantiation(as found in serialized body): ";
                         const string COUNT = "  This will cause us not to be able to process this and the rest of the bundle, which means we will not process count: ";
-                        throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT, (count - i)));
+                        //throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT, (count - i)));
+                        throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT));
                     }
                     else
                     {
@@ -3321,29 +3452,38 @@ namespace GONet
 
                     byte index = (byte)bitStream_headerAlreadyRead.ReadByte();
 
-                    if (isBundleTypeValueChanges)
+                    if (gonetParticipant.IsMine) // with recent changes, bundles all all the same for all clients, which means you will receive your own stuff too...essentially want to skip, but have to move the bit reader forward!
                     {
-                        syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
-
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
-
-                        syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                        syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index);
                     }
-                    else // ASSume values now at rest bundle
+                    else
                     {
-                        // clear out the value blending buffer if appropriate and also ensure the value gets set instead of only added to blending buffer!
-                        if (syncCompanion.valuesChangesSupport[index].syncAttribute_ShouldBlendBetweenValuesReceived)
+                        if (isBundleTypeValueChanges)
                         {
-                            syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges(); // this effectively ensures that the new value at rest value is the one applied and no blending will occur since this is the only value in the blending buffer....neat trick to not need additional code to make sure we apply this new value at rest now!
-                            //GONetLog.Debug("just cleared most recent changes due to at rest....initial time sent: " + TimeSpan.FromTicks(elapsedTicksAtSend).TotalSeconds);
-                        }
-                        syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                            syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
-                        /* TODO change this to an at rest message?  probably not needed...leave commented out for now until deemed useful
-                        AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+                            AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
 
+#if PROCESS_SYNC_EVENTS
                         syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
-                        */
+#endif
+                        }
+                        else // ASSume values now at rest bundle
+                        {
+                            // clear out the value blending buffer if appropriate and also ensure the value gets set instead of only added to blending buffer!
+                            if (syncCompanion.valuesChangesSupport[index].syncAttribute_ShouldBlendBetweenValuesReceived)
+                            {
+                                syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges(); // this effectively ensures that the new value at rest value is the one applied and no blending will occur since this is the only value in the blending buffer....neat trick to not need additional code to make sure we apply this new value at rest now!
+                                                                                                    //GONetLog.Debug("just cleared most recent changes due to at rest....initial time sent: " + TimeSpan.FromTicks(elapsedTicksAtSend).TotalSeconds);
+                            }
+                            syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+
+                            /* TODO change this to an at rest message?  probably not needed...leave commented out for now until deemed useful
+                            AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+
+                            syncValueChanges_ReceivedFromOtherQueue.Enqueue(GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.CreateInstance(SyncEvent_ValueChangeProcessedExplanation.InboundFromOther, elapsedTicksAtSend, sourceOfChangeConnection.OwnerAuthorityId, changedValue.syncCompanion, changedValue.index));
+                            */
+                        }
                     }
                 }
                 catch (Exception e)
@@ -3385,7 +3525,27 @@ namespace GONet
             }
         }
 
-        #endregion
+#endregion
+        /// <summary>
+        /// A breadth first search for child transforms that goes deep into children, which is not the case with <see cref="Transform.Find(string)"/>
+        /// </summary>
+        public static Transform FindDeep(this Transform transform, string childName)
+        {
+            Transform result = transform.Find(childName);
+            if (result == null)
+            {
+                int count = transform.childCount;
+                for (int i = 0; i < count; ++i)
+                {
+                    result = transform.GetChild(i).FindDeep(childName);
+                    if (result != null)
+                    {
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
     }
 
     [Serializable]

@@ -109,7 +109,7 @@ namespace GONet
                 case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
                 case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
                 case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
-                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion.eulerAngles == right.unityEngine_Quaternion.eulerAngles; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
@@ -489,6 +489,12 @@ namespace GONet
     {
         void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound);
 
+        /// <summary>
+        /// Since the way this custom serializer may or may not perform quantization during <see cref="Serialize(BitByBitByteArrayBuilder, GONetParticipant, GONetSyncableValue)"/>, 
+        /// this method is helpful to know if two values are considered the same *IF* quantization is part of the equation.
+        /// </summary>
+        bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB);
+        
         /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
         void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value);
 
@@ -539,6 +545,16 @@ namespace GONet
 
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.x), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.y), bitsPerComponent);
+        }
+
+        public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            Vector2 vector2A = valueA.UnityEngine_Vector2;
+            Vector2 vector2B = valueB.UnityEngine_Vector2;
+
+            return
+                quantizer.Quantize(vector2A.x) == quantizer.Quantize(vector2B.x) &&
+                quantizer.Quantize(vector2A.y) == quantizer.Quantize(vector2B.y);
         }
     }
 
@@ -613,6 +629,17 @@ namespace GONet
                 bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
             }
         }
+
+        public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            Vector3 vector3A = valueA.UnityEngine_Vector3;
+            Vector3 vector3B = valueB.UnityEngine_Vector3;
+
+            return
+                quantizer.Quantize(vector3A.x) == quantizer.Quantize(vector3B.x) &&
+                quantizer.Quantize(vector3A.y) == quantizer.Quantize(vector3B.y) &&
+                quantizer.Quantize(vector3A.z) == quantizer.Quantize(vector3B.z);
+        }
     }
 
     public class Vector4Serializer : IGONetAutoMagicalSync_CustomSerializer
@@ -663,6 +690,18 @@ namespace GONet
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.y), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.z), bitsPerComponent);
             bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.w), bitsPerComponent);
+        }
+
+        public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            Vector4 vector4A = valueA.UnityEngine_Vector4;
+            Vector4 vector4B = valueB.UnityEngine_Vector4;
+
+            return
+                quantizer.Quantize(vector4A.x) == quantizer.Quantize(vector4B.x) &&
+                quantizer.Quantize(vector4A.y) == quantizer.Quantize(vector4B.y) &&
+                quantizer.Quantize(vector4A.z) == quantizer.Quantize(vector4B.z) &&
+                quantizer.Quantize(vector4A.w) == quantizer.Quantize(vector4B.w);
         }
     }
 
@@ -777,6 +816,16 @@ namespace GONet
             uint SmallestB;
             uint SmallestC;
 
+            Quantize(value, out LargestIndex, out SmallestA, out SmallestB, out SmallestC);
+
+            bitStream_appendTo.WriteUInt(LargestIndex, 2);
+            bitStream_appendTo.WriteUInt(SmallestA, bitsPerSmallestThreeItem);
+            bitStream_appendTo.WriteUInt(SmallestB, bitsPerSmallestThreeItem);
+            bitStream_appendTo.WriteUInt(SmallestC, bitsPerSmallestThreeItem);
+        }
+
+        private void Quantize(GONetSyncableValue value, out uint largestIndex, out uint smallestA, out uint smallestB, out uint smallestC)
+        {
             Quaternion quattie = value.UnityEngine_Quaternion;
             float x = quattie.x;
             float y = quattie.y;
@@ -788,24 +837,24 @@ namespace GONet
             float zABS = Math.Abs(z);
             float wABS = Math.Abs(w);
 
-            LargestIndex = 0;
+            largestIndex = 0;
             float largestValue = xABS;
 
             if (yABS > largestValue)
             {
-                LargestIndex = 1;
+                largestIndex = 1;
                 largestValue = yABS;
             }
 
             if (zABS > largestValue)
             {
-                LargestIndex = 2;
+                largestIndex = 2;
                 largestValue = zABS;
             }
 
             if (wABS > largestValue)
             {
-                LargestIndex = 3;
+                largestIndex = 3;
                 largestValue = wABS;
             }
 
@@ -813,7 +862,7 @@ namespace GONet
             float b = 0f;
             float c = 0f;
 
-            switch (LargestIndex)
+            switch (largestIndex)
             {
                 case 0:
                     if (x >= 0)
@@ -881,14 +930,26 @@ namespace GONet
             }
 
 
-            SmallestA = quantizer.Quantize(a);
-            SmallestB = quantizer.Quantize(b);
-            SmallestC = quantizer.Quantize(c);
+            smallestA = quantizer.Quantize(a);
+            smallestB = quantizer.Quantize(b);
+            smallestC = quantizer.Quantize(c);
+        }
 
-            bitStream_appendTo.WriteUInt(LargestIndex, 2);
-            bitStream_appendTo.WriteUInt(SmallestA, bitsPerSmallestThreeItem);
-            bitStream_appendTo.WriteUInt(SmallestB, bitsPerSmallestThreeItem);
-            bitStream_appendTo.WriteUInt(SmallestC, bitsPerSmallestThreeItem);
+        public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            uint LargestIndex_A, LargestIndex_B;
+            uint SmallestA_A, SmallestA_B;
+            uint SmallestB_A, SmallestB_B;
+            uint SmallestC_A, SmallestC_B;
+
+            Quantize(valueA, out LargestIndex_A, out SmallestA_A, out SmallestB_A, out SmallestC_A);
+            Quantize(valueB, out LargestIndex_B, out SmallestA_B, out SmallestB_B, out SmallestC_B);
+
+            return
+                LargestIndex_A == LargestIndex_B &&
+                SmallestA_A == SmallestA_B &&
+                SmallestB_A == SmallestB_B &&
+                SmallestC_A == SmallestC_B;
         }
     }
 }

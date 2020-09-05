@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Generation;
 using GONet.Utils;
 using System.Collections.Generic;
 using System.Linq;
@@ -243,6 +244,19 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                                         GUILayout.MinWidth(70), GUILayout.ExpandWidth(true));
 
                                     GONetAutoMagicalSyncAttribute autoSyncMember_SyncAttribute = (GONetAutoMagicalSyncAttribute)autoSyncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+
+                                    { // is at rest?
+                                        GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = GONetMain.GetSyncCompanionByGNP(targetGONetParticipant);
+
+                                        byte index = 0;
+                                        if (syncCompanion != null && syncCompanion.TryGetIndexByMemberName(autoSyncMember.Name, out index))
+                                        {
+                                            bool isAtRest = syncCompanion != null ? syncCompanion.IsValueAtRest(index) : false;
+                                            EditorGUILayout.LabelField("At_Rest?");
+                                            EditorGUILayout.Toggle(isAtRest);
+                                        }
+                                    }
+
                                     DrawGONetSyncProfileTemplateButton(autoSyncMember_SyncAttribute.SettingsProfileTemplateName, siblingMonoBehaviour);
 
                                     EditorGUILayout.EndHorizontal();

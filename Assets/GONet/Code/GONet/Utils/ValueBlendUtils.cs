@@ -227,7 +227,7 @@ namespace GONet.Utils
                                             older.numericValue.UnityEngine_Quaternion,
                                             newer.numericValue.UnityEngine_Quaternion,
                                             interpolationTime);
-                                        //GONetLog.Debug("we loip'd 'eem");
+                                        //GONetLog.Debug("we loip'd 'eem. are they the same value, which should only be the case if our recent quantization equality checks are not working? " + (older.numericValue.UnityEngine_Quaternion.eulerAngles == newer.numericValue.UnityEngine_Quaternion.eulerAngles ? "Yes" : "No"));
                                         didWeLoip = true;
                                         break;
                                     }

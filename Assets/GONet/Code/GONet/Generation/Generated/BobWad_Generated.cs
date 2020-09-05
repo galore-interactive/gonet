@@ -155,7 +155,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.UInt32 valuePrevious;
 		[MessagePack.Key(7)] public System.UInt32 valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_GONetId> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_GONetId>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_GONetId> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_GONetId>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_GONetId> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_GONetId>();
         static System.Threading.Thread borrowThread;
 
@@ -235,7 +235,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_IsPositionSyncd> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_IsPositionSyncd>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_IsPositionSyncd> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_IsPositionSyncd>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_IsPositionSyncd> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_IsPositionSyncd>();
         static System.Threading.Thread borrowThread;
 
@@ -315,7 +315,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_IsRotationSyncd> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_IsRotationSyncd>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_IsRotationSyncd> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_IsRotationSyncd>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_IsRotationSyncd> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_IsRotationSyncd>();
         static System.Threading.Thread borrowThread;
 
@@ -395,7 +395,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.UInt16 valuePrevious;
 		[MessagePack.Key(7)] public System.UInt16 valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_OwnerAuthorityId> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_OwnerAuthorityId>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetParticipant_OwnerAuthorityId> pool = new Utils.ObjectPool<SyncEvent_GONetParticipant_OwnerAuthorityId>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_OwnerAuthorityId> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetParticipant_OwnerAuthorityId>();
         static System.Threading.Thread borrowThread;
 
@@ -475,7 +475,7 @@ namespace GONet
 		[MessagePack.Key(6)] public UnityEngine.Quaternion valuePrevious;
 		[MessagePack.Key(7)] public UnityEngine.Quaternion valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_Transform_rotation> pool = new Utils.ObjectPool<SyncEvent_Transform_rotation>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_Transform_rotation> pool = new Utils.ObjectPool<SyncEvent_Transform_rotation>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_Transform_rotation> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_Transform_rotation>();
         static System.Threading.Thread borrowThread;
 
@@ -555,7 +555,7 @@ namespace GONet
 		[MessagePack.Key(6)] public UnityEngine.Vector3 valuePrevious;
 		[MessagePack.Key(7)] public UnityEngine.Vector3 valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_Transform_position> pool = new Utils.ObjectPool<SyncEvent_Transform_position>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_Transform_position> pool = new Utils.ObjectPool<SyncEvent_Transform_position>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_Transform_position> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_Transform_position>();
         static System.Threading.Thread borrowThread;
 
@@ -635,7 +635,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_A>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_A> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_A>();
         static System.Threading.Thread borrowThread;
 
@@ -715,7 +715,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_D>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_D> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_D>();
         static System.Threading.Thread borrowThread;
 
@@ -795,7 +795,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_DownArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_DownArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_DownArrow>();
         static System.Threading.Thread borrowThread;
 
@@ -875,7 +875,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_LeftArrow>();
         static System.Threading.Thread borrowThread;
 
@@ -955,7 +955,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_RightArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_RightArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_RightArrow>();
         static System.Threading.Thread borrowThread;
 
@@ -1035,7 +1035,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_S>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_S> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_S>();
         static System.Threading.Thread borrowThread;
 
@@ -1115,7 +1115,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_UpArrow>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_UpArrow> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_UpArrow>();
         static System.Threading.Thread borrowThread;
 
@@ -1195,7 +1195,7 @@ namespace GONet
 		[MessagePack.Key(6)] public System.Boolean valuePrevious;
 		[MessagePack.Key(7)] public System.Boolean valueNew;
 
-        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W> pool = new Utils.ObjectPool<SyncEvent_GONetSampleInputSync_GetKey_W>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_W> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<SyncEvent_GONetSampleInputSync_GetKey_W>();
         static System.Threading.Thread borrowThread;
 
