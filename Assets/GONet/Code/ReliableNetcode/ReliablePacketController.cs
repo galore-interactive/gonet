@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -123,13 +124,23 @@ namespace ReliableNetcode
         {
             this.timeSeconds = newTimeSeconds;
 
+            bool doYouCareAboutPayingTheCostToCalculate = false;
+            if (doYouCareAboutPayingTheCostToCalculate)
+            {
+                UpdateUsageStatistics();
+            }
+        }
+
+        private void UpdateUsageStatistics()
+        {
             // calculate packet loss
             {
                 uint baseSequence = (uint)((sentPackets.sequence - config.SentPacketBufferSize + 1) + 0xFFFF);
 
                 int numDropped = 0;
                 int numSamples = config.SentPacketBufferSize >> 1; // config.SentPacketBufferSize / 2;
-                for (int i = 0; i < numSamples; i++) {
+                for (int i = 0; i < numSamples; i++)
+                {
                     ushort sequence = (ushort)(baseSequence + i);
                     var sentPacketData = sentPackets.Find(sequence);
                     if (sentPacketData != null && !sentPacketData.acked)
@@ -141,10 +152,12 @@ namespace ReliableNetcode
                 {
                     packetLoss = 0;
                 }
-                if (Math.Abs(this.packetLoss - packetLoss) > 0.00001f) {
+                if (Math.Abs(this.packetLoss - packetLoss) > 0.00001f)
+                {
                     this.packetLoss += (packetLoss - this.packetLoss) * config.PacketLossSmoothingFactor;
                 }
-                else {
+                else
+                {
                     this.packetLoss = packetLoss;
                 }
             }
@@ -157,7 +170,8 @@ namespace ReliableNetcode
                 double startTime = double.MaxValue;
                 double finishTime = 0.0;
                 int numSamples = config.SentPacketBufferSize / 2;
-                for (int i = 0; i < numSamples; i++) {
+                for (int i = 0; i < numSamples; i++)
+                {
                     ushort sequence = (ushort)(baseSequence + i);
                     var sentPacketData = sentPackets.Find(sequence);
                     if (sentPacketData == null) continue;
@@ -167,16 +181,19 @@ namespace ReliableNetcode
                     finishTime = (finishTime > sentPacketData.timeSeconds) ? finishTime : sentPacketData.timeSeconds; // Math.Max(finishTime, sentPacketData.time);
                 }
 
-                if (startTime != double.MaxValue && finishTime != 0.0) {
+                if (startTime != double.MaxValue && finishTime != 0.0)
+                {
                     float sentBandwidth = (float)bytesSent / (float)(finishTime - startTime) * 8f / 1000f;
                     if (float.IsNaN(sentBandwidth) || float.IsInfinity(sentBandwidth))
                     {
                         sentBandwidth = 0;
                     }
-                    if (Math.Abs(this.sentBandwidthKBPS - sentBandwidth) > 0.00001f) {
+                    if (Math.Abs(this.sentBandwidthKBPS - sentBandwidth) > 0.00001f)
+                    {
                         this.sentBandwidthKBPS += (sentBandwidth - this.sentBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
-                    else {
+                    else
+                    {
                         this.sentBandwidthKBPS = sentBandwidth;
                     }
                 }
@@ -191,7 +208,8 @@ namespace ReliableNetcode
                 double startTime = double.MaxValue;
                 double finishTime = 0.0;
                 int numSamples = config.ReceivedPacketBufferSize / 2;
-                for (int i = 0; i < numSamples; i++) {
+                for (int i = 0; i < numSamples; i++)
+                {
                     ushort sequence = (ushort)(baseSequence + i);
                     var receivedPacketData = receivedPackets.Find(sequence);
                     if (receivedPacketData == null) continue;
@@ -201,16 +219,19 @@ namespace ReliableNetcode
                     finishTime = (finishTime > receivedPacketData.time) ? finishTime : receivedPacketData.time; // Math.Max(finishTime, receivedPacketData.time);
                 }
 
-                if (startTime != double.MaxValue && finishTime != 0.0) {
+                if (startTime != double.MaxValue && finishTime != 0.0)
+                {
                     float receivedBandwidth = (float)bytesReceived / (float)(finishTime - startTime) * 8f / 1000f;
                     if (float.IsNaN(receivedBandwidth) || float.IsInfinity(receivedBandwidth))
                     {
                         receivedBandwidth = 0;
                     }
-                    if (Math.Abs(this.receivedBandwidthKBPS - receivedBandwidth) > 0.00001f) {
+                    if (Math.Abs(this.receivedBandwidthKBPS - receivedBandwidth) > 0.00001f)
+                    {
                         this.receivedBandwidthKBPS += (receivedBandwidth - this.receivedBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
-                    else {
+                    else
+                    {
                         this.receivedBandwidthKBPS = receivedBandwidth;
                     }
                 }
@@ -224,7 +245,8 @@ namespace ReliableNetcode
                 double startTime = double.MaxValue;
                 double finishTime = 0.0;
                 int numSamples = config.SentPacketBufferSize / 2;
-                for (int i = 0; i < numSamples; i++) {
+                for (int i = 0; i < numSamples; i++)
+                {
                     ushort sequence = (ushort)(baseSequence + i);
                     var sentPacketData = sentPackets.Find(sequence);
                     if (sentPacketData == null || sentPacketData.acked == false) continue;
@@ -234,16 +256,19 @@ namespace ReliableNetcode
                     finishTime = (finishTime > sentPacketData.timeSeconds) ? finishTime : sentPacketData.timeSeconds; // Math.Max(finishTime, sentPacketData.time);
                 }
 
-                if (startTime != double.MaxValue && finishTime != 0.0) {
+                if (startTime != double.MaxValue && finishTime != 0.0)
+                {
                     float ackedBandwidth = (float)bytesSent / (float)(finishTime - startTime) * 8f / 1000f;
                     if (float.IsNaN(ackedBandwidth) || float.IsInfinity(ackedBandwidth))
                     {
                         ackedBandwidth = 0;
                     }
-                    if (Math.Abs(this.ackedBandwidthKBPS - ackedBandwidth) > 0.00001f) {
+                    if (Math.Abs(this.ackedBandwidthKBPS - ackedBandwidth) > 0.00001f)
+                    {
                         this.ackedBandwidthKBPS += (ackedBandwidth - this.ackedBandwidthKBPS) * config.BandwidthSmoothingFactor;
                     }
-                    else {
+                    else
+                    {
                         this.ackedBandwidthKBPS = ackedBandwidth;
                     }
                 }

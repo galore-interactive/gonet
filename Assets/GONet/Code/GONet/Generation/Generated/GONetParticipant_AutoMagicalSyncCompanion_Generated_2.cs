@@ -95,6 +95,8 @@ namespace GONet.Generation
             support0.baselineValue_current.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue_previous.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support0.valueLimitEncountered_min.System_UInt32 = GONetParticipant.GONetId; 
+			support0.valueLimitEncountered_max.System_UInt32 = GONetParticipant.GONetId; 
 			support0.syncCompanion = this;
 			support0.memberName = "GONetId";
 			support0.index = 0;
@@ -113,6 +115,8 @@ namespace GONet.Generation
             support1.baselineValue_current.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue_previous.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support1.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsPositionSyncd; 
+			support1.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsPositionSyncd; 
 			support1.syncCompanion = this;
 			support1.memberName = "IsPositionSyncd";
 			support1.index = 1;
@@ -130,6 +134,8 @@ namespace GONet.Generation
             support2.baselineValue_current.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue_previous.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support2.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsRotationSyncd; 
+			support2.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsRotationSyncd; 
 			support2.syncCompanion = this;
 			support2.memberName = "IsRotationSyncd";
 			support2.index = 2;
@@ -147,6 +153,8 @@ namespace GONet.Generation
             support3.baselineValue_current.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue_previous.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support3.valueLimitEncountered_min.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
+			support3.valueLimitEncountered_max.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
 			support3.syncCompanion = this;
 			support3.memberName = "OwnerAuthorityId";
 			support3.index = 3;
@@ -164,6 +172,8 @@ namespace GONet.Generation
             support4.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_A; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_A; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_A; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support4.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_A; 
+			support4.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_A; 
 			support4.syncCompanion = this;
 			support4.memberName = "GetKey_A";
 			support4.index = 4;
@@ -181,6 +191,8 @@ namespace GONet.Generation
             support5.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_D; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_D; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_D; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support5.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_D; 
+			support5.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_D; 
 			support5.syncCompanion = this;
 			support5.memberName = "GetKey_D";
 			support5.index = 5;
@@ -198,6 +210,8 @@ namespace GONet.Generation
             support6.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_DownArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support6.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_DownArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support6.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_DownArrow; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support6.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_DownArrow; 
+			support6.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_DownArrow; 
 			support6.syncCompanion = this;
 			support6.memberName = "GetKey_DownArrow";
 			support6.index = 6;
@@ -215,6 +229,8 @@ namespace GONet.Generation
             support7.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_LeftArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support7.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_LeftArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support7.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_LeftArrow; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support7.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_LeftArrow; 
+			support7.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_LeftArrow; 
 			support7.syncCompanion = this;
 			support7.memberName = "GetKey_LeftArrow";
 			support7.index = 7;
@@ -232,6 +248,8 @@ namespace GONet.Generation
             support8.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_RightArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support8.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_RightArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support8.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_RightArrow; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support8.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_RightArrow; 
+			support8.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_RightArrow; 
 			support8.syncCompanion = this;
 			support8.memberName = "GetKey_RightArrow";
 			support8.index = 8;
@@ -249,6 +267,8 @@ namespace GONet.Generation
             support9.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_S; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support9.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_S; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support9.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_S; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support9.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_S; 
+			support9.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_S; 
 			support9.syncCompanion = this;
 			support9.memberName = "GetKey_S";
 			support9.index = 9;
@@ -266,6 +286,8 @@ namespace GONet.Generation
             support10.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_UpArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support10.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_UpArrow; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support10.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_UpArrow; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support10.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_UpArrow; 
+			support10.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_UpArrow; 
 			support10.syncCompanion = this;
 			support10.memberName = "GetKey_UpArrow";
 			support10.index = 10;
@@ -283,6 +305,8 @@ namespace GONet.Generation
             support11.baselineValue_current.System_Boolean = GONetSampleInputSync.GetKey_W; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support11.lastKnownValue.System_Boolean = GONetSampleInputSync.GetKey_W; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support11.lastKnownValue_previous.System_Boolean = GONetSampleInputSync.GetKey_W; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support11.valueLimitEncountered_min.System_Boolean = GONetSampleInputSync.GetKey_W; 
+			support11.valueLimitEncountered_max.System_Boolean = GONetSampleInputSync.GetKey_W; 
 			support11.syncCompanion = this;
 			support11.memberName = "GetKey_W";
 			support11.index = 11;
@@ -300,6 +324,8 @@ namespace GONet.Generation
             support12.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support12.lastKnownValue.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support12.lastKnownValue_previous.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support12.valueLimitEncountered_min.UnityEngine_Quaternion = Transform.rotation; 
+			support12.valueLimitEncountered_max.UnityEngine_Quaternion = Transform.rotation; 
 			support12.syncCompanion = this;
 			support12.memberName = "rotation";
 			support12.index = 12;
@@ -322,6 +348,8 @@ namespace GONet.Generation
             support13.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support13.lastKnownValue.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support13.lastKnownValue_previous.UnityEngine_Vector3 = Transform.position; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support13.valueLimitEncountered_min.UnityEngine_Vector3 = Transform.position; 
+			support13.valueLimitEncountered_max.UnityEngine_Vector3 = Transform.position; 
 			support13.syncCompanion = this;
 			support13.memberName = "position";
 			support13.index = 13;

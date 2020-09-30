@@ -2569,6 +2569,11 @@ PrefabInstance:
       propertyPath: designTimeLocation
       value: scene://ProjectileTest/GONet_GlobalContext
       objectReference: {fileID: 0}
+    - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: codeGenerationId
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: valueBlendingBufferLeadTimeMilliseconds

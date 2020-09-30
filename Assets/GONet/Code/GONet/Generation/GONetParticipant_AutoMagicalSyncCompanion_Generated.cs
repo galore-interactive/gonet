@@ -151,6 +151,7 @@ namespace GONet.Generation
                     {
                         if (valueChangeSupport.lastKnownValue == valueChangeSupport.lastKnownValue_previous)
                         {
+                            //bool doesAtRestEvenApply = false; // TODO FIXME put the real processing of at rest back: valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             bool doesAtRestEvenApply = valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             if (doesAtRestEvenApply)
                             { // if the value is the same and our at rest stuff applies here, we need to check if this is (newly) considered 'at rest' or not and act accordingly (i.e., signal that further action needs to be taken to tell others)
@@ -162,7 +163,6 @@ namespace GONet.Generation
                                 if (isConsideredAtRest)
                                 {
                                     lastKnownValueAtRestBits[i] |= LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST; // or in this value instead of assign because it might already be the value of LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED and we do not want to change that!
-
                                     if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
                                     {
                                         valuesAtRestToBroadcast.Add(valueChangeSupport);
@@ -308,6 +308,7 @@ namespace GONet.Generation
         /// <summary>
         /// PRE: <see cref="lastKnownValueChangesSinceLastCheck"/> still has true values in it and has not been reset via <see cref="OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping)"/>
         /// POST: <see cref="doesBaselineValueNeedAdjusting"/> is updated with true values for the baseline values needing adjustment, but adjustment is not applied until <see cref="ApplyAnnotatedBaselineValueAdjustments"/> is called later
+        /// POST: for the values where <see cref="lastKnownValueChangesSinceLastCheck"/> is true, calls to update min and max if we went past the previous min/max (e.g., <see cref="GONetSyncableValue.UpdateMinimumEncountered_IfApppropriate"/>)
         /// </summary>
         internal void AnnotateMyBaselineValuesNeedingAdjustment()
         {
@@ -327,6 +328,9 @@ namespace GONet.Generation
                         {
                             doesBaselineValueNeedAdjusting[i] = true;
                         }
+
+                        GONetSyncableValue.UpdateMinimumEncountered_IfApppropriate(ref valueChangeSupport.valueLimitEncountered_min, valueChangeSupport.lastKnownValue);
+                        GONetSyncableValue.UpdateMaximumEncountered_IfApppropriate(ref valueChangeSupport.valueLimitEncountered_max, valueChangeSupport.lastKnownValue);
                     }
                 }
             }
@@ -384,6 +388,18 @@ namespace GONet.Generation
             for (int i = 0; i < valuesCount; ++i)
             {
                 syncValuesToSend.Add(valuesChangesSupport[i]);
+            }
+        }
+
+        internal void ResetAtRestValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (!(lastKnownValueAtRestBits[i] != LAST_KNOWN_VALUE_NOT_AT_REST) && DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
+                {
+                    lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED;
+                }
             }
         }
     }

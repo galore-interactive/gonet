@@ -262,7 +262,22 @@ namespace GONet
             }
         }
 
-        public uint GONetIdAtInstantiation { get; private set; }
+        internal delegate void GNP_uint_Changed(GONetParticipant gonetParticipant);
+        internal event GNP_uint_Changed GONetIdAtInstantiationChanged;
+
+        /// <summary>
+        /// IMPORTANT: This is INTERNAL bud, so leave it alone!
+        /// </summary>
+        internal uint _GONetIdAtInstantiation;
+        public uint GONetIdAtInstantiation
+        { 
+            get => _GONetIdAtInstantiation; 
+            private set
+            { 
+                _GONetIdAtInstantiation = value; 
+                GONetIdAtInstantiationChanged?.Invoke(this);
+            }
+        }
 
         internal void SetGONetIdFromRemoteInstantiation(InstantiateGONetParticipantEvent instantiateEvent)
         {

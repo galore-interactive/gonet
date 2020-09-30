@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Utils;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -54,6 +55,40 @@ namespace GONet
         /// <para>Do NOT attempt to modify this collection as to avoid creating issues for yourself/others.</para>
         /// </summary>
         public IEnumerable<GONetParticipant> EnabledGONetParticipants => enabledGONetParticipants;
+        
+        public const string ServerIPAddress_Default = "127.0.0.1";
+        public const int ServerPort_Default = 40000;
+
+        public delegate void ServerConnectionInfoChanged(string serverIP, int serverPort);
+        public static event ServerConnectionInfoChanged ActualServerConnectionInfoSet;
+
+        public static bool AreAllServerConnectionInfoActualsSet => !string.IsNullOrWhiteSpace(serverIPAddress_Actual) && serverPort_Actual != -1;
+
+        /// <summary>
+        /// DO NOT SET THIS OUTSIDE GONET INTERNAL CODE!
+        /// </summary>
+        internal static string serverIPAddress_Actual;
+        /// <summary>
+        /// IMPORTANT: This will be NULL/empty when the actual serer ip address is not known!
+        /// </summary>
+        public static string ServerIPAddress_Actual { get => serverIPAddress_Actual; internal set { serverIPAddress_Actual = value; FireEventIfBothActualsSet(); } }
+
+        /// <summary>
+        /// DO NOT SET THIS OUTSIDE GONET INTERNAL CODE!
+        /// </summary>
+        internal static int serverPort_Actual = -1;
+        /// <summary>
+        /// IMPORTANT: This will be -1 when the actual serer ip address is not known!
+        /// </summary>
+        public static int ServerPort_Actual { get => serverPort_Actual; internal set { serverPort_Actual = value; FireEventIfBothActualsSet(); } }
+
+        private static void FireEventIfBothActualsSet()
+        {
+            if (AreAllServerConnectionInfoActualsSet)
+            {
+                ActualServerConnectionInfoSet?.Invoke(serverIPAddress_Actual, serverPort_Actual);
+            }
+        }
 
         protected override void Awake()
         {
@@ -81,7 +116,7 @@ namespace GONet
 
             if (shouldAttemptAutoStartAsClient)
             {
-                AttemptStartAsClientIfAppropriate();
+                Editor_AttemptStartAsClientIfAppropriate();
             }
         }
 
@@ -112,9 +147,15 @@ namespace GONet
             enabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
 
-        private void AttemptStartAsClientIfAppropriate()
+        private void Editor_AttemptStartAsClientIfAppropriate()
         {
-            bool isAppropriate = !GONetMain.IsServer && !GONetMain.IsClient && Application.isEditor;
+            bool isAppropriate = 
+                Application.isEditor &&
+                !GONetMain.IsClient && 
+                !GONetMain.IsServer && 
+                NetworkUtils.IsIPAddressOnLocalMachine(GONetGlobal.ServerIPAddress_Default) && // just for editor, we can assume we only want to auto start client when server running locally
+                NetworkUtils.IsLocalPortListening(GONetGlobal.ServerPort_Default); // just for editor, we can assume we only want to auto start client when server running locally
+            
             if (isAppropriate) // do not attempt to start a client when we already know this is the server...no matter what the shouldAttemptAutoStartAsClient set to true seems to indicate!
             {
                 var sampleSpawner = GetComponent<GONetSampleSpawner>();

@@ -56,6 +56,7 @@ namespace GONet
             server.OnClientConnected += OnClientConnected;
             server.OnClientDisconnected += OnClientDisconnected;
             server.OnClientMessageReceived += OnClientMessageReceived;
+            server.TickBeginning += Server_TickBeginning_PossibleSeparateThread;
 
             if (NetworkUtils.IsIPAddressOnLocalMachine(address))
             {
@@ -70,6 +71,15 @@ namespace GONet
             }
         }
 
+        private void Server_TickBeginning_PossibleSeparateThread()
+        {
+            for (int iConnection = 0; iConnection < numConnections; ++iConnection)
+            {
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
+                gONetConnection_ServerToClient.ProcessSendBuffer_IfAppropriate();
+            }
+        }
+
         /// <summary>
         /// If the server can start, it will and return true......returns false otherwise.
         /// </summary>
@@ -80,9 +90,9 @@ namespace GONet
                 server.Start(90); // NOTE: this starts a separate thread where the server's Tick method is called
                 GONetMain.isServerOverride = true; // wherever the server is running is automatically considered "the" server
             }
-            catch (Exception)
+            catch (Exception e)
             { // one main reason why here is if a server is already started on this machine on port....so this process will turn into a client
-                // TODO log
+                GONetLog.Error($"Attempting to start server failed due to exception of type: {e.GetType().Name} with message: {e.Message}");
                 return false;
             }
 

@@ -288,7 +288,11 @@ namespace NetcodeIO.NET
 			if (autoTick)
 			{
 				this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
-				ThreadPool.QueueUserWorkItem(clientTick_SeparateThread);
+
+				Thread tickThread = new Thread(clientTick_SeparateThread);
+				tickThread.Name = "GONet Client Tick";
+				tickThread.Priority = ThreadPriority.AboveNormal;
+				tickThread.Start();
 			}
 		}
 
@@ -340,9 +344,14 @@ namespace NetcodeIO.NET
 			serverToClientKey = null;
 		}
 
+		public delegate void Nathaniel();
+		public event Nathaniel TickBeginning;
+
 		internal void Tick(double time)
 		{
 			if (this.socket == null) return;
+
+			TickBeginning?.Invoke();
 
 			this.socket.Pump();
 
@@ -381,22 +390,31 @@ namespace NetcodeIO.NET
 		private double timer = 0.0;
 		private void clientTick_SeparateThread(Object stateInfo)
 		{
+			long lastStartTicks = DateTime.UtcNow.Ticks;
+			double tickLength = 1.0 / tickrate;
+			long tickDurationTicks = TimeSpan.FromSeconds(tickLength).Ticks;
+
 			while (isRunning)
 			{
-                try
-                {
-                    Tick(DateTime.UtcNow.GetTotalSeconds());
-                }
-                catch (Exception e)
-                {
-                    GONet.GONetLog.Error(string.Concat("Unexpected error while ticking in separate thread.  Exception.Type: ", e.GetType().Name, " Exception.Message: ", e.Message, " \nException.StackTrace: ", e.StackTrace));
-                }
-                finally
-                {
-                    // sleep until next tick
-                    double tickLength = 1.0 / tickrate;
-                    Thread.Sleep((int)(tickLength * 1000));
-                }
+				try
+				{
+					var utcNow = DateTime.UtcNow;
+					lastStartTicks = utcNow.Ticks;
+
+					Tick(utcNow.GetTotalSeconds());
+				}
+				catch (Exception e)
+				{
+					GONet.GONetLog.Error(string.Concat("Unexpected error while ticking in separate thread.  Exception.Type: ", e.GetType().Name, " Exception.Message: ", e.Message, " \nException.StackTrace: ", e.StackTrace));
+				}
+				finally
+				{
+					long ticksToSleep = tickDurationTicks - (DateTime.UtcNow.Ticks - lastStartTicks);
+					if (ticksToSleep > 0)
+					{
+						Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
+					}
+				}
 			}
 		}
 
@@ -724,7 +742,7 @@ namespace NetcodeIO.NET
 
             // send packet
             try {
-                socket.SendTo(packetBuffer, packetLen, currentServerEndpoint);
+                socket.SendToAsync(packetBuffer, packetLen, currentServerEndpoint);
             }
             catch { }
 

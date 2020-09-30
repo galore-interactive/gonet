@@ -20,12 +20,7 @@ namespace ReliableNetcode
 		/// <summary>
 		/// Message is not guaranteed delivery nor order
 		/// </summary>
-		Unreliable = 1,
-
-		/// <summary>
-		/// Message is not guaranteed delivery, but will be in order
-		/// </summary>
-		UnreliableOrdered = 2
+		Unreliable = 1
 	}
 
 	/// <summary>
@@ -84,7 +79,6 @@ namespace ReliableNetcode
 			{
 				_reliableChannel,
 				new UnreliableMessageChannel() { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage },
-				new UnreliableOrderedMessageChannel() { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage },
 			};
 		}
 
@@ -128,6 +122,12 @@ namespace ReliableNetcode
 
 			for (int i = 0; i < messageChannels.Length; i++)
 				messageChannels[i].Update(this.time);
+		}
+
+		public void ProcessSendBuffer_IfAppropriate()
+		{
+			for (int i = 0; i < messageChannels.Length; i++)
+				messageChannels[i].ProcessSendBuffer_IfAppropriate();
 		}
 
 		/// <summary>

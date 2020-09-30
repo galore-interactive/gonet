@@ -52,24 +52,24 @@ namespace GONet.Utils
         public byte Position_InnerByteBit => position_InnerByteBit;
 
         private int length_WrittenBytes;
-        public int Length_WrittenBytes => IsUsingBitWriterReader ? bitWriter.BitsWritten / 8 : length_WrittenBytes;
+        public int Length_WrittenBytes => isUsingBitWriterReader ? bitWriter.BitsWritten / 8 : length_WrittenBytes;
 
         private int position_Bytes;
-        public int Position_Bytes => IsUsingBitWriterReader ? bitReader.BitsRead / 8 : position_Bytes;
-        public int Position_Bits => IsUsingBitWriterReader ? bitReader.BitsRead : position_InnerByteBit == 0 ? (position_Bytes * 8) : ((position_Bytes - 1) * 8) + position_InnerByteBit;
+        public int Position_Bytes => isUsingBitWriterReader ? bitReader.BitsRead / 8 : position_Bytes;
+        public int Position_Bits => isUsingBitWriterReader ? bitReader.BitsRead : position_InnerByteBit == 0 ? (position_Bytes * 8) : ((position_Bytes - 1) * 8) + position_InnerByteBit;
 
 
         BitWriter bitWriter;
         BitReader bitReader;
-        public bool IsUsingBitWriterReader { get; private set; }
+        bool isUsingBitWriterReader;
 
         /// <summary>
         /// IMPORTANT: ALWAYS use true for <paramref name="shouldUseBitWriterReader"/> for an order of magnitude higher performance in the calls on this class!!!
         /// </summary>
         private BitByBitByteArrayBuilder(bool shouldUseBitWriterReader = true)
         {
-            IsUsingBitWriterReader = shouldUseBitWriterReader;
-            if (IsUsingBitWriterReader)
+            isUsingBitWriterReader = shouldUseBitWriterReader;
+            if (isUsingBitWriterReader)
             {
                 bitReader = new BitReader(streamBuffer, 0);
                 bitWriter = new BitWriter(streamBuffer, streamBuffer.Length);
@@ -100,7 +100,7 @@ namespace GONet.Utils
             position_Bytes = 0;
             position_InnerByteBit = InnerByteBitPosition_MaxValue;
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.Reset();
                 bitReader.Reset();
@@ -124,7 +124,7 @@ namespace GONet.Utils
             Buffer.BlockCopy(newData, 0, streamBuffer, 0, newDataBytesSize);
             length_WrittenBytes = newDataBytesSize;
             
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitReader.NumBytes = newDataBytesSize;
             }
@@ -185,7 +185,7 @@ namespace GONet.Utils
         /// <returns>How many bytes were actually read.</returns>
         public int Read(byte[] buffer, int offset, int count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -206,7 +206,7 @@ namespace GONet.Utils
         /// <returns>Whether the stream could be read from or not.</returns>
         public bool ReadBits(out byte value, byte bits)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 value = (byte)bitReader.ReadBits(bits);
                 return true;
@@ -295,7 +295,7 @@ namespace GONet.Utils
         /// <returns>How many bits were actually read.</returns>
         private ulong ReadBits(byte[] buffer, int offset, ulong count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -341,7 +341,7 @@ namespace GONet.Utils
 
         public bool ReadBit(out bool oBool)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 oBool = bitReader.ReadBits(1) == 1;
                 return true;
@@ -357,9 +357,9 @@ namespace GONet.Utils
 
         public ulong ReadUShort(out ushort oUShort, ulong bitCount = 16)
         {
-            Debug.Assert(bitCount <= 16);
+            // Debug.Assert(bitCount <= 16);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 oUShort = (ushort)bitReader.ReadBits((int)bitCount);
                 return bitCount;
@@ -382,7 +382,7 @@ namespace GONet.Utils
         /// <returns>false if not enough data to read</returns>
         public bool PeekChar(out char oChar, ulong bitCount = 16)
         {
-            Debug.Assert(bitCount <= 16);
+            // Debug.Assert(bitCount <= 16);
 
             BitNum previousBitPosition = BitPosition;
             long previousPosition = Position;
@@ -403,9 +403,9 @@ namespace GONet.Utils
         public ulong ReadFloat(out float oFloat /*, ulong bitCount = 32 */)
         {
             const ulong bitCount = 32;
-            //Debug.Assert(bitCount <= 32);
+            //// Debug.Assert(bitCount <= 32);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 oFloat = bitReader.ReadFloat();
                 return bitCount;
@@ -428,9 +428,9 @@ namespace GONet.Utils
         
         public ulong ReadUInt(out uint oUInt, ulong bitCount = 32)
         {
-            Debug.Assert(bitCount <= 32);
+            // Debug.Assert(bitCount <= 32);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 oUInt = bitReader.ReadUInt((int)bitCount);
 
@@ -448,9 +448,9 @@ namespace GONet.Utils
 
         public ulong ReadLong(out long oLong, ulong bitCount = 64)
         {
-            Debug.Assert(bitCount <= 64);
+            // Debug.Assert(bitCount <= 64);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 oLong = bitReader.ReadLong((int)bitCount);
 
@@ -472,7 +472,7 @@ namespace GONet.Utils
         /// <returns>The value that was read, or -1 if it could not be read.</returns>
         public int ReadByte()
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 return (byte)bitReader.ReadBits(8);
             }
@@ -512,7 +512,7 @@ namespace GONet.Utils
         /// <param name="count">The number of bytes to write.</param>
         public void Write(byte[] buffer, int offset, int count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -534,7 +534,7 @@ namespace GONet.Utils
         /// <param name="count">The number of bits to write.</param>
         private void WriteBits(byte[] buffer, int offset, ulong count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -561,7 +561,7 @@ namespace GONet.Utils
 
         public void WriteBit(bool bit)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteBit(bit);
             }
@@ -573,9 +573,9 @@ namespace GONet.Utils
 
         public void WriteUShort(ushort iUShort, ulong bitCount = 16)
         {
-            Debug.Assert(bitCount <= 16);
+            // Debug.Assert(bitCount <= 16);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteUInt(iUShort, (int)bitCount);
             }
@@ -593,9 +593,9 @@ namespace GONet.Utils
         public void WriteFloat(float iFloat/*, ulong bitCount = 32*/)
         {
             const ulong bitCount = 32;
-            //Debug.Assert(bitCount <= 32);
+            //// Debug.Assert(bitCount <= 32);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteFloat(iFloat);
             }
@@ -612,9 +612,9 @@ namespace GONet.Utils
 
         public void WriteUInt(uint iUInt, ulong bitCount = 32)
         {
-            Debug.Assert(bitCount <= 32);
+            // Debug.Assert(bitCount <= 32);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteUInt(iUInt, (int)bitCount);
             }
@@ -631,9 +631,9 @@ namespace GONet.Utils
 
         public void WriteLong(long iLong, ulong bitCount = 64)
         {
-            Debug.Assert(bitCount <= 64);
+            // Debug.Assert(bitCount <= 64);
 
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteLong(iLong, (int)bitCount);
             }
@@ -656,7 +656,7 @@ namespace GONet.Utils
         /// <param name="bits">The number of bits to write.</param>
         public void WriteBits(byte value, byte bits)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.WriteBits(value, bits);
             }
@@ -760,7 +760,7 @@ namespace GONet.Utils
         /// </returns>
         public bool WriteCurrentPartialByte()
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 bitWriter.FlushBits();
             }
@@ -789,7 +789,7 @@ namespace GONet.Utils
 
         private void Stream_WriteByte(byte value)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -805,7 +805,7 @@ namespace GONet.Utils
 
         private void Stream_Write(byte[] buffer, int offset, int count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -826,7 +826,7 @@ namespace GONet.Utils
 
         private int Stream_Read(byte[] buffer, int offset, int count)
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }
@@ -846,7 +846,7 @@ namespace GONet.Utils
 
         private byte Stream_ReadByte()
         {
-            if (IsUsingBitWriterReader)
+            if (isUsingBitWriterReader)
             {
                 throw new NotImplementedException();
             }

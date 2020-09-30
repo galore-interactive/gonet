@@ -91,3 +91,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a371f9581286c9046aa358e6ce54eac4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  IsBeingControlledViaManualOverride: 0

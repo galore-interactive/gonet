@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -26,12 +27,28 @@ namespace GONet
         private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
         private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
         private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
+        private Subscription<SyncEvent_GONetParticipant_OwnerAuthorityId> gonetSubscriptionOwnerAuthorityId;
 
         protected virtual void Awake()
         {
             gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
             gonetSubscriptionStarted = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => OnGONetParticipantStarted(envelope.GONetParticipant));
             gonetSubscriptionDisabled = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(envelope => OnGONetParticipantDisabled(envelope.GONetParticipant));
+            gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.valuePrevious, envelope.Event.valueNew));
+        }
+
+        private void OnGONetParticipant_OwnerAuthorityIdChanged(GONetParticipant gonetParticipant, uint gonetId, ushort valuePrevious, ushort valueNew)
+        {
+            if ((object)gonetParticipant == null)
+            {
+                gonetParticipant = GONetMain.DeriveGNPFromCurrentAndPreviousValues(gonetId, valuePrevious, valueNew);
+            }
+
+            bool isSetToValidValue = gonetParticipant.gonetId_raw != GONetParticipant.GONetId_Unset && valueNew != GONetMain.OwnerAuthorityId_Unset;
+            if (isSetToValidValue)
+            {
+                OnGONetParticipant_OwnerAuthorityIdSet(gonetParticipant);
+            }
         }
 
         protected virtual void Start()
@@ -54,6 +71,7 @@ namespace GONet
             gonetSubscriptionEnabled.Unsubscribe();
             gonetSubscriptionStarted.Unsubscribe();
             gonetSubscriptionDisabled.Unsubscribe();
+            gonetSubscriptionOwnerAuthorityId.Unsubscribe();
         }
 
         /// <summary>
@@ -71,6 +89,14 @@ namespace GONet
         public virtual void OnGONetParticipantStarted(GONetParticipant gonetParticipant) { }
 
         public virtual void OnGONetParticipantDisabled(GONetParticipant gonetParticipant) { }
+
+        /// <summary>
+        /// Since there is some order of operations differences between machines who instantiate a new <see cref="GONetParticipant"/> and others in regards to 
+        /// at what point the <see cref="GONetParticipant.OwnerAuthorityId"/> is set AND one of those differences is the value not being set at the point of 
+        /// the call to <see cref="OnGONetParticipantStarted(GONetParticipant)"/>, this method exists to have a callback.
+        /// </summary>
+        /// <param name="gonetParticipant"></param>
+        public virtual void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant) { }
     }
 
     /// <summary>
@@ -106,5 +132,53 @@ namespace GONet
                 xform = xform.parent;
             }
         }
+
+        public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantEnabled(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantEnabled();
+            }
+        }
+
+        public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantStarted(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantStarted();
+            }
+        }
+
+        public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantDisabled(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantDisabled();
+            }
+        }
+
+        public override void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipant_OwnerAuthorityIdSet(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipant_OwnerAuthorityIdSet();
+            }
+        }
+
+        public virtual void OnGONetParticipantEnabled() { }
+
+        public virtual void OnGONetParticipantStarted() { }
+
+        public virtual void OnGONetParticipantDisabled() { }
+
+        public virtual void OnGONetParticipant_OwnerAuthorityIdSet() { }
     }
 }

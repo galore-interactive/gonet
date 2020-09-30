@@ -92,6 +92,12 @@ namespace GONet
             connectionToServer = new GONetConnection_ClientToServer(client);
 
             client.OnStateChanged += OnStateChanged;
+            client.TickBeginning += Client_TickBeginning_PossibleSeparateThread;
+        }
+
+        private void Client_TickBeginning_PossibleSeparateThread()
+        {
+            connectionToServer.ProcessSendBuffer_IfAppropriate();
         }
 
         public void ConnectToServer(string serverIP, int serverPort, int ongoingTimeoutSeconds)

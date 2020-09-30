@@ -16,6 +16,7 @@
 using GONet.Utils;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -109,7 +110,15 @@ namespace GONet
                 case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
                 case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
                 case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
-                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion.eulerAngles == right.unityEngine_Quaternion.eulerAngles; break;
+
+                case GONetSyncableValueTypes.UnityEngine_Quaternion:
+                    { // the following method is used to compare orientation equality (since quat == quat is pure equality) in a faster way than quat.eulerAngles == quat.eulerAngles
+                        float angleDiff = Quaternion.Angle(left.unityEngine_Quaternion, right.unityEngine_Quaternion);
+                        angleDiff = angleDiff < 0 ? -angleDiff : angleDiff;
+                        areValuesEqual = angleDiff < 1e-3f; 
+                        break;
+                    }
+
                 case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
@@ -134,13 +143,123 @@ namespace GONet
                 case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
                 case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
                 case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
-                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
+
+                case GONetSyncableValueTypes.UnityEngine_Quaternion:
+                    { // the following method is used to compare orientation equality (since quat == quat is pure equality) in a faster way than quat.eulerAngles == quat.eulerAngles
+                        float angleDiff = Quaternion.Angle(left.unityEngine_Quaternion, right.unityEngine_Quaternion);
+                        angleDiff = angleDiff < 0 ? -angleDiff : angleDiff;
+                        areValuesEqual = angleDiff < 1e-3f;
+                        break;
+                    }
+
                 case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
                 case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
             }
 
             return left.GONetSyncType != right.GONetSyncType || !areValuesEqual;
+        }
+
+        [Conditional("GONET_MEASURE_VALUES_MIN_MAX")]
+        internal static void UpdateMinimumEncountered_IfApppropriate(ref GONetSyncableValue minimum, GONetSyncableValue value)
+        {
+            switch (minimum.GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Boolean: break;
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: break;
+
+                case GONetSyncableValueTypes.System_Byte: if (value.system_Byte < minimum.system_Byte) minimum.system_Byte = value.system_Byte; break;
+                case GONetSyncableValueTypes.System_Double: if (value.system_Double < minimum.system_Double) minimum.system_Double = value.system_Double; break;
+                case GONetSyncableValueTypes.System_Int16: if (value.system_Int16 < minimum.system_Int16) minimum.system_Int16 = value.system_Int16; break;
+                case GONetSyncableValueTypes.System_Int32: if (value.system_Int32 < minimum.system_Int32) minimum.system_Int32 = value.system_Int32; break;
+                case GONetSyncableValueTypes.System_Int64: if (value.system_Int64 < minimum.system_Int64) minimum.system_Int64 = value.system_Int64; break;
+                case GONetSyncableValueTypes.System_SByte: if (value.system_SByte < minimum.system_SByte) minimum.system_SByte = value.system_SByte; break;
+                case GONetSyncableValueTypes.System_Single: if (value.system_Single < minimum.system_Single) minimum.system_Single = value.system_Single; break;
+                case GONetSyncableValueTypes.System_UInt16: if (value.system_UInt16 < minimum.system_UInt16) minimum.system_UInt16 = value.system_UInt16; break;
+                case GONetSyncableValueTypes.System_UInt32: if (value.system_UInt32 < minimum.system_UInt32) minimum.system_UInt32 = value.system_UInt32; break;
+                case GONetSyncableValueTypes.System_UInt64: if (value.system_UInt64 < minimum.system_UInt64) minimum.system_UInt64 = value.system_UInt64; break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector2:
+                    if (value.unityEngine_Vector2.x < minimum.unityEngine_Vector2.x) minimum.unityEngine_Vector2.x = value.unityEngine_Vector2.x;
+                    if (value.unityEngine_Vector2.y < minimum.unityEngine_Vector2.y) minimum.unityEngine_Vector2.y = value.unityEngine_Vector2.y;
+                    break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector3:
+                    if (value.unityEngine_Vector3.x < minimum.unityEngine_Vector3.x) minimum.unityEngine_Vector3.x = value.unityEngine_Vector3.x;
+                    if (value.unityEngine_Vector3.y < minimum.unityEngine_Vector3.y) minimum.unityEngine_Vector3.y = value.unityEngine_Vector3.y;
+                    if (value.unityEngine_Vector3.z < minimum.unityEngine_Vector3.z) minimum.unityEngine_Vector3.z = value.unityEngine_Vector3.z;
+                    break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector4:
+                    if (value.unityEngine_Vector4.x < minimum.unityEngine_Vector4.x) minimum.unityEngine_Vector4.x = value.unityEngine_Vector4.x;
+                    if (value.unityEngine_Vector4.y < minimum.unityEngine_Vector4.y) minimum.unityEngine_Vector4.y = value.unityEngine_Vector4.y;
+                    if (value.unityEngine_Vector4.z < minimum.unityEngine_Vector4.z) minimum.unityEngine_Vector4.z = value.unityEngine_Vector4.z;
+                    if (value.unityEngine_Vector4.w < minimum.unityEngine_Vector4.w) minimum.unityEngine_Vector4.w = value.unityEngine_Vector4.w;
+                    break;
+            }
+        }
+        
+        public override string ToString()
+        {
+            switch (GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Boolean: return system_Boolean.ToString();
+                case GONetSyncableValueTypes.System_Byte: return system_Byte.ToString();
+                case GONetSyncableValueTypes.System_Double: return system_Double.ToString();
+                case GONetSyncableValueTypes.System_Int16: return system_Int16.ToString();
+                case GONetSyncableValueTypes.System_Int32: return system_Int32.ToString();
+                case GONetSyncableValueTypes.System_Int64: return system_Int64.ToString();
+                case GONetSyncableValueTypes.System_SByte: return system_SByte.ToString();
+                case GONetSyncableValueTypes.System_Single: return system_Single.ToString();
+                case GONetSyncableValueTypes.System_UInt16: return system_UInt16.ToString();
+                case GONetSyncableValueTypes.System_UInt32: return system_UInt32.ToString();
+                case GONetSyncableValueTypes.System_UInt64: return system_UInt64.ToString();
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: return unityEngine_Quaternion.ToString();
+                case GONetSyncableValueTypes.UnityEngine_Vector2: return unityEngine_Vector2.ToString();
+                case GONetSyncableValueTypes.UnityEngine_Vector3: return unityEngine_Vector3.ToString();
+                case GONetSyncableValueTypes.UnityEngine_Vector4: return unityEngine_Vector4.ToString();
+            }
+
+            return base.ToString();
+        }
+
+        [Conditional("GONET_MEASURE_VALUES_MIN_MAX")]
+        internal static void UpdateMaximumEncountered_IfApppropriate(ref GONetSyncableValue maximum, GONetSyncableValue value)
+        {
+            switch (maximum.GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Boolean: break;
+                case GONetSyncableValueTypes.UnityEngine_Quaternion: break;
+
+                case GONetSyncableValueTypes.System_Byte: if (value.system_Byte > maximum.system_Byte) maximum.system_Byte = value.system_Byte; break;
+                case GONetSyncableValueTypes.System_Double: if (value.system_Double > maximum.system_Double) maximum.system_Double = value.system_Double; break;
+                case GONetSyncableValueTypes.System_Int16: if (value.system_Int16 > maximum.system_Int16) maximum.system_Int16 = value.system_Int16; break;
+                case GONetSyncableValueTypes.System_Int32: if (value.system_Int32 > maximum.system_Int32) maximum.system_Int32 = value.system_Int32; break;
+                case GONetSyncableValueTypes.System_Int64: if (value.system_Int64 > maximum.system_Int64) maximum.system_Int64 = value.system_Int64; break;
+                case GONetSyncableValueTypes.System_SByte: if (value.system_SByte > maximum.system_SByte) maximum.system_SByte = value.system_SByte; break;
+                case GONetSyncableValueTypes.System_Single: if (value.system_Single > maximum.system_Single) maximum.system_Single = value.system_Single; break;
+                case GONetSyncableValueTypes.System_UInt16: if (value.system_UInt16 > maximum.system_UInt16) maximum.system_UInt16 = value.system_UInt16; break;
+                case GONetSyncableValueTypes.System_UInt32: if (value.system_UInt32 > maximum.system_UInt32) maximum.system_UInt32 = value.system_UInt32; break;
+                case GONetSyncableValueTypes.System_UInt64: if (value.system_UInt64 > maximum.system_UInt64) maximum.system_UInt64 = value.system_UInt64; break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector2:
+                    if (value.unityEngine_Vector2.x > maximum.unityEngine_Vector2.x) maximum.unityEngine_Vector2.x = value.unityEngine_Vector2.x;
+                    if (value.unityEngine_Vector2.y > maximum.unityEngine_Vector2.y) maximum.unityEngine_Vector2.y = value.unityEngine_Vector2.y;
+                    break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector3:
+                    if (value.unityEngine_Vector3.x > maximum.unityEngine_Vector3.x) maximum.unityEngine_Vector3.x = value.unityEngine_Vector3.x;
+                    if (value.unityEngine_Vector3.y > maximum.unityEngine_Vector3.y) maximum.unityEngine_Vector3.y = value.unityEngine_Vector3.y;
+                    if (value.unityEngine_Vector3.z > maximum.unityEngine_Vector3.z) maximum.unityEngine_Vector3.z = value.unityEngine_Vector3.z;
+                    break;
+
+                case GONetSyncableValueTypes.UnityEngine_Vector4:
+                    if (value.unityEngine_Vector4.x > maximum.unityEngine_Vector4.x) maximum.unityEngine_Vector4.x = value.unityEngine_Vector4.x;
+                    if (value.unityEngine_Vector4.y > maximum.unityEngine_Vector4.y) maximum.unityEngine_Vector4.y = value.unityEngine_Vector4.y;
+                    if (value.unityEngine_Vector4.z > maximum.unityEngine_Vector4.z) maximum.unityEngine_Vector4.z = value.unityEngine_Vector4.z;
+                    if (value.unityEngine_Vector4.w > maximum.unityEngine_Vector4.w) maximum.unityEngine_Vector4.w = value.unityEngine_Vector4.w;
+                    break;
+            }
         }
 
         #endregion
@@ -797,7 +916,7 @@ namespace GONet
 
                 default:
                     {
-                        Debug.Assert(false);
+                        UnityEngine.Debug.Assert(false);
                         x = 0F;
                         y = 0F;
                         z = 0F;
@@ -806,7 +925,9 @@ namespace GONet
                     break;
             }
 
-            return new Quaternion(x, y, z, w);
+            // IMPORTANT: normalizing here is important since the quantization process will lose precision naturally, which will potentially
+            //            cause the resultant unquantized value to be unnormalized and Unity will not like dealing with unnormalized.
+            return new Quaternion(x, y, z, w).normalized;
         }
 
         public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
@@ -832,10 +953,10 @@ namespace GONet
             float z = quattie.z;
             float w = quattie.w;
 
-            float xABS = Math.Abs(x);
-            float yABS = Math.Abs(y);
-            float zABS = Math.Abs(z);
-            float wABS = Math.Abs(w);
+            float xABS = x < 0 ? -x : x;
+            float yABS = y < 0 ? -y : y;
+            float zABS = z < 0 ? -z : z;
+            float wABS = w < 0 ? -w : w;
 
             largestIndex = 0;
             float largestValue = xABS;
@@ -925,7 +1046,7 @@ namespace GONet
                     break;
 
                 default:
-                    Debug.Assert(false);
+                    UnityEngine.Debug.Assert(false);
                     break;
             }
 

@@ -309,44 +309,100 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line default
             #line hidden
             this.Write(@"; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass ""has anything changed"" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-");
+			support");
             
             #line 106 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
+            
+            #line default
+            #line hidden
+            this.Write(".valueLimitEncountered_min.");
+            
+            #line 106 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
+            
+            #line 106 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 106 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write("; \r\n\t\t\tsupport");
+            
+            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
+            
+            #line default
+            #line hidden
+            this.Write(".valueLimitEncountered_max.");
+            
+            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
+            
+            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".");
+            
+            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
+            
+            #line default
+            #line hidden
+            this.Write("; \r\n");
+            
+            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		} else { 
             
             #line default
             #line hidden
             this.Write("            support");
             
-            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".baselineValue_current.");
             
-            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" = ");
             
-            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 107 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
@@ -355,35 +411,35 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     " after) ensures GetComponnet<T>() called up front and that component is cached a" +
                     "nd available subsequently as needed/referenced/used\r\n            support");
             
-            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue.");
             
-            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" = ");
             
-            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 108 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
@@ -392,162 +448,232 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     " after) ensures GetComponnet<T>() called up front and that component is cached a" +
                     "nd available subsequently as needed/referenced/used\r\n            support");
             
-            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue_previous.");
             
-            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" = ");
             
-            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(@"); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass ""has anything changed"" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
-");
+			support");
             
-            #line 110 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
+            
+            #line default
+            #line hidden
+            this.Write(".valueLimitEncountered_min.");
+            
+            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
+            
+            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".Get");
+            
+            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
+            
+            #line default
+            #line hidden
+            this.Write("(");
+            
+            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
+            
+            #line default
+            #line hidden
+            this.Write("); \r\n\t\t\tsupport");
+            
+            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
+            
+            #line default
+            #line hidden
+            this.Write(".valueLimitEncountered_max.");
+            
+            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
+            
+            #line default
+            #line hidden
+            this.Write(" = ");
+            
+            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
+            
+            #line default
+            #line hidden
+            this.Write(".Get");
+            
+            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
+            
+            #line default
+            #line hidden
+            this.Write("(");
+            
+            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
+            
+            #line default
+            #line hidden
+            this.Write("); \r\n");
+            
+            #line 114 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		} 
             
             #line default
             #line hidden
             this.Write("\t\t\tsupport");
             
-            #line 111 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 115 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncCompanion = this;\r\n\t\t\tsupport");
             
-            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 116 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".memberName = \"");
             
-            #line 112 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 116 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\";\r\n\t\t\tsupport");
             
-            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 117 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".index = ");
             
-            #line 113 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 117 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\tsupport");
             
-            #line 114 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 118 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_MustRunOnUnityMainThread = ");
             
-            #line 114 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 118 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.MustRunOnUnityMainThread ? "true" : "false"));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\tsupport");
             
-            #line 115 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 119 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_ProcessingPriority = ");
             
-            #line 115 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 119 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.ProcessingPriority));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\tsupport");
             
-            #line 116 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 120 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_ProcessingPriority_GONetInternalOverride = ");
             
-            #line 116 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 120 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.ProcessingPriority_GONetInternalOverride));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\tsupport");
             
-            #line 117 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_SyncChangesEverySeconds = ");
             
-            #line 117 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.SyncChangesEverySeconds));
             
             #line default
             #line hidden
             this.Write("f;\r\n\t\t\tsupport");
             
-            #line 118 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 122 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_Reliability = AutoMagicalSyncReliability.");
             
-            #line 118 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 122 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.Reliability));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\tsupport");
             
-            #line 119 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 123 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_ShouldBlendBetweenValuesReceived = ");
             
-            #line 119 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 123 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"));
             
             #line default
@@ -555,49 +681,49 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write(";\r\n\t\t\tGONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGe" +
                     "tValue(");
             
-            #line 120 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 124 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.ShouldSkipSync_RegistrationId));
             
             #line default
             #line hidden
             this.Write(", out support");
             
-            #line 120 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 124 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_ShouldSkipSync);\r\n\t\t\tsupport");
             
-            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(");
             
-            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f"));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f"));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 121 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
             
             #line default
             #line hidden
             this.Write(", true);\r\n\r\n");
             
-            #line 123 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 127 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			if (singleMember.attribute.CustomSerialize_Instance != null)
 			{
             
@@ -605,48 +731,48 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\tcachedCustomSerializers[");
             
-            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<");
             
-            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")));
             
             #line default
             #line hidden
             this.Write(">(");
             
-            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeDownToBitCount));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)));
             
             #line default
             #line hidden
             this.Write("f, ");
             
-            #line 125 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)));
             
             #line default
             #line hidden
             this.Write("f);\r\n");
             
-            #line 126 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 130 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
             
             #line default
             #line hidden
             
-            #line 127 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 131 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
             {
             
@@ -654,14 +780,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\r\n            int support");
             
-            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 133 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("_mostRecentChanges_calcdSize = support");
             
-            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 133 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -669,21 +795,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write(".syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBuffe" +
                     "rLeadSeconds / support");
             
-            #line 129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 133 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;\r\n            support");
             
-            #line 130 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 134 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".mostRecentChanges_capacitySize = Math.Max(support");
             
-            #line 130 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 134 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -691,7 +817,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_Ch" +
                     "angedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);\r\n\t\t\tsupport");
             
-            #line 131 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 135 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -699,21 +825,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write(".mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValu" +
                     "e.mostRecentChangesPool.Borrow(support");
             
-            #line 131 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 135 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".mostRecentChanges_capacitySize);\r\n");
             
-            #line 132 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 136 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 134 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 138 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			iOverall++;
 		}
@@ -725,7 +851,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t}\r\n\r\n        internal override void SetAutoMagicalSyncValue(byte index, GONetSy" +
                     "ncableValue value)\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
             
-            #line 145 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 149 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -742,84 +868,84 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 156 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall++));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t");
             
-            #line 157 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 161 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t");
             
-            #line 158 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 162 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 158 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 162 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value.");
             
-            #line 158 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 162 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\t\t");
             
-            #line 159 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 163 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t");
             
-            #line 160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Set");
             
-            #line 160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(", value.");
             
-            #line 160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 161 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 165 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\treturn;\r\n");
             
-            #line 163 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 167 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		}
 	}
 
@@ -829,7 +955,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t}\r\n\t\t}\r\n\r\n        internal override GONetSyncableValue GetAutoMagicalSyncValue" +
                     "(byte index)\r\n\t\t{\r\n\t\t\tswitch (index)\r\n\t\t\t{\r\n");
             
-            #line 173 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 177 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -846,69 +972,69 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 184 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 188 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall++));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t");
             
-            #line 185 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 189 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\treturn ");
             
-            #line 186 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 190 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 186 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 190 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\t\t");
             
-            #line 187 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 191 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\treturn ");
             
-            #line 188 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 192 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 188 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 192 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 188 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 192 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 189 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 193 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 190 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 194 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		}
 	}
 
@@ -929,7 +1055,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
         {
 ");
             
-            #line 205 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 209 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -952,21 +1078,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t{ // ");
             
-            #line 222 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 226 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 222 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 226 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 223 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 227 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -979,76 +1105,76 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSeriali" +
                     "zers[");
             
-            #line 229 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 233 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 230 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 234 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 231 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 235 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 231 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 235 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" - valuesChangesSupport[");
             
-            #line 231 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 235 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 231 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 235 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 232 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 236 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 233 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 237 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 233 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 237 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 234 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 238 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 235 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 239 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -1058,62 +1184,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 239 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 243 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteBit(");
             
-            #line 240 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 244 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 240 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 244 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 241 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 245 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteBit(");
             
-            #line 242 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 246 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 242 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 246 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 242 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 246 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 243 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 247 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 244 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 248 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -1126,28 +1252,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tSerializeSingleQuantized(bitStream_appendTo, ");
             
-            #line 251 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 255 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 251 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 255 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 251 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 255 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 252 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 256 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 					else
@@ -1158,62 +1284,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 257 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 261 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteFloat(");
             
-            #line 258 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 262 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 258 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 262 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 259 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 263 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteFloat(");
             
-            #line 260 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 264 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 260 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 264 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 260 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 264 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 261 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 265 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 262 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 266 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 				}
@@ -1225,21 +1351,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteLong(");
             
-            #line 268 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 272 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 268 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 272 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 269 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 273 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -1250,21 +1376,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteUInt(");
             
-            #line 274 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 278 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 274 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 278 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 275 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 279 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -1275,21 +1401,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("                bitStream_appendTo.WriteString(");
             
-            #line 280 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 284 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 280 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 284 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 281 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 285 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -1300,21 +1426,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteByte(");
             
-            #line 286 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 290 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 286 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 290 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 287 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 291 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -1325,21 +1451,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tbitStream_appendTo.WriteUShort(");
             
-            #line 292 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 296 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 292 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 296 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 293 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 297 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
@@ -1353,56 +1479,56 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 301 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 305 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbyte[] bytes = BitConverter.GetBytes(");
             
-            #line 302 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 306 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 302 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 306 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 303 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 307 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\tbyte[] bytes = BitConverter.GetBytes(");
             
-            #line 304 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 308 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 304 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 308 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 304 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 308 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 305 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 309 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
@@ -1410,7 +1536,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tint count = bytes.Length;\r\n\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tb" +
                     "itStream_appendTo.WriteByte(bytes[i]);\r\n\t\t\t\t}\r\n");
             
-            #line 311 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 315 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -1425,76 +1551,76 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 319 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 323 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 320 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 324 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 321 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 325 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 321 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 325 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" - valuesChangesSupport[");
             
-            #line 321 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 325 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 321 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 325 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 322 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 326 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 323 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 327 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 323 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 327 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 324 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 328 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 325 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 329 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -1503,7 +1629,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t}\r\n");
             
-            #line 329 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 333 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -1515,7 +1641,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "ayBuilder bitStream_appendTo, byte singleIndex)\r\n        {\r\n\t\t\tswitch (singleInd" +
                     "ex)\r\n\t\t\t{\r\n");
             
-            #line 339 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 343 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -1532,28 +1658,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 350 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 354 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 351 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 355 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 351 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 355 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 352 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 356 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -1566,76 +1692,76 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 358 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 362 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 359 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 363 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 360 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 364 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 360 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 364 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" - valuesChangesSupport[");
             
-            #line 360 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 364 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 360 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 364 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 361 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 365 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 362 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 366 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 362 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 366 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 363 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 367 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 364 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 368 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -1645,62 +1771,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 368 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 372 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteBit(");
             
-            #line 369 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 373 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 369 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 373 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 370 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 374 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteBit(");
             
-            #line 371 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 375 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 371 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 375 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 371 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 375 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 372 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 376 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 373 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 377 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -1713,28 +1839,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tSerializeSingleQuantized(bitStream_appendTo, ");
             
-            #line 380 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 384 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 380 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 384 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 380 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 384 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 381 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 385 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 					else
@@ -1745,62 +1871,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 386 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 390 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteFloat(");
             
-            #line 387 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 391 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 387 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 391 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 388 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 392 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteFloat(");
             
-            #line 389 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 393 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 389 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 393 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 389 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 393 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 390 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 394 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 391 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 395 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 				}
@@ -1812,21 +1938,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteLong(");
             
-            #line 397 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 401 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 397 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 401 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 398 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 402 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -1837,21 +1963,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteUInt(");
             
-            #line 403 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 407 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 403 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 407 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 404 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 408 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -1862,21 +1988,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteString(");
             
-            #line 409 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 413 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 409 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 413 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 410 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 414 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -1887,21 +2013,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteByte(");
             
-            #line 415 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 419 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 415 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 419 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 416 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 420 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -1912,21 +2038,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_appendTo.WriteUShort(");
             
-            #line 421 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 425 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 421 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 425 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 422 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 426 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
@@ -1940,56 +2066,56 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 430 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 434 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbyte[] bytes = BitConverter.GetBytes(");
             
-            #line 431 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 435 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 431 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 435 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 432 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 436 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tbyte[] bytes = BitConverter.GetBytes(");
             
-            #line 433 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 437 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 433 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 437 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 433 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 437 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write("));\r\n\t\t\t\t");
             
-            #line 434 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 438 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
@@ -1997,7 +2123,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t\tint count = bytes.Length;\r\n\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t" +
                     "\t\t\tbitStream_appendTo.WriteByte(bytes[i]);\r\n\t\t\t\t\t}\r\n");
             
-            #line 440 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 444 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -2012,76 +2138,76 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 448 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 452 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 449 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 453 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 450 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 454 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 450 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 454 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" - valuesChangesSupport[");
             
-            #line 450 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 454 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 450 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 454 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 451 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 455 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ");
             
-            #line 452 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 456 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 452 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 456 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 453 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 457 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 454 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 458 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -2090,7 +2216,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t}\r\n\t\t\t\tbreak;\r\n\r\n");
             
-            #line 460 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 464 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -2111,7 +2237,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 			{
 ");
             
-            #line 475 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 479 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -2128,28 +2254,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 486 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 490 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 487 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 491 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 487 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 491 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 488 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 492 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -2162,7 +2288,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 494 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 498 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -2170,7 +2296,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("];\r\n\t\t\t\t\treturn customSerializer.AreEqualConsideringQuantization(valueA, valueB);" +
                     "\r\n");
             
-            #line 496 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 500 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -2180,21 +2306,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\treturn valueA.");
             
-            #line 500 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 504 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" == valueB.");
             
-            #line 500 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 504 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 501 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 505 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -2207,21 +2333,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\treturn QuantizeSingle(");
             
-            #line 508 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 512 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(", valueA) == QuantizeSingle(");
             
-            #line 508 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 512 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(", valueB);\r\n");
             
-            #line 509 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 513 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 				}
@@ -2233,7 +2359,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 516 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 520 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -2244,7 +2370,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 522 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 526 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -2255,7 +2381,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 528 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 532 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -2266,7 +2392,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 534 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 538 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -2277,7 +2403,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 540 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 544 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName
@@ -2291,7 +2417,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// handle quantization of this type eventually?\r\n");
             
-            #line 549 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 553 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -2306,7 +2432,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 557 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 561 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -2314,7 +2440,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("];\r\n\t\t\t\t\treturn customSerializer.AreEqualConsideringQuantization(valueA, valueB);" +
                     "\r\n");
             
-            #line 559 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 563 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -2323,7 +2449,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t}\r\n\t\t\t\tbreak;\r\n\r\n");
             
-            #line 565 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 569 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -2345,7 +2471,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
         {
 ");
             
-            #line 581 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 585 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -2368,21 +2494,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t{ // ");
             
-            #line 598 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 602 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 598 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 602 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 599 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 603 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because the case values are not constant!!!  TODO Must make the following more performant!
@@ -2395,90 +2521,90 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSeriali" +
                     "zers[");
             
-            #line 605 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 609 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 606 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 610 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 607 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 607 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 607 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" + valuesChangesSupport[");
             
-            #line 607 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 607 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 608 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 612 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 609 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 613 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 609 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 613 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 609 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 613 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 610 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 614 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 611 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 615 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -2488,62 +2614,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tbool value;\r\n                bitStream_readFrom.ReadBit(out value);\r\n\t\t\t\t");
             
-            #line 617 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 621 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 618 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 622 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 618 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 622 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n\t\t\t\t");
             
-            #line 619 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 623 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 620 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 624 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Set");
             
-            #line 620 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 624 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 620 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 624 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(", value);\r\n\t\t\t\t");
             
-            #line 621 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 625 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 622 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 626 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -2554,7 +2680,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tfloat value;\r\n");
             
-            #line 628 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 632 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
@@ -2564,14 +2690,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tvalue = DeserializeSingleQuantized(bitStream_readFrom, ");
             
-            #line 632 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 636 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(").System_Single;\r\n");
             
-            #line 633 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 637 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 					else
@@ -2582,7 +2708,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("                bitStream_readFrom.ReadFloat(out value);\r\n");
             
-            #line 639 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 643 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 
@@ -2591,62 +2717,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 642 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 646 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 643 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 647 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 643 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 647 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n\t\t\t\t");
             
-            #line 644 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 648 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 645 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 649 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Set");
             
-            #line 645 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 649 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 645 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 649 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(", value);\r\n\t\t\t\t");
             
-            #line 646 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 650 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 647 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 651 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(long).FullName)
@@ -2657,21 +2783,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tlong value;\r\n                bitStream_readFrom.ReadLong(out value);\r\n\t\t\t\t");
             
-            #line 654 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 658 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 654 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 658 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n");
             
-            #line 655 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 659 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -2682,21 +2808,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tuint value;\r\n                bitStream_readFrom.ReadUInt(out value);\r\n\t\t\t\t");
             
-            #line 662 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 666 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 662 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 666 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n");
             
-            #line 663 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 667 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -2708,21 +2834,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tstring value;\r\n                bitStream_readFrom.ReadString(out value);\r\n\t\t\t" +
                     "\t");
             
-            #line 670 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 674 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 670 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 674 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n");
             
-            #line 671 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 675 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -2733,21 +2859,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 676 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 680 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 676 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 680 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = (byte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 677 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 681 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -2759,21 +2885,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tushort value;\r\n                bitStream_readFrom.ReadUShort(out value);\r\n\t\t\t" +
                     "\t");
             
-            #line 684 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 688 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 684 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 688 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n");
             
-            #line 685 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 689 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName)
@@ -2786,21 +2912,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
                     "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
-            #line 697 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 701 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 697 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 701 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = BitConverter.ToInt16(bytes, 0);\r\n");
             
-            #line 698 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 702 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
@@ -2813,62 +2939,62 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
                     "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
-            #line 710 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 714 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 711 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 715 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 711 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 715 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = BitConverter.ToInt32(bytes, 0);\r\n\t\t\t\t");
             
-            #line 712 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 716 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 713 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 717 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Set");
             
-            #line 713 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 717 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 713 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 717 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(", BitConverter.ToInt32(bytes, 0));\r\n\t\t\t\t");
             
-            #line 714 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 718 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 715 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 719 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
@@ -2879,21 +3005,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 720 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 724 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 720 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 724 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = (sbyte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 721 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 725 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(double).FullName)
@@ -2906,21 +3032,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     " (int i = 0; i < count; ++i)\r\n\t\t\t\t{\r\n\t\t\t\t\tbyte b = (byte)bitStream_readFrom.Read" +
                     "Byte();\r\n\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t}\r\n\t\t\t\t");
             
-            #line 733 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 737 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 733 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 737 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = BitConverter.ToDouble(bytes, 0);\r\n");
             
-            #line 734 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 738 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -2935,90 +3061,90 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSeriali" +
                     "zers[");
             
-            #line 742 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 746 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n");
             
-            #line 743 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 747 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 744 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 744 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 744 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" + valuesChangesSupport[");
             
-            #line 744 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 744 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 745 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 749 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 746 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 750 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 746 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 750 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 746 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 750 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 747 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 751 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 748 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 752 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -3027,7 +3153,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t}\r\n");
             
-            #line 752 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 756 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -3047,7 +3173,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 			{
 ");
             
-            #line 766 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 770 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -3064,28 +3190,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 777 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 781 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 778 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 782 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 778 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 782 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 779 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 783 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -3098,48 +3224,48 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 785 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 789 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n\t\t\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 786 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 790 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 787 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 791 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tvalue += valuesChangesSupport[");
             
-            #line 788 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 792 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 788 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 792 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 789 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 793 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 790 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 794 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -3149,7 +3275,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbool value;\r\n\t\t\t\t\tbitStream_readFrom.ReadBit(out value);\r\n");
             
-            #line 796 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 800 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -3160,7 +3286,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tfloat value;\r\n");
             
-            #line 802 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 806 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
@@ -3170,14 +3296,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvalue = DeserializeSingleQuantized(bitStream_readFrom, ");
             
-            #line 806 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 810 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(").System_Single;\r\n");
             
-            #line 807 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 811 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 					else
@@ -3188,7 +3314,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_readFrom.ReadFloat(out value);\r\n");
             
-            #line 813 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 817 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 				}
@@ -3200,7 +3326,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tlong value;\r\n\t\t\t\t\tbitStream_readFrom.ReadLong(out value);\r\n");
             
-            #line 821 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 825 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -3211,7 +3337,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tuint value;\r\n\t\t\t\t\tbitStream_readFrom.ReadUInt(out value);\r\n");
             
-            #line 828 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 832 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -3222,7 +3348,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tstring value;\r\n\t\t\t\t\tbitStream_readFrom.ReadString(out value);\r\n");
             
-            #line 835 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 839 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -3233,7 +3359,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvar value = (byte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 841 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 845 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -3244,7 +3370,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tushort value;\r\n\t\t\t\t\tbitStream_readFrom.ReadUShort(out value);\r\n");
             
-            #line 848 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 852 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName)
@@ -3258,7 +3384,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToInt16" +
                     "(bytes, 0);\r\n");
             
-            #line 861 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 865 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
@@ -3272,7 +3398,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToInt32" +
                     "(bytes, 0);\r\n");
             
-            #line 874 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 878 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
@@ -3283,7 +3409,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvar value = (sbyte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 880 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 884 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(double).FullName)
@@ -3297,7 +3423,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     ".ReadByte();\r\n\t\t\t\t\t\tbytes[i] = b;\r\n\t\t\t\t\t}\r\n\t\t\t\t\tvar value = BitConverter.ToDoubl" +
                     "e(bytes, 0);\r\n");
             
-            #line 893 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 897 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -3312,48 +3438,48 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 901 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 905 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n\t\t\t\t\tvar value = customSerializer.Deserialize(bitStream_readFrom).");
             
-            #line 902 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 906 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 903 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 907 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.attribute.QuantizeDownToBitCount > 0) {
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tvalue += valuesChangesSupport[");
             
-            #line 904 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 908 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("].baselineValue_current.");
             
-            #line 904 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 908 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 905 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 909 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					}
             
             #line default
             #line hidden
             
-            #line 906 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 910 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -3362,7 +3488,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\r\n");
             
-            #line 910 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 914 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			if (singleMember.attribute.ShouldBlendBetweenValuesReceived
 				&&
 				(singleMember.animatorControllerParameterId == 0 || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)) // currently only float animator parameter types can be blended
@@ -3372,7 +3498,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvaluesChangesSupport[");
             
-            #line 914 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 918 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -3381,7 +3507,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "/ NOTE: this queue will be used each frame to blend between this value and other" +
                     "s added there\r\n");
             
-            #line 915 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 919 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
 			else
 			{
@@ -3390,76 +3516,76 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t");
             
-            #line 918 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 922 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t");
             
-            #line 919 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 923 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 919 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 923 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(" = value;\r\n\t\t\t\t");
             
-            #line 920 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 924 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\t");
             
-            #line 921 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 925 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Set");
             
-            #line 921 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 925 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 921 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 925 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(", (");
             
-            #line 921 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 925 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName));
             
             #line default
             #line hidden
             this.Write(")value);\r\n\t\t\t\t");
             
-            #line 922 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 926 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             
-            #line 923 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 927 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
             
             #line default
             #line hidden
             this.Write("\t\t\t\t}\r\n\t\t\t\tbreak;\r\n\r\n");
             
-            #line 927 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 931 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -3480,7 +3606,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 			{
 ");
             
-            #line 942 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 946 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -3497,28 +3623,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 953 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 957 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 954 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 958 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 954 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 958 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 955 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 959 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -3531,14 +3657,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 961 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 965 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n\t\t\t\t\tcustomSerializer.Deserialize(bitStream_readFrom);\r\n");
             
-            #line 963 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 967 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
               }
 				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
                 {
@@ -3548,7 +3674,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbool value;\r\n\t\t\t\t\tbitStream_readFrom.ReadBit(out value);\r\n");
             
-            #line 969 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 973 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
@@ -3559,7 +3685,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tfloat value;\r\n");
             
-            #line 975 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 979 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				
 					if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
@@ -3569,14 +3695,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tDeserializeSingleQuantized(bitStream_readFrom, ");
             
-            #line 979 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 983 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(");\r\n");
             
-            #line 980 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 984 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 					else
@@ -3587,7 +3713,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tbitStream_readFrom.ReadFloat(out value);\r\n");
             
-            #line 986 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 990 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
                     }
 				}
@@ -3599,7 +3725,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tlong value;\r\n\t\t\t\t\tbitStream_readFrom.ReadLong(out value);\r\n");
             
-            #line 994 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 998 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
@@ -3610,7 +3736,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tuint value;\r\n\t\t\t\t\tbitStream_readFrom.ReadUInt(out value);\r\n");
             
-            #line 1001 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1005 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(string).FullName)
@@ -3621,7 +3747,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tstring value;\r\n\t\t\t\t\tbitStream_readFrom.ReadString(out value);\r\n");
             
-            #line 1008 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1012 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
@@ -3632,7 +3758,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvar value = (byte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 1014 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1018 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
@@ -3643,7 +3769,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tushort value;\r\n\t\t\t\t\tbitStream_readFrom.ReadUShort(out value);\r\n");
             
-            #line 1021 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1025 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(short).FullName)
@@ -3655,7 +3781,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t\tint count = 2;\r\n\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b =" +
                     " (byte)bitStream_readFrom.ReadByte();\r\n\t\t\t\t\t}\r\n");
             
-            #line 1031 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1035 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
@@ -3667,7 +3793,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t\tint count = 4;\r\n\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b =" +
                     " (byte)bitStream_readFrom.ReadByte();\r\n\t\t\t\t\t}\r\n");
             
-            #line 1041 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1045 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
@@ -3678,7 +3804,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\tvar value = (sbyte)bitStream_readFrom.ReadByte();\r\n");
             
-            #line 1047 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1051 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(double).FullName)
@@ -3690,7 +3816,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t\tint count = 8;\r\n\t\t\t\t\tfor (int i = 0; i < count; ++i)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tbyte b =" +
                     " (byte)bitStream_readFrom.ReadByte();\r\n\t\t\t\t\t}\r\n");
             
-            #line 1057 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1061 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
                 else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
@@ -3705,14 +3831,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSer" +
                     "ializers[");
             
-            #line 1065 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1069 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n\t\t\t\t\tcustomSerializer.Deserialize(bitStream_readFrom);\r\n");
             
-            #line 1067 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1071 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 				}
 			}
@@ -3721,7 +3847,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t}\r\n\t\t\t\tbreak;\r\n\r\n");
             
-            #line 1073 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1077 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -3732,7 +3858,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("\t\t\t}\r\n        }\r\n\r\n\t\tinternal override void UpdateLastKnownValues(GONetMain.SyncB" +
                     "undleUniqueGrouping onlyMatchIfUniqueGroupingMatches)\r\n\t\t{\r\n");
             
-            #line 1082 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1086 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -3749,21 +3875,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tvar valuesChangesSupport");
             
-            #line 1093 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1097 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(" = valuesChangesSupport[");
             
-            #line 1093 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1097 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write("];\r\n\t\t\t\tif (DoesMatchUniqueGrouping(valuesChangesSupport");
             
-            #line 1094 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1098 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -3771,14 +3897,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write(", onlyMatchIfUniqueGroupingMatches) &&\r\n\t\t\t\t\t!ShouldSkipSync(valuesChangesSupport" +
                     "");
             
-            #line 1095 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(", ");
             
-            #line 1095 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
@@ -3787,105 +3913,105 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 				{
 					valuesChangesSupport");
             
-            #line 1097 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue_previous = valuesChangesSupport");
             
-            #line 1097 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue;\r\n\t\t\t\t");
             
-            #line 1098 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1102 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tvaluesChangesSupport");
             
-            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1103 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue.");
             
-            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1103 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" = ");
             
-            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1103 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 1099 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1103 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write(";\r\n\t\t\t\t");
             
-            #line 1100 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1104 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\tvaluesChangesSupport");
             
-            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(".lastKnownValue.");
             
-            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" = ");
             
-            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".Get");
             
-            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterMethodSuffix));
             
             #line default
             #line hidden
             this.Write("(");
             
-            #line 1101 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterId.ToString()));
             
             #line default
             #line hidden
             this.Write(");\r\n\t\t\t\t");
             
-            #line 1102 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1106 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  } 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t}\r\n\r\n");
             
-            #line 1105 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1109 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 		
 			iOverall++;
 		}
@@ -3898,7 +4024,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "QuantizationRange(byte singleIndex, GONetMain.AutoMagicalSync_ValueMonitoringSup" +
                     "port_ChangedValue valueChangeSupport)\r\n\t\t{\r\n\t\t\tswitch (singleIndex)\r\n\t\t\t{\r\n");
             
-            #line 1116 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1120 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -3915,28 +4041,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 1127 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1131 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 1128 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1132 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 1128 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1132 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 1129 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1133 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -3945,56 +4071,56 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line default
             #line hidden
             
-            #line 1133 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1137 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
 				{
             
             #line default
             #line hidden
             
-            #line 1135 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1139 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("                    System.Single diff = valueChangeSupport.lastKnownValue.");
             
-            #line 1136 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1140 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" - valueChangeSupport.baselineValue_current.");
             
-            #line 1136 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1140 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 1137 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1141 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} else { 
             
             #line default
             #line hidden
             this.Write("                    System.Single diff = valueChangeSupport.lastKnownValue.");
             
-            #line 1138 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1142 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" - valueChangeSupport.baselineValue_current.");
             
-            #line 1138 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1142 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(";\r\n");
             
-            #line 1139 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1143 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 					} 
             
             #line default
@@ -4005,7 +4131,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
 ");
             
-            #line 1144 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1148 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				}
 				else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
 				{
@@ -4015,14 +4141,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("                    UnityEngine.Vector3 diff = valueChangeSupport.lastKnownValue." +
                     "");
             
-            #line 1147 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1151 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write(" - valueChangeSupport.baselineValue_current.");
             
-            #line 1147 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1151 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
@@ -4037,7 +4163,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
 ");
             
-            #line 1155 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1159 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				}
 				else
 				{
@@ -4046,20 +4172,20 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\t\t// this type not supported for this functionality\r\n");
             
-            #line 1159 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1163 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				}
             
             #line default
             #line hidden
             
-            #line 1160 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
             
             #line default
             #line hidden
             this.Write("\t\t\t\t}\r\n\t\t\t\tbreak;\r\n\r\n");
             
-            #line 1164 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1168 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -4069,7 +4195,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t}");
             
-            #line 1168 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1172 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  /* end switch */ 
             
             #line default
@@ -4078,7 +4204,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                     "selineEvent CreateNewBaselineValueEvent(uint gonetId, byte singleIndex, GONetSyn" +
                     "cableValue newBaselineValue)\r\n\t\t{\r\n\t\t\tswitch (singleIndex)\r\n\t\t\t{\r\n");
             
-            #line 1177 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1181 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 	iOverall = 0;
 	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
@@ -4095,28 +4221,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t\tcase ");
             
-            #line 1188 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1192 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(iOverall));
             
             #line default
             #line hidden
             this.Write(":\r\n\t\t\t\t{ // ");
             
-            #line 1189 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1193 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(single.componentTypeName));
             
             #line default
             #line hidden
             this.Write(".");
             
-            #line 1189 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1193 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberName));
             
             #line default
             #line hidden
             this.Write("\r\n");
             
-            #line 1190 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1194 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 
 			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
 			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
@@ -4125,14 +4251,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line default
             #line hidden
             
-            #line 1194 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1198 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				if (singleMember.animatorControllerParameterId == 0) { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\treturn new ValueMonitoringSupport_NewBaselineEvent_");
             
-            #line 1195 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1199 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
@@ -4140,21 +4266,21 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("() {\r\n\t\t\t\t\t\tGONetId = gonetId,\r\n\t\t\t\t\t\tValueIndex = singleIndex,\r\n\t\t\t\t\t\tNewBaselin" +
                     "eValue = newBaselineValue.");
             
-            #line 1198 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1202 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.memberTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write("\r\n\t\t\t\t\t};\r\n");
             
-            #line 1200 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1204 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				} else { 
             
             #line default
             #line hidden
             this.Write("\t\t\t\t\treturn new ValueMonitoringSupport_NewBaselineEvent_");
             
-            #line 1201 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1205 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
@@ -4162,27 +4288,27 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             this.Write("() {\r\n\t\t\t\t\t\tGONetId = gonetId,\r\n\t\t\t\t\t\tValueIndex = singleIndex,\r\n\t\t\t\t\t\tNewBaselin" +
                     "eValue = newBaselineValue.");
             
-            #line 1204 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1208 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")));
             
             #line default
             #line hidden
             this.Write("\r\n\t\t\t\t\t};\r\n");
             
-            #line 1206 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1210 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 				} 
             
             #line default
             #line hidden
             
-            #line 1207 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1211 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			}
             
             #line default
             #line hidden
             this.Write("\t\t\t\t}\r\n\r\n");
             
-            #line 1210 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1214 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
 			++iOverall;
 		}
 	}
@@ -4192,28 +4318,28 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             #line hidden
             this.Write("\t\t\t}");
             
-            #line 1214 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1218 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  /* end switch */ 
             
             #line default
             #line hidden
             this.Write("\r\n\t\t\treturn null;\r\n\t\t}");
             
-            #line 1217 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1221 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  /* end CreateNewBaselineValueEvent() */ 
             
             #line default
             #line hidden
             this.Write("    }");
             
-            #line 1218 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1222 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  /* end class */ 
             
             #line default
             #line hidden
             this.Write("}");
             
-            #line 1219 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
+            #line 1223 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt"
  /* end namespace */ 
             
             #line default

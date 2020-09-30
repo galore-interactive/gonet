@@ -43,29 +43,23 @@ namespace GONet.Utils
         /// </summary>
         public static bool IsLocalPortListening(int port)
         {
-            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-            List<IPAddress> addressesToCheck = new List<IPAddress>(host.AddressList);
-            addressesToCheck.Add(IPAddress.Parse(LOOPBACK_IP));
-            foreach (var myAddressToCheck in addressesToCheck)
+            var endpoint = new IPEndPoint(IPAddress.Any, port);
+            Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            try
             {
-                var endpoint = new IPEndPoint(myAddressToCheck, port);
-                Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-                try
+                socket.Bind(endpoint);
+            }
+            catch (SocketException socketException)
+            {
+                const string IN_USE = "Address already in use";
+                if (socketException.ErrorCode == (int)SocketError.AddressAlreadyInUse || socketException.Message == IN_USE)
                 {
-                    socket.Bind(endpoint);
+                    return true;
                 }
-                catch (SocketException socketException)
-                {
-                    const string IN_USE = "Address already in use";
-                    if (socketException.ErrorCode == (int)SocketError.AddressAlreadyInUse || socketException.Message == IN_USE)
-                    {
-                        return true;
-                    }
-                }
-                finally
-                {
-                    socket.Close();
-                }
+            }
+            finally
+            {
+                socket.Close();
             }
 
             return false;

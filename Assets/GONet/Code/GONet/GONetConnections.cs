@@ -32,7 +32,8 @@ namespace GONet
 
         private float rtt_latest;
         /// <summary>
-        /// GONet owned data.  If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
+        /// GONet owned data that represents more than just the low level network "wire" time.
+        /// If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
         /// Unit of measure is seconds here.
         /// </summary>
         public float RTT_Latest
@@ -70,7 +71,8 @@ namespace GONet
         }
 
         /// <summary>
-        /// GONet owned data.  If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
+        /// GONet owned data that represents more than just the low level network "wire" time.
+        /// If you want internally calculated value of RTT from lower level transport/protocol impl, see/use <see cref="RTTMilliseconds_LowLevelTransportProtocol"/> (which is just a reflection of <see cref="ReliableEndpoint.RTTMilliseconds"/>) instead.
         /// This is useful to reference/use instead of <see cref="RTT_Latest"/> in order to account for jitter (i.e., RTT variation) by averaging recent values.
         /// Unit of measure is seconds here.
         /// </summary>
@@ -211,10 +213,12 @@ namespace GONet
         /// <param name="ongoingTimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
         public void Connect(string serverIP, int serverPort, int ongoingTimeoutSeconds)
         {
+            const int CONNECTION_TOKEN_TIMOUT_SECONDS = 120;
+
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
             ulong clientID = (ulong)GUID.Generate().AsInt64();
             byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { new IPEndPoint(IPAddress.Parse(serverIP), serverPort) },
-                30,
+                CONNECTION_TOKEN_TIMOUT_SECONDS,
                 ongoingTimeoutSeconds,
                 1UL,
                 clientID,

@@ -70,6 +70,8 @@
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\BasicBehaviour.cs" />
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\FlyBehaviour.cs" />
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\MoveBehaviour.cs" />
+    <Compile Include="Assets\Amazon\Scripts\Credentials.cs" />
+    <Compile Include="Assets\Amazon\Scripts\GameLift.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\bzip2\src\BZip2Constants.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\bzip2\src\CBZip2InputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\bzip2\src\CBZip2OutputStream.cs" />
@@ -1833,7 +1835,11 @@
     <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
+    <None Include="Assets\Amazon\Plugins\System.Collections.Immutable.xml" />
+    <None Include="Assets\Amazon\Plugins\Newtonsoft.Json.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Properties.cginc" />
+    <None Include="Assets\Amazon\Plugins\System.Buffers.xml" />
+    <None Include="Assets\Amazon\Plugins\System.Memory.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap-Custom-Atlas.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\TextMesh Pro\Sprites\EmojiOne Attribution.txt" />
@@ -1841,11 +1847,15 @@
     <None Include="Assets\StreamingAssets\GONet\DesignTimeLocations.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF Overlay.shader" />
+    <None Include="Assets\Amazon\Plugins\AWSSDK.Core.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Surface.cginc" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Mobile Overlay.shader" />
     <None Include="Assets\StreamingAssets\GONet\log_config.xml" />
+    <None Include="Assets\Amazon\Plugins\Google.Protobuf.xml" />
+    <None Include="Assets\Amazon\Plugins\System.Runtime.CompilerServices.Unsafe.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro.cginc" />
+    <None Include="Assets\Amazon\Plugins\AWSSDK.S3.xml" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF.shader" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\GONet\Plugins\log4net\log4net.xml" />
