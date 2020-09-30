@@ -15,6 +15,7 @@
 
 using GONet.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -185,8 +186,26 @@ namespace GONet
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel);
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
-                GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+
+                if (GONetMain.IsClientVsServerStatusKnown)
+                {
+                    GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+                }
+                else
+                {
+                    StartCoroutine(AssignOwnerAuthorityIds_WhenAppropriate(gonetParticipantsInLevel));
+                }
             }
+        }
+
+        private IEnumerator AssignOwnerAuthorityIds_WhenAppropriate(List<GONetParticipant> gonetParticipantsInLevel)
+        {
+            while (!GONetMain.IsClientVsServerStatusKnown)
+            {
+                yield return null;
+            }
+
+            GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
         }
 
         private static void FindAndAppend<T>(GameObject[] gameObjects, /* IN/OUT */ List<T> listToAppend)

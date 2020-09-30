@@ -1936,7 +1936,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1743745984}
   - component: {fileID: 1743745983}
-  - component: {fileID: 1743745982}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -1944,27 +1943,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1743745982
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1743745981}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  codeGenerationId: 1
-  animatorSyncSupport:
-    keys: []
-    values: []
-  IsRigidBodyOwnerOnlyControlled: 0
-  ShouldHideDuringRemoteInstantiate: 0
-  IsPositionSyncd: 0
-  IsRotationSyncd: 0
-  designTimeLocation: scene://ProjectileTest/Directional Light
 --- !u!108 &1743745983
 Light:
   m_ObjectHideFlags: 0

@@ -813,7 +813,7 @@ namespace GONet
 
                 const string APPLIED = "New baseline value applied for type: ";
                 const string INDEX = " valueIndex: ";
-                GONetLog.Debug(string.Concat(APPLIED, @event.GetType().FullName, INDEX, @event.ValueIndex));
+                //GONetLog.Debug(string.Concat(APPLIED, @event.GetType().FullName, INDEX, @event.ValueIndex));
             }
             else
             {
@@ -2674,35 +2674,57 @@ namespace GONet
         {
             if (Application.isPlaying)
             {
-                if (WasDefinedInScene(gonetParticipant))
+                if (IsClientVsServerStatusKnown)
                 {
-                    if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
-                    {
-                        AssignGONetIdRaw_IfAppropriate(gonetParticipant);
-                    }
+                    Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL(gonetParticipant);
                 }
                 else
                 {
-                    //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
-
-                    bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
-                    if (isThisCondisideredTheMomentOfInitialInstantiation)
-                    {
-                        gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
-                        AssignGONetIdRaw_IfAppropriate(gonetParticipant);
-
-                        AutoPropagateInitialInstantiation(gonetParticipant);
-                    }
-                    else
-                    {
-                        // this data item has now served its purpose (i.e., avoid auto propagate since it already came from remote source!), so remove it
-                        remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
-                    }
+                    GlobalSessionContext_Participant.StartCoroutine(AutoPropogateInstantiation_WhenAppropriate(gonetParticipant));
                 }
-
-                var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
-                PublishEventAsSoonAsGONetIdAssigned(startEvent, gonetParticipant);
             }
+        }
+
+        private static IEnumerator AutoPropogateInstantiation_WhenAppropriate(GONetParticipant gonetParticipant)
+        {
+            while (!IsClientVsServerStatusKnown)
+            {
+                yield return null;
+            }
+
+            Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL(gonetParticipant);
+        }
+
+        private static void Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL(GONetParticipant gonetParticipant)
+        {
+            if (WasDefinedInScene(gonetParticipant))
+            {
+                if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
+                {
+                    AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+                }
+            }
+            else
+            {
+                //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
+
+                bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
+                if (isThisCondisideredTheMomentOfInitialInstantiation)
+                {
+                    gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+                    AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+
+                    AutoPropagateInitialInstantiation(gonetParticipant);
+                }
+                else
+                {
+                    // this data item has now served its purpose (i.e., avoid auto propagate since it already came from remote source!), so remove it
+                    remoteSpawns_avoidAutoPropagateSupport.Remove(gonetParticipant);
+                }
+            }
+
+            var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
+            PublishEventAsSoonAsGONetIdAssigned(startEvent, gonetParticipant);
         }
 
         /// <summary>
