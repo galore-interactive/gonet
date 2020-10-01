@@ -176,11 +176,12 @@ namespace GONet.Utils
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
                                     Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
                                     float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
-                                    blendedValue = Quaternion.SlerpUnclamped(
-                                        newestValue,
-                                        newestValue * diffRotation,
+                                    Quaternion extrapolatedRotation = newestValue * diffRotation;
+                                    blendedValue = QuaternionUtils.SlerpUnclamped(
+                                        ref newestValue,
+                                        ref extrapolatedRotation,
                                         interpolationTime);
-                                    
+
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
                                 }
                                 else

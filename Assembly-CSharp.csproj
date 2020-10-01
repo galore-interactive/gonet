@@ -1714,6 +1714,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\NetworkUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ObjectPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\Quantizer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\QuaternionUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\StringUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\TypeUtils.cs" />
