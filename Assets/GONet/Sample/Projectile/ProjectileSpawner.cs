@@ -81,7 +81,10 @@ public class ProjectileSpawner : GONetBehaviour
             if (projectile.GONetParticipant.IsMine)
             {
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
-                projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
+                projectile.transform.Translate(Vector3.forward * Time.deltaTime * projectile.speed, Space.World);
+
+                float rotationAngle = Time.deltaTime * 100;
+                projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
             }
         }
     }

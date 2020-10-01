@@ -167,7 +167,7 @@ namespace GONet.Generation
 			support4.syncAttribute_MustRunOnUnityMainThread = true;
 			support4.syncAttribute_ProcessingPriority = 0;
 			support4.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support4.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
+			support4.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support4.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support4.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(1, out support4.syncAttribute_ShouldSkipSync);
@@ -191,7 +191,7 @@ namespace GONet.Generation
 			support5.syncAttribute_MustRunOnUnityMainThread = true;
 			support5.syncAttribute_ProcessingPriority = 0;
 			support5.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support5.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
+			support5.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support5.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support5.syncAttribute_ShouldSkipSync);

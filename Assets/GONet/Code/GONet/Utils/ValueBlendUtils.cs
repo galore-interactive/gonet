@@ -174,61 +174,13 @@ namespace GONet.Utils
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-                                    long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
-
-
-                                    { //* option 1:
-                                        Quaternion valueDiffBetweenLastTwo = justBeforeNewest.numericValue.UnityEngine_Quaternion * Quaternion.Inverse(newestValue);
-
-                                        if (valueCount >= 3)
-                                        {
-                                            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest_2 = valueBuffer[newestBufferIndex + 2];
-                                            long ticksBetweenLastTwo_2 = justBeforeNewest.elapsedTicksAtChange - justBeforeNewest_2.elapsedTicksAtChange;
-                                            Quaternion valueDiffBetweenLastTwo_2 = justBeforeNewest_2.numericValue.UnityEngine_Quaternion * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
-
-                                            Vector3 valueDiffBetweenLastTwo_eulers = valueDiffBetweenLastTwo.eulerAngles;
-                                            Vector3 angularVelocity = valueDiffBetweenLastTwo_eulers / ticksBetweenLastTwo;
-                                            
-                                            
-                                            Vector3 valueDiffBetweenLastTwo_eulers_2 = valueDiffBetweenLastTwo_2.eulerAngles;
-                                            Vector3 angularVelocity_2 = valueDiffBetweenLastTwo_eulers_2 / ticksBetweenLastTwo_2;
-
-                                            Vector3 dw = (angularVelocity - angularVelocity_2) / (ticksBetweenLastTwo * ticksBetweenLastTwo_2);
-
-                                            long t_2 = atElapsedTicks - newest.elapsedTicksAtChange;
-                                            t_2 = t_2 * t_2;
-
-                                            if (ticksBetweenLastTwo == 0 || ticksBetweenLastTwo_2 == 0)
-                                            {
-                                                blendedValue = newest.numericValue.UnityEngine_Quaternion;
-                                            }
-                                            else
-                                            {
-                                                blendedValue = Quaternion.Euler(newest.numericValue.UnityEngine_Quaternion.eulerAngles + (dw * t_2));
-                                            }
-                                        }
-                                        else
-                                        {
-                                            Quaternion extrapolated_ValueNew = newestValue * valueDiffBetweenLastTwo;
-                                            float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
-                                            blendedValue = Quaternion.Slerp(newestValue, extrapolated_ValueNew, interpolationTime);
-                                        }
-                                        //*/
-                                    }
-
-                                    { /* option 2:
-                                        var rot = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion); // rot is the rotation from t1 to t2
-                                        var dt = (extrapolated_TicksAtSend - justBeforeNewest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange); // dt = extrapolation factor
-                                        float ang;
-                                        Vector3 axis;
-                                        rot.ToAngleAxis(out ang, out axis); // find axis-angle representation
-                                        if (ang > 180) ang -= 360;  // assume the shortest path
-                                        ang = ang * dt % 360; // multiply angle by the factor
-                                        blendedValue = Quaternion.AngleAxis(ang, axis) * justBeforeNewest.numericValue.UnityEngine_Quaternion; // combine with first rotation
-                                        */
-                                    }
-
+                                    Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
+                                    float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
+                                    blendedValue = Quaternion.SlerpUnclamped(
+                                        newestValue,
+                                        newestValue * diffRotation,
+                                        interpolationTime);
+                                    
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
                                 }
                                 else
