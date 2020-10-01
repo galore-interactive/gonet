@@ -741,8 +741,9 @@ namespace NetcodeIO.NET
 			}
 
             // send packet
-            try {
-                socket.SendToAsync(packetBuffer, packetLen, currentServerEndpoint);
+            try
+			{
+                socket.SendTo(packetBuffer, packetLen, currentServerEndpoint);
             }
             catch { }
 

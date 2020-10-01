@@ -17,6 +17,7 @@ namespace NetcodeIO.NET.Utils.IO
 		void Close();
 		void Bind(EndPoint endpoint);
 		void SendTo(byte[] data, EndPoint remoteEP);
+		void SendTo(byte[] data, int length, EndPoint remoteEP);
 		void SendToAsync(byte[] data, int length, EndPoint remoteEP);
 		bool Read(out Datagram packet);
 		void Pump();
@@ -67,7 +68,17 @@ namespace NetcodeIO.NET.Utils.IO
             //GONet.GONetLog.Debug("sending...length[]: " + data.Length);
         }
 
-		static readonly ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>> asyncSendBorrowedPayloadsByPool = new ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>>(3, 3);
+		/// <summary>
+		/// IMPORTANT: This is NOT an async send.
+		/// </summary>
+		public void SendTo(byte[] data, int length, EndPoint remoteEP)
+		{
+			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
+		}
+
+        #region Async send related stuff
+
+        static readonly ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>> asyncSendBorrowedPayloadsByPool = new ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>>(3, 3);
 		static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> asyncSendPoolByThread = new ConcurrentDictionary<Thread, ArrayPool<byte>>(2, 2);
 
 		static readonly ConcurrentDictionary<ObjectPool<AsyncSendPackaging>, ConcurrentQueue<AsyncSendPackaging>> asyncSendBorrowedPackagingByPool = new ConcurrentDictionary<ObjectPool<AsyncSendPackaging>, ConcurrentQueue<AsyncSendPackaging>>(3, 3);
@@ -96,23 +107,10 @@ namespace NetcodeIO.NET.Utils.IO
         }
 
 		/// <summary>
-		/// IMPORTANT: This is NOT an async send.
-		/// </summary>
-		public void SendTo(byte[] data, int length, EndPoint remoteEP)
-        {
-			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
-		}
-
-		/// <summary>
 		/// IMPORTANT: This is an ASYNC send.
 		/// </summary>
 		public void SendToAsync(byte[] data, int length, EndPoint remoteEP)
 		{
-			{ // TODO FIXME remove this test:
-				SendTo(data, length, remoteEP);
-				return;
-			}
-
 			ArrayPool<byte> asyncSendPool;
 			if (!asyncSendPoolByThread.TryGetValue(Thread.CurrentThread, out asyncSendPool))
             {
@@ -227,6 +225,8 @@ namespace NetcodeIO.NET.Utils.IO
             }
         }
 
+        #endregion
+
         public void Pump()
 		{
 		}
@@ -253,7 +253,7 @@ namespace NetcodeIO.NET.Utils.IO
 			Close();
 		}
 
-		private void ReadFromSocket_SeparateThread() // TODO this no longer needs to be a separate thread now that we receive async!
+		private void ReadFromSocket_SeparateThread()
 		{
 			isReadSocketRunning = true;
 
@@ -425,6 +425,11 @@ namespace NetcodeIO.NET.Utils.IO
 		/// </summary>
 		public void SendToAsync(byte[] data, int length, EndPoint remoteEP)
 		{
+			SendTo(data, length, remoteEP);
+		}
+
+		public void SendTo(byte[] data, int length, EndPoint remoteEP)
+        {
 			if (!running) throw new SocketException();
 
 			byte[] temp = new byte[length];

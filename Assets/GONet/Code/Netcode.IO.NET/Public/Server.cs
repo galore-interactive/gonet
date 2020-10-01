@@ -969,7 +969,7 @@ namespace NetcodeIO.NET
 
             // send packet
             //GONet.GONetLog.Debug("sending...packetLen: " + packetLen);
-            listenSocket.SendToAsync(packetBuffer, packetLen, endpoint);
+            listenSocket.SendTo(packetBuffer, packetLen, endpoint);
 
 			BufferPool.ReturnBuffer(packetBuffer);
 			BufferPool.ReturnBuffer(encryptedPacketBuffer);
