@@ -316,30 +316,12 @@ namespace GONet.Utils
                                     Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
-                                    if (valueCount >= 3)
-                                    {
-                                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest_2 = valueBuffer[newestBufferIndex + 2];
-                                        long ticksBetweenLastTwo_2 = justBeforeNewest.elapsedTicksAtChange - justBeforeNewest_2.elapsedTicksAtChange;
-                                        Vector3 valueDiffBetweenLastTwo_2 = justBeforeNewest.numericValue.UnityEngine_Vector3 - justBeforeNewest_2.numericValue.UnityEngine_Vector3;
+                                    long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
+                                    Vector3 extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
+                                    float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
 
-                                        Vector3 angularVelocity = valueDiffBetweenLastTwo / ticksBetweenLastTwo;
-                                        Vector3 angularVelocity_2 = valueDiffBetweenLastTwo_2 / ticksBetweenLastTwo_2;
-                                        Vector3 dw = (angularVelocity - angularVelocity_2) / (ticksBetweenLastTwo * ticksBetweenLastTwo_2);
-
-                                        long t_2 = atElapsedTicks - newest.elapsedTicksAtChange;
-                                        t_2 = t_2 * t_2;
-                                        blendedValue = newest.numericValue.UnityEngine_Vector3 + (dw * t_2);
-                                    }
-                                    else
-                                    {
-                                        long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
-                                        Vector3 extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
-                                        float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
-
-                                        float bezierTime = 0.5f + (interpolationTime / 2f);
-                                        blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
-                                    }
-
+                                    float bezierTime = 0.5f + (interpolationTime / 2f);
+                                    blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                 }
                                 else
