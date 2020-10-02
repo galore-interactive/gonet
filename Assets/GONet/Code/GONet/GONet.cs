@@ -2431,6 +2431,11 @@ namespace GONet
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
                     var item = mostRecentChanges[i];
+                    if (item.elapsedTicksAtChange == elapsedTicksAtChange)
+                    {
+                        return; // avoid adding in new items with same timestamp as an existing item as it will mess up value blending, NOTE: This probably only happens just after an 'at rest'
+                    }
+
                     if (item.elapsedTicksAtChange < elapsedTicksAtChange)
                     {
                         // insert new guy, who is more recent than current, here at i; but first, move all the ones down a notch as they are all older than the new guy:

@@ -269,11 +269,29 @@ namespace GONet.Utils
                                     Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
                                     long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
 
-                                    long extrapolated_TicksAtSend = newest.elapsedTicksAtChange + ticksBetweenLastTwo;
-                                    Vector3 extrapolated_ValueNew = newestValue + valueDiffBetweenLastTwo;
-                                    float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(extrapolated_TicksAtSend - newest.elapsedTicksAtChange);
+                                    long atMinusNewestTicks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                    int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
+                                    long extrapolated_TicksAtChange = newest.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
+                                    Vector3 extrapolated_ValueNew = newestValue + (valueDiffBetweenLastTwo * extrapolationSections);
 
-                                    float bezierTime = 0.5f + (interpolationTime / 2f);
+                                    /* the above 4 lines is preferred over what we would have done below here accumulating in a loop as somehow the loop would get infinite or at least stop the simulation
+                                    do
+                                    {
+                                        extrapolated_TicksAtChange += ticksBetweenLastTwo;
+                                        extrapolated_ValueNew += valueDiffBetweenLastTwo;
+                                        ++extrapolationSections;
+                                    } while (extrapolated_TicksAtChange < atElapsedTicks);
+                                    */
+
+                                    long denominator = extrapolated_TicksAtChange - newest.elapsedTicksAtChange;
+                                    if (denominator == 0)
+                                    {
+                                        denominator = 1;
+                                    }
+                                    float interpolationTime = atMinusNewestTicks / (float)denominator;
+                                    float oneSectionPercentage = (1 / (float)(extrapolationSections + 1));
+                                    float remainingSectionPercentage = 1f - oneSectionPercentage;
+                                    float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                     blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                 }
