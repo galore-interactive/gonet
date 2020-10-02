@@ -33,10 +33,12 @@ public class ProjectileSpawner : GONetBehaviour
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
             projectiles.Add(projectile);
 
+            /* This was replaced in v1.1.1 with use of GONetMain.Client_InstantiateToBeRemotelyControlledByMe():
             if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
             {
                 GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
             }
+            */
         }
     }
 
@@ -72,7 +74,7 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (shouldInstantiateBasedOnInput)
             {
-                Instantiate(projectilPrefab, transform.position, transform.rotation);
+                GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation); // used to be: //Instantiate(projectilPrefab, transform.position, transform.rotation);
             }
         }
 

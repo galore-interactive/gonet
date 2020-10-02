@@ -154,6 +154,24 @@ namespace GONet
         public bool IsNoLongerMine => WasMineAtAnyPoint && !IsMine;
 
         /// <summary>
+        /// This is mainly here to support player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
+        /// the server process remotely and hopefully manipulate this GNP.
+        /// <see cref="IsMine_ToRemotelyControl"/>
+        /// </summary>
+        [GONetAutoMagicalSync(
+            GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
+            SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS,
+            MustRunOnUnityMainThread = true)]
+        public ushort RemotelyControlledByAuthorityId = GONetMain.OwnerAuthorityId_Unset;
+
+        /// <summary>
+        /// This is mainly here for player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
+        /// the server process remotely and hopefully manipulate this GNP.
+        /// Unless people use <see cref="RemotelyControlledByAuthorityId"/> in a strange way, when this is true, <see cref="IsMine"/> will be false.
+        /// </summary>
+        public bool IsMine_ToRemotelyControl => RemotelyControlledByAuthorityId == GONetMain.MyAuthorityId && GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Unset;
+
+        /// <summary>
         /// <para>
         /// The expectation on setting this to true is the values for <see cref="IsPositionSyncd"/> and <see cref="IsRotationSyncd"/> are true
         /// and the associated <see cref="GameObject"/> has a <see cref="Rigidbody"/> installed on it as well 

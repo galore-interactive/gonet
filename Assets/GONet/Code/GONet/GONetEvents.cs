@@ -206,6 +206,9 @@ namespace GONet
         [Key(7)]
         public uint GONetIdAtInstantiation;
 
+        [Key(8)]
+        public bool ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
@@ -217,6 +220,7 @@ namespace GONet
             @event.GONetId = gonetParticipant.GONetId;
             @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
@@ -236,6 +240,28 @@ namespace GONet
             @event.GONetId = gonetParticipant.GONetId;
             @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
+
+            @event.Position = gonetParticipant.transform.position;
+            @event.Rotation = gonetParticipant.transform.rotation;
+
+            @event.OccurredAtElapsedTicks = default;
+
+            return @event;
+        }
+
+        internal static InstantiateGONetParticipantEvent Create_WithRemotelyControlledByInfo(GONetParticipant gonetParticipant)
+        {
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
+
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
+
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = true;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;

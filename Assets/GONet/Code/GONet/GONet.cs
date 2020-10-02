@@ -960,6 +960,11 @@ namespace GONet
                 {
                     Server_OnNewClientInstantiatedItsGONetLocal(gonetLocal);
                 }
+
+                if (eventEnvelope.Event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority)
+                {
+                    GONetSpawnSupport_Runtime.Server_MarkToBeRemotelyControlled(instance, eventEnvelope.SourceAuthorityId);
+                }
             }
 
             if (instance.ShouldHideDuringRemoteInstantiate && valueBlendingBufferLeadSeconds > 0)
@@ -1100,6 +1105,27 @@ namespace GONet
         public static GONetParticipant Instantiate_WithNonAuthorityAlternate(GONetParticipant authorityOriginal, GONetParticipant nonAuthorityAlternateOriginal, Vector3 position, Quaternion rotation)
         {
             return GONetSpawnSupport_Runtime.Instantiate_WithNonAuthorityAlternate(authorityOriginal, nonAuthorityAlternateOriginal, position, rotation);
+        }
+
+        /// <summary>
+        /// <para>
+        /// This is mainly here to support player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
+        /// the server process remotely and hopefully manipulate this GNP.
+        /// See <see cref="GONetParticipant.RemotelyControlledByAuthorityId"/> and <see cref="GONetParticipant.IsMine_ToRemotelyControl"/>.
+        /// </para>
+        /// <para>
+        /// IMPORTANT: This could be used for projectiles too even if the client instantiating it will not control it after the initial "birth" of it.
+        /// </para>
+        /// </summary>
+        public static GONetParticipant Client_InstantiateToBeRemotelyControlledByMe(GONetParticipant prefab, Vector3 position, Quaternion rotation)
+        {
+            if (IsClient)
+            {
+                // send to server to immediately assume ownership over, which will yield this being always at 0 latency!!!
+                return GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
+            }
+
+            return null;
         }
 
         #endregion
@@ -2795,6 +2821,10 @@ namespace GONet
             if (GONetSpawnSupport_Runtime.TryGetNonAuthorityDesignTimeLocation(gonetParticipant, out nonAuthorityDesignTimeLocation))
             {
                 @event = InstantiateGONetParticipantEvent.Create_WithNonAuthorityInfo(gonetParticipant, nonAuthorityDesignTimeLocation);
+            }
+            else if (GONetSpawnSupport_Runtime.IsMarkedToBeRemotelyControlled(gonetParticipant))
+            {
+                @event = InstantiateGONetParticipantEvent.Create_WithRemotelyControlledByInfo(gonetParticipant);
             }
             else
             {

@@ -133,6 +133,18 @@ namespace GONet
             base.OnGONetParticipantStarted(gonetParticipant);
 
             AddIfAppropriate(gonetParticipant);
+
+
+            ushort toBeRemotelyControlledByAuthorityId;
+            if (GONetMain.IsServer && GONetSpawnSupport_Runtime.Server_TryGetMarkToBeRemotelyControlledBy(gonetParticipant, out toBeRemotelyControlledByAuthorityId))
+            {
+                GONetMain.Server_AssumeAuthorityOver(gonetParticipant);
+
+                // IMPORTANT: only now, after assuming authority, will the following change actually get propogated to the non-owners (i.e., since only the owner can make a auto-propogated change)
+                gonetParticipant.RemotelyControlledByAuthorityId = toBeRemotelyControlledByAuthorityId;
+
+                GONetSpawnSupport_Runtime.Server_UnmarkToBeRemotelyControlled_ProcessingComplete(gonetParticipant);
+            }
         }
 
         private void AddIfAppropriate(GONetParticipant gonetParticipant)

@@ -177,6 +177,22 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                     EditorGUILayout.Toggle(GONetMain.IsMine(targetGONetParticipant));
                     EditorGUILayout.EndHorizontal();
                 }
+
+                if (targetGONetParticipant.RemotelyControlledByAuthorityId != GONetMain.OwnerAuthorityId_Unset)
+                { // RemotelyControlledByAuthorityId && IsMine_ToRemotelyControl
+                    EditorGUILayout.BeginHorizontal();
+                    const string REMOTELY_CONTROLLED_BY_AUTHORITY_ID = "Remotely Controlled by Authority Id";
+                    EditorGUILayout.LabelField(REMOTELY_CONTROLLED_BY_AUTHORITY_ID);
+                    string value = targetGONetParticipant.RemotelyControlledByAuthorityId.ToString();
+                    EditorGUILayout.TextField(value);
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    const string IS_REMOTELY_CONTROLLED_BY_ME = "Is Mine (for Remote Control)?";
+                    EditorGUILayout.LabelField(IS_REMOTELY_CONTROLLED_BY_ME);
+                    EditorGUILayout.Toggle(targetGONetParticipant.IsMine_ToRemotelyControl);
+                    EditorGUILayout.EndHorizontal();
+                }
             }
 
             GUI.enabled = guiEnabledPrevious;
