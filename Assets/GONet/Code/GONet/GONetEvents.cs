@@ -68,17 +68,22 @@ namespace GONet
 
     #endregion
 
-    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
-    {
-        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
-    }
-
     public struct ServerSaysClientInitializationCompletion : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new NotImplementedException();
     }
 
+    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
     public struct AutoMagicalSync_ValueChanges_Message : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
+    public struct AutoMagicalSync_ValuesNowAtRest_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }

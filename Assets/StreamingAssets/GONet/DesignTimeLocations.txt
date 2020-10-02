@@ -1,7 +1,4 @@
-project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab
-project://Assets/GONet/Resources/Player_Authority.prefab
-project://Assets/GONet/Resources/Player_NonAuthority.prefab
 scene://SampleScene/Cubeta (1)
 scene://SampleScene/Cubetas_+30N06
 scene://SampleScene/Cubetas_+31N06
