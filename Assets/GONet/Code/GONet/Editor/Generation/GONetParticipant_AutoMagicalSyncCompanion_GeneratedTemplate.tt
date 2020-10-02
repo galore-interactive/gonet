@@ -498,10 +498,15 @@ namespace GONet.Generation
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
 					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
 <#              }
-				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
                 {
 #>
 					return valueA.<#=singleMember.memberTypeFullName.Replace(".", "_")#> == valueB.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#              }
+				else if (singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
+                {
+#>
+					return valueA.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> == valueB.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#>;
 <#
 				}
 				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
