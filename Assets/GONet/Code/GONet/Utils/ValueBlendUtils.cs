@@ -173,14 +173,131 @@ namespace GONet.Utils
                                 bool isEnoughInfoToExtrapolate = valueCount >= VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
-                                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
-                                    float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
-                                    Quaternion extrapolatedRotation = newestValue * diffRotation;
-                                    blendedValue = QuaternionUtils.SlerpUnclamped(
-                                        ref newestValue,
-                                        ref extrapolatedRotation,
-                                        interpolationTime);
+                                    if (valueCount > 200)
+                                    {
+                                        { // use velocity and acceleration presuming that it will be more accurate than regular interpolation
+                                            
+                                            //* as many quats:
+                                            {
+                                                int olderBufferIndex = newestBufferIndex + 1;
+                                                Quaternion older_numericValue = valueBuffer[olderBufferIndex].numericValue.UnityEngine_Quaternion;
+                                                long older_elapsedTicksAtChange = valueBuffer[olderBufferIndex].elapsedTicksAtChange;
+
+                                                int oldererBufferIndex = olderBufferIndex + 1;
+                                                Quaternion olderer_numericValue = valueBuffer[oldererBufferIndex].numericValue.UnityEngine_Quaternion;
+                                                long olderer_elapsedTicksAtChange = valueBuffer[oldererBufferIndex].elapsedTicksAtChange;
+
+                                                long time_newerOlder = newest.elapsedTicksAtChange - older_elapsedTicksAtChange;
+                                                long time = atElapsedTicks - newest.elapsedTicksAtChange;
+
+                                                Quaternion older_olderer_diff = Quaternion.Inverse(olderer_numericValue) * older_numericValue;
+                                                Vector3 older_velocity = older_olderer_diff.eulerAngles / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+
+                                                Quaternion newest_older_diff = Quaternion.Inverse(older_numericValue) * newest.numericValue.UnityEngine_Quaternion;
+                                                Vector3 newer_velocity = newest_older_diff.eulerAngles / time_newerOlder;
+                                                Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
+
+                                                Vector3 blended_velocity = newer_velocity + newer_acceleration * time;
+                                                Vector3 blendedValue_eulers = newest.numericValue.UnityEngine_Quaternion.eulerAngles + blended_velocity * time;
+                                                blendedValue = Quaternion.Euler(blendedValue_eulers);
+                                            }
+                                            //*/
+
+                                            /* eulers
+                                            int olderBufferIndex = newestBufferIndex + 1;
+                                            Vector3 older_numericValue = valueBuffer[olderBufferIndex].numericValue.UnityEngine_Quaternion.eulerAngles;
+                                            long older_elapsedTicksAtChange = valueBuffer[olderBufferIndex].elapsedTicksAtChange;
+
+                                            int oldererBufferIndex = olderBufferIndex + 1;
+                                            Vector3 olderer_numericValue = valueBuffer[oldererBufferIndex].numericValue.UnityEngine_Quaternion.eulerAngles;
+                                            long olderer_elapsedTicksAtChange = valueBuffer[oldererBufferIndex].elapsedTicksAtChange;
+
+                                            long time_newerOlder = newest.elapsedTicksAtChange - older_elapsedTicksAtChange;
+                                            long time = atElapsedTicks - newest.elapsedTicksAtChange;
+
+                                            Vector3 older_velocity = (older_numericValue - olderer_numericValue) / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+                                            Vector3 newer_velocity = (newest.numericValue.UnityEngine_Quaternion.eulerAngles - older_numericValue) / time_newerOlder;
+                                            Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
+
+                                            Vector3 blended_velocity = newer_velocity + newer_acceleration * time;
+                                            Vector3 blendedValue_eulers = newest.numericValue.UnityEngine_Quaternion.eulerAngles + blended_velocity * time;
+                                            blendedValue = Quaternion.Euler(blendedValue_eulers);
+                                            */
+                                            //GONetLog.Debug(string.Concat("we extroip_accelerated his ace...blended_velocity: ", blended_velocity.x, ",", blended_velocity.y, ",", blended_velocity.z, " newerAcceleration: ", newer_acceleration.x, ",", newer_acceleration.y, ",", newer_acceleration.z));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        { // SQUAD life!  This is much better for dynamic movements, but is a bit more costly on CPU
+                                            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
+                                            Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
+                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                            float interpolationTime_InitialRaw = atMinusNewest_ticks / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
+                                            Quaternion extrapolatedRotation = newestValue * diffRotation;
+
+                                            float interpolationTime1 = 
+                                                interpolationTime_InitialRaw > 1
+                                                    ? interpolationTime_InitialRaw + 0.1f
+                                                    : 1.1f; // ensure at least 1 so math below does not get whack (e.g., atInterpolationTime1_ticks)
+                                            Quaternion extrapolated1 = 
+                                                QuaternionUtils.SlerpUnclamped(
+                                                    ref newestValue,
+                                                    ref extrapolatedRotation,
+                                                    interpolationTime1);
+
+                                            float interpolationTime2 = interpolationTime1 + 0.5f;
+                                            Quaternion extrapolated2 =
+                                                QuaternionUtils.SlerpUnclamped(
+                                                    ref newestValue,
+                                                    ref extrapolatedRotation,
+                                                    interpolationTime2);
+
+                                            Quaternion 
+                                                q0 = justBeforeNewest.numericValue.UnityEngine_Quaternion, 
+                                                q1 = newest.numericValue.UnityEngine_Quaternion, 
+                                                q2 = extrapolated1, 
+                                                q3 = extrapolated2;
+                                            
+                                            float atInterpolationTime1_ticks = newest.elapsedTicksAtChange + (atMinusNewest_ticks * interpolationTime1);
+                                            float t1MinusNewest_ticks = atInterpolationTime1_ticks - newest.elapsedTicksAtChange;
+                                            float interpolationTimeSquad = atMinusNewest_ticks / t1MinusNewest_ticks; // % between q1 and q2
+
+                                            //float atInterpolationTime1MinusNewest_ticks = (1f - (interpolationTime_InitialRaw / interpolationTime1)) * atMinusNewest_ticks;
+                                            //float interpolationTimeSquad = atMinusNewest_ticks / atInterpolationTime1MinusNewest_ticks;
+
+                                            // We want to interpolate between q1 and q2 by an interpolation factor t
+                                            Quaternion q, a, b, p;
+                                            QuaternionUtils.SquadSetup(ref q0, ref q1, ref q2, ref q3, out q, out a, out b, out p);
+                                            blendedValue = QuaternionUtils.Squad(ref q, ref a, ref b, ref p, interpolationTimeSquad);
+
+                                            //* just double checking some numbers to make sure the math is good
+                                            GONetLog.Debug(string.Concat(
+                                                "\nq0: ", q0.eulerAngles, 
+                                                "\nq1: ", q1.eulerAngles,
+                                                "\nq2: ", q2.eulerAngles,
+                                                "\nq3: ", q3.eulerAngles, 
+                                                "\nsq: ", blendedValue.UnityEngine_Quaternion.eulerAngles,
+                                                "\ninterpolationTimeSquad: ", interpolationTimeSquad,
+                                                ", interpolationTime_InitialRaw: ", interpolationTime_InitialRaw,
+                                                ", q0(ms): ", TimeSpan.FromTicks(justBeforeNewest.elapsedTicksAtChange).TotalMilliseconds,
+                                                ", q1(ms): ", TimeSpan.FromTicks(newest.elapsedTicksAtChange).TotalMilliseconds,
+                                                ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
+                                                ", q3(ms): ", TimeSpan.FromTicks((long)atInterpolationTime1_ticks).TotalMilliseconds,
+                                                ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusNewest_ticks).TotalMilliseconds,
+                                                ", t1MinusNewest(ms): ", TimeSpan.FromTicks((long)t1MinusNewest_ticks).TotalMilliseconds));
+                                            //*/
+                                        }
+                                        /*{ // Simple impl that works well on more linear movements
+                                            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
+                                            Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
+                                            float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
+                                            Quaternion extrapolatedRotation = newestValue * diffRotation;
+                                            blendedValue = QuaternionUtils.SlerpUnclamped(
+                                                ref newestValue,
+                                                ref extrapolatedRotation,
+                                                interpolationTime);
+                                        }*/
+                                    }
 
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
                                 }
