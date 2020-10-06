@@ -85,7 +85,14 @@ public class ProjectileSpawner : GONetBehaviour
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
                 projectile.transform.Translate(Vector3.forward * Time.deltaTime * projectile.speed, Space.World);
 
-                float rotationAngle = Time.deltaTime * 100;
+                const float CYCLE_SECONDS = 5f;
+                const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
+
+                var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
+                smoothlyChangingMultiplyFactor *= DECGREES_PER_CYCLE;
+                smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
+
+                float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
                 projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
             }
         }

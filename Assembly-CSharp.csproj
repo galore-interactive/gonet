@@ -1836,6 +1836,7 @@
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
     <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
+    <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\Amazon\Plugins\System.Collections.Immutable.xml" />

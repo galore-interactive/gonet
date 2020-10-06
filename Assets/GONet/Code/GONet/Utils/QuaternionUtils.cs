@@ -106,7 +106,7 @@ namespace GONet.Utils
                 return Quaternion.identity;
             }
         }
-        
+
         #region Squad
 
         /// <overloads>
@@ -255,13 +255,13 @@ namespace GONet.Utils
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1704:IdentifiersShouldBeSpelledCorrectly")]
         public static Quaternion Exp(this Quaternion quaternion)
         {
-            float θ = (float)Math.Sqrt(quaternion.x * quaternion.x + quaternion.y * quaternion.y + quaternion.z * quaternion.z);
-            float cosθ = (float)Math.Cos(θ);
+            float theta = (float)Math.Sqrt(quaternion.x * quaternion.x + quaternion.y * quaternion.y + quaternion.z * quaternion.z);
+            float cosTheta = (float)Math.Cos(theta);
 
-            if (θ > float.Epsilon)
+            if (theta > float.Epsilon)
             {
-                float coefficient = (float)Math.Sin(θ) / θ;
-                quaternion.w = cosθ;
+                float coefficient = (float)Math.Sin(theta) / theta;
+                quaternion.w = cosTheta;
                 quaternion.x *= coefficient;
                 quaternion.y *= coefficient;
                 quaternion.z *= coefficient;
@@ -270,7 +270,7 @@ namespace GONet.Utils
             {
                 // In this case θ was 0.
                 // Therefore: cos(θ) = 1, sin(θ) = 0
-                quaternion.w = cosθ;
+                quaternion.w = cosTheta;
 
                 // We do not have to set (x, y, z) because we already know that length
                 // is 0.
@@ -281,7 +281,7 @@ namespace GONet.Utils
         /// <summary>
         /// Calculates the natural logarithm.
         /// </summary>
-        /// <param name="quaternion">The quaternion.</param>
+        /// <param name="quaternion">The quaternion.  If not a unit quaternion, this method will normalize it before proceeding.</param>
         /// <returns>The natural logarithm ln(<i>q</i>).</returns>
         /// <remarks>
         /// <para>
@@ -298,50 +298,45 @@ namespace GONet.Utils
         /// The result is returned as a quaternion with the form: (0, <i><b>u</b>θ</i>)
         /// </para>
         /// </remarks>
-        /// <exception cref="MathematicsException">
-        /// The given quaternion is not a unit quaternion.
-        /// </exception>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly")]
         public static Quaternion Ln(this Quaternion quaternion)
         {
-            if (Math.Abs(quaternion.w) <= 1.0f)
+            if (Math.Abs(quaternion.w) > 1.0f)
             {
-                float sinθ = (float)Math.Sqrt(quaternion.x * quaternion.x + quaternion.y * quaternion.y + quaternion.z * quaternion.z);
-                float θ = (float)Math.Atan(sinθ / quaternion.w);
+                quaternion = quaternion.normalized;
+            }
 
-                // Slower version:
-                //float θ = System.Math.Acos(quaternion.W);
-                //float sinθ = System.Math.Sin(θ);
+            float sinTheta = (float)Math.Sqrt(quaternion.x * quaternion.x + quaternion.y * quaternion.y + quaternion.z * quaternion.z);
+            float theta = (float)Math.Atan(sinTheta / quaternion.w);
 
-                if (sinθ != 0)
-                {
-                    float coefficient = θ / sinθ;
-                    quaternion.w = 0.0f;
-                    quaternion.x *= coefficient;
-                    quaternion.y *= coefficient;
-                    quaternion.z *= coefficient;
-                }
-                else
-                {
-                    // In this case θ was 0.
-                    // cos(θ) = 1, sin(θ) = 0
-                    // We assume that the given quaternion is a unit quaternion.
-                    // If w = 1, then all other components should be 0.
-                    Debug.Assert(quaternion.x == 0, "Quaternion is not a unit quaternion.");
-                    Debug.Assert(quaternion.y == 0, "Quaternion is not a unit quaternion.");
-                    Debug.Assert(quaternion.z == 0, "Quaternion is not a unit quaternion.");
+            // Slower version:
+            //float θ = System.Math.Acos(quaternion.W);
+            //float sinθ = System.Math.Sin(θ);
 
-                    // Return (0, (0, 0, 0))
-                    quaternion.w = 0.0f;
-
-                    // We do not have to touch (x, y, z).
-                }
-                return quaternion;
+            if (sinTheta != 0)
+            {
+                float coefficient = theta / sinTheta;
+                quaternion.w = 0.0f;
+                quaternion.x *= coefficient;
+                quaternion.y *= coefficient;
+                quaternion.z *= coefficient;
             }
             else
             {
-                throw new ArgumentOutOfRangeException("The quaternion is not a unit quaternion. Ln only works for unit quaternions.");
+                // In this case θ was 0.
+                // cos(θ) = 1, sin(θ) = 0
+                // We assume that the given quaternion is a unit quaternion.
+                // If w = 1, then all other components should be 0.
+                Debug.Assert(quaternion.x == 0, "Quaternion is not a unit quaternion.");
+                Debug.Assert(quaternion.y == 0, "Quaternion is not a unit quaternion.");
+                Debug.Assert(quaternion.z == 0, "Quaternion is not a unit quaternion.");
+
+                // Return (0, (0, 0, 0))
+                quaternion.w = 0.0f;
+
+                // We do not have to touch (x, y, z).
             }
+            return quaternion;
         }
 
         /// <summary>
