@@ -226,46 +226,41 @@ namespace GONet.Utils
                                             //GONetLog.Debug(string.Concat("we extroip_accelerated his ace...blended_velocity: ", blended_velocity.x, ",", blended_velocity.y, ",", blended_velocity.z, " newerAcceleration: ", newer_acceleration.x, ",", newer_acceleration.y, ",", newer_acceleration.z));
                                         }
                                     }
-                                    else if (valueCount > 2)
+                                    else if (valueCount > 2_000000000)
                                     { // shaun's way of acceleration-based extrapolation of quaternions:
-                                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
-                                        Quaternion q0 = q0_snap.numericValue.UnityEngine_Quaternion;
-                                        
-                                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-                                        Quaternion q1 = q1_snap.numericValue.UnityEngine_Quaternion;
+                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
+                                    }
+                                    else if (valueCount > 3)
+                                    {
+                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
 
-                                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q2_snap = newest;
-                                        Quaternion q2 = newest.numericValue.UnityEngine_Quaternion;
-                                        Quaternion diffRotation_q2_q1 = q2 * Quaternion.Inverse(q1);
-                                        Quaternion diffRotation_q1_q0 = q1 * Quaternion.Inverse(q0);
-                                        Quaternion diffDiff = diffRotation_q2_q1 * Quaternion.Inverse(diffRotation_q1_q0);
-                                        Quaternion q3 = q2 * diffRotation_q2_q1 * diffDiff;
-                                        long atMinusNewest_ticks = atElapsedTicks - q2_snap.elapsedTicksAtChange;
-                                        long newestMinusJustBefore_ticks = q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange;
-                                        float interpolationTime = atMinusNewest_ticks / (float)newestMinusJustBefore_ticks;
-                                        blendedValue =
-                                            QuaternionUtils.SlerpUnclamped(
-                                                ref q2,
-                                                ref q3,
-                                                interpolationTime);
-                                        
-                                        /* just double checking some numbers to make sure the math is good
-                                        GONetLog.Debug(string.Concat(
-                                            "\nq0: ", q0.eulerAngles,
-                                            "\nq1: ", q1.eulerAngles,
-                                            "\nq2: ", q2.eulerAngles,
-                                            "\nd2: ", diffRotation_q2_q1.eulerAngles,
-                                            "\nd1: ", diffRotation_q1_q0.eulerAngles,
-                                            "\ndd: ", diffDiff.eulerAngles,
-                                            "\nsq: ", blendedValue.UnityEngine_Quaternion.eulerAngles,
-                                            "\nq3: ", q3.eulerAngles,
-                                            "\ninterpolationTime: ", interpolationTime,
-                                            ", q0(ms): ", TimeSpan.FromTicks(q0_snap.elapsedTicksAtChange).TotalMilliseconds,
-                                            ", q1(ms): ", TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange).TotalMilliseconds,
-                                            ", q2(ms): ", TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange).TotalMilliseconds,
-                                            ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
-                                            ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusNewest_ticks).TotalMilliseconds));
-                                        */
+                                        long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....maybe average the time between elements instead to be dynamic!!!
+                                        long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                        float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
+                                        if (timePercentageCompleteBeforeNextSync < 1)
+                                        {
+                                            float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
+
+                                            var newest_last = valueBuffer[newestBufferIndex + 1];
+                                            Quaternion newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
+                                                GetQuaternionAccelerationBasedExtrapolation(
+                                                    valueBuffer, 
+                                                    newest.elapsedTicksAtChange, 
+                                                    newestBufferIndex + 1, 
+                                                    newest_last);
+
+                                            Quaternion identity = Quaternion.identity;
+                                            Quaternion overExtrapolationNewest = newestAsExtrapolated * Quaternion.Inverse(newest.numericValue.UnityEngine_Quaternion);
+                                            Quaternion overExtrapolationNewest_adjustmentToSmooth =
+                                                QuaternionUtils.SlerpUnclamped(
+                                                    ref identity,
+                                                    ref overExtrapolationNewest,
+                                                    timePercentageRemainingBeforeNextSync);
+
+                                            //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
+
+                                            blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
+                                        }
                                     }
                                     else
                                     {
@@ -338,7 +333,7 @@ namespace GONet.Utils
                                             //* /
                                         }*/
                                         
-                                        /*{ // Simple impl that works well on more linear movements
+                                        { // Simple impl that works well on more linear movements
                                             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
                                             Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
                                             float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
@@ -347,7 +342,7 @@ namespace GONet.Utils
                                                 ref newestValue,
                                                 ref extrapolatedRotation,
                                                 interpolationTime);
-                                        }*/
+                                        }
                                     }
 
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
@@ -357,6 +352,8 @@ namespace GONet.Utils
                                     blendedValue = newestValue;
                                     //GONetLog.Debug("QUAT new new beast");
                                 }
+
+                                // SeeHowWeDid_ExtrapolateQuaternion(valueBuffer, valueCount);
                             }
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
@@ -407,6 +404,183 @@ namespace GONet.Utils
             }
 
             return false;
+        }
+
+        private static Quaternion GetQuaternionAccelerationBasedExtrapolation(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot newest)
+        {
+            Quaternion extrapolatedViaAcceleration;
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
+            Quaternion q0 = q0_snap.numericValue.UnityEngine_Quaternion;
+
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
+            Quaternion q1 = q1_snap.numericValue.UnityEngine_Quaternion;
+
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q2_snap = newest;
+            Quaternion q2 = newest.numericValue.UnityEngine_Quaternion;
+            Quaternion diffRotation_q2_q1 = q2 * Quaternion.Inverse(q1);
+
+
+            Quaternion diffRotation_q1_q0 = q1 * Quaternion.Inverse(q0);
+            long q1MinusQ0_ticks = q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange;
+            long q2MinusQ1_ticks = q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange; // IMPORTANT: This is the main unit of measure...considered the whole of 1, which is why it is the denominator when calculating interpolationTime below
+            float interpolationTime_q1q0 = q2MinusQ1_ticks / (float)q1MinusQ0_ticks;
+            Quaternion identity = Quaternion.identity;
+            Quaternion diffRotation_q1_q0_scaledTo_q2q1_Time =
+                QuaternionUtils.SlerpUnclamped(
+                    ref identity,
+                    ref diffRotation_q1_q0,
+                    interpolationTime_q1q0);
+
+
+            Quaternion diffDiff = diffRotation_q2_q1 * Quaternion.Inverse(diffRotation_q1_q0_scaledTo_q2q1_Time);
+            Quaternion q3 = q2 * diffRotation_q2_q1 * diffDiff;
+            long atMinusQ2_ticks = atElapsedTicks - q2_snap.elapsedTicksAtChange;
+
+
+            float interpolationTime = atMinusQ2_ticks / (float)q2MinusQ1_ticks;
+            extrapolatedViaAcceleration =
+                QuaternionUtils.SlerpUnclamped(
+                    ref q2,
+                    ref q3,
+                    interpolationTime * 0.25f);
+
+            /* just double checking some numbers to make sure the math is good
+            GONetLog.Debug(string.Concat(
+                "\nq0: ", q0.eulerAngles,
+                "\nq1: ", q1.eulerAngles,
+                "\nq2: ", q2.eulerAngles,
+                "\nd2: ", diffRotation_q2_q1.eulerAngles,
+                "\nd1: ", diffRotation_q1_q0_scaledTo_q2q1_Time.eulerAngles,
+                "\ndd: ", diffDiff.eulerAngles,
+                "\nsq: ", extrapolatedViaAcceleration.UnityEngine_Quaternion.eulerAngles,
+                "\nq3: ", q3.eulerAngles,
+                "\ninterpolationTime: ", interpolationTime,
+                ", q0(ms): ", TimeSpan.FromTicks(q0_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", q1(ms): ", TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", q2(ms): ", TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
+                ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusQ2_ticks).TotalMilliseconds));
+            //*/
+            return extrapolatedViaAcceleration;
+        }
+
+        private static void SeeHowWeDid_ExtrapolateQuaternion(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount)
+        {
+            if (valueCount > 3)
+            {
+                int newestBufferIndex = 1;
+                var newest = valueBuffer[newestBufferIndex];
+
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
+                Quaternion q0 = q0_snap.numericValue.UnityEngine_Quaternion;
+
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
+                Quaternion q1 = q1_snap.numericValue.UnityEngine_Quaternion;
+
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q2_snap = newest;
+                Quaternion q2 = newest.numericValue.UnityEngine_Quaternion;
+                Quaternion diffRotation_q2_q1 = q2 * Quaternion.Inverse(q1);
+
+
+                Quaternion diffRotation_q1_q0 = q1 * Quaternion.Inverse(q0);
+                long q1MinusQ0_ticks = q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange;
+                long q2MinusQ1_ticks = q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange; // IMPORTANT: This is the main unit of measure...considered the whole of 1, which is why it is the denominator when calculating interpolationTime below
+                float interpolationTime_q1q0 = q2MinusQ1_ticks / (float)q1MinusQ0_ticks;
+                Quaternion identity = Quaternion.identity;
+                Quaternion diffRotation_q1_q0_scaledTo_q2q1_Time =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref identity,
+                        ref diffRotation_q1_q0,
+                        interpolationTime_q1q0);
+
+                Quaternion diffDiff = diffRotation_q2_q1 * Quaternion.Inverse(diffRotation_q1_q0_scaledTo_q2q1_Time);
+                Quaternion q3predicted = q2 * diffRotation_q2_q1 * diffDiff;
+
+
+                {
+                    Vector3 axis_diff_q1_q0 = Vector3.zero;
+                    float ang_diff_q1_q0;
+                    diffRotation_q1_q0.ToAngleAxis(out ang_diff_q1_q0, out axis_diff_q1_q0);
+                    float ang_diff_q1_q0Scaled = ang_diff_q1_q0 * (q1MinusQ0_ticks / (float)TimeSpan.FromSeconds(1).Ticks);
+
+                    Vector3 axis_diff_q2_q1 = Vector3.zero;
+                    float ang_diff_q2_q1;
+                    diffRotation_q2_q1.ToAngleAxis(out ang_diff_q2_q1, out axis_diff_q2_q1);
+                    float ang_diff_q2_q1Scaled = ang_diff_q2_q1 * (q2MinusQ1_ticks / (float)TimeSpan.FromSeconds(1).Ticks);
+
+                    GONetLog.Debug($"\naxis_diff_q1_q0: (x:{axis_diff_q1_q0.x}, y:{axis_diff_q1_q0.y}, z:{axis_diff_q1_q0.z}) ang_diff_q1_q0: {ang_diff_q1_q0} ang_diff_q1_q0Scaled: {ang_diff_q1_q0Scaled}\naxis_diff_q2_q1: (x:{axis_diff_q2_q1.x}, y:{axis_diff_q2_q1.y}, z:{axis_diff_q2_q1.z}) ang_diff_q2_q1: {ang_diff_q2_q1} ang_diff_q2_q1Scaled: {ang_diff_q2_q1Scaled}");
+/*
+                    if (ang > 180)
+                    {
+                        ang -= 360;
+                    }
+
+                    float dt_FIXME = 0.5f;
+                    ang = ang * (float)dt_FIXME % 360;
+                    var extrapd = Quaternion.AngleAxis(ang, axis) * q1;
+*/
+                }
+
+                int q3actualIndex = newestBufferIndex - 1;
+                var q3actual = valueBuffer[q3actualIndex];
+                long atElapsedTicks_q3Actual = valueBuffer[q3actualIndex].elapsedTicksAtChange;
+                long atMinusQ2_ticks = atElapsedTicks_q3Actual - q2_snap.elapsedTicksAtChange;
+
+                float interpolationTime_scale1 = atMinusQ2_ticks / (float)q2MinusQ1_ticks;
+
+                Quaternion extrapolatedPrediction_scale0_5 =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref q2,
+                        ref q3predicted,
+                        interpolationTime_scale1 * 0.5f);
+                Quaternion q3actual_q = q3actual.numericValue.UnityEngine_Quaternion;
+                Quaternion slerpedActual_scale0_5 =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref q2,
+                        ref q3actual_q,
+                        0.5f);
+                Quaternion thisIsHowWeDid = slerpedActual_scale0_5 * Quaternion.Inverse(extrapolatedPrediction_scale0_5);
+                GONetLog.Append($"\n0.5) extrapolated - actual: (x:{thisIsHowWeDid.eulerAngles.x}, y:{thisIsHowWeDid.eulerAngles.y}, z:{thisIsHowWeDid.eulerAngles.z})");
+
+                Quaternion extrapolatedPrediction_scale1 =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref q2,
+                        ref q3predicted,
+                        interpolationTime_scale1);
+                thisIsHowWeDid = q3actual.numericValue.UnityEngine_Quaternion * Quaternion.Inverse(extrapolatedPrediction_scale1);
+                GONetLog.Append($"\n1.0) extrapolated - actual: (x:{thisIsHowWeDid.eulerAngles.x}, y:{thisIsHowWeDid.eulerAngles.y}, z:{thisIsHowWeDid.eulerAngles.z})");
+
+                Quaternion extrapolatedPrediction_scale1_5 =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref q2,
+                        ref q3predicted,
+                        interpolationTime_scale1 * 1.5f);
+                Quaternion slerpedActual_scale1_5 =
+                    QuaternionUtils.SlerpUnclamped(
+                        ref q2,
+                        ref q3actual_q,
+                        1.5f);
+                thisIsHowWeDid = slerpedActual_scale1_5 * Quaternion.Inverse(extrapolatedPrediction_scale1_5);
+                //GONetLog.Append_FlushDebug($"\n1.5) extrapolated - actual: (x:{thisIsHowWeDid.eulerAngles.x}, y:{thisIsHowWeDid.eulerAngles.y}, z:{thisIsHowWeDid.eulerAngles.z})");
+
+                /* just double checking some numbers to make sure the math is good
+                GONetLog.Debug(string.Concat(
+                    "\nq0: ", q0.eulerAngles,
+                    "\nq1: ", q1.eulerAngles,
+                    "\nq2: ", q2.eulerAngles,
+                    "\nd2: ", diffRotation_q2_q1.eulerAngles,
+                    "\nd1: ", diffRotation_q1_q0_scaledTo_q2q1_Time.eulerAngles,
+                    "\ndd: ", diffDiff.eulerAngles,
+                    "\nsq: ", blendedValue.UnityEngine_Quaternion.eulerAngles,
+                    "\nq3: ", q3.eulerAngles,
+                    "\ninterpolationTime: ", interpolationTime,
+                    ", q0(ms): ", TimeSpan.FromTicks(q0_snap.elapsedTicksAtChange).TotalMilliseconds,
+                    ", q1(ms): ", TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange).TotalMilliseconds,
+                    ", q2(ms): ", TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange).TotalMilliseconds,
+                    ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
+                    ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusQ2_ticks).TotalMilliseconds));
+                //*/
+            }
         }
 
         static bool GetBlendedValue_Vector3(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
