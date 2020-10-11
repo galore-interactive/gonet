@@ -173,94 +173,43 @@ namespace GONet.Utils
                                 bool isEnoughInfoToExtrapolate = valueCount >= VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
-                                    if (valueCount > 2000)
+                                    if (valueCount > 3)
                                     {
-                                        { // use velocity and acceleration presuming that it will be more accurate than regular interpolation
-                                            
-                                            //* as many quats:
+                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
+
+                                        { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
+                                            long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....TODO FIXME: maybe average the time between elements instead to be dynamic!!!
+                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                            float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
+                                            if (timePercentageCompleteBeforeNextSync < 1)
                                             {
-                                                int olderBufferIndex = newestBufferIndex + 1;
-                                                Quaternion older_numericValue = valueBuffer[olderBufferIndex].numericValue.UnityEngine_Quaternion;
-                                                long older_elapsedTicksAtChange = valueBuffer[olderBufferIndex].elapsedTicksAtChange;
+                                                float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
 
-                                                int oldererBufferIndex = olderBufferIndex + 1;
-                                                Quaternion olderer_numericValue = valueBuffer[oldererBufferIndex].numericValue.UnityEngine_Quaternion;
-                                                long olderer_elapsedTicksAtChange = valueBuffer[oldererBufferIndex].elapsedTicksAtChange;
+                                                var newest_last = valueBuffer[newestBufferIndex + 1];
+                                                Quaternion newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
+                                                    GetQuaternionAccelerationBasedExtrapolation(
+                                                        valueBuffer,
+                                                        newest.elapsedTicksAtChange,
+                                                        newestBufferIndex + 1,
+                                                        newest_last);
 
-                                                long time_newerOlder = newest.elapsedTicksAtChange - older_elapsedTicksAtChange;
-                                                long time = atElapsedTicks - newest.elapsedTicksAtChange;
+                                                Quaternion identity = Quaternion.identity;
+                                                Quaternion overExtrapolationNewest = newestAsExtrapolated * Quaternion.Inverse(newest.numericValue.UnityEngine_Quaternion);
+                                                Quaternion overExtrapolationNewest_adjustmentToSmooth =
+                                                    QuaternionUtils.SlerpUnclamped(
+                                                        ref identity,
+                                                        ref overExtrapolationNewest,
+                                                        timePercentageRemainingBeforeNextSync);
 
-                                                Quaternion older_olderer_diff = Quaternion.Inverse(olderer_numericValue) * older_numericValue;
-                                                Vector3 older_velocity = older_olderer_diff.eulerAngles / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
+                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
 
-                                                Quaternion newest_older_diff = Quaternion.Inverse(older_numericValue) * newest.numericValue.UnityEngine_Quaternion;
-                                                Vector3 newer_velocity = newest_older_diff.eulerAngles / time_newerOlder;
-                                                Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
-
-                                                Vector3 blended_velocity = newer_velocity + newer_acceleration * time;
-                                                Vector3 blendedValue_eulers = newest.numericValue.UnityEngine_Quaternion.eulerAngles + blended_velocity * time;
-                                                blendedValue = Quaternion.Euler(blendedValue_eulers);
+                                                blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
                                             }
-                                            //*/
-
-                                            /* eulers
-                                            int olderBufferIndex = newestBufferIndex + 1;
-                                            Vector3 older_numericValue = valueBuffer[olderBufferIndex].numericValue.UnityEngine_Quaternion.eulerAngles;
-                                            long older_elapsedTicksAtChange = valueBuffer[olderBufferIndex].elapsedTicksAtChange;
-
-                                            int oldererBufferIndex = olderBufferIndex + 1;
-                                            Vector3 olderer_numericValue = valueBuffer[oldererBufferIndex].numericValue.UnityEngine_Quaternion.eulerAngles;
-                                            long olderer_elapsedTicksAtChange = valueBuffer[oldererBufferIndex].elapsedTicksAtChange;
-
-                                            long time_newerOlder = newest.elapsedTicksAtChange - older_elapsedTicksAtChange;
-                                            long time = atElapsedTicks - newest.elapsedTicksAtChange;
-
-                                            Vector3 older_velocity = (older_numericValue - olderer_numericValue) / (older_elapsedTicksAtChange - olderer_elapsedTicksAtChange);
-                                            Vector3 newer_velocity = (newest.numericValue.UnityEngine_Quaternion.eulerAngles - older_numericValue) / time_newerOlder;
-                                            Vector3 newer_acceleration = (newer_velocity - older_velocity) / time_newerOlder;
-
-                                            Vector3 blended_velocity = newer_velocity + newer_acceleration * time;
-                                            Vector3 blendedValue_eulers = newest.numericValue.UnityEngine_Quaternion.eulerAngles + blended_velocity * time;
-                                            blendedValue = Quaternion.Euler(blendedValue_eulers);
-                                            */
-                                            //GONetLog.Debug(string.Concat("we extroip_accelerated his ace...blended_velocity: ", blended_velocity.x, ",", blended_velocity.y, ",", blended_velocity.z, " newerAcceleration: ", newer_acceleration.x, ",", newer_acceleration.y, ",", newer_acceleration.z));
                                         }
                                     }
-                                    else if (valueCount > 2_000000000)
-                                    { // shaun's way of acceleration-based extrapolation of quaternions:
-                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
-                                    }
-                                    else if (valueCount > 3)
+                                    else if (valueCount > 2)
                                     {
                                         blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
-
-                                        long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....maybe average the time between elements instead to be dynamic!!!
-                                        long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
-                                        float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
-                                        if (timePercentageCompleteBeforeNextSync < 1)
-                                        {
-                                            float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
-
-                                            var newest_last = valueBuffer[newestBufferIndex + 1];
-                                            Quaternion newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
-                                                GetQuaternionAccelerationBasedExtrapolation(
-                                                    valueBuffer, 
-                                                    newest.elapsedTicksAtChange, 
-                                                    newestBufferIndex + 1, 
-                                                    newest_last);
-
-                                            Quaternion identity = Quaternion.identity;
-                                            Quaternion overExtrapolationNewest = newestAsExtrapolated * Quaternion.Inverse(newest.numericValue.UnityEngine_Quaternion);
-                                            Quaternion overExtrapolationNewest_adjustmentToSmooth =
-                                                QuaternionUtils.SlerpUnclamped(
-                                                    ref identity,
-                                                    ref overExtrapolationNewest,
-                                                    timePercentageRemainingBeforeNextSync);
-
-                                            //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
-
-                                            blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
-                                        }
                                     }
                                     else
                                     {
@@ -442,7 +391,7 @@ namespace GONet.Utils
                 QuaternionUtils.SlerpUnclamped(
                     ref q2,
                     ref q3,
-                    interpolationTime * 0.25f);
+                    interpolationTime);
 
             /* just double checking some numbers to make sure the math is good
             GONetLog.Debug(string.Concat(
@@ -606,36 +555,78 @@ namespace GONet.Utils
                                 bool isEnoughInfoToExtrapolate = valueCount >= VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
-                                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                    Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
-                                    Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
-                                    long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-
-                                    long atMinusNewestTicks = atElapsedTicks - newest.elapsedTicksAtChange;
-                                    int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
-                                    long extrapolated_TicksAtChange = newest.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
-                                    Vector3 extrapolated_ValueNew = newestValue + (valueDiffBetweenLastTwo * extrapolationSections);
-
-                                    /* the above 4 lines is preferred over what we would have done below here accumulating in a loop as somehow the loop would get infinite or at least stop the simulation
-                                    do
+                                    if (valueCount > 3)
                                     {
-                                        extrapolated_TicksAtChange += ticksBetweenLastTwo;
-                                        extrapolated_ValueNew += valueDiffBetweenLastTwo;
-                                        ++extrapolationSections;
-                                    } while (extrapolated_TicksAtChange < atElapsedTicks);
-                                    */
+                                        blendedValue = GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
 
-                                    long denominator = extrapolated_TicksAtChange - newest.elapsedTicksAtChange;
-                                    if (denominator == 0)
-                                    {
-                                        denominator = 1;
+                                        { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
+                                            long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....TODO FIXME: maybe average the time between elements instead to be dynamic!!!
+                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                            float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
+                                            if (timePercentageCompleteBeforeNextSync < 1)
+                                            {
+                                                float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
+
+                                                var newest_last = valueBuffer[newestBufferIndex + 1];
+                                                Vector3 newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
+                                                    GetVector3AccelerationBasedExtrapolation(
+                                                        valueBuffer,
+                                                        newest.elapsedTicksAtChange,
+                                                        newestBufferIndex + 1,
+                                                        newest_last);
+
+                                                Vector3 identity = Vector3.zero;
+                                                Vector3 overExtrapolationNewest = newestAsExtrapolated - newest.numericValue.UnityEngine_Vector3;
+                                                Vector3 overExtrapolationNewest_adjustmentToSmooth =
+                                                    Vector3.LerpUnclamped(
+                                                        identity,
+                                                        overExtrapolationNewest,
+                                                        timePercentageRemainingBeforeNextSync);
+
+                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
+
+                                                blendedValue = blendedValue.UnityEngine_Vector3 + overExtrapolationNewest_adjustmentToSmooth;
+                                            }
+
+                                        }
                                     }
-                                    float interpolationTime = atMinusNewestTicks / (float)denominator;
-                                    float oneSectionPercentage = (1 / (float)(extrapolationSections + 1));
-                                    float remainingSectionPercentage = 1f - oneSectionPercentage;
-                                    float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
-                                    blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
-                                    //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                    else if (valueCount > 2)
+                                    {
+                                        blendedValue = GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
+                                    }
+                                    else
+                                    {
+                                        GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
+                                        Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
+                                        Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
+                                        long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
+
+                                        long atMinusNewestTicks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                        int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
+                                        long extrapolated_TicksAtChange = newest.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
+                                        Vector3 extrapolated_ValueNew = newestValue + (valueDiffBetweenLastTwo * extrapolationSections);
+
+                                        /* the above 4 lines is preferred over what we would have done below here accumulating in a loop as somehow the loop would get infinite or at least stop the simulation
+                                        do
+                                        {
+                                            extrapolated_TicksAtChange += ticksBetweenLastTwo;
+                                            extrapolated_ValueNew += valueDiffBetweenLastTwo;
+                                            ++extrapolationSections;
+                                        } while (extrapolated_TicksAtChange < atElapsedTicks);
+                                        */
+
+                                        long denominator = extrapolated_TicksAtChange - newest.elapsedTicksAtChange;
+                                        if (denominator == 0)
+                                        {
+                                            denominator = 1;
+                                        }
+                                        float interpolationTime = atMinusNewestTicks / (float)denominator;
+                                        float oneSectionPercentage = (1 / (float)(extrapolationSections + 1));
+                                        float remainingSectionPercentage = 1f - oneSectionPercentage;
+                                        float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
+                                        blendedValue = GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
+                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                    }
                                 }
                                 else
                                 {
@@ -692,6 +683,63 @@ namespace GONet.Utils
             }
 
             return false;
+        }
+
+        private static Vector3 GetVector3AccelerationBasedExtrapolation(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot newest)
+        {
+            Vector3 extrapolatedViaAcceleration;
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
+            Vector3 q0 = q0_snap.numericValue.UnityEngine_Vector3;
+
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
+            Vector3 q1 = q1_snap.numericValue.UnityEngine_Vector3;
+
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot q2_snap = newest;
+            Vector3 q2 = newest.numericValue.UnityEngine_Vector3;
+            Vector3 diffRotation_q2_q1 = q2 - q1;
+
+            Vector3 diffRotation_q1_q0 = q1 - q0;
+            long q1MinusQ0_ticks = q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange;
+            long q2MinusQ1_ticks = q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange; // IMPORTANT: This is the main unit of measure...considered the whole of 1, which is why it is the denominator when calculating interpolationTime below
+            float interpolationTime_q1q0 = q2MinusQ1_ticks / (float)q1MinusQ0_ticks;
+            Vector3 identity = Vector3.zero;
+            Vector3 diffRotation_q1_q0_scaledTo_q2q1_Time =
+                Vector3.LerpUnclamped(
+                    identity,
+                    diffRotation_q1_q0,
+                    interpolationTime_q1q0);
+
+
+            Vector3 diffDiff = diffRotation_q2_q1 - diffRotation_q1_q0_scaledTo_q2q1_Time;
+            Vector3 q3 = q2 + diffRotation_q2_q1 + diffDiff;
+            long atMinusQ2_ticks = atElapsedTicks - q2_snap.elapsedTicksAtChange;
+
+
+            float interpolationTime = atMinusQ2_ticks / (float)q2MinusQ1_ticks;
+            extrapolatedViaAcceleration =
+                Vector3.LerpUnclamped(
+                    q2,
+                    q3,
+                    interpolationTime);
+
+            /* just double checking some numbers to make sure the math is good
+            GONetLog.Debug(string.Concat(
+                "\nq0: ", q0.eulerAngles,
+                "\nq1: ", q1.eulerAngles,
+                "\nq2: ", q2.eulerAngles,
+                "\nd2: ", diffRotation_q2_q1.eulerAngles,
+                "\nd1: ", diffRotation_q1_q0_scaledTo_q2q1_Time.eulerAngles,
+                "\ndd: ", diffDiff.eulerAngles,
+                "\nsq: ", extrapolatedViaAcceleration.UnityEngine_Quaternion.eulerAngles,
+                "\nq3: ", q3.eulerAngles,
+                "\ninterpolationTime: ", interpolationTime,
+                ", q0(ms): ", TimeSpan.FromTicks(q0_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", q1(ms): ", TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", q2(ms): ", TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange).TotalMilliseconds,
+                ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
+                ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusQ2_ticks).TotalMilliseconds));
+            //*/
+            return extrapolatedViaAcceleration;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
