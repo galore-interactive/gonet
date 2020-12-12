@@ -15,6 +15,7 @@
 
 using GONet.Utils;
 using MessagePack;
+using NetcodeIO.NET;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -524,6 +525,30 @@ namespace GONet
             ClientAuthorityId = myAuthorityId;
             FlagsPrevious = flagsPrevious;
             FlagsNow = flagsNow;
+        }
+    }
+
+    [MessagePackObject]
+    public struct ClientStateChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(1)]
+        public long ClientGUID { get; set; }
+
+        [Key(2)]
+        public ClientState StatePrevious { get; set; }
+
+        [Key(3)]
+        public ClientState StateNow { get; set; }
+
+        public ClientStateChangedEvent(long occurredAtElapsedTicks, long myClientGUID, ClientState statePrevious, ClientState stateNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            ClientGUID = myClientGUID;
+            StatePrevious = statePrevious;
+            StateNow = stateNow;
         }
     }
 

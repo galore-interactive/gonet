@@ -22,12 +22,23 @@ namespace GONet
     /// <summary>
     /// Provides a base class with commonly used hooks into the GONet API that might be easier to use for beginners before they are familiar with GONet's event api (i.e., <see cref="GONetMain.EventBus"/>).
     /// </summary>
+    [DisallowMultipleComponent]
     public abstract class GONetBehaviour : MonoBehaviour
     {
         private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
         private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
         private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
         private Subscription<SyncEvent_GONetParticipant_OwnerAuthorityId> gonetSubscriptionOwnerAuthorityId;
+
+        /// <summary>
+        /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
+        /// </summary>
+        public bool IsServer => GONetMain.IsServer;
+
+        /// <summary>
+        /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
+        /// </summary>
+        public bool IsClient => GONetMain.IsClient;
 
         protected virtual void Awake()
         {

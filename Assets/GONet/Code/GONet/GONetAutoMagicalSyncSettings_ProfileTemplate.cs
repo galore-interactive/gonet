@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GONet.PluginAPI;
+using System;
 using TypeReferences;
 using UnityEngine;
 
@@ -81,6 +82,8 @@ namespace GONet
         [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
         public SyncType_CustomSerializer_Pair[] SyncValueTypeSerializerOverrides;
 
+        public SyncType_CustomValueBlending_Pair[] SyncValueTypeValueBlendingOverrides;
+
         /// <summary>
         /// ***Do NOT change this!  Thanks.
         /// --GONet Team
@@ -98,5 +101,15 @@ namespace GONet
         [Tooltip("NOTE: Any selection needs to implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
         [ClassImplements(typeof(IGONetAutoMagicalSync_CustomSerializer))]
         public ClassTypeReference CustomSerializerType;
+    }
+
+    [Serializable]
+    public struct SyncType_CustomValueBlending_Pair
+    {
+        public GONetSyncableValueTypes ValueType;
+
+        [Tooltip("NOTE: Any selection needs to implement GONet.PluginAPI.IGONetAutoMagicalSync_CustomValueBlending.")]
+        [ClassImplements(typeof(IGONetAutoMagicalSync_CustomValueBlending))]
+        public ClassTypeReference CustomValueBlendingType;
     }
 }

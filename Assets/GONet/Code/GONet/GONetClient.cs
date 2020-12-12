@@ -39,6 +39,11 @@ namespace GONet
 
     public class GONetClient
     {
+        /// <summary>
+        /// Globally unique ID for this client instance.
+        /// </summary>
+        public long GUID { get; private set; } = Utils.GUID.Generate().AsInt64();
+
         private ClientTypeFlags _clientTypeFlags = ClientTypeFlags.Player_Standard;
         internal ClientTypeFlags ClientTypeFlags
         {
@@ -57,6 +62,11 @@ namespace GONet
 
         public bool IsConnectedToServer => ConnectionState == ClientState.Connected;
 
+        /// <summary>
+        /// Current state of this client connection to server.
+        /// Subscribe to <see cref="ClientStateChangedEvent"/> via <see cref="GONetMain.EventBus"/>'s <see cref="GONetEventBus.Subscribe{T}(GONetEventBus.HandleEventDelegate{T}, GONetEventBus.EventFilterDelegate{T})"/>
+        /// if you want notification each time this changes.
+        /// </summary>
         public ClientState ConnectionState { get; private set; } = ClientState.Disconnected;
 
         internal readonly Queue<GONetMain.NetworkData> incomingNetworkData_mustProcessAfterClientInitialized = new Queue<GONetMain.NetworkData>(100);
@@ -81,9 +91,9 @@ namespace GONet
         public delegate void InitializedWithServerDelegate(GONetClient client);
         public event InitializedWithServerDelegate InitializedWithServer;
 
-        internal GONetConnection_ClientToServer connectionToServer;
+        internal readonly GONetConnection_ClientToServer connectionToServer;
 
-        private Client client;
+        private readonly Client client;
 
         public GONetClient(Client client)
         {
@@ -91,7 +101,7 @@ namespace GONet
 
             connectionToServer = new GONetConnection_ClientToServer(client);
 
-            client.OnStateChanged += OnStateChanged;
+            client.OnStateChanged += OnStateChanged_BubbleEventUp;
             client.TickBeginning += Client_TickBeginning_PossibleSeparateThread;
         }
 
@@ -100,6 +110,12 @@ namespace GONet
             connectionToServer.ProcessSendBuffer_IfAppropriate();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="serverIP"></param>
+        /// <param name="serverPort"></param>
+        /// <param name="ongoingTimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
         public void ConnectToServer(string serverIP, int serverPort, int ongoingTimeoutSeconds)
         {
             connectionToServer.Connect(serverIP, serverPort, ongoingTimeoutSeconds);
@@ -126,12 +142,24 @@ namespace GONet
             connectionToServer.Disconnect();
         }
 
-        private void OnStateChanged(ClientState state)
+        /// <summary>
+        /// Since the <see cref="client"/> is private, the event is publishes for state change is not visible to GONet users.
+        /// So, this bubbles it up and fires a GONet event for them (i.e., <see cref="ClientStateChangedEvent"/>).
+        /// </summary>
+        private void OnStateChanged_BubbleEventUp(ClientState state)
         {
+            var previous = ConnectionState;
             ConnectionState = state;
-            GONetLog.Debug("state changed to: " + Enum.GetName(typeof(ClientState), state)); // TODO remove unity references from this code base!
-        }
 
+            const string CLIENT = "Client state changed to: ";
+            const string AUTH = ".  My client guid: ";
+            GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), state), AUTH, GUID));
+
+            if (previous != state)
+            {
+                GONetMain.EventBus.Publish(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, GUID, previous, state));
+            }
+        }
     }
 
     public class GONetRemoteClient

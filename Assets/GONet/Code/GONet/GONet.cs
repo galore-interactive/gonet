@@ -32,6 +32,7 @@ using System.Runtime.Serialization;
 using System.Net;
 using System.Collections;
 using System.Diagnostics;
+using GONet.PluginAPI;
 
 namespace GONet
 {
@@ -269,14 +270,14 @@ namespace GONet
         /// </summary>
         public static bool IsClientVsServerStatusKnown => IsServer || IsClient;
 
-        private static GONetServer _gonetServer; // TODO remove this once we make gonetServer private again!
+        private static GONetServer _gonetServer;
         /// <summary>
-        /// TODO FIXME make this private.....its internal temporary for testing
+        /// This will be set internally only on the server side.  Do NOT set yourself!
         /// </summary>
-        internal static GONetServer gonetServer
+        public static GONetServer gonetServer
         {
             get { return _gonetServer; }
-            set
+            internal set
             {
                 if (value != null)
                 {
@@ -427,13 +428,13 @@ namespace GONet
 
         internal static GONetClient _gonetClient;
         /// <summary>
-        /// TODO FIXME make this private.....its internal temporary for testing
+        /// This will be set internally only on the client side.  Do NOT set yourself!
         /// </summary>
-        internal static GONetClient GONetClient
+        public static GONetClient GONetClient
         {
             get => _gonetClient;
 
-            set
+            internal set
             {
                 ClientTypeFlags flagsPrevious = MyClientTypeFlags;
 
@@ -1719,7 +1720,8 @@ namespace GONet
         #endregion
 
         /// <summary>
-        /// Should only be called from <see cref="GONetGlobal"/>
+        /// Should only be called from <see cref="GONetGlobal"/>.
+        /// Calling this cleans up things from the game session.
         /// </summary>
         internal static void Shutdown()
         {
@@ -2377,57 +2379,6 @@ namespace GONet
             /// </summary>
             internal GONetSyncableValue valueLimitEncountered_max;
 
-            /// <summary>
-            /// TODO replace this with <see cref="GONetSyncableValue"/>
-            /// </summary>
-            [StructLayout(LayoutKind.Explicit)]
-            internal struct NumericValueChangeSnapshot // TODO : IEquatable<T>
-            {
-                [FieldOffset(0)]
-                internal long elapsedTicksAtChange;
-
-                [FieldOffset(8)]
-                internal GONetSyncableValue numericValue;
-
-                NumericValueChangeSnapshot(long elapsedTicksAtChange, GONetSyncableValue value) : this()
-                {
-                    this.elapsedTicksAtChange = elapsedTicksAtChange;
-                    numericValue = value;
-                }
-
-                internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, GONetSyncableValue value)
-                {
-                    if (value.GONetSyncType == GONetSyncableValueTypes.System_Single ||
-                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 ||
-                        value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion) // TODO move this to some public static list for folks to reference! e.g. Allowed Blendy Value Types
-                    {
-                        return new NumericValueChangeSnapshot(elapsedTicksAtChange, value);
-                    }
-
-                    throw new ArgumentException("Type not supported.", nameof(value.GONetSyncType));
-                }
-
-                public override bool Equals(object obj)
-                {
-                    if (!(obj is NumericValueChangeSnapshot))
-                    {
-                        return false;
-                    }
-
-                    var snapshot = (NumericValueChangeSnapshot)obj;
-                    return elapsedTicksAtChange == snapshot.elapsedTicksAtChange &&
-                           EqualityComparer<GONetSyncableValue>.Default.Equals(numericValue, snapshot.numericValue);
-                }
-
-                public override int GetHashCode()
-                {
-                    var hashCode = -1529925349;
-                    hashCode = hashCode * -1521134295 + elapsedTicksAtChange.GetHashCode();
-                    hashCode = hashCode * -1521134295 + EqualityComparer<GONetSyncableValue>.Default.GetHashCode(numericValue);
-                    return hashCode;
-                }
-            }
-
             internal const int MOST_RECENT_CHANGEs_SIZE_MINIMUM = 10;
             internal const int MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED = 100;
             internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE_MINIMUM, MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED);
@@ -2528,7 +2479,7 @@ namespace GONet
             /// <summary>
             /// <para>Expected that this is called each frame.</para>
             /// <para>IMPORTANT: This method will do nothing (i.e., not appripriate) if <see cref="syncCompanion"/>'s <see cref="GONetParticipant_AutoMagicalSyncCompanion_Generated.gonetParticipant"/> is mine (<see cref="GONetMain.IsMine(GONetParticipant)"/>) - do not value blend on something I own...value blending is only something that makes sense for GNPs that others own</para>
-            /// <para>Loop through the recent changes to interpolate or extrapolate is possible.</para>
+            /// <para>Loop through the recent changes to interpolate or extrapolate if possible.</para>
             /// <para>POST: The related/associated value is updated to what is believed to be the current value based on recent changes accumulated from owner/source.</para>
             /// </summary>
             internal void ApplyValueBlending_IfAppropriate(long useBufferLeadTicks)
