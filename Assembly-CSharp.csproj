@@ -1699,6 +1699,7 @@
     <Compile Include="Assets\GONet\Code\GONet\GONetSessionContext.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSpawnSupport_Runtime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\PluginAPI\GONetSyncableValues.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\PluginAPI\IGONetAutoMagicalSync_CustomSerializer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\PluginAPI\IGONetAutoMagicalSync_CustomValueBlending.cs" />
     <Compile Include="Assets\GONet\Code\GONet\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ArrayPool.cs" />

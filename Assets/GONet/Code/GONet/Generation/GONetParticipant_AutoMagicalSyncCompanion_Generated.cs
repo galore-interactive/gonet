@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.PluginAPI;
 using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
@@ -75,6 +76,10 @@ namespace GONet.Generation
             new ArrayPool<IGONetAutoMagicalSync_CustomSerializer>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
         protected IGONetAutoMagicalSync_CustomSerializer[] cachedCustomSerializers;
 
+        protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomValueBlending> cachedCustomValueBlendingsArrayPool =
+            new ArrayPool<IGONetAutoMagicalSync_CustomValueBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        protected IGONetAutoMagicalSync_CustomValueBlending[] cachedCustomValueBlendings;
+
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
         internal abstract byte CodeGenerationId { get; }
@@ -92,6 +97,7 @@ namespace GONet.Generation
 
             doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
+            cachedCustomValueBlendingsArrayPool.Return(cachedCustomValueBlendings);
 
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -401,6 +407,18 @@ namespace GONet.Generation
                     lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED;
                 }
             }
+        }
+
+        internal bool TryGetBlendedValue(byte index, NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        {
+            IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
+            if (customValueBlending != null)
+            {
+                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue);
+            }
+
+            blendedValue = default;
+            return false;
         }
     }
 

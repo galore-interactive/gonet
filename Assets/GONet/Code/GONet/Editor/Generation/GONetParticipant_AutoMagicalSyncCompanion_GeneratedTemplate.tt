@@ -70,6 +70,7 @@ namespace GONet.Generation
 			valuesCount = <#=overallCount#>;
 			
 			cachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
@@ -127,6 +128,10 @@ namespace GONet.Generation
 <#			if (singleMember.attribute.CustomSerialize_Instance != null)
 			{#>
 			cachedCustomSerializers[<#=iOverall#>] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f);
+<#			}#>
+<#			if (singleMember.attribute.CustomValueBlending_Instance != null)
+			{#>
+			cachedCustomValueBlendings[<#=iOverall#>] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<<#=singleMember.attribute.CustomValueBlending_Instance.GetType().FullName.Replace("+", ".")#>>();
 <#			}#>
 <#			if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
             {#>		

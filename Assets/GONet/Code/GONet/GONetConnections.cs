@@ -24,6 +24,15 @@ namespace GONet
 {
     public abstract class GONetConnection : ReliableEndpoint
     {
+        /// <summary>
+        /// Whether this connection is client side and represents the connection to the server or it is server side and represents the connection to the client, 
+        /// this value here is the unique ID of the connection between the two computers as was initially set/created by the client first starting the connection.
+        /// There is even the potential for future releases of GONet where this connection represents a client (peer) to client (peer) connection, but one of the two
+        /// had to initiate the connection.
+        /// Both parties connected will have the same value in this field.
+        /// </summary>
+        public ulong InitiatingClientConnectionUID { get; protected set; }
+
         public ushort OwnerAuthorityId { get; internal set; }
 
         #region round trip time stuffs (RTT)
@@ -184,6 +193,10 @@ namespace GONet
     {
         private Client client;
 
+        private IPEndPoint mostRecentConnectInfo;
+
+        public ClientState State => client.State;
+
         public GONetConnection_ClientToServer(Client client) : base()
         {
             this.client = client;
@@ -216,26 +229,49 @@ namespace GONet
             const int CONNECTION_TOKEN_TIMOUT_SECONDS = 120;
 
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
-            ulong clientID = (ulong)GUID.Generate().AsInt64();
-            byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { new IPEndPoint(IPAddress.Parse(serverIP), serverPort) },
+
+            IPAddress currenetServerIP = IPAddress.Parse(serverIP);
+            bool isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
+            if (isChangingConnectInfo)
+            {
+                mostRecentConnectInfo = new IPEndPoint(currenetServerIP, serverPort);
+            }
+
+            if (InitiatingClientConnectionUID == default || isChangingConnectInfo)
+            {
+                InitiatingClientConnectionUID = (ulong)GUID.Generate().AsInt64();
+            }
+
+            byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { mostRecentConnectInfo },
                 CONNECTION_TOKEN_TIMOUT_SECONDS,
                 ongoingTimeoutSeconds,
                 1UL,
-                clientID,
+                InitiatingClientConnectionUID,
                 new byte[256]);
 
             client.Connect(connectToken);
         }
 
+        /// <summary>
+        /// Will log a warning if <see cref="client"/> is not in a <see cref="State"/> of <see cref="ClientState.Connected"/>; however, the deeper internal call to disconnect will still process.
+        /// </summary>
         public void Disconnect()
         {
+            if (State != ClientState.Connected)
+            {
+                const string STATE = "Calling Disconnect on a client connection to the server that is not currently in a connected state.  Actual state: ";
+                GONetLog.Warning(string.Concat(STATE, Enum.GetName(typeof(ClientState), State)));
+            }
+
             client.Disconnect();
         }
     }
 
     public class GONetConnection_ServerToClient : GONetConnection
     {
-        private RemoteClient remoteClient;
+        private readonly RemoteClient remoteClient;
+
+        public bool IsConnectedToClient => remoteClient.Connected;
 
         public GONetConnection_ServerToClient(RemoteClient remoteClient) : base()
         {

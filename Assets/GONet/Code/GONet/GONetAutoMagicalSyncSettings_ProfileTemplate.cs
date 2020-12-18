@@ -79,9 +79,10 @@ namespace GONet
         [Tooltip("GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.\nSome things just cannot be done outside the main Unity thread.\nTherefore, if you know for certain that the value to sync being decorated with this attribute cannot run outside unity main thread, set this to true and GONet will ensure it is so.")]
         public bool MustRunOnUnityMainThread = false;
 
-        [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
+        [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to be public and implement GONet.IGONetAutoMagicalSync_CustomSerializer.\n*WARNING: Do NOT have multiple entries for the same GONet Value Type or else GONet will get confused.")]
         public SyncType_CustomSerializer_Pair[] SyncValueTypeSerializerOverrides;
 
+        [Tooltip("*If this is left empty, the GONet default value blending will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom value blending technique applied on non-owners of data when determining current value between values auto-magically sync'd from the owner at the configured regular frequency.\n*NOTE: The implementation Type needs to be public and implement GONet.PluginAPI.IGONetAutoMagicalSync_CustomValueBlending.\n*WARNING: Do NOT have multiple entries for the same GONet Value Type or else GONet will get confused.")]
         public SyncType_CustomValueBlending_Pair[] SyncValueTypeValueBlendingOverrides;
 
         /// <summary>
@@ -98,7 +99,7 @@ namespace GONet
     {
         public GONetSyncableValueTypes ValueType;
 
-        [Tooltip("NOTE: Any selection needs to implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
+        [Tooltip("NOTE: Any selection needs to be public and implement GONet.IGONetAutoMagicalSync_CustomSerializer.")]
         [ClassImplements(typeof(IGONetAutoMagicalSync_CustomSerializer))]
         public ClassTypeReference CustomSerializerType;
     }
@@ -108,7 +109,7 @@ namespace GONet
     {
         public GONetSyncableValueTypes ValueType;
 
-        [Tooltip("NOTE: Any selection needs to implement GONet.PluginAPI.IGONetAutoMagicalSync_CustomValueBlending.")]
+        [Tooltip("NOTE: Any selection needs to be public and implement GONet.PluginAPI.IGONetAutoMagicalSync_CustomValueBlending.")]
         [ClassImplements(typeof(IGONetAutoMagicalSync_CustomValueBlending))]
         public ClassTypeReference CustomValueBlendingType;
     }

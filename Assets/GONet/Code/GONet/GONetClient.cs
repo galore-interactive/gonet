@@ -39,11 +39,6 @@ namespace GONet
 
     public class GONetClient
     {
-        /// <summary>
-        /// Globally unique ID for this client instance.
-        /// </summary>
-        public long GUID { get; private set; } = Utils.GUID.Generate().AsInt64();
-
         private ClientTypeFlags _clientTypeFlags = ClientTypeFlags.Player_Standard;
         internal ClientTypeFlags ClientTypeFlags
         {
@@ -153,11 +148,11 @@ namespace GONet
 
             const string CLIENT = "Client state changed to: ";
             const string AUTH = ".  My client guid: ";
-            GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), state), AUTH, GUID));
+            GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), state), AUTH, connectionToServer.InitiatingClientConnectionUID));
 
             if (previous != state)
             {
-                GONetMain.EventBus.Publish(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, GUID, previous, state));
+                GONetMain.EventBus.Publish(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, connectionToServer.InitiatingClientConnectionUID, previous, state));
             }
         }
     }

@@ -26,4 +26,8 @@ MonoBehaviour:
   - ValueType: 12
     CustomSerializerType:
       _classRef: GONet.Vector3Serializer, Assembly-CSharp
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 12
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Vector3, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

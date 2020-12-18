@@ -26,4 +26,8 @@ MonoBehaviour:
   - ValueType: 14
     CustomSerializerType:
       _classRef: GONet.QuaternionSerializer, Assembly-CSharp
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 14
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Quaternion, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 1

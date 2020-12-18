@@ -2509,6 +2509,11 @@ namespace GONet
                 mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here, but this is functional.
                 //GONetLog.Debug("Cleared most recent changes...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
             }
+
+            internal bool TryGetBlendedValue(long atElapsedTicks, out GONetSyncableValue blendedValue)
+            {
+                return syncCompanion.TryGetBlendedValue(index, mostRecentChanges, mostRecentChanges_usedSize, atElapsedTicks, out blendedValue);
+            }
         }
 
         /// <summary>

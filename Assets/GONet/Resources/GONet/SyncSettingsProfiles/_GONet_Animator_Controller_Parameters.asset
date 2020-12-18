@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c72ac148faf249b459357da12c865e3c, type: 3}
   m_Name: _GONet_Animator_Controller_Parameters
   m_EditorClassIdentifier: 
-  AttributeCorrelationName: 
   SyncChangesASAP: 0
   SyncChangesFrequencyOccurrences: 20
   SyncChangesFrequencyUnitOfTime: 0
@@ -24,4 +23,8 @@ MonoBehaviour:
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides: []
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 9
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Float, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 0
