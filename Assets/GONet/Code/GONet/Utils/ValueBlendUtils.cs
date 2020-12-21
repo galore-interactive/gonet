@@ -36,25 +36,22 @@ namespace GONet.Utils
                 return true;
             }
 
-            /*
+            // If the above does not yield good value blend, then the below will attmept to use the default implementations available.
+            // NOTE: This would most likely be due to the valueMonitoringSupport profile/template not having identified an implementation of IGONetAutoMagicalSync_CustomValueBlending for the type of blendedValue.
             if (valueMonitoringSupport.mostRecentChanges_usedSize > 0)
             {
                 IGONetAutoMagicalSync_CustomValueBlending customBlending;
-                if (getBlendedValues_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].numericValue.GONetSyncType, out customBlending))
+                if (defaultValueBlendings_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].numericValue.GONetSyncType, out customBlending))
                 {
                     return customBlending.TryGetBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue);
                 }
             }
-            */
 
             blendedValue = default;
             return false;
         }
 
-        /// <summary>
-        /// TODO refactor this to dynamically lookup all the implementations of IGONetAutoMagicalSync_CustomValueBlending and have a library available to users via Unity editor settings in sync profile/template
-        /// </summary>
-        static readonly Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomValueBlending> getBlendedValues_byValueType = new Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomValueBlending>(8)
+        static readonly Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomValueBlending> defaultValueBlendings_byValueType = new Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomValueBlending>(8)
         {
             { GONetSyncableValueTypes.System_Single, new GONetDefaultValueBlending_Float() },
             { GONetSyncableValueTypes.UnityEngine_Quaternion, new GONetDefaultValueBlending_Quaternion() },
