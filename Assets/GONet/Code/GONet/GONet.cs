@@ -1346,11 +1346,13 @@ namespace GONet
         static Thread endOfLineSendAndSaveThread;
 
         /// <summary>
-        /// Should only be called from <see cref="GONetGlobal"/>
+        /// Should only be called from <see cref="GONetGlobal"/> once per Unity <see cref="MonoBehaviour"/> Update cycle.
         /// </summary>
         internal static void Update(GONetBehaviour coroutineManager)
         {
             Time.Update(); // This is the important thing to execute as early in a frame as possible (hence the -32000 setting in Script Execution Order) to get more accurate network timing to match Unity's frame time as it relates to values changing
+
+            EventBus.PublishQueuedEventsForMainThread();
 
             if (myLocal == null) // NOTE: This check is important since it will eventually call Update_DoTheHeavyLifting_IfAppropriate, which is also called regularly from MyLocal.LateUpdate and we only want to process this during the time MyLocal is not present (i.e., since it is instantiated after start-up)
             {

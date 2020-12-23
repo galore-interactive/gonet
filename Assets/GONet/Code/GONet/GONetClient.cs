@@ -86,6 +86,13 @@ namespace GONet
         public delegate void InitializedWithServerDelegate(GONetClient client);
         public event InitializedWithServerDelegate InitializedWithServer;
 
+        /// <summary>
+        /// This auto-assigned UID is used to correlate this client's connection to the server both on client side and server side.
+        /// See <see cref="ClientStateChangedEvent.InitiatingClientConnectionUID"/> and <see cref="RemoteClientStateChangedEvent.InitiatingClientConnectionUID"/>.
+        /// IMPORTANT: This value changes inside the call to <see cref="ConnectToServer(string, int, int)"/> and <see cref="ConnectToServer(string, int, int, int)"/>, which means you should always access this property instead of storing the value off elsewhere.
+        /// </summary>
+        public ulong InitiatingClientConnectionUID => connectionToServer.InitiatingClientConnectionUID;
+
         internal readonly GONetConnection_ClientToServer connectionToServer;
 
         private readonly Client client;
@@ -106,14 +113,32 @@ namespace GONet
         }
 
         /// <summary>
-        /// 
+        /// NOTE: Consider subscribing to <see cref="ClientStateChangedEvent"/> prior to calling this so you can react to any changes to the state.
+        ///       If you do subscribe, ensure the subscription filter/predicate compares its <see cref="ClientStateChangedEvent.InitiatingClientConnectionUID"/> to <see cref="InitiatingClientConnectionUID"/>.
+        ///       See <see cref="GONetSampleSpawner.OnClientStateChanged_LogIt(GONetEventEnvelope{ClientStateChangedEvent})"/> for example.
+        ///       
+        /// Calling this is the same as calling <see cref="ConnectToServer(string, int, int, int)"/> passing in <see cref="GONetConnection_ClientToServer.CONNECTION_TOKEN_TIMOUT_SECONDS"/> for preConnection_TimeoutSeconds.
         /// </summary>
         /// <param name="serverIP"></param>
         /// <param name="serverPort"></param>
-        /// <param name="ongoingTimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
-        public void ConnectToServer(string serverIP, int serverPort, int ongoingTimeoutSeconds)
+        /// <param name="postConnection_TimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
+        public void ConnectToServer(string serverIP, int serverPort, int postConnection_TimeoutSeconds)
         {
-            connectionToServer.Connect(serverIP, serverPort, ongoingTimeoutSeconds);
+            ConnectToServer(serverIP, serverPort, GONetConnection_ClientToServer.CONNECTION_TOKEN_TIMOUT_SECONDS, postConnection_TimeoutSeconds);
+        }
+
+        /// <summary>
+        /// NOTE: Consider subscribing to <see cref="ClientStateChangedEvent"/> prior to calling this so you can react to any changes to the state.
+        ///       If you do subscribe, ensure the subscription filter/predicate compares its <see cref="ClientStateChangedEvent.InitiatingClientConnectionUID"/> to <see cref="InitiatingClientConnectionUID"/>.
+        ///       See <see cref="GONetSampleSpawner.OnClientStateChanged_LogIt(GONetEventEnvelope{ClientStateChangedEvent})"/> for example.
+        /// </summary>
+        /// <param name="serverIP"></param>
+        /// <param name="serverPort"></param>
+        /// <param name="preConnection_TimeoutSeconds">While the connection is being established, this is the maximum time/seconds the attempt to connect will be made before giving up.</param>
+        /// <param name="postConnection_TimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
+        public void ConnectToServer(string serverIP, int serverPort, int preConnection_TimeoutSeconds, int postConnection_TimeoutSeconds)
+        {
+            connectionToServer.Connect(serverIP, serverPort, preConnection_TimeoutSeconds, postConnection_TimeoutSeconds);
         }
 
         public void SendBytesToServer(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
@@ -138,7 +163,7 @@ namespace GONet
         }
 
         /// <summary>
-        /// Since the <see cref="client"/> is private, the event is publishes for state change is not visible to GONet users.
+        /// Since the <see cref="client"/> is private, the event it publishes for state change is not visible to GONet users.
         /// So, this bubbles it up and fires a GONet event for them (i.e., <see cref="ClientStateChangedEvent"/>).
         /// </summary>
         private void OnStateChanged_BubbleEventUp(ClientState state)
@@ -152,7 +177,7 @@ namespace GONet
 
             if (previous != state)
             {
-                GONetMain.EventBus.Publish(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, connectionToServer.InitiatingClientConnectionUID, previous, state));
+                GONetMain.EventBus.PublishASAP(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, connectionToServer.InitiatingClientConnectionUID, previous, state));
             }
         }
     }

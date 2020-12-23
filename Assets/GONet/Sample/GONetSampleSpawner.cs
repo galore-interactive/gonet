@@ -14,10 +14,11 @@
  */
 
 using GONet;
+using NetcodeIO.NET;
 using System;
 using UnityEngine;
 
-public class GONetSampleSpawner : MonoBehaviour
+public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
 {
     public GONetSampleClientOrServer GONetServerPREFAB;
     public GONetSampleClientOrServer GONetClientPREFAB;
@@ -27,8 +28,74 @@ public class GONetSampleSpawner : MonoBehaviour
     private bool hasServerSpawned;
     private bool hasClientSpawned;
 
-    private void Start()
+    #region sample event subscription for client (connection) state changes
+
+    protected override void Awake()
     {
+        base.Awake();
+
+        EventBus.Subscribe<ClientStateChangedEvent>(OnClientStateChanged_LogIt);
+        EventBus.Subscribe<RemoteClientStateChangedEvent>(OnRemoteClientStateChanged_LogIt);
+    }
+
+    private void OnRemoteClientStateChanged_LogIt(GONetEventEnvelope<RemoteClientStateChangedEvent> eventEnvelope)
+    {
+        GONetLog.Append($"As indicated by the server, GONet client with InitiatingClientConnectionUID: {eventEnvelope.Event.InitiatingClientConnectionUID} has changed state to: {Enum.GetName(typeof(ClientState), eventEnvelope.Event.StateNow)}");
+
+        if (IsClient)
+        {
+            if (eventEnvelope.Event.InitiatingClientConnectionUID == GONetMain.GONetClient.InitiatingClientConnectionUID)
+            {
+                const string MY = " and it is my client.";
+                GONetLog.Append(MY);
+            }
+            else
+            {
+                const string NOT = " and it is NOT my client (i.e., some other client's status changed).";
+                GONetLog.Append(NOT);
+            }
+        }
+        else
+        {
+            const string SRVR = " and this is the server acknowledging it to myself.";
+            GONetLog.Append(SRVR);
+        }
+
+        GONetLog.Append_FlushDebug();
+    }
+
+    private void OnClientStateChanged_LogIt(GONetEventEnvelope<ClientStateChangedEvent> eventEnvelope)
+    {
+        GONetLog.Append($"As indicated by the initiating client, GONet client with InitiatingClientConnectionUID: {eventEnvelope.Event.InitiatingClientConnectionUID} indicated it has changed state to: {Enum.GetName(typeof(ClientState), eventEnvelope.Event.StateNow)}");
+
+        if (IsClient)
+        {
+            if (eventEnvelope.Event.InitiatingClientConnectionUID == GONetMain.GONetClient.InitiatingClientConnectionUID)
+            {
+                const string MY = " and it is my client.";
+                GONetLog.Append(MY);
+            }
+            else
+            {
+                const string NOT = " and it is NOT my client (i.e., some other client's status changed).";
+                GONetLog.Append(NOT);
+            }
+        }
+        else
+        {
+            const string SRVR = " and this is the server acknowledging it.";
+            GONetLog.Append(SRVR);
+        }
+
+        GONetLog.Append_FlushDebug();
+    }
+
+    #endregion
+
+    protected override void Start()
+    {
+        base.Start();
+        
         if (Application.platform == RuntimePlatform.Android) // NOTE: for sample's sake, this check and inner block will make all android machines clients...change as your needs dictate!
         {
             InstantiateClientIfNotAlready();

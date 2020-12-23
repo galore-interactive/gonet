@@ -217,7 +217,7 @@ namespace GONet
             const string AUTH = ".  My client guid: ";
             GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), newState), AUTH, clientID));
 
-            GONetMain.EventBus.Publish(new RemoteClientStateChangedEvent(GONetMain.Time.ElapsedTicks, clientID, previous, newState));
+            GONetMain.EventBus.PublishASAP(new RemoteClientStateChangedEvent(GONetMain.Time.ElapsedTicks, clientID, previous, newState));
         }
 
         private void ProcessClientsNewlyConnectedDisconnected_MainUnityThread()

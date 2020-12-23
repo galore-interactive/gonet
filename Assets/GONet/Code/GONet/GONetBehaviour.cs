@@ -40,6 +40,11 @@ namespace GONet
         /// </summary>
         public bool IsClient => GONetMain.IsClient;
 
+        /// <summary>
+        /// Since this is a vital feature of GONet, it is conveniently placed here to avoid having to type "GONetMain." each time when in a child class.
+        /// </summary>
+        public GONetEventBus EventBus => GONetMain.EventBus;
+
         protected virtual void Awake()
         {
             gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
@@ -109,6 +114,18 @@ namespace GONet
         /// <param name="gonetParticipant"></param>
         public virtual void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant) { }
     }
+
+    /// <summary>
+    /// Provides a base class with commonly used hooks into the GONet API that might be easier to use for beginners before they are familiar with GONet's event api (i.e., <see cref="GONetMain.EventBus"/>).
+    /// NOTE: This is a convenience class named for Photon PUN users as they might be used to using MonoBehaviourPunCallbacks, but this is the same as <see cref="GONetBehaviour"/>.
+    /// </summary>
+    public abstract class MonoBehaviourGONetCallbacks : GONetBehaviour { }
+
+    /// <summary>
+    /// NOTE: This is a convenience class named with the "MonoBehaviour" prefix in case it helps identifying this class as a possible one to use.
+    ///       This is the same as <see cref="GONetParticipantCompanionBehaviour"/> and you can read the class documentation there to know how to use.
+    /// </summary>
+    public abstract class MonoBehaviourGONetParticipantCompanion : GONetParticipantCompanionBehaviour { }
 
     /// <summary>
     /// <para>
