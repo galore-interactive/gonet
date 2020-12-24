@@ -7,6 +7,7 @@ using System.Linq;
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
+using GONet;
 
 namespace NetcodeIO.NET
 {
@@ -114,7 +115,7 @@ namespace NetcodeIO.NET
 		/// <summary>
 		/// Log level for messages
 		/// </summary>
-		public NetcodeLogLevel LogLevel = NetcodeLogLevel.Error;
+		public NetcodeLogLevel LogLevel = NetcodeLogLevel.Debug;
 
 		/// <summary>
 		/// Gets the port this server is listening on (or -1 if not listening)
@@ -264,13 +265,18 @@ namespace NetcodeIO.NET
 
 			resetConnectTokenHistory();
 
-			this.listenSocket.Bind(this.listenEndpoint);
+			IPEndPoint any = new IPEndPoint(IPAddress.Any, this.listenEndpoint.Port);
+			this.listenSocket.Bind(any);
 			isRunning = true;
 
 			if (autoTick)
 			{
 				this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
-				ThreadPool.QueueUserWorkItem(serverTick_SeparateThread);
+
+				Thread tickThread = new Thread(serverTick_SeparateThread);
+				tickThread.Name = "GONet Server Tick";
+				tickThread.Priority = ThreadPriority.AboveNormal;
+				tickThread.Start();
 			}
 		}
 
@@ -322,11 +328,16 @@ namespace NetcodeIO.NET
 
 		#endregion
 
+		public delegate void Nathaniel();
+		public event Nathaniel TickBeginning;
+
 		#region Core
 
 		double secondsSinceLastKeepAlive = 0.0;
 		internal void Tick(double newTotalSeconds)
 		{
+			TickBeginning?.Invoke();
+
 			listenSocket.Pump();
 
 			double deltaSeconds = newTotalSeconds - totalSeconds;
@@ -372,16 +383,24 @@ namespace NetcodeIO.NET
             {
                 processDatagram(packet.payload, packet.payloadSize, packet.sender);
 				packet.Release();
+				++countProcessed;
 			}
 		}
 
 		private void serverTick_SeparateThread(Object stateInfo)
 		{
+			long lastStartTicks = DateTime.UtcNow.Ticks;
+			double tickLength = 1.0 / tickrate;
+			long tickDurationTicks = TimeSpan.FromSeconds(tickLength).Ticks;
+			
 			while (isRunning)
 			{
                 try
                 {
-                    Tick(DateTime.UtcNow.GetTotalSeconds());
+					var utcNow = DateTime.UtcNow;
+					lastStartTicks = utcNow.Ticks;
+
+					Tick(utcNow.GetTotalSeconds());
                 }
                 catch (Exception e)
                 {
@@ -389,11 +408,12 @@ namespace NetcodeIO.NET
                 }
                 finally
                 {
-                    // sleep until next tick
-                    // sleep until next tick
-                    double tickLength = 1.0 / tickrate;
-                    Thread.Sleep((int)(tickLength * 1000));
-                }
+					long ticksToSleep = tickDurationTicks - (DateTime.UtcNow.Ticks - lastStartTicks);
+					if (ticksToSleep > 0)
+					{
+						Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
+					}
+				}
 			}
 		}
 
@@ -829,6 +849,19 @@ namespace NetcodeIO.NET
         /// </summary>
         private void NoOpWrite(ByteArrayReaderWriter writer) { }
 
+
+		/* TODO come back to figure this refactor out to avoid GC for calls like writer => writer.WriteBuffer(payload, payloadSize)
+		internal interface IReadWritePacket { }
+
+		internal ref struct PayloadPacket : IReadWritePacket
+        {
+			public byte[] payload;
+			public int payloadSize;
+
+
+		}
+		*/
+
         // send a payload to a client
         private void sendPayloadToClient(RemoteClient client, byte[] payload, int payloadSize)
 		{
@@ -845,7 +878,13 @@ namespace NetcodeIO.NET
 
             byte[] cryptKey = encryptionManager.GetSendKey(cryptIdx);
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, writer => writer.WriteBuffer(payload, payloadSize), client.RemoteEndpoint, cryptKey);
+			// TODO this is part of the come back from above PayloadPacket payloadPacket = new PayloadPacket() { payload = payload, payloadSize = payloadSize };
+
+			serializePacket(
+				new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, 
+				writer => writer.WriteBuffer(payload, payloadSize), 
+				client.RemoteEndpoint, 
+				cryptKey);
 		}
 
 		// send a keep-alive packet to the client

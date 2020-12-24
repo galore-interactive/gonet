@@ -23,4 +23,8 @@ MonoBehaviour:
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides: []
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 9
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Float, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 0

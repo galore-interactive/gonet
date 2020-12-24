@@ -61,6 +61,7 @@ namespace GONet.Generation
 			valuesCount = 6;
 			
 			cachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
@@ -82,7 +83,10 @@ namespace GONet.Generation
             support0.baselineValue_current.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue_previous.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support0.valueLimitEncountered_min.System_UInt32 = GONetParticipant.GONetId; 
+			support0.valueLimitEncountered_max.System_UInt32 = GONetParticipant.GONetId; 
 			support0.syncCompanion = this;
+			support0.memberName = "GONetId";
 			support0.index = 0;
 			support0.syncAttribute_MustRunOnUnityMainThread = true;
 			support0.syncAttribute_ProcessingPriority = 0;
@@ -99,7 +103,10 @@ namespace GONet.Generation
             support1.baselineValue_current.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue_previous.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support1.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsPositionSyncd; 
+			support1.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsPositionSyncd; 
 			support1.syncCompanion = this;
+			support1.memberName = "IsPositionSyncd";
 			support1.index = 1;
 			support1.syncAttribute_MustRunOnUnityMainThread = true;
 			support1.syncAttribute_ProcessingPriority = 0;
@@ -115,7 +122,10 @@ namespace GONet.Generation
             support2.baselineValue_current.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue_previous.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support2.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsRotationSyncd; 
+			support2.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsRotationSyncd; 
 			support2.syncCompanion = this;
+			support2.memberName = "IsRotationSyncd";
 			support2.index = 2;
 			support2.syncAttribute_MustRunOnUnityMainThread = true;
 			support2.syncAttribute_ProcessingPriority = 0;
@@ -131,7 +141,10 @@ namespace GONet.Generation
             support3.baselineValue_current.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue_previous.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support3.valueLimitEncountered_min.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
+			support3.valueLimitEncountered_max.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
 			support3.syncCompanion = this;
+			support3.memberName = "OwnerAuthorityId";
 			support3.index = 3;
 			support3.syncAttribute_MustRunOnUnityMainThread = true;
 			support3.syncAttribute_ProcessingPriority = 0;
@@ -147,18 +160,22 @@ namespace GONet.Generation
             support4.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support4.lastKnownValue_previous.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support4.valueLimitEncountered_min.UnityEngine_Quaternion = Transform.rotation; 
+			support4.valueLimitEncountered_max.UnityEngine_Quaternion = Transform.rotation; 
 			support4.syncCompanion = this;
+			support4.memberName = "rotation";
 			support4.index = 4;
 			support4.syncAttribute_MustRunOnUnityMainThread = true;
 			support4.syncAttribute_ProcessingPriority = 0;
 			support4.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support4.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
+			support4.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support4.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support4.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(1, out support4.syncAttribute_ShouldSkipSync);
 			support4.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
 			cachedCustomSerializers[4] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedCustomValueBlendings[4] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetDefaultValueBlending_Quaternion>();
 		
             int support4_mostRecentChanges_calcdSize = support4.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support4.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support4.mostRecentChanges_capacitySize = Math.Max(support4_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
@@ -168,18 +185,22 @@ namespace GONet.Generation
             support5.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support5.lastKnownValue_previous.UnityEngine_Vector3 = Transform.position; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support5.valueLimitEncountered_min.UnityEngine_Vector3 = Transform.position; 
+			support5.valueLimitEncountered_max.UnityEngine_Vector3 = Transform.position; 
 			support5.syncCompanion = this;
+			support5.memberName = "position";
 			support5.index = 5;
 			support5.syncAttribute_MustRunOnUnityMainThread = true;
 			support5.syncAttribute_ProcessingPriority = 0;
 			support5.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support5.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
+			support5.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support5.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support5.syncAttribute_ShouldSkipSync);
 			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 
 			cachedCustomSerializers[5] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedCustomValueBlendings[5] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetDefaultValueBlending_Vector3>();
 		
             int support5_mostRecentChanges_calcdSize = support5.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support5.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support5.mostRecentChanges_capacitySize = Math.Max(support5_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
@@ -306,6 +327,58 @@ namespace GONet.Generation
         }
 
         /// <summary>
+        /// PRE: value at <paramref name="singleIndex"/> is known to be configured to be quantized
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        protected override bool AreEqualQuantized(byte singleIndex, GONetSyncableValue valueA, GONetSyncableValue valueB)
+		{
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[0];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					// handle quantization of this type eventually?
+				}
+				break;
+
+				case 4:
+				{ // Transform.rotation
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[4];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+				case 5:
+				{ // Transform.position
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+			}
+
+			return base.AreEqualQuantized(singleIndex, valueA, valueB);
+		}
+
+        /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
         /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
@@ -397,6 +470,59 @@ namespace GONet.Generation
 					value += valuesChangesSupport[5].baselineValue_current.UnityEngine_Vector3;
 
 					valuesChangesSupport[5].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
+				}
+				break;
+
+			}
+        }
+
+
+        /// <summary>
+        /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).
+        /// </summary>
+        internal override void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        {
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[0];
+					customSerializer.Deserialize(bitStream_readFrom);
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					ushort value;
+					bitStream_readFrom.ReadUShort(out value);
+				}
+				break;
+
+				case 4:
+				{ // Transform.rotation
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[4];
+					customSerializer.Deserialize(bitStream_readFrom);
+				}
+				break;
+
+				case 5:
+				{ // Transform.position
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
+					customSerializer.Deserialize(bitStream_readFrom);
 				}
 				break;
 

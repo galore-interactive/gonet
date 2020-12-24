@@ -14,10 +14,11 @@
  */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
+using System.Threading;
 
 namespace GONet.Utils
 {
@@ -146,6 +147,8 @@ namespace GONet.Utils
             return null;
         }
 
+        static readonly ConcurrentDictionary<Thread, List<Type>> toCheckTypesByThread = new ConcurrentDictionary<Thread, List<Type>>();
+
         public static bool IsTypeAInstanceOfTypeB(Type typeA, Type typeB)
         {
             if (typeA == null || typeB == null)
@@ -163,7 +166,17 @@ namespace GONet.Utils
                 return typeB.IsAssignableFrom(typeA);
             }
 
-            var toCheckTypes = new List<Type> { typeA }; // TODO FIXME newing up memory here is not good!
+            List<Type> toCheckTypes;
+            if (toCheckTypesByThread.TryGetValue(Thread.CurrentThread, out toCheckTypes))
+            {
+                toCheckTypes.Clear();
+            }
+            else
+            {
+                toCheckTypesByThread[Thread.CurrentThread] = toCheckTypes = new List<Type>(100);
+            }
+            toCheckTypes.Add(typeA);
+
             if (typeB.IsInterface)
             {
                 toCheckTypes.AddRange(typeA.GetInterfaces());
@@ -176,7 +189,18 @@ namespace GONet.Utils
                 basedOn = basedOn.BaseType;
             }
 
-            return toCheckTypes.Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeB); // TODO using Linq here is not good
+
+            int count = toCheckTypes.Count;
+            for (int i = 0; i < count; ++i) // NOTE: this for loop used to be a call to Linq's Any()
+            {
+                Type x = toCheckTypes[i];
+                if (x.IsGenericType && x.GetGenericTypeDefinition() == typeB)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static bool IsTypeAInstanceOfAnyTypesB(Type typeA, Type[] typesB)

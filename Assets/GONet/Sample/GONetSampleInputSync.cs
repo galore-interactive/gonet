@@ -23,6 +23,11 @@ namespace GONet.Sample
         private const string GONET_SAMPLE_INPUT_BLEND = "_GONet_Sample_Input_Blend";
         private const string GONET_SAMPLE_INPUT_IMMEDIATE = "_GONet_Sample_Input_Immediate";
 
+        /// <summary>
+        /// Set this to true if some other code will manually set the values for the input sync variables herein instead of the input values being set "automatically" via monitoring inputs in <see cref="MonitorInputChanges"/>.
+        /// </summary>
+        public bool IsBeingControlledViaManualOverride;
+
         #region input sync variables
 
         [GONetAutoMagicalSync(GONET_SAMPLE_INPUT_IMMEDIATE)] public bool GetKey_W { get; set; }
@@ -395,7 +400,7 @@ namespace GONet.Sample
 
         private void Update()
         {
-            if (gonetParticipant.IsMine)
+            if (gonetParticipant.IsMine && !IsBeingControlledViaManualOverride)
             {
                 MonitorInputChanges();
             }

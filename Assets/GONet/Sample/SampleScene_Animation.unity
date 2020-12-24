@@ -239,6 +239,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -821,6 +822,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -1022,10 +1024,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -1173,6 +1176,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -1591,10 +1595,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -2019,10 +2024,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -2557,10 +2563,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -2766,6 +2773,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -2970,6 +2978,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -3273,10 +3282,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -4771,6 +4781,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -5435,7 +5446,7 @@ PrefabInstance:
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: codeGenerationId
-      value: 1
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
@@ -5747,6 +5758,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -6012,10 +6024,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -6169,6 +6182,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -6694,6 +6708,7 @@ MonoBehaviour:
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -6837,10 +6852,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -7029,10 +7045,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -7342,10 +7359,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
@@ -7767,10 +7785,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 5
   animatorSyncSupport:
     keys: []
     values: []
+  RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1

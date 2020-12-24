@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -21,17 +22,49 @@ namespace GONet
     /// <summary>
     /// Provides a base class with commonly used hooks into the GONet API that might be easier to use for beginners before they are familiar with GONet's event api (i.e., <see cref="GONetMain.EventBus"/>).
     /// </summary>
+    [DisallowMultipleComponent]
     public abstract class GONetBehaviour : MonoBehaviour
     {
         private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
         private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
         private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
+        private Subscription<SyncEvent_GONetParticipant_OwnerAuthorityId> gonetSubscriptionOwnerAuthorityId;
+
+        /// <summary>
+        /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
+        /// </summary>
+        public bool IsServer => GONetMain.IsServer;
+
+        /// <summary>
+        /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
+        /// </summary>
+        public bool IsClient => GONetMain.IsClient;
+
+        /// <summary>
+        /// Since this is a vital feature of GONet, it is conveniently placed here to avoid having to type "GONetMain." each time when in a child class.
+        /// </summary>
+        public GONetEventBus EventBus => GONetMain.EventBus;
 
         protected virtual void Awake()
         {
             gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
             gonetSubscriptionStarted = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => OnGONetParticipantStarted(envelope.GONetParticipant));
             gonetSubscriptionDisabled = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(envelope => OnGONetParticipantDisabled(envelope.GONetParticipant));
+            gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.valuePrevious, envelope.Event.valueNew));
+        }
+
+        private void OnGONetParticipant_OwnerAuthorityIdChanged(GONetParticipant gonetParticipant, uint gonetId, ushort valuePrevious, ushort valueNew)
+        {
+            if ((object)gonetParticipant == null)
+            {
+                gonetParticipant = GONetMain.DeriveGNPFromCurrentAndPreviousValues(gonetId, valuePrevious, valueNew);
+            }
+
+            bool isSetToValidValue = gonetParticipant.gonetId_raw != GONetParticipant.GONetId_Unset && valueNew != GONetMain.OwnerAuthorityId_Unset;
+            if (isSetToValidValue)
+            {
+                OnGONetParticipant_OwnerAuthorityIdSet(gonetParticipant);
+            }
         }
 
         protected virtual void Start()
@@ -54,6 +87,7 @@ namespace GONet
             gonetSubscriptionEnabled.Unsubscribe();
             gonetSubscriptionStarted.Unsubscribe();
             gonetSubscriptionDisabled.Unsubscribe();
+            gonetSubscriptionOwnerAuthorityId.Unsubscribe();
         }
 
         /// <summary>
@@ -71,11 +105,31 @@ namespace GONet
         public virtual void OnGONetParticipantStarted(GONetParticipant gonetParticipant) { }
 
         public virtual void OnGONetParticipantDisabled(GONetParticipant gonetParticipant) { }
+
+        /// <summary>
+        /// Since there is some order of operations differences between machines who instantiate a new <see cref="GONetParticipant"/> and others in regards to 
+        /// at what point the <see cref="GONetParticipant.OwnerAuthorityId"/> is set AND one of those differences is the value not being set at the point of 
+        /// the call to <see cref="OnGONetParticipantStarted(GONetParticipant)"/>, this method exists to have a callback.
+        /// </summary>
+        /// <param name="gonetParticipant"></param>
+        public virtual void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant) { }
     }
 
     /// <summary>
+    /// Provides a base class with commonly used hooks into the GONet API that might be easier to use for beginners before they are familiar with GONet's event api (i.e., <see cref="GONetMain.EventBus"/>).
+    /// NOTE: This is a convenience class named for Photon PUN users as they might be used to using MonoBehaviourPunCallbacks, but this is the same as <see cref="GONetBehaviour"/>.
+    /// </summary>
+    public abstract class MonoBehaviourGONetCallbacks : GONetBehaviour { }
+
+    /// <summary>
+    /// NOTE: This is a convenience class named with the "MonoBehaviour" prefix in case it helps identifying this class as a possible one to use.
+    ///       This is the same as <see cref="GONetParticipantCompanionBehaviour"/> and you can read the class documentation there to know how to use.
+    /// </summary>
+    public abstract class MonoBehaviourGONetParticipantCompanion : GONetParticipantCompanionBehaviour { }
+
+    /// <summary>
     /// <para>
-    /// For <see cref="GameObject"/>s that have a <see cref="GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can 
+    /// For <see cref="GameObject"/>s that have a <see cref="GONet.GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can 
     /// optionally extend this class to automatically have a reference to the <see cref="GONetParticipant"/> instance to reference it when making decisions
     /// on what to execute.  The most common example is to use <see cref="GONetParticipant.IsMine"/> to know whether or not to execute some game logic or not so that
     /// the logic is only executed on the owner's machine and the networking will handle the rest so the other machines will see the results of the game logic being
@@ -106,5 +160,53 @@ namespace GONet
                 xform = xform.parent;
             }
         }
+
+        public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantEnabled(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantEnabled();
+            }
+        }
+
+        public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantStarted(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantStarted();
+            }
+        }
+
+        public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantDisabled(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantDisabled();
+            }
+        }
+
+        public override void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipant_OwnerAuthorityIdSet(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipant_OwnerAuthorityIdSet();
+            }
+        }
+
+        public virtual void OnGONetParticipantEnabled() { }
+
+        public virtual void OnGONetParticipantStarted() { }
+
+        public virtual void OnGONetParticipantDisabled() { }
+
+        public virtual void OnGONetParticipant_OwnerAuthorityIdSet() { }
     }
 }

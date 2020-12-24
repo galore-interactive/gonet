@@ -20,12 +20,7 @@ namespace ReliableNetcode
 		/// <summary>
 		/// Message is not guaranteed delivery nor order
 		/// </summary>
-		Unreliable = 1,
-
-		/// <summary>
-		/// Message is not guaranteed delivery, but will be in order
-		/// </summary>
-		UnreliableOrdered = 2
+		Unreliable = 1
 	}
 
 	/// <summary>
@@ -84,7 +79,6 @@ namespace ReliableNetcode
 			{
 				_reliableChannel,
 				new UnreliableMessageChannel() { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage },
-				new UnreliableOrderedMessageChannel() { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage },
 			};
 		}
 
@@ -130,11 +124,19 @@ namespace ReliableNetcode
 				messageChannels[i].Update(this.time);
 		}
 
+		public void ProcessSendBuffer_IfAppropriate()
+		{
+			for (int i = 0; i < messageChannels.Length; i++)
+				messageChannels[i].ProcessSendBuffer_IfAppropriate();
+		}
+
 		/// <summary>
 		/// Call this when a datagram has been received over the network
 		/// </summary>
 		public void ReceivePacket(byte[] buffer, int bufferLength)
 		{
+			//GONet.GONetLog.Debug("received length: " + bufferLength);
+
 			int channel = buffer[1];
 			messageChannels[channel].ReceivePacket(buffer, bufferLength);
 		}

@@ -70,6 +70,7 @@ namespace GONet.Generation
 			valuesCount = <#=overallCount#>;
 			
 			cachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
@@ -103,12 +104,17 @@ namespace GONet.Generation
             support<#=iOverall#>.baselineValue_current.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support<#=iOverall#>.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support<#=iOverall#>.lastKnownValue_previous.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support<#=iOverall#>.valueLimitEncountered_min.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>; 
+			support<#=iOverall#>.valueLimitEncountered_max.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>; 
 <#		} else { #>
             support<#=iOverall#>.baselineValue_current.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support<#=iOverall#>.lastKnownValue.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support<#=iOverall#>.lastKnownValue_previous.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support<#=iOverall#>.valueLimitEncountered_min.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); 
+			support<#=iOverall#>.valueLimitEncountered_max.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>); 
 <#		} #>
 			support<#=iOverall#>.syncCompanion = this;
+			support<#=iOverall#>.memberName = "<#=singleMember.memberName#>";
 			support<#=iOverall#>.index = <#=iOverall#>;
 			support<#=iOverall#>.syncAttribute_MustRunOnUnityMainThread = <#=singleMember.attribute.MustRunOnUnityMainThread ? "true" : "false"#>;
 			support<#=iOverall#>.syncAttribute_ProcessingPriority = <#=singleMember.attribute.ProcessingPriority#>;
@@ -122,6 +128,10 @@ namespace GONet.Generation
 <#			if (singleMember.attribute.CustomSerialize_Instance != null)
 			{#>
 			cachedCustomSerializers[<#=iOverall#>] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<<#=singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")#>>(<#=singleMember.attribute.QuantizeDownToBitCount#>, <#=singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)#>f, <#=singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)#>f);
+<#			}#>
+<#			if (singleMember.attribute.CustomValueBlending_Instance != null)
+			{#>
+			cachedCustomValueBlendings[<#=iOverall#>] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<<#=singleMember.attribute.CustomValueBlending_Instance.GetType().FullName.Replace("+", ".")#>>();
 <#			}#>
 <#			if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
             {#>		
@@ -462,6 +472,118 @@ namespace GONet.Generation
 #>
 			}
         }
+
+        /// <summary>
+        /// PRE: value at <paramref name="singleIndex"/> is known to be configured to be quantized
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        protected override bool AreEqualQuantized(byte singleIndex, GONetSyncableValue valueA, GONetSyncableValue valueB)
+		{
+			switch (singleIndex)
+			{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall#>:
+				{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {
+				if (singleMember.attribute.CustomSerialize_Instance != null)
+                {#>
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+<#              }
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName)
+                {
+#>
+					return valueA.<#=singleMember.memberTypeFullName.Replace(".", "_")#> == valueB.<#=singleMember.memberTypeFullName.Replace(".", "_")#>;
+<#              }
+				else if (singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
+                {
+#>
+					return valueA.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> == valueB.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#>;
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
+				{
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+					return QuantizeSingle(<#=iOverall#>, valueA) == QuantizeSingle(<#=iOverall#>, valueB);
+<#
+                    }
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
+				{
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName
+				 || singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName
+				 || singleMember_memberTypeFullName == typeof(sbyte).FullName
+				 || singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+#>
+					// handle quantization of this type eventually?
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+				{
+#>
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+<#
+				}
+			}#>
+				}
+				break;
+
+<#			++iOverall;
+		}
+	}
+#>
+			}
+
+			return base.AreEqualQuantized(singleIndex, valueA, valueB);
+		}
 
         /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
@@ -813,6 +935,152 @@ namespace GONet.Generation
 					<#=single.componentTypeName#>.Set<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>, (<#=singleMember.animatorControllerParameterTypeFullName#>)value);
 				<# } #>
 <#			}#>
+				}
+				break;
+
+<#			++iOverall;
+		}
+	}
+#>
+			}
+        }
+
+
+        /// <summary>
+        /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).
+        /// </summary>
+        internal override void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        {
+			switch (singleIndex)
+			{
+<#
+	iOverall = 0;
+	singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+	for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+	{
+		GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+		int singleMemberCount = single.autoSyncMembers.Length;
+		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+        {
+			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+#>
+				case <#=iOverall#>:
+				{ // <#=single.componentTypeName#>.<#=singleMember.memberName#>
+<#
+			string singleMember_memberTypeFullName = singleMember.memberTypeFullName;
+			// switch () boo hoo no switch for string because teh case values are not constant!!!  TODO Must make the following more performant!
+            {
+				if (singleMember.attribute.CustomSerialize_Instance != null)
+                {#>
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+					customSerializer.Deserialize(bitStream_readFrom);
+<#              }
+				else if (singleMember_memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
+                {
+#>
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
+				{
+#>
+					float value;
+<#				
+					if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+#>
+					DeserializeSingleQuantized(bitStream_readFrom, <#=iOverall#>);
+<#
+                    }
+					else
+                    {
+#>
+					bitStream_readFrom.ReadFloat(out value);
+<#
+                    }
+				}
+				else if (singleMember_memberTypeFullName == typeof(long).FullName)
+				{
+#>
+					long value;
+					bitStream_readFrom.ReadLong(out value);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(uint).FullName)
+				{
+#>
+					uint value;
+					bitStream_readFrom.ReadUInt(out value);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(string).FullName)
+                {
+#>
+					string value;
+					bitStream_readFrom.ReadString(out value);
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(byte).FullName)
+				{
+#>
+					var value = (byte)bitStream_readFrom.ReadByte();
+<#
+				}
+				else if (singleMember_memberTypeFullName == typeof(ushort).FullName)
+				{
+#>
+					ushort value;
+					bitStream_readFrom.ReadUShort(out value);
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(short).FullName)
+				{
+#>
+					int count = 2;
+					for (int i = 0; i < count; ++i)
+					{
+						byte b = (byte)bitStream_readFrom.ReadByte();
+					}
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(int).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(int).FullName)
+				{
+#>
+					int count = 4;
+					for (int i = 0; i < count; ++i)
+					{
+						byte b = (byte)bitStream_readFrom.ReadByte();
+					}
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(sbyte).FullName)
+				{
+#>
+					var value = (sbyte)bitStream_readFrom.ReadByte();
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(double).FullName)
+				{
+#>
+					int count = 8;
+					for (int i = 0; i < count; ++i)
+					{
+						byte b = (byte)bitStream_readFrom.ReadByte();
+					}
+<#
+				}
+                else if (singleMember_memberTypeFullName == typeof(UnityEngine.Vector2).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector3).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Vector4).FullName ||
+						 singleMember_memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+				{
+#>
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[<#=iOverall#>];
+					customSerializer.Deserialize(bitStream_readFrom);
+<#
+				}
+			}#>
 				}
 				break;
 

@@ -33,10 +33,12 @@ public class ProjectileSpawner : GONetBehaviour
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
             projectiles.Add(projectile);
 
+            /* This was replaced in v1.1.1 with use of GONetMain.Client_InstantiateToBeRemotelyControlledByMe():
             if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
             {
                 GONetMain.Server_AssumeAuthorityOver(projectile.GONetParticipant);
             }
+            */
         }
     }
 
@@ -72,7 +74,7 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (shouldInstantiateBasedOnInput)
             {
-                Instantiate(projectilPrefab, transform.position, transform.rotation);
+                GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation); // used to be: //Instantiate(projectilPrefab, transform.position, transform.rotation);
             }
         }
 
@@ -81,7 +83,17 @@ public class ProjectileSpawner : GONetBehaviour
             if (projectile.GONetParticipant.IsMine)
             {
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
-                projectile.transform.Translate(transform.forward * Time.deltaTime * projectile.speed);
+                projectile.transform.Translate(Vector3.forward * Time.deltaTime * projectile.speed, Space.World);
+
+                const float CYCLE_SECONDS = 5f;
+                const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
+
+                var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
+                smoothlyChangingMultiplyFactor *= DECGREES_PER_CYCLE;
+                smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
+
+                float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
+                projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
             }
         }
     }

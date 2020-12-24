@@ -1703,6 +1703,10 @@
     <Compile Include="Assets\GONet\Code\GONet\GONetServer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSessionContext.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSpawnSupport_Runtime.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\PluginAPI\GONetSyncableValues.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\PluginAPI\IGONetAutoMagicalSync_CustomSerializer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\PluginAPI\IGONetAutoMagicalSync_CustomValueBlending.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ArrayPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitByBitByteArrayBuilder.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitConverter.cs" />
@@ -1722,6 +1726,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\NotSoSoftCour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\ObjectPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\Quantizer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Utils\QuaternionUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\StringUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\TypeUtils.cs" />
@@ -1843,7 +1848,9 @@
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\SmoothingValuesModifiersUI.cs" />
     <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
+    <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMPro_Properties.cginc" />

@@ -13,10 +13,12 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.PluginAPI;
 using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
@@ -48,7 +50,7 @@ namespace GONet.Generation
         /// <summary>
         /// Look for true values inside <see cref="lastKnownValueChangesSinceLastCheck"/> to know which indexes/instances herein represent real changes since last check.
         /// </summary>
-        internal static readonly ArrayPool<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valuesChangesSupportArrayPool =
+        internal static readonly ArrayPool<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valuesChangesSupportArrayPool = 
             new ArrayPool<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
         internal static readonly ObjectPool<GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue> valueChangeSupportArrayPool =
@@ -74,6 +76,10 @@ namespace GONet.Generation
             new ArrayPool<IGONetAutoMagicalSync_CustomSerializer>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
         protected IGONetAutoMagicalSync_CustomSerializer[] cachedCustomSerializers;
 
+        protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomValueBlending> cachedCustomValueBlendingsArrayPool =
+            new ArrayPool<IGONetAutoMagicalSync_CustomValueBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        protected IGONetAutoMagicalSync_CustomValueBlending[] cachedCustomValueBlendings;
+
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
         internal abstract byte CodeGenerationId { get; }
@@ -91,6 +97,7 @@ namespace GONet.Generation
 
             doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
+            cachedCustomValueBlendingsArrayPool.Return(cachedCustomValueBlendings);
 
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -121,7 +128,7 @@ namespace GONet.Generation
             return mine;
         }
 
-        internal bool IsValueAtRest(byte index)
+        public bool IsValueAtRest(byte index)
         {
             return lastKnownValueAtRestBits[index] != LAST_KNOWN_VALUE_NOT_AT_REST;
         }
@@ -150,6 +157,7 @@ namespace GONet.Generation
                     {
                         if (valueChangeSupport.lastKnownValue == valueChangeSupport.lastKnownValue_previous)
                         {
+                            //bool doesAtRestEvenApply = false; // TODO FIXME put the real processing of at rest back: valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             bool doesAtRestEvenApply = valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             if (doesAtRestEvenApply)
                             { // if the value is the same and our at rest stuff applies here, we need to check if this is (newly) considered 'at rest' or not and act accordingly (i.e., signal that further action needs to be taken to tell others)
@@ -161,7 +169,6 @@ namespace GONet.Generation
                                 if (isConsideredAtRest)
                                 {
                                     lastKnownValueAtRestBits[i] |= LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST; // or in this value instead of assign because it might already be the value of LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED and we do not want to change that!
-
                                     if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
                                     {
                                         valuesAtRestToBroadcast.Add(valueChangeSupport);
@@ -171,15 +178,19 @@ namespace GONet.Generation
                         }
                         else
                         {
-                            if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                            // need to consider quantization here so we do not consider the value changed if the quanitized value is the same even though the actual value is changed
+                            if (!AreEqualConsideringQuantization(valueChangeSupport, valueChangeSupport.lastKnownValue, valueChangeSupport.lastKnownValue_previous))
                             {
-                                GONetLog.Warning("Value was 'At Rest' but it was not broadcasted!  And now the value has changed so that last at rest will not get broadcast, which is really probably will not be noticed, but it should have been broadcast...why not?  hmmmm...");
-                            }
+                                if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
+                                {
+                                    GONetLog.Warning("Value was 'At Rest' but it was not broadcasted!  And now the value has changed so that last at rest will not get broadcast, which is really probably will not be noticed, but it should have been broadcast...why not?  hmmmm...");
+                                }
 
-                            lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_NOT_AT_REST;
-                            lastKnownValueChangesSinceLastCheck[i] = true;
-                            lastKnownValueChangedAtElapsedTicks[i] = nowElapsedTicks;
-                            hasChange = true;
+                                lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_NOT_AT_REST;
+                                lastKnownValueChangesSinceLastCheck[i] = true;
+                                lastKnownValueChangedAtElapsedTicks[i] = nowElapsedTicks;
+                                hasChange = true;
+                            }
                         }
                     }
                 }
@@ -187,6 +198,23 @@ namespace GONet.Generation
 
             return hasChange;
         }
+
+        private bool AreEqualConsideringQuantization(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetSyncableValue valueA, GONetSyncableValue valueB)
+        {
+            bool areEqual = valueA == valueB;
+            if (!areEqual // if they are equal unquantized, then ASSume they will also be the same after quantization since that process is supposed to be deterministic!
+                /* && valueChangeSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization */) // IMPORTANT: we had to remove this since the custom serializer ones would have this as false!
+            {
+                areEqual = AreEqualQuantized(valueChangeSupport.index, valueA, valueB);
+            }
+            return areEqual;
+        }
+
+        /// <summary>
+        /// PRE: value at <paramref name="singleIndex"/> is known to be configured to be quantized
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        protected virtual bool AreEqualQuantized(byte singleIndex, GONetSyncableValue valueA, GONetSyncableValue valueB) { return false; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool ShouldSkipSync(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, int index)
@@ -205,13 +233,20 @@ namespace GONet.Generation
             }
         }
 
-        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, GONetSyncableValue value)
+        internal uint QuantizeSingle(byte singleIndex, GONetSyncableValue value)
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             float valueAsFloat = value.System_Single;//valueChangeSupport.lastKnownValue // TODO maybe use this instead of accepting in value
             valueAsFloat -= valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
-            uint valueQuantized = Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
+            return Quantizer.LookupQuantizer(quantizeSettings).Quantize(valueAsFloat);
+        }
+
+        internal void SerializeSingleQuantized(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, GONetSyncableValue value)
+        {
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
+            QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
+            uint valueQuantized = QuantizeSingle(singleIndex, value);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
 
@@ -237,6 +272,13 @@ namespace GONet.Generation
 
         internal abstract void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex);
 
+        public bool TryGetIndexByMemberName(string memberName, out byte index)
+        {
+            var valueChangeSupport = valuesChangesSupport.FirstOrDefault(x => x != null && x.memberName == memberName);
+            index = valueChangeSupport != null ? valueChangeSupport.index : default;
+            return valueChangeSupport != null;
+        }
+
         /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
@@ -249,6 +291,11 @@ namespace GONet.Generation
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
         internal abstract void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
+
+        /// <summary>
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        internal virtual void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex) { }
 
         internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches);
 
@@ -267,6 +314,7 @@ namespace GONet.Generation
         /// <summary>
         /// PRE: <see cref="lastKnownValueChangesSinceLastCheck"/> still has true values in it and has not been reset via <see cref="OnValueChangeCheck_Reset(GONetMain.SyncBundleUniqueGrouping)"/>
         /// POST: <see cref="doesBaselineValueNeedAdjusting"/> is updated with true values for the baseline values needing adjustment, but adjustment is not applied until <see cref="ApplyAnnotatedBaselineValueAdjustments"/> is called later
+        /// POST: for the values where <see cref="lastKnownValueChangesSinceLastCheck"/> is true, calls to update min and max if we went past the previous min/max (e.g., <see cref="GONetSyncableValue.UpdateMinimumEncountered_IfApppropriate"/>)
         /// </summary>
         internal void AnnotateMyBaselineValuesNeedingAdjustment()
         {
@@ -286,6 +334,9 @@ namespace GONet.Generation
                         {
                             doesBaselineValueNeedAdjusting[i] = true;
                         }
+
+                        GONetSyncableValue.UpdateMinimumEncountered_IfApppropriate(ref valueChangeSupport.valueLimitEncountered_min, valueChangeSupport.lastKnownValue);
+                        GONetSyncableValue.UpdateMaximumEncountered_IfApppropriate(ref valueChangeSupport.valueLimitEncountered_max, valueChangeSupport.lastKnownValue);
                     }
                 }
             }
@@ -333,7 +384,7 @@ namespace GONet.Generation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
-            return
+            return 
                 onlyMatchIfUniqueGroupingMatches.scheduleFrequency == valueChangeSupport.syncAttribute_SyncChangesEverySeconds &&
                 onlyMatchIfUniqueGroupingMatches.reliability == valueChangeSupport.syncAttribute_Reliability;
         }
@@ -345,12 +396,36 @@ namespace GONet.Generation
                 syncValuesToSend.Add(valuesChangesSupport[i]);
             }
         }
+
+        internal void ResetAtRestValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
+        {
+            for (int i = 0; i < valuesCount; ++i)
+            {
+                GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+                if (!(lastKnownValueAtRestBits[i] != LAST_KNOWN_VALUE_NOT_AT_REST) && DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
+                {
+                    lastKnownValueAtRestBits[i] = LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED;
+                }
+            }
+        }
+
+        internal bool TryGetBlendedValue(byte index, NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        {
+            IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
+            if (customValueBlending != null)
+            {
+                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue);
+            }
+
+            blendedValue = default;
+            return false;
+        }
     }
 
     internal static class GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory
     {
         internal delegate GONetParticipant_AutoMagicalSyncCompanion_Generated GONetParticipant_AutoMagicalSyncCompanion_Generated_FactoryDelegate(GONetParticipant gonetParticipant);
-        internal static GONetParticipant_AutoMagicalSyncCompanion_Generated_FactoryDelegate theRealness = delegate (GONetParticipant gonetParticipant)
+        internal static GONetParticipant_AutoMagicalSyncCompanion_Generated_FactoryDelegate theRealness = delegate (GONetParticipant gonetParticipant) 
         {
             throw new System.Exception("Run code generation or else the correct generated instance cannot be created.");
         };

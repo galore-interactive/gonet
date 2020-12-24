@@ -15,6 +15,7 @@
 
 using GONet.Utils;
 using MessagePack;
+using NetcodeIO.NET;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -206,6 +207,9 @@ namespace GONet
         [Key(7)]
         public uint GONetIdAtInstantiation;
 
+        [Key(8)]
+        public bool ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
@@ -217,6 +221,7 @@ namespace GONet
             @event.GONetId = gonetParticipant.GONetId;
             @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
@@ -236,6 +241,28 @@ namespace GONet
             @event.GONetId = gonetParticipant.GONetId;
             @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
+
+            @event.Position = gonetParticipant.transform.position;
+            @event.Rotation = gonetParticipant.transform.rotation;
+
+            @event.OccurredAtElapsedTicks = default;
+
+            return @event;
+        }
+
+        internal static InstantiateGONetParticipantEvent Create_WithRemotelyControlledByInfo(GONetParticipant gonetParticipant)
+        {
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
+
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
+
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = true;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
@@ -498,6 +525,74 @@ namespace GONet
             ClientAuthorityId = myAuthorityId;
             FlagsPrevious = flagsPrevious;
             FlagsNow = flagsNow;
+        }
+    }
+
+    /// <summary>
+    /// IMPORTANT: This event is initiated (and first published) from a client once the state changes locally on that client, which is slightly different than <see cref="RemoteClientStateChangedEvent"/>
+    /// </summary>
+    [MessagePackObject]
+    public struct ClientStateChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
+        ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
+        /// </summary>
+        [Key(1)]
+        public ulong InitiatingClientConnectionUID { get; set; }
+
+        [Key(2)]
+        public ClientState StatePrevious { get; set; }
+
+        [Key(3)]
+        public ClientState StateNow { get; set; }
+
+        public ClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            InitiatingClientConnectionUID = initiatingClientConnectionUID;
+            StatePrevious = statePrevious;
+            StateNow = stateNow;
+        }
+    }
+
+    /// <summary>
+    /// IMPORTANT: This event is initiated (and first published) from the server once the state changes locally on the server for a client, which is slightly different than <see cref="ClientStateChangedEvent"/>
+    ///            When this event is fired and is received/processed on a client, the client's local data representing the client state may likely NOT be updated to reflect the state change
+    ///            and if it is important that the client IS updated to reflect the state change, subscribe to <see cref="ClientStateChangedEvent"/> instead.
+    /// </summary>
+    [MessagePackObject]
+    public struct RemoteClientStateChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
+        ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
+        /// </summary>
+        [Key(1)]
+        public ulong InitiatingClientConnectionUID { get; set; }
+
+        /// <summary>
+        /// Since this event initiates server side and the server will not have as many possible states for a client, the only values this might be are:
+        /// <see cref="ClientState.Connected"/> and <see cref="ClientState.Disconnected"/> TODO: see about getting all other values working as well!
+        /// </summary>
+        [Key(2)]
+        public ClientState StatePrevious { get; set; }
+
+        [Key(3)]
+        public ClientState StateNow { get; set; }
+
+        public RemoteClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            InitiatingClientConnectionUID = initiatingClientConnectionUID;
+            StatePrevious = statePrevious;
+            StateNow = stateNow;
         }
     }
 

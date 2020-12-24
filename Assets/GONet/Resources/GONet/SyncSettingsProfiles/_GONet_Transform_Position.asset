@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: _GONet_Transform_Position
   m_EditorClassIdentifier: 
   SyncChangesASAP: 0
-  SyncChangesFrequencyOccurrences: 30
+  SyncChangesFrequencyOccurrences: 20
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
@@ -26,4 +26,8 @@ MonoBehaviour:
   - ValueType: 12
     CustomSerializerType:
       _classRef: GONet.Vector3Serializer, Assembly-CSharp
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 12
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Vector3, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

@@ -15,6 +15,7 @@
 
 using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
+using GONet.PluginAPI;
 using GONet.Utils;
 using MessagePack;
 using System;
@@ -49,6 +50,18 @@ namespace GONet.Generation
         internal const string GENERATION_FILE_PATH = "Assets/GONet/Code/GONet/Generation/";
         internal const string GENERATED_FILE_PATH = GENERATION_FILE_PATH + "Generated/";
         const string FILE_SUFFIX = ".cs";
+
+        public static int LastPlayModeStateChange_frameCount { get; private set; } = -1;
+        static PlayModeStateChange? lastPlayModeStateChange;
+        public static PlayModeStateChange? LastPlayModeStateChange
+        {
+            get => lastPlayModeStateChange;
+            private set
+            {
+                lastPlayModeStateChange = value;
+                LastPlayModeStateChange_frameCount = Time.frameCount;
+            }
+        }
 
         static GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator()
         {
@@ -170,6 +183,8 @@ namespace GONet.Generation
 
         private static void OnEditorPlayModeStateChanged(PlayModeStateChange state)
         {
+            LastPlayModeStateChange = state;
+
             bool canASSume_GoingFrom_Editer_To_Play = !EditorApplication.isPlaying && EditorApplication.isPlayingOrWillChangePlaymode; // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
             if (canASSume_GoingFrom_Editer_To_Play)
             {
@@ -659,6 +674,11 @@ namespace GONet.Generation
                                 new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Vector3, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(Vector3Serializer)) },
                                 new SyncType_CustomSerializer_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Quaternion, CustomSerializerType = new TypeReferences.ClassTypeReference(typeof(QuaternionSerializer)) },
                             };
+                        defaultProfile.SyncValueTypeValueBlendingOverrides = new SyncType_CustomValueBlending_Pair[] {
+                                new SyncType_CustomValueBlending_Pair() { ValueType = GONetSyncableValueTypes.System_Single, CustomValueBlendingType = new TypeReferences.ClassTypeReference(typeof(GONetDefaultValueBlending_Float)) },
+                                new SyncType_CustomValueBlending_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Vector3, CustomValueBlendingType = new TypeReferences.ClassTypeReference(typeof(GONetDefaultValueBlending_Vector3)) },
+                                new SyncType_CustomValueBlending_Pair() { ValueType = GONetSyncableValueTypes.UnityEngine_Quaternion, CustomValueBlendingType = new TypeReferences.ClassTypeReference(typeof(GONetDefaultValueBlending_Quaternion)) },
+                            };
                     }
 
                     profile = defaultProfile;
@@ -710,6 +730,28 @@ namespace GONet.Generation
                             if (attribute.CustomSerialize_Type != null)
                             {
                                 GONetLog.Debug("GONet will use the custom serializer type: " + attribute.CustomSerialize_Type.FullName);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        GONetLog.Warning("Could not match up the actual C# Type of the data (" + syncMemberType.FullName + ") with a valid/supported value on " + typeof(GONetSyncableValueTypes).FullName);
+                    }
+                }
+
+                if (profile.SyncValueTypeValueBlendingOverrides != null && profile.SyncValueTypeValueBlendingOverrides.Length > 0)
+                {
+                    GONetSyncableValueTypes gonetSyncType;
+                    if (gonetSyncTypeByRealTypeMap.TryGetValue(syncMemberType, out gonetSyncType))
+                    {
+                        if (profile.SyncValueTypeValueBlendingOverrides.Any(x => x.ValueType == gonetSyncType))
+                        {
+                            SyncType_CustomValueBlending_Pair first = profile.SyncValueTypeValueBlendingOverrides.First(x => x.ValueType == gonetSyncType);
+                            attribute.CustomValueBlending_Type = first.CustomValueBlendingType.Type;
+
+                            if (attribute.CustomValueBlending_Type != null)
+                            {
+                                GONetLog.Debug("GONet will use the custom value blending type: " + attribute.CustomValueBlending_Type.FullName);
                             }
                         }
                     }

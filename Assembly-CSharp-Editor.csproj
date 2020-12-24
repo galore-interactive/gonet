@@ -77,7 +77,9 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLocalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\BitByBitByteArrayBuilderTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />
     <Reference Include="Unity.TextMeshPro.Editor">

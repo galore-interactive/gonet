@@ -84,9 +84,10 @@ namespace GONet.Generation
 
         internal GONetParticipant_AutoMagicalSyncCompanion_Generated_6(GONetParticipant gonetParticipant) : base(gonetParticipant)
 		{
-			valuesCount = 12;
+			valuesCount = 15;
 			
 			cachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
@@ -108,7 +109,10 @@ namespace GONet.Generation
             support0.baselineValue_current.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support0.lastKnownValue_previous.System_UInt32 = GONetParticipant.GONetId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support0.valueLimitEncountered_min.System_UInt32 = GONetParticipant.GONetId; 
+			support0.valueLimitEncountered_max.System_UInt32 = GONetParticipant.GONetId; 
 			support0.syncCompanion = this;
+			support0.memberName = "GONetId";
 			support0.index = 0;
 			support0.syncAttribute_MustRunOnUnityMainThread = true;
 			support0.syncAttribute_ProcessingPriority = 0;
@@ -125,7 +129,10 @@ namespace GONet.Generation
             support1.baselineValue_current.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support1.lastKnownValue_previous.System_Boolean = GONetParticipant.IsPositionSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support1.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsPositionSyncd; 
+			support1.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsPositionSyncd; 
 			support1.syncCompanion = this;
+			support1.memberName = "IsPositionSyncd";
 			support1.index = 1;
 			support1.syncAttribute_MustRunOnUnityMainThread = true;
 			support1.syncAttribute_ProcessingPriority = 0;
@@ -141,7 +148,10 @@ namespace GONet.Generation
             support2.baselineValue_current.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support2.lastKnownValue_previous.System_Boolean = GONetParticipant.IsRotationSyncd; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support2.valueLimitEncountered_min.System_Boolean = GONetParticipant.IsRotationSyncd; 
+			support2.valueLimitEncountered_max.System_Boolean = GONetParticipant.IsRotationSyncd; 
 			support2.syncCompanion = this;
+			support2.memberName = "IsRotationSyncd";
 			support2.index = 2;
 			support2.syncAttribute_MustRunOnUnityMainThread = true;
 			support2.syncAttribute_ProcessingPriority = 0;
@@ -157,7 +167,10 @@ namespace GONet.Generation
             support3.baselineValue_current.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
             support3.lastKnownValue_previous.System_UInt16 = GONetParticipant.OwnerAuthorityId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support3.valueLimitEncountered_min.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
+			support3.valueLimitEncountered_max.System_UInt16 = GONetParticipant.OwnerAuthorityId; 
 			support3.syncCompanion = this;
+			support3.memberName = "OwnerAuthorityId";
 			support3.index = 3;
 			support3.syncAttribute_MustRunOnUnityMainThread = true;
 			support3.syncAttribute_ProcessingPriority = 0;
@@ -170,15 +183,18 @@ namespace GONet.Generation
 
 
 			var support4 = valuesChangesSupport[4] = valueChangeSupportArrayPool.Borrow();
-            support4.baselineValue_current.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support4.lastKnownValue.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support4.lastKnownValue_previous.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support4.baselineValue_current.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support4.lastKnownValue.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support4.lastKnownValue_previous.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support4.valueLimitEncountered_min.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId; 
+			support4.valueLimitEncountered_max.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId; 
 			support4.syncCompanion = this;
+			support4.memberName = "RemotelyControlledByAuthorityId";
 			support4.index = 4;
-			support4.syncAttribute_MustRunOnUnityMainThread = false;
-			support4.syncAttribute_ProcessingPriority = 3;
+			support4.syncAttribute_MustRunOnUnityMainThread = true;
+			support4.syncAttribute_ProcessingPriority = 0;
 			support4.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support4.syncAttribute_SyncChangesEverySeconds = 0.04166667f;
+			support4.syncAttribute_SyncChangesEverySeconds = 0f;
 			support4.syncAttribute_Reliability = AutoMagicalSyncReliability.Reliable;
 			support4.syncAttribute_ShouldBlendBetweenValuesReceived = false;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support4.syncAttribute_ShouldSkipSync);
@@ -186,52 +202,57 @@ namespace GONet.Generation
 
 
 			var support5 = valuesChangesSupport[5] = valueChangeSupportArrayPool.Borrow();
-            support5.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support5.lastKnownValue.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support5.lastKnownValue_previous.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support5.baselineValue_current.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support5.lastKnownValue.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support5.lastKnownValue_previous.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support5.valueLimitEncountered_min.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; 
+			support5.valueLimitEncountered_max.System_Single = DestroyIfMineOnKeyPress.willHeUpdate; 
 			support5.syncCompanion = this;
+			support5.memberName = "willHeUpdate";
 			support5.index = 5;
-			support5.syncAttribute_MustRunOnUnityMainThread = true;
-			support5.syncAttribute_ProcessingPriority = 0;
+			support5.syncAttribute_MustRunOnUnityMainThread = false;
+			support5.syncAttribute_ProcessingPriority = 3;
 			support5.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support5.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
-			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
-			support5.syncAttribute_ShouldBlendBetweenValuesReceived = true;
-			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(1, out support5.syncAttribute_ShouldSkipSync);
+			support5.syncAttribute_SyncChangesEverySeconds = 0.04166667f;
+			support5.syncAttribute_Reliability = AutoMagicalSyncReliability.Reliable;
+			support5.syncAttribute_ShouldBlendBetweenValuesReceived = false;
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support5.syncAttribute_ShouldSkipSync);
 			support5.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
-			cachedCustomSerializers[5] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
-		
-            int support5_mostRecentChanges_calcdSize = support5.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support5.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
-            support5.mostRecentChanges_capacitySize = Math.Max(support5_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
-			support5.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support5.mostRecentChanges_capacitySize);
 
 			var support6 = valuesChangesSupport[6] = valueChangeSupportArrayPool.Borrow();
-            support6.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support6.lastKnownValue.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support6.lastKnownValue_previous.UnityEngine_Vector3 = Transform.position; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support6.baselineValue_current.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support6.lastKnownValue.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support6.lastKnownValue_previous.UnityEngine_Quaternion = Transform.rotation; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support6.valueLimitEncountered_min.UnityEngine_Quaternion = Transform.rotation; 
+			support6.valueLimitEncountered_max.UnityEngine_Quaternion = Transform.rotation; 
 			support6.syncCompanion = this;
+			support6.memberName = "rotation";
 			support6.index = 6;
 			support6.syncAttribute_MustRunOnUnityMainThread = true;
 			support6.syncAttribute_ProcessingPriority = 0;
 			support6.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
-			support6.syncAttribute_SyncChangesEverySeconds = 0.03333334f;
+			support6.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support6.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support6.syncAttribute_ShouldBlendBetweenValuesReceived = true;
-			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support6.syncAttribute_ShouldSkipSync);
-			support6.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(1, out support6.syncAttribute_ShouldSkipSync);
+			support6.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
-			cachedCustomSerializers[6] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedCustomSerializers[6] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedCustomValueBlendings[6] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetDefaultValueBlending_Quaternion>();
 		
             int support6_mostRecentChanges_calcdSize = support6.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support6.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support6.mostRecentChanges_capacitySize = Math.Max(support6_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
 			support6.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support6.mostRecentChanges_capacitySize);
 
 			var support7 = valuesChangesSupport[7] = valueChangeSupportArrayPool.Borrow();
-            support7.baselineValue_current.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support7.lastKnownValue.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support7.lastKnownValue_previous.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support7.baselineValue_current.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support7.lastKnownValue.UnityEngine_Vector3 = Transform.position; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support7.lastKnownValue_previous.UnityEngine_Vector3 = Transform.position; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support7.valueLimitEncountered_min.UnityEngine_Vector3 = Transform.position; 
+			support7.valueLimitEncountered_max.UnityEngine_Vector3 = Transform.position; 
 			support7.syncCompanion = this;
+			support7.memberName = "position";
 			support7.index = 7;
 			support7.syncAttribute_MustRunOnUnityMainThread = true;
 			support7.syncAttribute_ProcessingPriority = 0;
@@ -239,19 +260,24 @@ namespace GONet.Generation
 			support7.syncAttribute_SyncChangesEverySeconds = 0.05f;
 			support7.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support7.syncAttribute_ShouldBlendBetweenValuesReceived = true;
-			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support7.syncAttribute_ShouldSkipSync);
-			support7.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support7.syncAttribute_ShouldSkipSync);
+			support7.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 
+			cachedCustomSerializers[7] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedCustomValueBlendings[7] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetDefaultValueBlending_Vector3>();
 		
             int support7_mostRecentChanges_calcdSize = support7.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support7.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support7.mostRecentChanges_capacitySize = Math.Max(support7_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
 			support7.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support7.mostRecentChanges_capacitySize);
 
 			var support8 = valuesChangesSupport[8] = valueChangeSupportArrayPool.Borrow();
-            support8.baselineValue_current.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support8.lastKnownValue.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support8.lastKnownValue_previous.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support8.baselineValue_current.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support8.lastKnownValue.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support8.lastKnownValue_previous.System_Single = Animator.GetFloat(-823668238); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support8.valueLimitEncountered_min.System_Single = Animator.GetFloat(-823668238); 
+			support8.valueLimitEncountered_max.System_Single = Animator.GetFloat(-823668238); 
 			support8.syncCompanion = this;
+			support8.memberName = "parameters";
 			support8.index = 8;
 			support8.syncAttribute_MustRunOnUnityMainThread = true;
 			support8.syncAttribute_ProcessingPriority = 0;
@@ -268,10 +294,13 @@ namespace GONet.Generation
 			support8.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support8.mostRecentChanges_capacitySize);
 
 			var support9 = valuesChangesSupport[9] = valueChangeSupportArrayPool.Borrow();
-            support9.baselineValue_current.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support9.lastKnownValue.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support9.lastKnownValue_previous.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support9.baselineValue_current.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support9.lastKnownValue.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support9.lastKnownValue_previous.System_Boolean = Animator.GetBool(125937960); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support9.valueLimitEncountered_min.System_Boolean = Animator.GetBool(125937960); 
+			support9.valueLimitEncountered_max.System_Boolean = Animator.GetBool(125937960); 
 			support9.syncCompanion = this;
+			support9.memberName = "parameters";
 			support9.index = 9;
 			support9.syncAttribute_MustRunOnUnityMainThread = true;
 			support9.syncAttribute_ProcessingPriority = 0;
@@ -288,10 +317,13 @@ namespace GONet.Generation
 			support9.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support9.mostRecentChanges_capacitySize);
 
 			var support10 = valuesChangesSupport[10] = valueChangeSupportArrayPool.Borrow();
-            support10.baselineValue_current.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support10.lastKnownValue.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support10.lastKnownValue_previous.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support10.baselineValue_current.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support10.lastKnownValue.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support10.lastKnownValue_previous.System_Boolean = Animator.GetBool(1808254291); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support10.valueLimitEncountered_min.System_Boolean = Animator.GetBool(1808254291); 
+			support10.valueLimitEncountered_max.System_Boolean = Animator.GetBool(1808254291); 
 			support10.syncCompanion = this;
+			support10.memberName = "parameters";
 			support10.index = 10;
 			support10.syncAttribute_MustRunOnUnityMainThread = true;
 			support10.syncAttribute_ProcessingPriority = 0;
@@ -308,10 +340,13 @@ namespace GONet.Generation
 			support10.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support10.mostRecentChanges_capacitySize);
 
 			var support11 = valuesChangesSupport[11] = valueChangeSupportArrayPool.Borrow();
-            support11.baselineValue_current.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support11.lastKnownValue.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
-            support11.lastKnownValue_previous.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+            support11.baselineValue_current.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support11.lastKnownValue.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support11.lastKnownValue_previous.System_Boolean = Animator.GetBool(153482222); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support11.valueLimitEncountered_min.System_Boolean = Animator.GetBool(153482222); 
+			support11.valueLimitEncountered_max.System_Boolean = Animator.GetBool(153482222); 
 			support11.syncCompanion = this;
+			support11.memberName = "parameters";
 			support11.index = 11;
 			support11.syncAttribute_MustRunOnUnityMainThread = true;
 			support11.syncAttribute_ProcessingPriority = 0;
@@ -326,6 +361,75 @@ namespace GONet.Generation
             int support11_mostRecentChanges_calcdSize = support11.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support11.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
             support11.mostRecentChanges_capacitySize = Math.Max(support11_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
 			support11.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support11.mostRecentChanges_capacitySize);
+
+			var support12 = valuesChangesSupport[12] = valueChangeSupportArrayPool.Borrow();
+            support12.baselineValue_current.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support12.lastKnownValue.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support12.lastKnownValue_previous.System_Single = Animator.GetFloat(-1442503121); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support12.valueLimitEncountered_min.System_Single = Animator.GetFloat(-1442503121); 
+			support12.valueLimitEncountered_max.System_Single = Animator.GetFloat(-1442503121); 
+			support12.syncCompanion = this;
+			support12.memberName = "parameters";
+			support12.index = 12;
+			support12.syncAttribute_MustRunOnUnityMainThread = true;
+			support12.syncAttribute_ProcessingPriority = 0;
+			support12.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
+			support12.syncAttribute_SyncChangesEverySeconds = 0.05f;
+			support12.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
+			support12.syncAttribute_ShouldBlendBetweenValuesReceived = true;
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support12.syncAttribute_ShouldSkipSync);
+			support12.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+
+		
+            int support12_mostRecentChanges_calcdSize = support12.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support12.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
+            support12.mostRecentChanges_capacitySize = Math.Max(support12_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
+			support12.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support12.mostRecentChanges_capacitySize);
+
+			var support13 = valuesChangesSupport[13] = valueChangeSupportArrayPool.Borrow();
+            support13.baselineValue_current.System_Single = Animator.GetFloat(1342839628); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support13.lastKnownValue.System_Single = Animator.GetFloat(1342839628); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support13.lastKnownValue_previous.System_Single = Animator.GetFloat(1342839628); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support13.valueLimitEncountered_min.System_Single = Animator.GetFloat(1342839628); 
+			support13.valueLimitEncountered_max.System_Single = Animator.GetFloat(1342839628); 
+			support13.syncCompanion = this;
+			support13.memberName = "parameters";
+			support13.index = 13;
+			support13.syncAttribute_MustRunOnUnityMainThread = true;
+			support13.syncAttribute_ProcessingPriority = 0;
+			support13.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
+			support13.syncAttribute_SyncChangesEverySeconds = 0.05f;
+			support13.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
+			support13.syncAttribute_ShouldBlendBetweenValuesReceived = true;
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support13.syncAttribute_ShouldSkipSync);
+			support13.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+
+		
+            int support13_mostRecentChanges_calcdSize = support13.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support13.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
+            support13.mostRecentChanges_capacitySize = Math.Max(support13_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
+			support13.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support13.mostRecentChanges_capacitySize);
+
+			var support14 = valuesChangesSupport[14] = valueChangeSupportArrayPool.Borrow();
+            support14.baselineValue_current.System_Boolean = Animator.GetBool(862969536); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support14.lastKnownValue.System_Boolean = Animator.GetBool(862969536); // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used
+            support14.lastKnownValue_previous.System_Boolean = Animator.GetBool(862969536); // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass "has anything changed" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!
+			support14.valueLimitEncountered_min.System_Boolean = Animator.GetBool(862969536); 
+			support14.valueLimitEncountered_max.System_Boolean = Animator.GetBool(862969536); 
+			support14.syncCompanion = this;
+			support14.memberName = "parameters";
+			support14.index = 14;
+			support14.syncAttribute_MustRunOnUnityMainThread = true;
+			support14.syncAttribute_ProcessingPriority = 0;
+			support14.syncAttribute_ProcessingPriority_GONetInternalOverride = 0;
+			support14.syncAttribute_SyncChangesEverySeconds = 0.05f;
+			support14.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
+			support14.syncAttribute_ShouldBlendBetweenValuesReceived = true;
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(0, out support14.syncAttribute_ShouldSkipSync);
+			support14.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
+
+		
+            int support14_mostRecentChanges_calcdSize = support14.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support14.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
+            support14.mostRecentChanges_capacitySize = Math.Max(support14_mostRecentChanges_calcdSize, GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.MOST_RECENT_CHANGEs_SIZE_MINIMUM);
+			support14.mostRecentChanges = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.mostRecentChangesPool.Borrow(support14.mostRecentChanges_capacitySize);
 
 		}
 
@@ -346,28 +450,37 @@ namespace GONet.Generation
 									GONetParticipant.OwnerAuthorityId = value.System_UInt16;
 									return;
 				case 4:
-									DestroyIfMineOnKeyPress.willHeUpdate = value.System_Single;
+									GONetParticipant.RemotelyControlledByAuthorityId = value.System_UInt16;
 									return;
 				case 5:
-									Transform.rotation = value.UnityEngine_Quaternion;
+									DestroyIfMineOnKeyPress.willHeUpdate = value.System_Single;
 									return;
 				case 6:
-									Transform.position = value.UnityEngine_Vector3;
+									Transform.rotation = value.UnityEngine_Quaternion;
 									return;
 				case 7:
-									Animator.SetFloat(-823668238, value.System_Single);
+									Transform.position = value.UnityEngine_Vector3;
 									return;
 				case 8:
-									Animator.SetBool(125937960, value.System_Boolean);
+									Animator.SetFloat(-823668238, value.System_Single);
 									return;
 				case 9:
-									Animator.SetBool(1808254291, value.System_Boolean);
+									Animator.SetBool(125937960, value.System_Boolean);
 									return;
 				case 10:
-									Animator.SetBool(153482222, value.System_Boolean);
+									Animator.SetBool(1808254291, value.System_Boolean);
 									return;
 				case 11:
+									Animator.SetBool(153482222, value.System_Boolean);
+									return;
+				case 12:
 									Animator.SetFloat(-1442503121, value.System_Single);
+									return;
+				case 13:
+									Animator.SetFloat(1342839628, value.System_Single);
+									return;
+				case 14:
+									Animator.SetBool(862969536, value.System_Boolean);
 									return;
 			}
 		}
@@ -385,21 +498,27 @@ namespace GONet.Generation
 								case 3:
 									return GONetParticipant.OwnerAuthorityId;
 								case 4:
-									return DestroyIfMineOnKeyPress.willHeUpdate;
+									return GONetParticipant.RemotelyControlledByAuthorityId;
 								case 5:
-									return Transform.rotation;
+									return DestroyIfMineOnKeyPress.willHeUpdate;
 								case 6:
-									return Transform.position;
+									return Transform.rotation;
 								case 7:
-									return Animator.GetFloat(-823668238);
+									return Transform.position;
 								case 8:
-									return Animator.GetBool(125937960);
+									return Animator.GetFloat(-823668238);
 								case 9:
-									return Animator.GetBool(1808254291);
+									return Animator.GetBool(125937960);
 								case 10:
-									return Animator.GetBool(153482222);
+									return Animator.GetBool(1808254291);
 								case 11:
+									return Animator.GetBool(153482222);
+								case 12:
 									return Animator.GetFloat(-1442503121);
+								case 13:
+									return Animator.GetFloat(1342839628);
+								case 14:
+									return Animator.GetBool(862969536);
 							}
 
 			return default;
@@ -421,16 +540,19 @@ namespace GONet.Generation
 			{ // GONetParticipant.OwnerAuthorityId
 				bitStream_appendTo.WriteUShort(GONetParticipant.OwnerAuthorityId);
 			}
+			{ // GONetParticipant.RemotelyControlledByAuthorityId
+				bitStream_appendTo.WriteUShort(GONetParticipant.RemotelyControlledByAuthorityId);
+			}
 			{ // DestroyIfMineOnKeyPress.willHeUpdate
 								bitStream_appendTo.WriteFloat(DestroyIfMineOnKeyPress.willHeUpdate);
 							}
 			{ // Transform.rotation
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 			}
 			{ // Transform.position
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[6].baselineValue_current.UnityEngine_Vector3);
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[7].baselineValue_current.UnityEngine_Vector3);
 			}
 			{ // Animator.parameters
 								bitStream_appendTo.WriteFloat(Animator.GetFloat(-823668238));
@@ -446,6 +568,12 @@ namespace GONet.Generation
 							}
 			{ // Animator.parameters
 								bitStream_appendTo.WriteFloat(Animator.GetFloat(-1442503121));
+							}
+			{ // Animator.parameters
+								bitStream_appendTo.WriteFloat(Animator.GetFloat(1342839628));
+							}
+			{ // Animator.parameters
+								bitStream_appendTo.WriteBit(Animator.GetBool(862969536));
 							}
         }
 
@@ -479,57 +607,177 @@ namespace GONet.Generation
 				break;
 
 				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					bitStream_appendTo.WriteUShort(GONetParticipant.RemotelyControlledByAuthorityId);
+				}
+				break;
+
+				case 5:
 				{ // DestroyIfMineOnKeyPress.willHeUpdate
 									bitStream_appendTo.WriteFloat(DestroyIfMineOnKeyPress.willHeUpdate);
 								}
 				break;
 
-				case 5:
+				case 6:
 				{ // Transform.rotation
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
 					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 				}
 				break;
 
-				case 6:
+				case 7:
 				{ // Transform.position
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[6].baselineValue_current.UnityEngine_Vector3);
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.position - valuesChangesSupport[7].baselineValue_current.UnityEngine_Vector3);
 				}
 				break;
 
-				case 7:
+				case 8:
 				{ // Animator.parameters
 									bitStream_appendTo.WriteFloat(Animator.GetFloat(-823668238));
 								}
 				break;
 
-				case 8:
+				case 9:
 				{ // Animator.parameters
 									bitStream_appendTo.WriteBit(Animator.GetBool(125937960));
 								}
 				break;
 
-				case 9:
+				case 10:
 				{ // Animator.parameters
 									bitStream_appendTo.WriteBit(Animator.GetBool(1808254291));
 								}
 				break;
 
-				case 10:
+				case 11:
 				{ // Animator.parameters
 									bitStream_appendTo.WriteBit(Animator.GetBool(153482222));
 								}
 				break;
 
-				case 11:
+				case 12:
 				{ // Animator.parameters
 									bitStream_appendTo.WriteFloat(Animator.GetFloat(-1442503121));
 								}
 				break;
 
+				case 13:
+				{ // Animator.parameters
+									bitStream_appendTo.WriteFloat(Animator.GetFloat(1342839628));
+								}
+				break;
+
+				case 14:
+				{ // Animator.parameters
+									bitStream_appendTo.WriteBit(Animator.GetBool(862969536));
+								}
+				break;
+
 			}
         }
+
+        /// <summary>
+        /// PRE: value at <paramref name="singleIndex"/> is known to be configured to be quantized
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// </summary>
+        protected override bool AreEqualQuantized(byte singleIndex, GONetSyncableValue valueA, GONetSyncableValue valueB)
+		{
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[0];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					// handle quantization of this type eventually?
+				}
+				break;
+
+				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					// handle quantization of this type eventually?
+				}
+				break;
+
+				case 5:
+				{ // DestroyIfMineOnKeyPress.willHeUpdate
+				}
+				break;
+
+				case 6:
+				{ // Transform.rotation
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+				case 7:
+				{ // Transform.position
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+					return customSerializer.AreEqualConsideringQuantization(valueA, valueB);
+				}
+				break;
+
+				case 8:
+				{ // Animator.parameters
+				}
+				break;
+
+				case 9:
+				{ // Animator.parameters
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 10:
+				{ // Animator.parameters
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 11:
+				{ // Animator.parameters
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+				case 12:
+				{ // Animator.parameters
+				}
+				break;
+
+				case 13:
+				{ // Animator.parameters
+				}
+				break;
+
+				case 14:
+				{ // Animator.parameters
+					return valueA.System_Boolean == valueB.System_Boolean;
+				}
+				break;
+
+			}
+
+			return base.AreEqualQuantized(singleIndex, valueA, valueB);
+		}
 
         /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
@@ -553,18 +801,23 @@ namespace GONet.Generation
                 bitStream_readFrom.ReadUShort(out value);
 				GONetParticipant.OwnerAuthorityId = value;
 			}
+			{ // GONetParticipant.RemotelyControlledByAuthorityId
+				ushort value;
+                bitStream_readFrom.ReadUShort(out value);
+				GONetParticipant.RemotelyControlledByAuthorityId = value;
+			}
 			{ // DestroyIfMineOnKeyPress.willHeUpdate
 				float value;
                 bitStream_readFrom.ReadFloat(out value);
 								DestroyIfMineOnKeyPress.willHeUpdate = value;
 							}
 			{ // Transform.rotation
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
 				Transform.rotation = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
 			}
 			{ // Transform.position
-				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
-				Transform.position = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3 + valuesChangesSupport[6].baselineValue_current.UnityEngine_Vector3;
+				IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+				Transform.position = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3 + valuesChangesSupport[7].baselineValue_current.UnityEngine_Vector3;
 			}
 			{ // Animator.parameters
 				float value;
@@ -590,6 +843,16 @@ namespace GONet.Generation
 				float value;
                 bitStream_readFrom.ReadFloat(out value);
 								Animator.SetFloat(-1442503121, value);
+							}
+			{ // Animator.parameters
+				float value;
+                bitStream_readFrom.ReadFloat(out value);
+								Animator.SetFloat(1342839628, value);
+							}
+			{ // Animator.parameters
+				bool value;
+                bitStream_readFrom.ReadBit(out value);
+								Animator.SetBool(862969536, value);
 							}
         }
 
@@ -638,6 +901,15 @@ namespace GONet.Generation
 				break;
 
 				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					ushort value;
+					bitStream_readFrom.ReadUShort(out value);
+
+									GONetParticipant.RemotelyControlledByAuthorityId = value;
+								}
+				break;
+
+				case 5:
 				{ // DestroyIfMineOnKeyPress.willHeUpdate
 					float value;
 					bitStream_readFrom.ReadFloat(out value);
@@ -646,35 +918,35 @@ namespace GONet.Generation
 								}
 				break;
 
-				case 5:
-				{ // Transform.rotation
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[5];
-					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
-
-					valuesChangesSupport[5].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
-				}
-				break;
-
 				case 6:
-				{ // Transform.position
+				{ // Transform.rotation
 				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
-					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
-					value += valuesChangesSupport[6].baselineValue_current.UnityEngine_Vector3;
+					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
 
 					valuesChangesSupport[6].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
 				}
 				break;
 
 				case 7:
-				{ // Animator.parameters
-					float value;
-					bitStream_readFrom.ReadFloat(out value);
+				{ // Transform.position
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
+					value += valuesChangesSupport[7].baselineValue_current.UnityEngine_Vector3;
 
 					valuesChangesSupport[7].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
 				}
 				break;
 
 				case 8:
+				{ // Animator.parameters
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+
+					valuesChangesSupport[8].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
+				}
+				break;
+
+				case 9:
 				{ // Animator.parameters
 					bool value;
 					bitStream_readFrom.ReadBit(out value);
@@ -683,7 +955,7 @@ namespace GONet.Generation
 								}
 				break;
 
-				case 9:
+				case 10:
 				{ // Animator.parameters
 					bool value;
 					bitStream_readFrom.ReadBit(out value);
@@ -692,7 +964,7 @@ namespace GONet.Generation
 								}
 				break;
 
-				case 10:
+				case 11:
 				{ // Animator.parameters
 					bool value;
 					bitStream_readFrom.ReadBit(out value);
@@ -701,12 +973,146 @@ namespace GONet.Generation
 								}
 				break;
 
-				case 11:
+				case 12:
 				{ // Animator.parameters
 					float value;
 					bitStream_readFrom.ReadFloat(out value);
 
-					valuesChangesSupport[11].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
+					valuesChangesSupport[12].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
+				}
+				break;
+
+				case 13:
+				{ // Animator.parameters
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+
+					valuesChangesSupport[13].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there
+				}
+				break;
+
+				case 14:
+				{ // Animator.parameters
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+
+									Animator.SetBool(862969536, (System.Boolean)value);
+								}
+				break;
+
+			}
+        }
+
+
+        /// <summary>
+        /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).
+        /// </summary>
+        internal override void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        {
+			switch (singleIndex)
+			{
+				case 0:
+				{ // GONetParticipant.GONetId
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[0];
+					customSerializer.Deserialize(bitStream_readFrom);
+				}
+				break;
+
+				case 1:
+				{ // GONetParticipant.IsPositionSyncd
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 2:
+				{ // GONetParticipant.IsRotationSyncd
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 3:
+				{ // GONetParticipant.OwnerAuthorityId
+					ushort value;
+					bitStream_readFrom.ReadUShort(out value);
+				}
+				break;
+
+				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					ushort value;
+					bitStream_readFrom.ReadUShort(out value);
+				}
+				break;
+
+				case 5:
+				{ // DestroyIfMineOnKeyPress.willHeUpdate
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+				}
+				break;
+
+				case 6:
+				{ // Transform.rotation
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[6];
+					customSerializer.Deserialize(bitStream_readFrom);
+				}
+				break;
+
+				case 7:
+				{ // Transform.position
+				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[7];
+					customSerializer.Deserialize(bitStream_readFrom);
+				}
+				break;
+
+				case 8:
+				{ // Animator.parameters
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+				}
+				break;
+
+				case 9:
+				{ // Animator.parameters
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 10:
+				{ // Animator.parameters
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 11:
+				{ // Animator.parameters
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
+				}
+				break;
+
+				case 12:
+				{ // Animator.parameters
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+				}
+				break;
+
+				case 13:
+				{ // Animator.parameters
+					float value;
+					bitStream_readFrom.ReadFloat(out value);
+				}
+				break;
+
+				case 14:
+				{ // Animator.parameters
+					bool value;
+					bitStream_readFrom.ReadBit(out value);
 				}
 				break;
 
@@ -752,7 +1158,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport4, 4)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport4.lastKnownValue_previous = valuesChangesSupport4.lastKnownValue;
-									valuesChangesSupport4.lastKnownValue.System_Single = DestroyIfMineOnKeyPress.willHeUpdate;
+									valuesChangesSupport4.lastKnownValue.System_UInt16 = GONetParticipant.RemotelyControlledByAuthorityId;
 								}
 
 				var valuesChangesSupport5 = valuesChangesSupport[5];
@@ -760,7 +1166,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport5, 5)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport5.lastKnownValue_previous = valuesChangesSupport5.lastKnownValue;
-									valuesChangesSupport5.lastKnownValue.UnityEngine_Quaternion = Transform.rotation;
+									valuesChangesSupport5.lastKnownValue.System_Single = DestroyIfMineOnKeyPress.willHeUpdate;
 								}
 
 				var valuesChangesSupport6 = valuesChangesSupport[6];
@@ -768,7 +1174,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport6, 6)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport6.lastKnownValue_previous = valuesChangesSupport6.lastKnownValue;
-									valuesChangesSupport6.lastKnownValue.UnityEngine_Vector3 = Transform.position;
+									valuesChangesSupport6.lastKnownValue.UnityEngine_Quaternion = Transform.rotation;
 								}
 
 				var valuesChangesSupport7 = valuesChangesSupport[7];
@@ -776,7 +1182,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport7, 7)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport7.lastKnownValue_previous = valuesChangesSupport7.lastKnownValue;
-									valuesChangesSupport7.lastKnownValue.System_Single = Animator.GetFloat(-823668238);
+									valuesChangesSupport7.lastKnownValue.UnityEngine_Vector3 = Transform.position;
 								}
 
 				var valuesChangesSupport8 = valuesChangesSupport[8];
@@ -784,7 +1190,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport8, 8)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport8.lastKnownValue_previous = valuesChangesSupport8.lastKnownValue;
-									valuesChangesSupport8.lastKnownValue.System_Boolean = Animator.GetBool(125937960);
+									valuesChangesSupport8.lastKnownValue.System_Single = Animator.GetFloat(-823668238);
 								}
 
 				var valuesChangesSupport9 = valuesChangesSupport[9];
@@ -792,7 +1198,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport9, 9)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport9.lastKnownValue_previous = valuesChangesSupport9.lastKnownValue;
-									valuesChangesSupport9.lastKnownValue.System_Boolean = Animator.GetBool(1808254291);
+									valuesChangesSupport9.lastKnownValue.System_Boolean = Animator.GetBool(125937960);
 								}
 
 				var valuesChangesSupport10 = valuesChangesSupport[10];
@@ -800,7 +1206,7 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport10, 10)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport10.lastKnownValue_previous = valuesChangesSupport10.lastKnownValue;
-									valuesChangesSupport10.lastKnownValue.System_Boolean = Animator.GetBool(153482222);
+									valuesChangesSupport10.lastKnownValue.System_Boolean = Animator.GetBool(1808254291);
 								}
 
 				var valuesChangesSupport11 = valuesChangesSupport[11];
@@ -808,7 +1214,31 @@ namespace GONet.Generation
 					!ShouldSkipSync(valuesChangesSupport11, 11)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport11.lastKnownValue_previous = valuesChangesSupport11.lastKnownValue;
-									valuesChangesSupport11.lastKnownValue.System_Single = Animator.GetFloat(-1442503121);
+									valuesChangesSupport11.lastKnownValue.System_Boolean = Animator.GetBool(153482222);
+								}
+
+				var valuesChangesSupport12 = valuesChangesSupport[12];
+				if (DoesMatchUniqueGrouping(valuesChangesSupport12, onlyMatchIfUniqueGroupingMatches) &&
+					!ShouldSkipSync(valuesChangesSupport12, 12)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
+				{
+					valuesChangesSupport12.lastKnownValue_previous = valuesChangesSupport12.lastKnownValue;
+									valuesChangesSupport12.lastKnownValue.System_Single = Animator.GetFloat(-1442503121);
+								}
+
+				var valuesChangesSupport13 = valuesChangesSupport[13];
+				if (DoesMatchUniqueGrouping(valuesChangesSupport13, onlyMatchIfUniqueGroupingMatches) &&
+					!ShouldSkipSync(valuesChangesSupport13, 13)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
+				{
+					valuesChangesSupport13.lastKnownValue_previous = valuesChangesSupport13.lastKnownValue;
+									valuesChangesSupport13.lastKnownValue.System_Single = Animator.GetFloat(1342839628);
+								}
+
+				var valuesChangesSupport14 = valuesChangesSupport[14];
+				if (DoesMatchUniqueGrouping(valuesChangesSupport14, onlyMatchIfUniqueGroupingMatches) &&
+					!ShouldSkipSync(valuesChangesSupport14, 14)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
+				{
+					valuesChangesSupport14.lastKnownValue_previous = valuesChangesSupport14.lastKnownValue;
+									valuesChangesSupport14.lastKnownValue.System_Boolean = Animator.GetBool(862969536);
 								}
 
 		}
@@ -842,6 +1272,12 @@ namespace GONet.Generation
 				break;
 
 				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 5:
 				{ // DestroyIfMineOnKeyPress.willHeUpdate
                     System.Single diff = valueChangeSupport.lastKnownValue.System_Single - valueChangeSupport.baselineValue_current.System_Single;
 					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
@@ -851,13 +1287,13 @@ namespace GONet.Generation
 				}
 				break;
 
-				case 5:
+				case 6:
 				{ // Transform.rotation
 					// this type not supported for this functionality
 				}
 				break;
 
-				case 6:
+				case 7:
 				{ // Transform.position
                     UnityEngine.Vector3 diff = valueChangeSupport.lastKnownValue.UnityEngine_Vector3 - valueChangeSupport.baselineValue_current.UnityEngine_Vector3;
 					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
@@ -870,19 +1306,13 @@ namespace GONet.Generation
 				}
 				break;
 
-				case 7:
+				case 8:
 				{ // Animator.parameters
                     System.Single diff = valueChangeSupport.lastKnownValue.System_Single - valueChangeSupport.baselineValue_current.System_Single;
 					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
 					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
                     bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = diff < componentLimitLower || diff > componentLimitUpper;
 					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
-				}
-				break;
-
-				case 8:
-				{ // Animator.parameters
-					// this type not supported for this functionality
 				}
 				break;
 
@@ -900,11 +1330,33 @@ namespace GONet.Generation
 
 				case 11:
 				{ // Animator.parameters
+					// this type not supported for this functionality
+				}
+				break;
+
+				case 12:
+				{ // Animator.parameters
                     System.Single diff = valueChangeSupport.lastKnownValue.System_Single - valueChangeSupport.baselineValue_current.System_Single;
 					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
 					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
                     bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = diff < componentLimitLower || diff > componentLimitUpper;
 					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
+				}
+				break;
+
+				case 13:
+				{ // Animator.parameters
+                    System.Single diff = valueChangeSupport.lastKnownValue.System_Single - valueChangeSupport.baselineValue_current.System_Single;
+					System.Single componentLimitLower = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.lowerBound * 0.8f; // TODO cache this value
+					System.Single componentLimitUpper = valueChangeSupport.syncAttribute_QuantizerSettingsGroup.upperBound * 0.8f; // TODO cache this value
+                    bool isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange = diff < componentLimitLower || diff > componentLimitUpper;
+					return isVeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange;
+				}
+				break;
+
+				case 14:
+				{ // Animator.parameters
+					// this type not supported for this functionality
 				}
 				break;
 
@@ -953,6 +1405,15 @@ namespace GONet.Generation
 				}
 
 				case 4:
+				{ // GONetParticipant.RemotelyControlledByAuthorityId
+					return new ValueMonitoringSupport_NewBaselineEvent_System_UInt16() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_UInt16
+					};
+				}
+
+				case 5:
 				{ // DestroyIfMineOnKeyPress.willHeUpdate
 					return new ValueMonitoringSupport_NewBaselineEvent_System_Single() {
 						GONetId = gonetId,
@@ -961,7 +1422,7 @@ namespace GONet.Generation
 					};
 				}
 
-				case 5:
+				case 6:
 				{ // Transform.rotation
 					return new ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion() {
 						GONetId = gonetId,
@@ -970,7 +1431,7 @@ namespace GONet.Generation
 					};
 				}
 
-				case 6:
+				case 7:
 				{ // Transform.position
 					return new ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3() {
 						GONetId = gonetId,
@@ -979,21 +1440,12 @@ namespace GONet.Generation
 					};
 				}
 
-				case 7:
+				case 8:
 				{ // Animator.parameters
 					return new ValueMonitoringSupport_NewBaselineEvent_System_Single() {
 						GONetId = gonetId,
 						ValueIndex = singleIndex,
 						NewBaselineValue = newBaselineValue.System_Single
-					};
-				}
-
-				case 8:
-				{ // Animator.parameters
-					return new ValueMonitoringSupport_NewBaselineEvent_System_Boolean() {
-						GONetId = gonetId,
-						ValueIndex = singleIndex,
-						NewBaselineValue = newBaselineValue.System_Boolean
 					};
 				}
 
@@ -1017,10 +1469,37 @@ namespace GONet.Generation
 
 				case 11:
 				{ // Animator.parameters
+					return new ValueMonitoringSupport_NewBaselineEvent_System_Boolean() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_Boolean
+					};
+				}
+
+				case 12:
+				{ // Animator.parameters
 					return new ValueMonitoringSupport_NewBaselineEvent_System_Single() {
 						GONetId = gonetId,
 						ValueIndex = singleIndex,
 						NewBaselineValue = newBaselineValue.System_Single
+					};
+				}
+
+				case 13:
+				{ // Animator.parameters
+					return new ValueMonitoringSupport_NewBaselineEvent_System_Single() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_Single
+					};
+				}
+
+				case 14:
+				{ // Animator.parameters
+					return new ValueMonitoringSupport_NewBaselineEvent_System_Boolean() {
+						GONetId = gonetId,
+						ValueIndex = singleIndex,
+						NewBaselineValue = newBaselineValue.System_Boolean
 					};
 				}
 

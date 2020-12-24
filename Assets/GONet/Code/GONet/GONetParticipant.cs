@@ -154,10 +154,31 @@ namespace GONet
         public bool IsNoLongerMine => WasMineAtAnyPoint && !IsMine;
 
         /// <summary>
+        /// This is mainly here to support player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
+        /// the server process remotely and hopefully manipulate this GNP.
+        /// <see cref="IsMine_ToRemotelyControl"/>
+        /// </summary>
+        [GONetAutoMagicalSync(
+            GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
+            SyncChangesEverySeconds = AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS,
+            MustRunOnUnityMainThread = true)]
+        public ushort RemotelyControlledByAuthorityId = GONetMain.OwnerAuthorityId_Unset;
+
+        /// <summary>
+        /// This is mainly here for player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
+        /// the server process remotely and hopefully manipulate this GNP.
+        /// Unless people use <see cref="RemotelyControlledByAuthorityId"/> in a strange way, when this is true, <see cref="IsMine"/> will be false.
+        /// </summary>
+        public bool IsMine_ToRemotelyControl => RemotelyControlledByAuthorityId == GONetMain.MyAuthorityId && GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Unset;
+
+        /// <summary>
         /// <para>
         /// The expectation on setting this to true is the values for <see cref="IsPositionSyncd"/> and <see cref="IsRotationSyncd"/> are true
         /// and the associated <see cref="GameObject"/> has a <see cref="Rigidbody"/> installed on it as well 
         /// and <see cref="Rigidbody.isKinematic"/> is false and if using gravity, <see cref="Rigidbody.useGravity"/> is true.
+        /// </para>
+        /// <para>
+        /// For 2D, GONet looks for the presence of <see cref="Rigidbody2D"/> installed and <see cref="Rigidbody2D.isKinematic"/>.
         /// </para>
         /// <para>
         /// If all that applies, then non-owners (i.e., <see cref="IsMine"/> is false) will have <see cref="Rigidbody.isKinematic"/> set to true and <see cref="Rigidbody.useGravity"/> set to false
@@ -262,7 +283,22 @@ namespace GONet
             }
         }
 
-        public uint GONetIdAtInstantiation { get; private set; }
+        internal delegate void GNP_uint_Changed(GONetParticipant gonetParticipant);
+        internal event GNP_uint_Changed GONetIdAtInstantiationChanged;
+
+        /// <summary>
+        /// IMPORTANT: This is INTERNAL bud, so leave it alone!
+        /// </summary>
+        internal uint _GONetIdAtInstantiation;
+        public uint GONetIdAtInstantiation
+        { 
+            get => _GONetIdAtInstantiation; 
+            private set
+            { 
+                _GONetIdAtInstantiation = value; 
+                GONetIdAtInstantiationChanged?.Invoke(this);
+            }
+        }
 
         internal void SetGONetIdFromRemoteInstantiation(InstantiateGONetParticipantEvent instantiateEvent)
         {
@@ -370,6 +406,15 @@ namespace GONet
         Rigidbody myRigidBody;
         RigidBodySettings myRigidbodySettingsAtStart;
 
+        struct RigidBody2DSettings
+        {
+            public bool isKinematic;
+            public bool simulated;
+            public RigidbodyType2D bodyType;
+        }
+        Rigidbody2D myRigidBody2D;
+        RigidBody2DSettings myRigidbody2DSettingsAtStart;
+
         private void Start()
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
@@ -392,6 +437,15 @@ namespace GONet
 
                     SetRigidBodySettingsConsideringOwner();
                 }
+
+                if ((myRigidBody2D = GetComponent<Rigidbody2D>()) != null)
+                {
+                    myRigidbody2DSettingsAtStart.isKinematic = myRigidBody2D.isKinematic;
+                    myRigidbody2DSettingsAtStart.simulated = myRigidBody2D.simulated;
+                    myRigidbody2DSettingsAtStart.bodyType = myRigidBody2D.bodyType;
+
+                    SetRigidBodySettingsConsideringOwner();
+                }
             }
         }
 
@@ -401,7 +455,9 @@ namespace GONet
         /// </summary>
         internal void SetRigidBodySettingsConsideringOwner()
         {
-            if (IsRigidBodyOwnerOnlyControlled && (object)myRigidBody != null)
+            if (IsRigidBodyOwnerOnlyControlled)
+            {
+                if (myRigidBody != null)
             {
                 if (IsMine)
                 {
@@ -412,6 +468,23 @@ namespace GONet
                 {
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
+                    }
+                }
+
+                if (myRigidBody2D != null)
+                {
+                    if (IsMine)
+                    {
+                        myRigidBody2D.bodyType = myRigidbody2DSettingsAtStart.bodyType;
+                        myRigidBody2D.isKinematic = myRigidbody2DSettingsAtStart.isKinematic;
+                        myRigidBody2D.simulated = myRigidbody2DSettingsAtStart.simulated;
+                    }
+                    else
+                    {
+                        myRigidBody2D.bodyType = RigidbodyType2D.Kinematic;
+                        myRigidBody2D.isKinematic = true;
+                        myRigidBody2D.simulated = false;
+                    }
                 }
             }
         }
@@ -511,6 +584,11 @@ namespace GONet
             public void InitQuantizationSettings(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
             {
                 // do nothing!  TODO consider supporting quantizing even this, but not making sense right now and still want to keep this interface/API
+            }
+
+            public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
+            {
+                return valueA.System_UInt32 == valueB.System_UInt32;
             }
         }
     }

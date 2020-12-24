@@ -144,5 +144,46 @@ namespace GONet
             // TODO consider removing authorityInstance as it will only serve its purpose for one call here (at least at time of writing)...cost of keeping around even after it is dead?
             return nonAuthorityDesignTimeLocationByAuthorityInstanceMap.TryGetValue(authorityInstance, out nonAuthorityDesignTimeLocation);
         }
+
+        static readonly HashSet<GONetParticipant> markedToBeRemotelyControlled = new HashSet<GONetParticipant>();
+        static readonly Dictionary<GONetParticipant, ushort> server_markedToBeRemotelyControlledToIdMap = new Dictionary<GONetParticipant, ushort>();
+
+        internal static bool IsMarkedToBeRemotelyControlled(GONetParticipant gonetParticipant)
+        {
+            return markedToBeRemotelyControlled.Contains(gonetParticipant) || server_markedToBeRemotelyControlledToIdMap.ContainsKey(gonetParticipant);
+        }
+
+        internal static bool Server_TryGetMarkToBeRemotelyControlledBy(GONetParticipant gonetParticipant, out ushort toBeRemotelyControlledByAuthorityId)
+        {
+            return server_markedToBeRemotelyControlledToIdMap.TryGetValue(gonetParticipant, out toBeRemotelyControlledByAuthorityId);
+        }
+
+        internal static void Server_MarkToBeRemotelyControlled(GONetParticipant gonetParticipant, ushort toBeRemotelyControlledByAuthorityId)
+        {
+            if (GONetMain.IsServer)
+            {
+                markedToBeRemotelyControlled.Add(gonetParticipant);
+                server_markedToBeRemotelyControlledToIdMap[gonetParticipant] = toBeRemotelyControlledByAuthorityId;
+            }
+        }
+
+        internal static bool Server_UnmarkToBeRemotelyControlled_ProcessingComplete(GONetParticipant gonetParticipant)
+        {
+            if (GONetMain.IsServer)
+            {
+                markedToBeRemotelyControlled.Remove(gonetParticipant);
+                server_markedToBeRemotelyControlledToIdMap.Remove(gonetParticipant);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal static GONetParticipant Instantiate_MarkToBeRemotelyControlled(GONetParticipant prefab, Vector3 position, Quaternion rotation)
+        {
+            GONetParticipant instanceSoonToBeOwnedByServerAndRemotelyControlledByMe = UnityEngine.Object.Instantiate(prefab, position, rotation);
+            markedToBeRemotelyControlled.Add(instanceSoonToBeOwnedByServerAndRemotelyControlledByMe);
+            return instanceSoonToBeOwnedByServerAndRemotelyControlledByMe;
+        }
     }
 }
