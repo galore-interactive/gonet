@@ -178,6 +178,9 @@ namespace GONet
         /// and <see cref="Rigidbody.isKinematic"/> is false and if using gravity, <see cref="Rigidbody.useGravity"/> is true.
         /// </para>
         /// <para>
+        /// For 2D, GONet looks for the presence of <see cref="Rigidbody2D"/> installed and <see cref="Rigidbody2D.isKinematic"/>.
+        /// </para>
+        /// <para>
         /// If all that applies, then non-owners (i.e., <see cref="IsMine"/> is false) will have <see cref="Rigidbody.isKinematic"/> set to true and <see cref="Rigidbody.useGravity"/> set to false
         /// so the auto magically sync'd values for position and rotation come from owner controlled actions only.
         /// </para>
@@ -403,6 +406,15 @@ namespace GONet
         Rigidbody myRigidBody;
         RigidBodySettings myRigidbodySettingsAtStart;
 
+        struct RigidBody2DSettings
+        {
+            public bool isKinematic;
+            public bool simulated;
+            public RigidbodyType2D bodyType;
+        }
+        Rigidbody2D myRigidBody2D;
+        RigidBody2DSettings myRigidbody2DSettingsAtStart;
+
         private void Start()
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
@@ -425,6 +437,15 @@ namespace GONet
 
                     SetRigidBodySettingsConsideringOwner();
                 }
+
+                if ((myRigidBody2D = GetComponent<Rigidbody2D>()) != null)
+                {
+                    myRigidbody2DSettingsAtStart.isKinematic = myRigidBody2D.isKinematic;
+                    myRigidbody2DSettingsAtStart.simulated = myRigidBody2D.simulated;
+                    myRigidbody2DSettingsAtStart.bodyType = myRigidBody2D.bodyType;
+
+                    SetRigidBodySettingsConsideringOwner();
+                }
             }
         }
 
@@ -434,7 +455,9 @@ namespace GONet
         /// </summary>
         internal void SetRigidBodySettingsConsideringOwner()
         {
-            if (IsRigidBodyOwnerOnlyControlled && (object)myRigidBody != null)
+            if (IsRigidBodyOwnerOnlyControlled)
+            {
+                if (myRigidBody != null)
             {
                 if (IsMine)
                 {
@@ -445,6 +468,23 @@ namespace GONet
                 {
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
+                    }
+                }
+
+                if (myRigidBody2D != null)
+                {
+                    if (IsMine)
+                    {
+                        myRigidBody2D.bodyType = myRigidbody2DSettingsAtStart.bodyType;
+                        myRigidBody2D.isKinematic = myRigidbody2DSettingsAtStart.isKinematic;
+                        myRigidBody2D.simulated = myRigidbody2DSettingsAtStart.simulated;
+                    }
+                    else
+                    {
+                        myRigidBody2D.bodyType = RigidbodyType2D.Kinematic;
+                        myRigidBody2D.isKinematic = true;
+                        myRigidBody2D.simulated = false;
+                    }
                 }
             }
         }
