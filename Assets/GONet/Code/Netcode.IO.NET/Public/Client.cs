@@ -277,7 +277,7 @@ namespace NetcodeIO.NET
 				connectServers.Enqueue(server.Endpoint);
 
 			this.connectToken = tokenData;
-			this.state = ClientState.SendingConnectionRequest;
+			changeState(ClientState.SendingConnectionRequest);
 
 			// bind socket, spin up threads, and start trying to connect
 			isRunning = true;

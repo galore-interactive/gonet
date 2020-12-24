@@ -218,27 +218,18 @@ namespace GONet
             ReceivePacket(payloadBytes, payloadSize);
         }
 
-        internal const int CONNECTION_TOKEN_TIMOUT_SECONDS = 120;
+        private const int CONNECTION_TOKEN_TIMOUT_SECONDS = 120;
 
         /// <summary>
-        /// Calling this method is the same as calling <see cref="Connect(string, int, int, int)"/> passing in <see cref="CONNECTION_TOKEN_TIMOUT_SECONDS"/> for preConnection_TimeoutSeconds.
         /// </summary>
         /// <param name="serverIP"></param>
         /// <param name="serverPort"></param>
-        /// <param name="postConnection_TimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
-        public void Connect(string serverIP, int serverPort, int postConnection_TimeoutSeconds)
-        {
-            Connect(serverIP, serverPort, CONNECTION_TOKEN_TIMOUT_SECONDS, postConnection_TimeoutSeconds);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="serverIP"></param>
-        /// <param name="serverPort"></param>
-        /// <param name="preConnection_TimeoutSeconds">While the connection is being established, this is the maximum time/seconds the attempt to connect will be made before giving up.</param>
-        /// <param name="postConnection_TimeoutSeconds">After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.</param>
-        public void Connect(string serverIP, int serverPort, int preConnection_TimeoutSeconds, int postConnection_TimeoutSeconds)
+        /// <param name="timeoutSeconds">
+        /// This value serves two purposes:
+        /// 1) Prior to connection being established, this represents how many seconds the client will attempt to connect to the server before giving up and considering the connected timed out (i.e., <see cref="ClientState.ConnectionRequestTimedOut"/>).  NOTE: During this time period, the connection will be attempted 10 times per second.
+        /// 2) After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.
+        /// </param>
+        public void Connect(string serverIP, int serverPort, int timeoutSeconds)
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
@@ -255,8 +246,8 @@ namespace GONet
             }
 
             byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { mostRecentConnectInfo },
-                preConnection_TimeoutSeconds,
-                postConnection_TimeoutSeconds,
+                CONNECTION_TOKEN_TIMOUT_SECONDS,
+                timeoutSeconds,
                 1UL,
                 InitiatingClientConnectionUID,
                 new byte[256]);
