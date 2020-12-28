@@ -13,7 +13,7 @@ namespace GONet
         TimesPerDay,
     }
 
-    public class GONetAutoMagicalSyncSettings_ProfileTemplate : ScriptableObject
+    public class GONetAutoMagicalSyncSettings_ProfileTemplate : ScriptableObject, ISerializationCallbackReceiver
     {
         [Tooltip("*If checked, any changes to the value will be networked to other/interested parties as soon as GONet can make that happen (i.e., end of frame in which the change occurs).\n*If unchecked, the values of both "+nameof(SyncChangesFrequencyOccurrences)+" (which in this case must be greater than 0) and "+nameof(SyncChangesFrequencyUnitOfTime)+" will be used to determine the frequency at which any changes will be acted upon.")]
         public bool SyncChangesASAP = false;
@@ -23,6 +23,7 @@ namespace GONet
 
         public SyncChangesTimeUOM SyncChangesFrequencyUnitOfTime = SyncChangesTimeUOM.TimesPerSecond;
 
+        [Space(10)]
         [Tooltip("Indicates the reliability settings to use when sending the changed value across the network to other/interested parties.")]
         public AutoMagicalSyncReliability SendViaReliability = AutoMagicalSyncReliability.Unreliable;
 
@@ -41,6 +42,7 @@ namespace GONet
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
         /// If value is 1, the result will be the quantized value can only represnt <see cref="QuantizeLowerBound"/> or <see cref="QuantizeUpperBound"/> and the one represented will be dictated by which of the two the original value is closest to.
         /// </summary>
+        [Space(10)]
         [Tooltip("Only applicable to primitive numeric data types, currently float and Vector2/3/4.\n*MUST be set less than 32.\n*If set to 0, no quantizing will occur.\n*If set to 1, the result will be the quantized value can only represnt " + nameof(QuantizeLowerBound)+" or "+nameof(QuantizeUpperBound)+" and the one represented will be dictated by which of the two the original value is closest to.")]
         [Range(0, 31)]
         public byte QuantizeDownToBitCount = 0;
@@ -61,11 +63,23 @@ namespace GONet
         public float QuantizeUpperBound = float.MaxValue / 2f;
 
         /// <summary>
+        /// This is a very helpful READONLY readout of what the above quantization settings will yield for the resulting precision.
+        /// This value is the same unit of measure of whatever is source value being quantized represents.
+        /// For example: a component of a position would be meters, which is common and that why we put the more useful millimeters
+        /// conversion in parenthesis for convenience (in which case sub-millimeter precision is great).
+        /// 
+        /// IMPORTANT: If there is a custom serializer associated with certain Value Type(s), it is possible these quantization settings are ignored (see <see cref="SyncValueTypeSerializerOverrides"/>).
+        /// </summary>
+        [Tooltip("This is a very helpful READONLY readout of what the above quantization settings will yield for the resulting precision.\nThis value is the same unit of measure of whatever the source value being quantized represents.\nFor example: a component of a position would be meters, which is common and that's why we put the more useful millimeters conversion in parenthesis for convenience (in which case sub-millimeter precision is great).\n\nIMPORTANT: If there is a custom serializer associated with certain Value Type(s), it is possible these quantization settings are ignored (see 'Sync Value Type Serializer Overrides' section).")]
+        public string QuantizationResultingPrecision;
+
+        /// <summary>
         /// Helps identify the order in which this single value change will be processed in a group of auto-magical value changes.
         /// Leave this alone for normal priority.
         /// 
         /// NOTE: The higher the number, the higher the priority and the sooner a change of value will be processed in a group of changes being processed at once.
         /// </summary>
+        [Space(10)]
         [Tooltip("Helps identify the order in which this single value change will be processed in a group of auto-magical value changes.\n*Leave this alone for normal priority.\n*The higher the number, the higher the priority and the sooner a change of value will be processed in a group of changes being processed at once.")]
         [Range(-255, 255)]
         public int ProcessingPriority = 0;
@@ -79,6 +93,7 @@ namespace GONet
         [Tooltip("GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.\nSome things just cannot be done outside the main Unity thread.\nTherefore, if you know for certain that the value to sync being decorated with this attribute cannot run outside unity main thread, set this to true and GONet will ensure it is so.")]
         public bool MustRunOnUnityMainThread = false;
 
+        [Space(10)]
         [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to be public and implement GONet.IGONetAutoMagicalSync_CustomSerializer.\n*WARNING: Do NOT have multiple entries for the same GONet Value Type or else GONet will get confused.")]
         public SyncType_CustomSerializer_Pair[] SyncValueTypeSerializerOverrides;
 
@@ -92,6 +107,30 @@ namespace GONet
         [HideInInspector]
         [Tooltip("***Do NOT change this!  Thanks.\n\n--GONet Team")]
         public GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId ShouldSkipSyncRegistrationId;
+
+        public void OnAfterDeserialize()
+        {
+            UpdateResultingPrecision();
+        }
+
+        public void OnBeforeSerialize()
+        {
+            UpdateResultingPrecision();
+        }
+
+        private void UpdateResultingPrecision()
+        {
+            if (QuantizeDownToBitCount == 0)
+            {
+                QuantizationResultingPrecision = "<full precision - no quantization will occur>";
+            }
+            else
+            {
+                float range = QuantizeUpperBound - QuantizeLowerBound;
+                float precision = range / (float)Math.Pow(2.0, QuantizeDownToBitCount);
+                QuantizationResultingPrecision = string.Concat(precision.ToString(), " (i.e., ", string.Format("{0:##,##0.###}", precision * 1000f), " millimeters)");
+            }
+        }
     }
 
     [Serializable]

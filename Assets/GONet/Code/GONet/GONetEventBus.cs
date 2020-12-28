@@ -180,7 +180,7 @@ namespace GONet
         /// This publishes the <paramref name="event"/> to all machines connected to the network session this is in including this
         /// machine/process (i.e., sends to self to activate subscriptions on this machine as well as all others too).
         /// 
-        /// IMPORTANT: Only call this from the main Unity thread!  If you need to call from a non main Unity thread, use/call <see cref="PublishASAP{T}(T, ushort?)"/> instead.
+        /// IMPORTANT: Only call this from the main Unity thread!  If you need to call from a non main Unity thread, use/call <see cref="PublishASAP{T}(T)"/> instead.
         /// </summary>
         /// <returns>0 if all went well, otherwise the number of failures/exceptions occurred during individual subscription/handler processing</returns>
         public int Publish<T>(T @event, ushort? remoteSourceAuthorityId = default) where T : IGONetEvent
