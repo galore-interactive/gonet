@@ -23,13 +23,27 @@ using UnityEngine;
 
 namespace GONet
 {
-    #region support classes
+    #region support classes (e.g., envelopes)
 
     public abstract class GONetEventEnvelope
     {
+        /// <summary>
+        /// The value of <see cref="GONetMain.MyAuthorityId"/> from the machine initially publishing the event in this envelope.
+        /// It could be from a remote machine (i.e., <see cref="IsSourceRemote"/> will be true) or from this local machine (i.e., <see cref="IsFromMe"/> will be true).
+        /// </summary>
         public virtual ushort SourceAuthorityId { get; set; }
 
+        /// <summary>
+        /// Indicates whether or not the event in this envelope initiated from a remote machine (as opposed to being from this/mine local machine).
+        /// This will always return the opposite of <see cref="IsFromMe"/>.
+        /// </summary>
         public virtual bool IsSourceRemote { get; }
+
+        /// <summary>
+        /// Indicates whether or not the event in this envelope initiated from this machine.
+        /// This will always return the opposite of <see cref="IsSourceRemote"/>.
+        /// </summary>
+        public virtual bool IsFromMe { get; }
 
         internal IGONetEvent EventUntyped { get; set; }
 
@@ -44,9 +58,23 @@ namespace GONet
     {
         static readonly ObjectPool<GONetEventEnvelope<T>> pool = new ObjectPool<GONetEventEnvelope<T>>(50, 5);
 
+        /// <summary>
+        /// The value of <see cref="GONetMain.MyAuthorityId"/> from the machine initially publishing the event in this envelope.
+        /// It could be from a remote machine (i.e., <see cref="IsSourceRemote"/> will be true) or from this local machine (i.e., <see cref="IsFromMe"/> will be true).
+        /// </summary>
         public override ushort SourceAuthorityId { get; set; }
 
+        /// <summary>
+        /// Indicates whether or not the event in this envelope initiated from a remote machine (as opposed to being from this/mine local machine).
+        /// This will always return the opposite of <see cref="IsFromMe"/>.
+        /// </summary>
         public override bool IsSourceRemote => SourceAuthorityId != GONetMain.MyAuthorityId;
+
+        /// <summary>
+        /// Indicates whether or not the event in this envelope initiated from this machine.
+        /// This will always return the opposite of <see cref="IsSourceRemote"/>.
+        /// </summary>
+        public override bool IsFromMe => SourceAuthorityId == GONetMain.MyAuthorityId;
 
         T eventTyped;
 
