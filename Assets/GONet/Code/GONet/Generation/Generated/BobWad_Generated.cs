@@ -1434,7 +1434,7 @@ namespace GONet.Generation
 			var item_codeGenerationId1_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember0);
 
-			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1f, 1f, 11, true);
+			var item_codeGenerationId1_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId1_single1_singleMember1);
 
 			var item_codeGenerationId2_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
@@ -1476,7 +1476,7 @@ namespace GONet.Generation
 			var item_codeGenerationId2_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId2_single2_singleMember0);
 
-			var item_codeGenerationId2_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1f, 1f, 11, true);
+			var item_codeGenerationId2_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId2_single2_singleMember1);
 
 			var item_codeGenerationId3_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
@@ -1497,7 +1497,7 @@ namespace GONet.Generation
 			var item_codeGenerationId3_single1_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId3_single1_singleMember0);
 
-			var item_codeGenerationId3_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1f, 1f, 11, true);
+			var item_codeGenerationId3_single1_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId3_single1_singleMember1);
 
 			var item_codeGenerationId4_single0_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
@@ -1542,7 +1542,7 @@ namespace GONet.Generation
 			var item_codeGenerationId4_single2_singleMember0 = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 			settings.Add(item_codeGenerationId4_single2_singleMember0);
 
-			var item_codeGenerationId4_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-1f, 1f, 11, true);
+			var item_codeGenerationId4_single2_singleMember1 = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 			settings.Add(item_codeGenerationId4_single2_singleMember1);
 
 			return settings;
