@@ -1345,16 +1345,11 @@ namespace GONet
 
         static Thread endOfLineSendAndSaveThread;
 
-        static readonly Stopwatch timer = new Stopwatch();
-
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/> once per Unity <see cref="MonoBehaviour"/> Update cycle.
         /// </summary>
         internal static void Update(GONetBehaviour coroutineManager)
         {
-            timer.Reset();
-            timer.Start();
-
             Time.Update(); // This is the important thing to execute as early in a frame as possible (hence the -32000 setting in Script Execution Order) to get more accurate network timing to match Unity's frame time as it relates to values changing
 
             EventBus.PublishQueuedEventsForMainThread();
@@ -1363,9 +1358,6 @@ namespace GONet
             {
                 coroutineManager.StartCoroutine(Update_EndOfFrame());
             }
-
-            timer.Stop();
-            GONetLog.Debug($"Update ticks: {timer.ElapsedTicks}");
         }
 
         private static IEnumerator Update_EndOfFrame()
@@ -1379,9 +1371,6 @@ namespace GONet
 
         internal static void Update_DoTheHeavyLifting_IfAppropriate(GONetLocal gonetLocalCaller, bool shouldCheckGONetLocalArgument)
         {
-            timer.Reset();
-            timer.Start();
-
             bool isAppropriate = (!shouldCheckGONetLocalArgument || gonetLocalCaller == myLocal)
                 && lastCalledFrame_Update_DoTheHeavyLifting < UnityEngine.Time.frameCount; // avoid accidentally calling this multiple times a frame since it is called from two possible places
 
@@ -1476,9 +1465,6 @@ namespace GONet
 
                 recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
             }
-
-            timer.Stop();
-            GONetLog.Debug($"Update_DoTheHeavyLifting_IfAppropriate time in ticks: {timer.ElapsedTicks}");
         }
 
         private static void SaveEventsInQueueASAP_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
