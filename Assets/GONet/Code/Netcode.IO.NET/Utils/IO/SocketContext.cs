@@ -56,6 +56,7 @@ namespace NetcodeIO.NET.Utils.IO
 			readFromSocketThread = new Thread(ReadFromSocket_SeparateThread);
 			readFromSocketThread.Name = "GONet Socket Reads";
 			readFromSocketThread.Priority = ThreadPriority.AboveNormal;
+			readFromSocketThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
 			readFromSocketThread.Start();
 		}
 

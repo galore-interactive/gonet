@@ -1113,6 +1113,7 @@ namespace GONet
         /// This is mainly here to support player controlled <see cref="GONetParticipant"/>s (GNPs) in a strict server authoritative setup where a client/player only submits inputs to have
         /// the server process remotely and hopefully manipulate this GNP.
         /// See <see cref="GONetParticipant.RemotelyControlledByAuthorityId"/> and <see cref="GONetParticipant.IsMine_ToRemotelyControl"/>.
+        /// IMPORTANT: send to server to immediately assume ownership over, which will yield this being always at 0 latency (i.e., all values will be extrapolated to match server)!!!
         /// </para>
         /// <para>
         /// IMPORTANT: This could be used for projectiles too even if the client instantiating it will not control it after the initial "birth" of it.
@@ -1122,7 +1123,6 @@ namespace GONet
         {
             if (IsClient)
             {
-                // send to server to immediately assume ownership over, which will yield this being always at 0 latency!!!
                 return GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
             }
 
@@ -1345,11 +1345,16 @@ namespace GONet
 
         static Thread endOfLineSendAndSaveThread;
 
+        static readonly Stopwatch timer = new Stopwatch();
+
         /// <summary>
         /// Should only be called from <see cref="GONetGlobal"/> once per Unity <see cref="MonoBehaviour"/> Update cycle.
         /// </summary>
         internal static void Update(GONetBehaviour coroutineManager)
         {
+            timer.Reset();
+            timer.Start();
+
             Time.Update(); // This is the important thing to execute as early in a frame as possible (hence the -32000 setting in Script Execution Order) to get more accurate network timing to match Unity's frame time as it relates to values changing
 
             EventBus.PublishQueuedEventsForMainThread();
@@ -1358,6 +1363,9 @@ namespace GONet
             {
                 coroutineManager.StartCoroutine(Update_EndOfFrame());
             }
+
+            timer.Stop();
+            GONetLog.Debug($"Update ticks: {timer.ElapsedTicks}");
         }
 
         private static IEnumerator Update_EndOfFrame()
@@ -1371,6 +1379,9 @@ namespace GONet
 
         internal static void Update_DoTheHeavyLifting_IfAppropriate(GONetLocal gonetLocalCaller, bool shouldCheckGONetLocalArgument)
         {
+            timer.Reset();
+            timer.Start();
+
             bool isAppropriate = (!shouldCheckGONetLocalArgument || gonetLocalCaller == myLocal)
                 && lastCalledFrame_Update_DoTheHeavyLifting < UnityEngine.Time.frameCount; // avoid accidentally calling this multiple times a frame since it is called from two possible places
 
@@ -1431,6 +1442,7 @@ namespace GONet
                     endOfLineSendAndSaveThread = new Thread(SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread);
                     endOfLineSendAndSaveThread.Name = "GONet End-of-the-Line Send & Save";
                     endOfLineSendAndSaveThread.Priority = System.Threading.ThreadPriority.AboveNormal;
+                    endOfLineSendAndSaveThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
                     endOfLineSendAndSaveThread.Start();
                 }
 
@@ -1464,6 +1476,9 @@ namespace GONet
 
                 recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
             }
+
+            timer.Stop();
+            GONetLog.Debug($"Update_DoTheHeavyLifting_IfAppropriate time in ticks: {timer.ElapsedTicks}");
         }
 
         private static void SaveEventsInQueueASAP_IfAppropriate(bool shouldForceAppropriateness = false) // TODO put all this in another thread to not disrupt the main thread with saving!!!
@@ -2426,6 +2441,12 @@ namespace GONet
                             }
                         }
 
+                        bool isPreviousValuePresent = (i + 1) < mostRecentChanges_usedSize;
+                        if (isPreviousValuePresent)
+                        {
+                            AdjustValueOnExpectedUpcomingNewBaseline_IfAppropriate(ref value, mostRecentChanges[i + 1].numericValue);
+                        }
+
                         mostRecentChanges[i] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
@@ -2445,6 +2466,39 @@ namespace GONet
                 }
 
                 //LogBufferContentsIfAppropriate();
+            }
+
+            private void AdjustValueOnExpectedUpcomingNewBaseline_IfAppropriate(ref GONetSyncableValue valueNew, GONetSyncableValue valuePrevious)
+            {
+                switch (valueNew.GONetSyncType)
+                {
+                    case GONetSyncableValueTypes.UnityEngine_Vector3: // see IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange to consolidate impls like below since they are very similar?
+                        UnityEngine.Vector3 diff = valueNew.UnityEngine_Vector3 - valuePrevious.UnityEngine_Vector3;
+                        System.Single componentLimitLower = syncAttribute_QuantizerSettingsGroup.lowerBound;// * 0.8f; // TODO cache this value
+                        System.Single componentLimitUpper = syncAttribute_QuantizerSettingsGroup.upperBound;// * 0.8f; // TODO cache this value
+                        
+                        bool isLikelyBeingProcessedPriorToExpectedUpcomingNewBaseline =
+                            diff.x < componentLimitLower || diff.x > componentLimitUpper ||
+                            diff.y < componentLimitLower || diff.y > componentLimitUpper ||
+                            diff.z < componentLimitLower || diff.z > componentLimitUpper;
+
+                        if (isLikelyBeingProcessedPriorToExpectedUpcomingNewBaseline)
+                        {
+                            GONetLog.Debug("the new value being placed in buffer is happening prior to applying the new baseline!");
+
+                            Vector3 replacementValue = valueNew.UnityEngine_Vector3;
+
+                            if (diff.x < componentLimitLower) replacementValue.x += componentLimitLower;
+                            if (diff.x > componentLimitUpper) replacementValue.x -= componentLimitUpper;
+                            if (diff.y < componentLimitLower) replacementValue.y += componentLimitLower;
+                            if (diff.y > componentLimitUpper) replacementValue.y -= componentLimitUpper;
+                            if (diff.z < componentLimitLower) replacementValue.z += componentLimitLower;
+                            if (diff.z > componentLimitUpper) replacementValue.z -= componentLimitUpper;
+
+                            valueNew = replacementValue;
+                        }
+                        break;
+                }
             }
 
             internal bool TryGetMostRecentChangeAtTime(long elapsedTicksAtChange, out GONetSyncableValue value)
@@ -2980,6 +3034,7 @@ namespace GONet
                     thread = new Thread(ContinuallyProcess_NotMainThread);
                     thread.Name = string.Concat("GONet Auto-magical Sync - ", Enum.GetName(typeof(AutoMagicalSyncReliability), uniqueGrouping.reliability), " Freq: ", uniqueGrouping.scheduleFrequency);
                     thread.Priority = System.Threading.ThreadPriority.AboveNormal;
+                    thread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
 
                     events_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
                     events_SendToOthersQueue_ByThreadMap[thread] = new ConcurrentQueue<IGONetEvent>(); // we're on main thread, safe to deal with regular dict here

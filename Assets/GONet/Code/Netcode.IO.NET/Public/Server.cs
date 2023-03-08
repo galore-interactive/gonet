@@ -276,6 +276,7 @@ namespace NetcodeIO.NET
 				Thread tickThread = new Thread(serverTick_SeparateThread);
 				tickThread.Name = "GONet Server Tick";
 				tickThread.Priority = ThreadPriority.AboveNormal;
+				tickThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
 				tickThread.Start();
 			}
 		}

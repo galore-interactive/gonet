@@ -304,6 +304,14 @@ namespace GONet.Generation
             for (int i = 0; i < valuesCount; ++i)
             {
                 GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+
+                { // TODO FIXME remove this test code:
+                    if (IsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange((byte)i, valueChangeSupport))
+                    {
+                        //GONetLog.Debug("***************************** (almost) out of range of quantization limits for index: " + i);
+                    }
+                }
+
                 if (lastKnownValueChangesSinceLastCheck[i] && DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches))
                 {
                     syncValuesToSend.Add(valueChangeSupport);

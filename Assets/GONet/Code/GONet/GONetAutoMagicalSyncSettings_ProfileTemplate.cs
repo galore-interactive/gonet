@@ -50,15 +50,40 @@ namespace GONet
         /// <summary>
         /// Only used/applied when <see cref="QuantizeDownToBitCount"/> greater than 0.
         ///
-        /// This is the known/expected lowest value possible.
+        /// This is the known/expected lowest value to likely be encountered.  HOWEVER, there is a really neat GONet feature
+        /// (auto adjusted baseline value - see <see cref="GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.baselineValue_current"/>)
+        /// that essentially allows defining a (potentially) small value range with this and <see cref="QuantizeUpperBound"/> and the end 
+        /// result is actually a semi-infinite acceptable values that can go anywhere outside the bounds defined here.  Sounds crazy, but it was an afterthought, post v1.0,
+        /// that turns these bounds into a range that dictates when to auto adjust the baseline value (i.e., a mandatory reliable message to all parties).
+        /// 
         /// IMPORTANT: 
         /// PRE: Must be less than <see cref="QuantizeUpperBound"/>.
+        /// 
+        /// WARNING: 
+        /// Do not make the range smaller than the expected rate of change of the values to which this will apply or else the 'auto adjust'
+        /// baseline logic will be applied every value change and that will yield bad looking results for non-owners!
         /// </summary>
-        [Tooltip("This is the known/expected lowest value possible.\n*Only used/applied when " + nameof(QuantizeDownToBitCount) + " greater than 0.\n*Must be less than " + nameof(QuantizeUpperBound) + ".")]
+        [Tooltip("This is the known/expected lowest value to likely be encountered.  HOWEVER, there is a really neat GONet feature (auto adjusted baseline value - see "+nameof(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue) +"." + nameof(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.baselineValue_current) + ") that essentially allows defining a (potentially) small value range with this and " + nameof(QuantizeUpperBound) + " and the end result is actually a semi-infinite acceptable values that can go anywhere outside the bounds defined here.  Sounds crazy, but it was an afterthought, post v1.0, that turns these bounds into a range that dictates when to auto adjust the baseline value (i.e., a mandatory reliable message to all parties).\n*Only used/applied when " + nameof(QuantizeDownToBitCount) + " greater than 0.\n*Must be less than " + nameof(QuantizeUpperBound) + ".\n\nWARNING: Do not make the range smaller than the expected rate of change of the values to which this will apply or else the 'auto adjust' baseline logic will be applied every value change and that will yield bad looking results for non-owners!")]
         //[Range(float.MinValue / 2f, (float.MaxValue / 2f) - 1)]
         public float QuantizeLowerBound = float.MinValue / 2f;
 
-        [Tooltip("This is the known/expected highest value possible.\n*Only used/applied when " + nameof(QuantizeDownToBitCount) + " greater than 0.\n*Must be greater than " + nameof(QuantizeLowerBound) + ".")]
+        /// <summary>
+        /// Only used/applied when <see cref="QuantizeDownToBitCount"/> greater than 0.
+        ///
+        /// This is the known/expected highest value to likely be encountered.  HOWEVER, there is a really neat GONet feature
+        /// (auto adjusted baseline value - see <see cref="GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.baselineValue_current"/>)
+        /// that essentially allows defining a (potentially) small value range with this and <see cref="QuantizeLowerBound"/> and the end 
+        /// result is actually a semi-infinite acceptable values that can go anywhere outside the bounds defined here.  Sounds crazy, but it was an afterthought, post v1.0,
+        /// that turns these bounds into a range that dictates when to auto adjust the baseline value (i.e., a mandatory reliable message to all parties).
+        /// 
+        /// IMPORTANT: 
+        /// PRE: Must be greater than <see cref="QuantizeLowerBound"/>.
+        /// 
+        /// WARNING: 
+        /// Do not make the range smaller than the expected rate of change of the values to which this will apply or else the 'auto adjust'
+        /// baseline value logic will be applied every value change and that will yield bad looking results for non-owners!
+        /// </summary>
+        [Tooltip("This is the known/expected highest value to likely be encountered.  HOWEVER, there is a really neat GONet feature (auto adjusted baseline value - see " + nameof(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue) + "." + nameof(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.baselineValue_current) + ") that essentially allows defining a (potentially) small value range with this and " + nameof(QuantizeLowerBound) + " and the end result is actually a semi-infinite acceptable values that can go anywhere outside the bounds defined here.  Sounds crazy, but it was an afterthought, post v1.0, that turns these bounds into a range that dictates when to auto adjust the baseline value (i.e., a mandatory reliable message to all parties).\n*Only used/applied when " + nameof(QuantizeDownToBitCount) + " greater than 0.\n*Must be less than " + nameof(QuantizeLowerBound) + ".\n\nWARNING: Do not make the range smaller than the expected rate of change of the values to which this will apply or else the 'auto adjust' baseline logic will be applied every value change and that will yield bad looking results for non-owners!")]
         //[Range((float.MinValue / 2f) + 1, float.MaxValue / 2f)]
         public float QuantizeUpperBound = float.MaxValue / 2f;
 

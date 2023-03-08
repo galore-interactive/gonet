@@ -362,9 +362,9 @@ namespace GONet.Generation
 			support13.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
 			support13.syncAttribute_ShouldBlendBetweenValuesReceived = true;
 			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(2, out support13.syncAttribute_ShouldSkipSync);
-			support13.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
+			support13.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1f, 1f, 11, true);
 
-			cachedCustomSerializers[13] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedCustomSerializers[13] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(11, -1f, 1f);
 			cachedCustomValueBlendings[13] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetDefaultValueBlending_Vector3>();
 		
             int support13_mostRecentChanges_calcdSize = support13.syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support13.syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;
