@@ -1,4 +1,4 @@
-# gonet
+# GONet
 Networking library for Unity GameObjects.  Developed and used during 2019 and 2020.  No longer actively maintained, but perhaps it could be of use.
 
 Here is the Unity Asset Store description from when it was active there:
