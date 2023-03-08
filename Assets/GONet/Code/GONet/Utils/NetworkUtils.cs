@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -43,25 +43,23 @@ namespace GONet.Utils
         /// </summary>
         public static bool IsLocalPortListening(int port)
         {
-            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-            List<IPAddress> addressesToCheck = new List<IPAddress>(host.AddressList);
-            addressesToCheck.Add(IPAddress.Parse(LOOPBACK_IP));
-            foreach (var myAddressToCheck in addressesToCheck)
+            var endpoint = new IPEndPoint(IPAddress.Any, port);
+            Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            try
             {
-                var endpoint = new IPEndPoint(myAddressToCheck, port);
-                Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-                try
-                {
-                    socket.Bind(endpoint);
-                }
-                catch (SocketException)
+                socket.Bind(endpoint);
+            }
+            catch (SocketException socketException)
+            {
+                const string IN_USE = "Address already in use";
+                if (socketException.ErrorCode == (int)SocketError.AddressAlreadyInUse || socketException.Message == IN_USE)
                 {
                     return true;
                 }
-                finally
-                {
-                    socket.Close();
-                }
+            }
+            finally
+            {
+                socket.Close();
             }
 
             return false;

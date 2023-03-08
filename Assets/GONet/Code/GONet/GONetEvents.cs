@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -15,6 +15,7 @@
 
 using GONet.Utils;
 using MessagePack;
+using NetcodeIO.NET;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -47,19 +48,43 @@ namespace GONet
     /// </summary>
     public interface ILocalOnlyPublish { }
 
-    #endregion
-
-    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
+    /// <summary>
+    /// This is something that would only apply to event class that implement <see cref="IPersistentEvent"/> that get queued up on server and sent to newly connecting clients.
+    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypesCancelledOut"/> and see if they cancel one another out 
+    /// so these messages can be removed from consideration in pairs as to not send these events anywhere.
+    /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DestroyGONetParticipantEvent"/>.
+    /// </summary>
+    public interface ICancelOutOtherEvents
     {
-        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+        /// <summary>
+        /// At time of writing, this should only be types that implement <see cref="IPersistentEvent"/>.
+        /// </summary>
+        Type[] OtherEventTypesCancelledOut { get; }
+
+        /// <summary>
+        /// This will only get called when <paramref name="otherEvent"/> is of the type <see cref="OtherEventTypesCancelledOut"/>.
+        /// </summary>
+        bool DoesCancelOutOtherEvent(IGONetEvent otherEvent);
     }
+
+    #endregion
 
     public struct ServerSaysClientInitializationCompletion : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new NotImplementedException();
     }
 
+    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
     public struct AutoMagicalSync_ValueChanges_Message : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
+    public struct AutoMagicalSync_ValuesNowAtRest_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
@@ -69,6 +94,25 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
+    /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
+    /// </summary>
+    public struct GONetParticipantEnabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantEnabledEvent(uint gonetId)
+        {
+            GONetId = gonetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its Start() method called and it is ready to be used by other game logic.
+    /// </summary>
     public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
@@ -76,6 +120,21 @@ namespace GONet
         public uint GONetId { get; set; }
 
         public GONetParticipantStartedEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnDisable() method called and will no longer be active in the game.
+    /// </summary>
+    public struct GONetParticipantDisabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    {
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        public GONetParticipantDisabledEvent(GONetParticipant gonetParticipant)
         {
             GONetId = gonetParticipant.GONetId;
         }
@@ -142,15 +201,27 @@ namespace GONet
         [Key(5)]
         public string InstanceName;
 
+        [Key(6)]
+        public string ParentFullUniquePath;
+
+        [Key(7)]
+        public uint GONetIdAtInstantiation;
+
+        [Key(8)]
+        public bool ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
             @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
@@ -168,7 +239,30 @@ namespace GONet
             @event.DesignTimeLocation = nonAuthorityAlternate_designTimeLocation;
 
             @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
             @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = false;
+
+            @event.Position = gonetParticipant.transform.position;
+            @event.Rotation = gonetParticipant.transform.rotation;
+
+            @event.OccurredAtElapsedTicks = default;
+
+            return @event;
+        }
+
+        internal static InstantiateGONetParticipantEvent Create_WithRemotelyControlledByInfo(GONetParticipant gonetParticipant)
+        {
+            InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
+
+            @event.InstanceName = gonetParticipant.gameObject.name;
+            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
+
+            @event.GONetId = gonetParticipant.GONetId;
+            @event.GONetIdAtInstantiation = gonetParticipant.GONetIdAtInstantiation;
+            @event.OwnerAuthorityId = gonetParticipant.OwnerAuthorityId;
+            @event.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority = true;
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
@@ -179,14 +273,219 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
+    /// </summary>
     [MessagePackObject]
-    public struct DestroyGONetParticipantEvent : IPersistentEvent
+    public struct DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
     {
         [IgnoreMember]
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(0)]
         public uint GONetId;
+
+        static readonly Type[] otherEventsTypeCancelledOut = new[] {
+            typeof(InstantiateGONetParticipantEvent),
+            typeof(ValueMonitoringSupport_NewBaselineEvent),
+            typeof(ValueMonitoringSupport_BaselineExpiredEvent)
+        };
+
+        [IgnoreMember]
+        public Type[] OtherEventTypesCancelledOut => otherEventsTypeCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            if (otherEvent is InstantiateGONetParticipantEvent)
+            {
+                InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
+                return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && 
+                    (instantiationEvent.GONetId == GONetId || instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId));
+            }
+            else if (otherEvent is ValueMonitoringSupport_NewBaselineEvent)
+            {
+                ValueMonitoringSupport_NewBaselineEvent newBaselineEvent = (ValueMonitoringSupport_NewBaselineEvent)otherEvent;
+                return newBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && newBaselineEvent.GONetId == GONetId;
+            }
+            else if (otherEvent is ValueMonitoringSupport_BaselineExpiredEvent)
+            {
+                ValueMonitoringSupport_BaselineExpiredEvent expiredBaselineEvent = (ValueMonitoringSupport_BaselineExpiredEvent)otherEvent;
+                return expiredBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && expiredBaselineEvent.GONetId == GONetId;
+            }
+
+            return false;
+        }
+    }
+
+    [MessagePack.Union(0, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+    [MessagePack.Union(1, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+    [MessagePack.Union(2, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+    [MessagePack.Union(3, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
+    [MessagePack.Union(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+    [MessagePack.Union(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+    [MessagePack.Union(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+    [MessagePack.Union(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+    [MessagePack.Union(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+    [MessagePack.Union(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+    [MessagePack.Union(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+    [MessagePack.Union(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+    [MessagePack.Union(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+    [MessagePack.Union(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+    [MessagePack.Union(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+    [MessagePackObject]
+    public abstract class ValueMonitoringSupport_NewBaselineEvent : IPersistentEvent
+    {
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(0)]
+        public uint GONetId { get; set; }
+
+        [Key(1)]
+        public byte ValueIndex { get; set; }
+    }
+
+    #region ValueMonitoringSupport_NewBaselineEvent child classes for each supported type
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Single : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Single NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector2 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector3 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Vector4 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public UnityEngine.Quaternion NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Boolean : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Boolean NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Byte : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Byte NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_SByte : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.SByte NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int16 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int16 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt16 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt16 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int32 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int32 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt32 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt32 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Int64 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Int64 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt64 : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.UInt64 NewBaselineValue { get; set; }
+    }
+
+    [MessagePackObject]
+    public class ValueMonitoringSupport_NewBaselineEvent_System_Double : ValueMonitoringSupport_NewBaselineEvent
+    {
+        [Key(2)]
+        public System.Double NewBaselineValue { get; set; }
+    }
+    #endregion
+
+    /// <summary>
+    /// <para>
+    /// This class uses a feature of the <see cref="ICancelOutOtherEvents"/> processing to allow us to only send newly connecting clients just
+    /// the most recent <see cref="ValueMonitoringSupport_NewBaselineEvent"/> instead of the entire history along the way of the game.
+    /// </para>
+    /// <para>
+    /// IMPORTANT: The semantics of this class and how GONet promises to use it is: for every instance of this class/event published, it is 
+    /// immediately followed by publishing a corresponding instance of <see cref="ValueMonitoringSupport_NewBaselineEvent"/>.
+    /// </para>
+    /// </summary>
+    [MessagePackObject]
+    public struct ValueMonitoringSupport_BaselineExpiredEvent : IPersistentEvent, ICancelOutOtherEvents
+    {
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        [Key(0)]
+        public uint GONetId { get; set; }
+
+        [Key(1)]
+        public byte ValueIndex { get; set; }
+
+        static readonly Type[] otherEventTypesCancelledOut = new[] { typeof(ValueMonitoringSupport_NewBaselineEvent) };
+
+        [IgnoreMember]
+        public Type[] OtherEventTypesCancelledOut => otherEventTypesCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            ValueMonitoringSupport_NewBaselineEvent newBaselineEvent = (ValueMonitoringSupport_NewBaselineEvent)otherEvent;
+            return newBaselineEvent.GONetId != GONetParticipant.GONetId_Unset && newBaselineEvent.GONetId == GONetId
+                && newBaselineEvent.ValueIndex == ValueIndex
+                ; // TODO && depending on if the evaluation order is important or not may need to check if this is the one immediately after the new baseline but only if OccurredAtElapsedTicks value is populated and reliable to reference for this
+        }
     }
 
     [MessagePackObject]
@@ -196,9 +495,9 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         [Key(1)]
-        public Queue<IPersistentEvent> PersistentEvents;
+        public LinkedList<IPersistentEvent> PersistentEvents;
 
-        public PersistentEvents_Bundle(long occurredAtElapsedTicks, Queue<IPersistentEvent> persistentEvents) : this()
+        public PersistentEvents_Bundle(long occurredAtElapsedTicks, LinkedList<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
             PersistentEvents = persistentEvents;
@@ -229,6 +528,74 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// IMPORTANT: This event is initiated (and first published) from a client once the state changes locally on that client, which is slightly different than <see cref="RemoteClientStateChangedEvent"/>
+    /// </summary>
+    [MessagePackObject]
+    public struct ClientStateChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
+        ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
+        /// </summary>
+        [Key(1)]
+        public ulong InitiatingClientConnectionUID { get; set; }
+
+        [Key(2)]
+        public ClientState StatePrevious { get; set; }
+
+        [Key(3)]
+        public ClientState StateNow { get; set; }
+
+        public ClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            InitiatingClientConnectionUID = initiatingClientConnectionUID;
+            StatePrevious = statePrevious;
+            StateNow = stateNow;
+        }
+    }
+
+    /// <summary>
+    /// IMPORTANT: This event is initiated (and first published) from the server once the state changes locally on the server for a client, which is slightly different than <see cref="ClientStateChangedEvent"/>
+    ///            When this event is fired and is received/processed on a client, the client's local data representing the client state may likely NOT be updated to reflect the state change
+    ///            and if it is important that the client IS updated to reflect the state change, subscribe to <see cref="ClientStateChangedEvent"/> instead.
+    /// </summary>
+    [MessagePackObject]
+    public struct RemoteClientStateChangedEvent : ITransientEvent
+    {
+        [Key(0)]
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
+        ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
+        /// </summary>
+        [Key(1)]
+        public ulong InitiatingClientConnectionUID { get; set; }
+
+        /// <summary>
+        /// Since this event initiates server side and the server will not have as many possible states for a client, the only values this might be are:
+        /// <see cref="ClientState.Connected"/> and <see cref="ClientState.Disconnected"/> TODO: see about getting all other values working as well!
+        /// </summary>
+        [Key(2)]
+        public ClientState StatePrevious { get; set; }
+
+        [Key(3)]
+        public ClientState StateNow { get; set; }
+
+        public RemoteClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
+        {
+            OccurredAtElapsedTicks = occurredAtElapsedTicks;
+            InitiatingClientConnectionUID = initiatingClientConnectionUID;
+            StatePrevious = statePrevious;
+            StateNow = stateNow;
+        }
+    }
+
     public enum SyncEvent_ValueChangeProcessedExplanation : byte
     {
         OutboundToOthers = 1,
@@ -249,7 +616,7 @@ namespace GONet
 
     public interface IHaveRelatedGONetId
     {
-        uint GONetId { get; }
+        uint GONetId { get; set; }
     }
 
     /// <summary>

@@ -107,14 +107,14 @@ namespace ReliableNetcode.Utils
 			out ushort sequence, out ushort ack, out uint ackBits, out byte channelID)
 		{
 			if (bufferLength < Defines.FRAGMENT_HEADER_BYTES)
-				throw new FormatException("Buffer too small for packet header");
+				throw new FormatException(string.Concat("Buffer too small for packet header.  bufferLength: ", bufferLength));
 
 			using (var reader = ByteArrayReaderWriter.Get(packetBuffer))
 			{
 				byte prefixByte = reader.ReadByte();
 
-				if (prefixByte != 1)
-					throw new FormatException("Packet header indicates non-fragment packet");
+				if ((prefixByte & 1) == 0)
+					throw new FormatException(string.Concat("Packet header indicates non-fragment packet.  prefixByte: ", prefixByte));
 
 				channelID = reader.ReadByte();
 				sequence = reader.ReadUInt16();
@@ -123,10 +123,10 @@ namespace ReliableNetcode.Utils
 				numFragments = reader.ReadByte() + 1;
 
 				if (numFragments > maxFragments)
-					throw new FormatException("Packet header indicates fragments outside of max range");
+					throw new FormatException(string.Concat("Packet header indicates fragments outside of max range. numFragments: ", numFragments));
 
 				if (fragmentID >= numFragments)
-					throw new FormatException("Packet header indicates fragment ID outside of fragment count");
+					throw new FormatException(string.Concat("Packet header indicates fragment ID outside of fragment count. fragmentID: ", fragmentID));
 
 				fragmentBytes = bufferLength - Defines.FRAGMENT_HEADER_BYTES;
 

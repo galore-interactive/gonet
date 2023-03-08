@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -14,158 +14,13 @@
  */
 
 using GONet.Utils;
+using GONet.PluginAPI;
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace GONet
 {
-    public enum GONetSyncableValueTypes : byte
-    {
-        System_Boolean,
-        System_Byte,
-        System_SByte,
-        System_Int16,
-        System_UInt16,
-        System_Int32,
-        System_UInt32,
-        System_Int64,
-        System_UInt64,
-        System_Single,
-        System_Double,
-        // ?? TODO reference type support: System_String,
-        UnityEngine_Vector2,
-        UnityEngine_Vector3,
-        UnityEngine_Vector4,
-        UnityEngine_Quaternion
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    public struct GONetSyncableValue
-    {
-        [FieldOffset(0)] public GONetSyncableValueTypes GONetSyncType;
-
-        [FieldOffset(1)] bool system_Boolean;
-        public bool System_Boolean { get => system_Boolean; set { system_Boolean = value; GONetSyncType = GONetSyncableValueTypes.System_Boolean; } }
-
-        [FieldOffset(1)] byte system_Byte;
-        public byte System_Byte { get => system_Byte; set { system_Byte = value; GONetSyncType = GONetSyncableValueTypes.System_Byte; } }
-
-        [FieldOffset(1)] sbyte system_SByte;
-        public sbyte System_SByte { get => system_SByte; set { system_SByte = value; GONetSyncType = GONetSyncableValueTypes.System_SByte; } }
-
-        [FieldOffset(1)] short system_Int16;
-        public short System_Int16 { get => system_Int16; set { system_Int16 = value; GONetSyncType = GONetSyncableValueTypes.System_Int16; } }
-
-        [FieldOffset(1)] ushort system_UInt16;
-        public ushort System_UInt16 { get => system_UInt16; set { system_UInt16 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt16; } }
-
-        [FieldOffset(1)] int system_Int32;
-        public int System_Int32 { get => system_Int32; set { system_Int32 = value; GONetSyncType = GONetSyncableValueTypes.System_Int32; } }
-
-        [FieldOffset(1)] uint system_UInt32;
-        public uint System_UInt32 { get => system_UInt32; set { system_UInt32 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt32; } }
-
-        [FieldOffset(1)] long system_Int64;
-        public long System_Int64 { get => system_Int64; set { system_Int64 = value; GONetSyncType = GONetSyncableValueTypes.System_Int64; } }
-
-        [FieldOffset(1)] ulong system_UInt64;
-        public ulong System_UInt64 { get => system_UInt64; set { system_UInt64 = value; GONetSyncType = GONetSyncableValueTypes.System_UInt64; } }
-
-        [FieldOffset(1)] float system_Single;
-        public float System_Single { get => system_Single; set { system_Single = value; GONetSyncType = GONetSyncableValueTypes.System_Single; } }
-
-        [FieldOffset(1)] double system_Double;
-        public double System_Double { get => system_Double; set { system_Double = value; GONetSyncType = GONetSyncableValueTypes.System_Double; } }
-
-        [FieldOffset(1)] Vector2 unityEngine_Vector2;
-        public Vector2 UnityEngine_Vector2 { get => unityEngine_Vector2; set { unityEngine_Vector2 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector2; } }
-
-        [FieldOffset(1)] Vector3 unityEngine_Vector3;
-        public Vector3 UnityEngine_Vector3 { get => unityEngine_Vector3; set { unityEngine_Vector3 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector3; } }
-
-        [FieldOffset(1)] Vector4 unityEngine_Vector4;
-        public Vector4 UnityEngine_Vector4 { get => unityEngine_Vector4; set { unityEngine_Vector4 = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Vector4; } }
-
-        [FieldOffset(1)] Quaternion unityEngine_Quaternion;
-        public Quaternion UnityEngine_Quaternion { get => unityEngine_Quaternion; set { unityEngine_Quaternion = value; GONetSyncType = GONetSyncableValueTypes.UnityEngine_Quaternion; } }
-
-        #region operators == and !=
-
-        public static bool operator ==(GONetSyncableValue left, GONetSyncableValue right)
-        {
-            bool areValuesEqual = false;
-            switch (left.GONetSyncType)
-            {
-                case GONetSyncableValueTypes.System_Boolean: areValuesEqual = left.system_Boolean == right.system_Boolean; break;
-                case GONetSyncableValueTypes.System_Byte: areValuesEqual = left.system_Byte == right.system_Byte; break;
-                case GONetSyncableValueTypes.System_Double: areValuesEqual = left.system_Double == right.system_Double; break;
-                case GONetSyncableValueTypes.System_Int16: areValuesEqual = left.system_Int16 == right.system_Int16; break;
-                case GONetSyncableValueTypes.System_Int32: areValuesEqual = left.system_Int32 == right.system_Int32; break;
-                case GONetSyncableValueTypes.System_Int64: areValuesEqual = left.system_Int64 == right.system_Int64; break;
-                case GONetSyncableValueTypes.System_SByte: areValuesEqual = left.system_SByte == right.system_SByte; break;
-                case GONetSyncableValueTypes.System_Single: areValuesEqual = left.system_Single == right.system_Single; break;
-                case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
-                case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
-                case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
-                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
-            }
-
-            return left.GONetSyncType == right.GONetSyncType && areValuesEqual;
-        }
-
-        public static bool operator !=(GONetSyncableValue left, GONetSyncableValue right)
-        {
-            bool areValuesEqual = false;
-            switch (left.GONetSyncType)
-            {
-                case GONetSyncableValueTypes.System_Boolean: areValuesEqual = left.system_Boolean == right.system_Boolean; break;
-                case GONetSyncableValueTypes.System_Byte: areValuesEqual = left.system_Byte == right.system_Byte; break;
-                case GONetSyncableValueTypes.System_Double: areValuesEqual = left.system_Double == right.system_Double; break;
-                case GONetSyncableValueTypes.System_Int16: areValuesEqual = left.system_Int16 == right.system_Int16; break;
-                case GONetSyncableValueTypes.System_Int32: areValuesEqual = left.system_Int32 == right.system_Int32; break;
-                case GONetSyncableValueTypes.System_Int64: areValuesEqual = left.system_Int64 == right.system_Int64; break;
-                case GONetSyncableValueTypes.System_SByte: areValuesEqual = left.system_SByte == right.system_SByte; break;
-                case GONetSyncableValueTypes.System_Single: areValuesEqual = left.system_Single == right.system_Single; break;
-                case GONetSyncableValueTypes.System_UInt16: areValuesEqual = left.system_UInt16 == right.system_UInt16; break;
-                case GONetSyncableValueTypes.System_UInt32: areValuesEqual = left.system_UInt32 == right.system_UInt32; break;
-                case GONetSyncableValueTypes.System_UInt64: areValuesEqual = left.system_UInt64 == right.system_UInt64; break;
-                case GONetSyncableValueTypes.UnityEngine_Quaternion: areValuesEqual = left.unityEngine_Quaternion == right.unityEngine_Quaternion; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector2: areValuesEqual = left.unityEngine_Vector2 == right.unityEngine_Vector2; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector3: areValuesEqual = left.unityEngine_Vector3 == right.unityEngine_Vector3; break;
-                case GONetSyncableValueTypes.UnityEngine_Vector4: areValuesEqual = left.unityEngine_Vector4 == right.unityEngine_Vector4; break;
-            }
-
-            return left.GONetSyncType != right.GONetSyncType || !areValuesEqual;
-        }
-
-        #endregion
-
-        #region implicit conversions from primitive values wrapped herein
-
-        public static implicit operator GONetSyncableValue(bool value) { return new GONetSyncableValue() { System_Boolean = value }; }
-        public static implicit operator GONetSyncableValue(byte value) { return new GONetSyncableValue() { System_Byte = value }; }
-        public static implicit operator GONetSyncableValue(double value) { return new GONetSyncableValue() { System_Double = value }; }
-        public static implicit operator GONetSyncableValue(short value) { return new GONetSyncableValue() { System_Int16 = value }; }
-        public static implicit operator GONetSyncableValue(int value) { return new GONetSyncableValue() { System_Int32 = value }; }
-        public static implicit operator GONetSyncableValue(long value) { return new GONetSyncableValue() { System_Int64 = value }; }
-        public static implicit operator GONetSyncableValue(sbyte value) { return new GONetSyncableValue() { System_SByte = value }; }
-        public static implicit operator GONetSyncableValue(float value) { return new GONetSyncableValue() { System_Single = value }; }
-        public static implicit operator GONetSyncableValue(ushort value) { return new GONetSyncableValue() { System_UInt16 = value }; }
-        public static implicit operator GONetSyncableValue(uint value) { return new GONetSyncableValue() { System_UInt32 = value }; }
-        public static implicit operator GONetSyncableValue(ulong value) { return new GONetSyncableValue() { System_UInt64 = value }; }
-        public static implicit operator GONetSyncableValue(Quaternion value) { return new GONetSyncableValue() { UnityEngine_Quaternion = value }; }
-        public static implicit operator GONetSyncableValue(Vector2 value) { return new GONetSyncableValue() { UnityEngine_Vector2 = value }; }
-        public static implicit operator GONetSyncableValue(Vector3 value) { return new GONetSyncableValue() { UnityEngine_Vector3 = value }; }
-        public static implicit operator GONetSyncableValue(Vector4 value) { return new GONetSyncableValue() { UnityEngine_Vector4 = value }; }
-
-        #endregion
-    }
-
     /// <summary>
     /// This class only holds constant value fields that can be used as <see cref="GONetAutoMagicalSyncAttribute.SyncChangesEverySeconds"/> values.
     /// </summary>
@@ -192,16 +47,25 @@ namespace GONet
     }
 
     /// <summary>
-    /// IMPORTANT: Ensure this is placed on a field on a <see cref="MonoBehaviour"/>
+    /// <para>
+    /// IMPORTANT: Ensure this is placed on a public field/property on a <see cref="MonoBehaviour"/>
     ///            and the aforementioned <see cref="MonoBehaviour"/> is placed on a 
     ///            <see cref="GameObject"/> with a <see cref="GONetParticipant"/>
     ///            placed on it as well!
-    /// 
+    /// </para>
+    /// <para>
+    /// IMPORTANT: There is a hard GONet limit of 256 of these maximum for a single <see cref="GONetParticipant"/> and that is collectively
+    ///            from *ALL* the <see cref="MonoBehaviour"/> instances installed on the same <see cref="GameObject"/> as the GNP.
+    /// </para>
+    /// <para>
     /// This is akin to [SyncVar] from old/legacy unity networking.....change sent at end of frame; HOWEVER, changes are
     /// monitored on both server (like [SyncVar]) ***AND*** client (UNlike [SyncVar]).
-    /// TODO have to figure out network ownership and whatnot!
-    /// 
-    /// As a reminder, here is the Unity 2017.4 documentation for SyncVar (taken from: https://docs.unity3d.com/2017.4/Documentation/ScriptReference/Networking.SyncVarAttribute.html):
+    /// </para>
+    /// <para>
+    /// See <see cref="GONetSyncableValueTypes"/> for a list of supported types this attribute can be placed on.
+    /// </para>
+    /// <para>
+    /// Also, as a reminder, here is the Unity 2017.4 documentation for SyncVar (taken from: https://docs.unity3d.com/2017.4/Documentation/ScriptReference/Networking.SyncVarAttribute.html):
     ///     [SyncVar] is an attribute that can be put on member variables of NetworkBehaviour classes. These variables will
     ///     have their values sychronized from the server to clients in the game that are in the ready state.
     ///     Setting the value of a[SyncVar] marks it as dirty, so it will be sent to clients at the end of the current frame.
@@ -210,6 +74,7 @@ namespace GONet
     ///     • Basic type(byte, int, float, string, UInt64, etc)
     ///     • Built-in Unity math type(Vector3, Quaternion, etc), 
     ///     • Structs containing allowable types.
+    /// </para>
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public class GONetAutoMagicalSyncAttribute : Attribute
@@ -270,7 +135,7 @@ namespace GONet
         public bool IsReadonlyInEditor = false;
 
         /// <summary>
-        /// Only applicable to primitive numeric data types, mainly float.
+        /// Only applicable to primitive numeric data types, currently float and Vector2/3/4.
         /// If value is 0, no quantizing will occur; otherwise, value MUST be less than 32.
         /// If value is 1, the result will be the quantized value can only represnt <see cref="QuantizeLowerBound"/> or <see cref="QuantizeUpperBound"/> and the one represented will be dictated by which of the two the original value is closest to.
         /// </summary>
@@ -314,6 +179,7 @@ namespace GONet
 
         #endregion
 
+        #region custom serializer stuffs
         /// <summary>
         /// OPTIONAL.
         /// You can use this when there is a special case for serialization (e.g., when not blittable or not GONet natively support type).
@@ -344,7 +210,58 @@ namespace GONet
             }
         }
 
-        static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomSerializer>(25);
+        internal struct CustomSerializerLookupKey : IEquatable<CustomSerializerLookupKey>
+        {
+            internal Type serializedType;
+
+            //{ // what we want, but in this block is what is easiest for now: QuantizerSettingsGroup quantizationSettings;
+            internal byte quantizeDownToBitCount;
+            internal float quantizeLowerBound;
+            internal float quantizeUpperBound;
+            //}
+
+            internal CustomSerializerLookupKey(Type serializedType, byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound)
+            {
+                this.serializedType = serializedType;
+                this.quantizeDownToBitCount = quantizeDownToBitCount;
+                this.quantizeLowerBound = quantizeLowerBound;
+                this.quantizeUpperBound = quantizeUpperBound;
+            }
+
+            public bool Equals(CustomSerializerLookupKey other)
+            {
+                return serializedType == other.serializedType
+                    && quantizeDownToBitCount == other.quantizeDownToBitCount
+                    && quantizeLowerBound == other.quantizeLowerBound
+                    && quantizeUpperBound == other.quantizeUpperBound;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (!(obj is CustomSerializerLookupKey))
+                {
+                    return false;
+                }
+
+                var key = (CustomSerializerLookupKey)obj;
+                return serializedType == key.serializedType
+                    && quantizeDownToBitCount == key.quantizeDownToBitCount
+                    && quantizeLowerBound == key.quantizeLowerBound
+                    && quantizeUpperBound == key.quantizeUpperBound;
+            }
+
+            public override int GetHashCode()
+            {
+                var hashCode = -1886448105;
+                hashCode = hashCode * -1521134295 + EqualityComparer<Type>.Default.GetHashCode(serializedType);
+                hashCode = hashCode * -1521134295 + quantizeDownToBitCount.GetHashCode();
+                hashCode = hashCode * -1521134295 + quantizeLowerBound.GetHashCode();
+                hashCode = hashCode * -1521134295 + quantizeUpperBound.GetHashCode();
+                return hashCode;
+            }
+        }
+
+        static readonly Dictionary<CustomSerializerLookupKey, IGONetAutoMagicalSync_CustomSerializer> customSerializerInstanceByTypeMap = new Dictionary<CustomSerializerLookupKey, IGONetAutoMagicalSync_CustomSerializer>(25);
         IGONetAutoMagicalSync_CustomSerializer customSerialize_Instance = null;
         /// <summary>
         /// IMPORTANT: Do NOT use this.
@@ -361,24 +278,38 @@ namespace GONet
                     TypeUtils.IsTypeAInstanceOfTypeB(CustomSerialize_Type, typeof(IGONetAutoMagicalSync_CustomSerializer)) &&
                     !CustomSerialize_Type.IsAbstract)
                 { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
-                    if (!customSerializerInstanceByTypeMap.TryGetValue(CustomSerialize_Type, out customSerialize_Instance))
+                    CustomSerializerLookupKey key = new CustomSerializerLookupKey(CustomSerialize_Type, QuantizeDownToBitCount, QuantizeLowerBound, QuantizeUpperBound);
+                    if (!customSerializerInstanceByTypeMap.TryGetValue(key, out customSerialize_Instance))
                     {
                         customSerialize_Instance = (IGONetAutoMagicalSync_CustomSerializer)Activator.CreateInstance(CustomSerialize_Type);
-                        customSerializerInstanceByTypeMap[CustomSerialize_Type] = customSerialize_Instance;
+                        customSerialize_Instance.InitQuantizationSettings(key.quantizeDownToBitCount, key.quantizeLowerBound, key.quantizeUpperBound);
+
+                        customSerializerInstanceByTypeMap[key] = customSerialize_Instance;
                     }
                 }
                 return customSerialize_Instance;
             }
         }
 
+        /// <summary>
+        /// Get/Create the "No quantization" option
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public static T GetCustomSerializer<T>() where T : IGONetAutoMagicalSync_CustomSerializer
+        {
+            return GetCustomSerializer<T>(0, 0, 0); // the first 0 for quantize down to bit count causes no quantization
+        }
+
+        public static T GetCustomSerializer<T>(byte quantizeDownToBitCount, float quantizeLowerBound, float quantizeUpperBound) where T : IGONetAutoMagicalSync_CustomSerializer
         {
             T customSerializer = default(T);
             Type typeofT = typeof(T);
             if (!typeofT.IsAbstract)
             { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
                 IGONetAutoMagicalSync_CustomSerializer customSerializer_raw;
-                if (customSerializerInstanceByTypeMap.TryGetValue(typeofT, out customSerializer_raw))
+                CustomSerializerLookupKey key = new CustomSerializerLookupKey(typeofT, quantizeDownToBitCount, quantizeLowerBound, quantizeUpperBound);
+                if (customSerializerInstanceByTypeMap.TryGetValue(key, out customSerializer_raw))
                 {
                     if (customSerializer_raw.GetType() == typeofT) // just double checking...probabaly overkill since we ensure this is true through other steps
                     {
@@ -388,11 +319,98 @@ namespace GONet
                 else
                 {
                     customSerializer = Activator.CreateInstance<T>();
-                    customSerializerInstanceByTypeMap[typeofT] = customSerializer;
+                    customSerializer.InitQuantizationSettings(key.quantizeDownToBitCount, key.quantizeLowerBound, key.quantizeUpperBound);
+
+                    customSerializerInstanceByTypeMap[key] = customSerializer;
                 }
             }
             return customSerializer;
         }
+
+        #endregion
+
+        #region custom value blending stuffs
+        /// <summary>
+        /// OPTIONAL.
+        /// You can use this when there is a special case for serialization (e.g., when not blittable or not GONet natively support type).
+        /// IMPORTANT: Due to C# attribute parameter type limitations (see https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/attributes),
+        ///            the type here is <see cref="Type"/> when it really needs to be an instance of <see cref="IGONetAutoMagicalSync_CustomValueBlending"/>.
+        ///            An instance of this type will be created and cast to <see cref="IGONetAutoMagicalSync_CustomValueBlending"/> and 
+        ///            set on <see cref="CustomValueBlending_Instance"/> and that is what will be used.
+        /// </summary>
+        public Type CustomValueBlending_Type = null;
+
+        /// <summary>
+        /// Only here to support serialization of <see cref="CustomValueBlending_Type"/>
+        /// </summary>
+        public string CustomValueBlending_Type_AsString
+        {
+            get { return CustomValueBlending_Type != null ? CustomValueBlending_Type.AssemblyQualifiedName : null; }
+
+            set
+            {
+                if (value == null)
+                {
+                    CustomValueBlending_Type = null;
+                }
+                else
+                {
+                    CustomValueBlending_Type = Type.GetType(value);
+                }
+            }
+        }
+
+        static readonly Dictionary<Type, IGONetAutoMagicalSync_CustomValueBlending> customValueBlendingInstanceByTypeMap = new Dictionary<Type, IGONetAutoMagicalSync_CustomValueBlending>(25);
+        IGONetAutoMagicalSync_CustomValueBlending customValueBlending_Instance = null;
+        /// <summary>
+        /// IMPORTANT: Do NOT use this.
+        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// This will only be non-null when <see cref="CustomValueBlending_Type"/> is set to a non-abstract type
+        /// that implements <see cref="IGONetAutoMagicalSync_CustomValueBlending"/>.
+        /// </summary>
+        public IGONetAutoMagicalSync_CustomValueBlending CustomValueBlending_Instance
+        {
+            get
+            {
+                if (CustomValueBlending_Type != null &&
+                    customValueBlending_Instance == null &&
+                    TypeUtils.IsTypeAInstanceOfTypeB(CustomValueBlending_Type, typeof(IGONetAutoMagicalSync_CustomValueBlending)) &&
+                    !CustomValueBlending_Type.IsAbstract)
+                { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
+                    if (!customValueBlendingInstanceByTypeMap.TryGetValue(CustomValueBlending_Type, out customValueBlending_Instance))
+                    {
+                        customValueBlending_Instance = (IGONetAutoMagicalSync_CustomValueBlending)Activator.CreateInstance(CustomValueBlending_Type);
+                        customValueBlendingInstanceByTypeMap[CustomValueBlending_Type] = customValueBlending_Instance;
+                    }
+                }
+                return customValueBlending_Instance;
+            }
+        }
+
+        public static T GetCustomValueBlending<T>() where T : IGONetAutoMagicalSync_CustomValueBlending
+        {
+            T customValueBlending = default(T);
+            Type typeofT = typeof(T);
+            if (!typeofT.IsAbstract)
+            { // if in here, we know we need to lookup or perhaps create a new instance of this class and it should work fine
+                IGONetAutoMagicalSync_CustomValueBlending customValueBlending_raw;
+                if (customValueBlendingInstanceByTypeMap.TryGetValue(typeofT, out customValueBlending_raw))
+                {
+                    if (customValueBlending_raw.GetType() == typeofT) // just double checking...probabaly overkill since we ensure this is true through other steps
+                    {
+                        customValueBlending = (T)customValueBlending_raw;
+                    }
+                }
+                else
+                {
+                    customValueBlending = Activator.CreateInstance<T>();
+                    customValueBlendingInstanceByTypeMap[typeofT] = customValueBlending;
+                }
+            }
+            return customValueBlending;
+        }
+
+        #endregion
 
         public GONetAutoMagicalSyncAttribute() { }
 
@@ -405,342 +423,6 @@ namespace GONet
         public GONetAutoMagicalSyncAttribute(string profileTemplateName)
         {
             SettingsProfileTemplateName = profileTemplateName;
-        }
-    }
-
-    public interface IGONetAutoMagicalSync_CustomSerializer
-    {
-        /// <param name="gonetParticipant">here for reference in case that helps to serialize properly</param>
-        void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value);
-
-        GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom);
-    }
-
-    public class Vector2Serializer : IGONetAutoMagicalSync_CustomSerializer
-    {
-        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
-        public const float DEFAULT_MAX_VALUE = 10000f;
-        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
-
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
-
-        public Vector2Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
-
-        public Vector2Serializer(float minValue, float maxValue, byte bitsPerComponent)
-        {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
-        }
-
-        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
-        {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
-
-            return new Vector2(quantizer.Unquantize(x), quantizer.Unquantize(y));
-        }
-
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
-        {
-            Vector2 vector2 = value.UnityEngine_Vector2;
-
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.y), bitsPerComponent);
-        }
-    }
-
-    public class Vector3Serializer : IGONetAutoMagicalSync_CustomSerializer
-    {
-        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
-        public const float DEFAULT_MAX_VALUE = 10000f;
-        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
-
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
-
-        public Vector3Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
-
-        public Vector3Serializer(float minValue, float maxValue, byte bitsPerComponent)
-        {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
-        }
-
-        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
-        {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
-            uint z;
-            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
-
-            return new Vector3(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z));
-        }
-
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
-        {
-            Vector3 vector3 = value.UnityEngine_Vector3;
-
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.y), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector3.z), bitsPerComponent);
-        }
-    }
-
-    public class Vector4Serializer : IGONetAutoMagicalSync_CustomSerializer
-    {
-        public const byte DEFAULT_BITS_PER_COMPONENT = 32;
-        public const float DEFAULT_MAX_VALUE = 10000f;
-        public const float DEFAULT_MIN_VALUE = -DEFAULT_MAX_VALUE;
-
-        readonly Quantizer quantizer;
-        byte bitsPerComponent;
-
-        public Vector4Serializer() : this(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE, DEFAULT_BITS_PER_COMPONENT) { }
-
-        public Vector4Serializer(float minValue, float maxValue, byte bitsPerComponent)
-        {
-            this.bitsPerComponent = bitsPerComponent;
-            quantizer = new Quantizer(minValue, maxValue, bitsPerComponent, true);
-        }
-
-        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
-        {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
-            uint z;
-            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
-            uint w;
-            bitStream_readFrom.ReadUInt(out w, bitsPerComponent);
-
-            return new Vector4(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z), quantizer.Unquantize(w));
-        }
-
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
-        {
-            Vector4 vector4 = value.UnityEngine_Vector4;
-
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.y), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.z), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.w), bitsPerComponent);
-        }
-    }
-
-    public class QuaternionSerializer : IGONetAutoMagicalSync_CustomSerializer
-    {
-        static readonly float SQUARE_ROOT_OF_2 = Mathf.Sqrt(2.0f);
-        static readonly float QuatValueMinimum = -1.0f / SQUARE_ROOT_OF_2;
-        static readonly float QuatValueMaximum = +1.0f / SQUARE_ROOT_OF_2;
-
-        Quantizer quantizer;
-        byte bitsPerSmallestThreeItem;
-
-        public const byte DEFAULT_BITS_PER_SMALLEST_THREE = 9;
-
-        public QuaternionSerializer() : this(DEFAULT_BITS_PER_SMALLEST_THREE) { }
-
-        public QuaternionSerializer(byte bitsPerSmallestThreeItem)
-        {
-            this.bitsPerSmallestThreeItem = bitsPerSmallestThreeItem;
-            quantizer = new Quantizer(QuatValueMinimum, QuatValueMaximum, bitsPerSmallestThreeItem, true);
-        }
-
-        /// <returns>a <see cref="Quaternion"/></returns>
-        public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
-        {
-            uint LargestIndex;
-            bitStream_readFrom.ReadUInt(out LargestIndex, 2);
-            uint SmallestA;
-            bitStream_readFrom.ReadUInt(out SmallestA, bitsPerSmallestThreeItem);
-            uint SmallestB;
-            bitStream_readFrom.ReadUInt(out SmallestB, bitsPerSmallestThreeItem);
-            uint SmallestC;
-            bitStream_readFrom.ReadUInt(out SmallestC, bitsPerSmallestThreeItem);
-
-            float a = quantizer.Unquantize(SmallestA);
-            float b = quantizer.Unquantize(SmallestB);
-            float c = quantizer.Unquantize(SmallestC);
-
-            float x, y, z, w;
-
-            switch (LargestIndex)
-            {
-                case 0:
-                    {
-                        x = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
-                        y = a;
-                        z = b;
-                        w = c;
-                    }
-                    break;
-
-                case 1:
-                    {
-                        x = a;
-                        y = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
-                        z = b;
-                        w = c;
-                    }
-                    break;
-
-                case 2:
-                    {
-                        x = a;
-                        y = b;
-                        z = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
-                        w = c;
-                    }
-                    break;
-
-                case 3:
-                    {
-                        x = a;
-                        y = b;
-                        z = c;
-                        w = (float)Math.Sqrt(1f - a * a - b * b - c * c); // calculated the largest value based on the smallest 3 values
-                    }
-                    break;
-
-                default:
-                    {
-                        Debug.Assert(false);
-                        x = 0F;
-                        y = 0F;
-                        z = 0F;
-                        w = 1F;
-                    }
-                    break;
-            }
-
-            return new Quaternion(x, y, z, w);
-        }
-
-        public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
-        {
-            uint LargestIndex;
-            uint SmallestA;
-            uint SmallestB;
-            uint SmallestC;
-
-            Quaternion quattie = value.UnityEngine_Quaternion;
-            float x = quattie.x;
-            float y = quattie.y;
-            float z = quattie.z;
-            float w = quattie.w;
-
-            float xABS = Math.Abs(x);
-            float yABS = Math.Abs(y);
-            float zABS = Math.Abs(z);
-            float wABS = Math.Abs(w);
-
-            LargestIndex = 0;
-            float largestValue = xABS;
-
-            if (yABS > largestValue)
-            {
-                LargestIndex = 1;
-                largestValue = yABS;
-            }
-
-            if (zABS > largestValue)
-            {
-                LargestIndex = 2;
-                largestValue = zABS;
-            }
-
-            if (wABS > largestValue)
-            {
-                LargestIndex = 3;
-                largestValue = wABS;
-            }
-
-            float a = 0f;
-            float b = 0f;
-            float c = 0f;
-
-            switch (LargestIndex)
-            {
-                case 0:
-                    if (x >= 0)
-                    {
-                        a = y;
-                        b = z;
-                        c = w;
-                    }
-                    else
-                    {
-                        a = -y;
-                        b = -z;
-                        c = -w;
-                    }
-                    break;
-
-                case 1:
-                    if (y >= 0)
-                    {
-                        a = x;
-                        b = z;
-                        c = w;
-                    }
-                    else
-                    {
-                        a = -x;
-                        b = -z;
-                        c = -w;
-                    }
-                    break;
-
-                case 2:
-                    if (z >= 0)
-                    {
-                        a = x;
-                        b = y;
-                        c = w;
-                    }
-                    else
-                    {
-                        a = -x;
-                        b = -y;
-                        c = -w;
-                    }
-                    break;
-
-                case 3:
-                    if (w >= 0)
-                    {
-                        a = x;
-                        b = y;
-                        c = z;
-                    }
-                    else
-                    {
-                        a = -x;
-                        b = -y;
-                        c = -z;
-                    }
-                    break;
-
-                default:
-                    Debug.Assert(false);
-                    break;
-            }
-
-
-            SmallestA = quantizer.Quantize(a);
-            SmallestB = quantizer.Quantize(b);
-            SmallestC = quantizer.Quantize(c);
-
-            bitStream_appendTo.WriteUInt(LargestIndex, 2);
-            bitStream_appendTo.WriteUInt(SmallestA, bitsPerSmallestThreeItem);
-            bitStream_appendTo.WriteUInt(SmallestB, bitsPerSmallestThreeItem);
-            bitStream_appendTo.WriteUInt(SmallestC, bitsPerSmallestThreeItem);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -61,11 +61,15 @@ namespace GONet.Utils
         protected T[] pool;
         
         protected int nextAvailableIndex;
+
+        public int BorrowedCount => nextAvailableIndex;
         
         /// <summary>
         /// The number of object instances the pool can hold.
         /// </summary>
         protected int poolCapacity;
+
+        public int Capacity => poolCapacity;
 
         /// <summary>
         /// the number of instances to grow the pool by when there are no more available
@@ -112,11 +116,16 @@ namespace GONet.Utils
             CreateAdditionalInstances(initialSize);
         }
 
+
+        //readonly HashSet<System.Threading.Thread> uniqueThreadsEncountered = new HashSet<System.Threading.Thread>();
+
         /// <summary>
         /// This method is to ensure the <see cref="nextAvailableIndex"/> is valid inside <see cref="pool"/> and contains teh next item to serve up for borrowing
         /// </summary>
         protected virtual void PreBorrow()
         {
+            //uniqueThreadsEncountered.Add(System.Threading.Thread.CurrentThread);
+
             // First, try to get an instance from the available list.
             // If none there, then create some more.
             if (nextAvailableIndex == poolCapacity)
@@ -173,6 +182,8 @@ namespace GONet.Utils
             {
                 throw new NullReferenceException();
             }
+            
+            //uniqueThreadsEncountered.Add(System.Threading.Thread.CurrentThread);
 
             --nextAvailableIndex; // IMPORTANT_NOTE456: until the swap actually occurs below, this value represents a checked out object that is NOT available....sorry :(
 
@@ -293,7 +304,7 @@ namespace GONet.Utils
                 // allow custom reaction to this grow
                 OnGrowComplete(prevPoolCapacity);
 
-                // UnityEnging.Log.Debug(this.ToString()); // little debuggery for analysis to make sure pools get utilized as expected....this info hopefully provides insight into how best tune/tweak the initial values
+                //UnityEngine.Debug.Log(this.ToString()); // little debuggery for analysis to make sure pools get utilized as expected....this info hopefully provides insight into how best tune/tweak the initial values
             }
         }
 
@@ -307,6 +318,10 @@ namespace GONet.Utils
             const string BorrowedCurrent = ", current # borrowed: ";
             const string BorrowedTotal = ", total # borrowed: ";
             const string Returned = ", total # returned: ";
+            
+            //const string UniqueThreads = ", # unique threads using this instance: ";
+            //string statement = string.Concat(Type, typeof(T).Name, Hash, GetHashCode(), Capacity, pool.Length, BorrowedCurrent, nextAvailableIndex, BorrowedTotal, totalBorrowed, Returned, totalReturned, UniqueThreads, uniqueThreadsEncountered.Count);
+            
             string statement = string.Concat(Type, typeof(T).Name, Hash, GetHashCode(), Capacity, pool.Length, BorrowedCurrent, nextAvailableIndex, BorrowedTotal, totalBorrowed, Returned, totalReturned);
             return statement;
         }

@@ -147,7 +147,7 @@ namespace Org.BouncyCastle.Cms
 		/// <summary>Return the version number for this object.</summary>
 		public int Version
 		{
-			get { return signedData.Version.Value.IntValue; }
+			get { return signedData.Version.IntValueExact; }
 		}
 
 		/**
@@ -279,6 +279,16 @@ namespace Org.BouncyCastle.Cms
 		{
 			return contentInfo.GetEncoded();
 		}
+
+        /**
+         * return the ASN.1 encoded representation of this object using the specified encoding.
+         *
+         * @param encoding the ASN.1 encoding format to use ("BER" or "DER").
+         */
+        public byte[] GetEncoded(string encoding)
+        {
+            return contentInfo.GetEncoded(encoding);
+        }
 
 		/**
 		* Replace the signerinformation store associated with this

@@ -6,6 +6,7 @@ using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.Cms;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.IO;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Security.Certificates;
 using Org.BouncyCastle.Utilities;
@@ -128,7 +129,7 @@ namespace Org.BouncyCastle.Cms
                     IDigest dig = Helper.GetDigestInstance(digestName);
                     if (content != null)
                     {
-                        content.Write(new DigOutputStream(dig));
+                        content.Write(new DigestSink(dig));
                     }
                     hash = DigestUtilities.DoFinal(dig);
                     outer._digests.Add(digestOID, hash.Clone());
@@ -513,15 +514,19 @@ namespace Org.BouncyCastle.Cms
 
 			if (_certs.Count != 0)
 			{
-				certificates = CmsUtilities.CreateBerSetFromList(_certs);
+				certificates = UseDerForCerts
+                    ?   CmsUtilities.CreateDerSetFromList(_certs)
+                    :   CmsUtilities.CreateBerSetFromList(_certs);
 			}
 
 			Asn1Set certrevlist = null;
 
 			if (_crls.Count != 0)
 			{
-				certrevlist = CmsUtilities.CreateBerSetFromList(_crls);
-			}
+                certrevlist = UseDerForCrls
+                    ?   CmsUtilities.CreateDerSetFromList(_crls)
+                    :   CmsUtilities.CreateBerSetFromList(_crls);
+            }
 
 			Asn1OctetString octs = null;
 			if (encapsulate)

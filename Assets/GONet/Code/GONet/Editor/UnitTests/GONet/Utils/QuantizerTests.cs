@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -22,6 +22,73 @@ namespace GONet.Utils
     [TestFixture]
     public class QuantizerTests
     {
+        [Test]
+        public void QuaternionOrientationEquality_PerformanceComparison()
+        {
+            Quaternion rotation1 = Quaternion.Euler(123.456f, -324.654f, 34.001f);
+            Quaternion rotation2 = Quaternion.Euler(-123.456f, 324.654f, -34.001f);
+
+            long ticksAtStart;
+            long durationTicks;
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, false, 100_000, true);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, false, 100_000, false);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+            rotation1 = rotation2;
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, true, 100_000, true);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, true, 100_000, false);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+            rotation1 = Quaternion.Euler(0f, 180f, 0f);
+            rotation2 = Quaternion.Euler(180f, 0f, -180f);
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, true, 100_000, true);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+
+            ticksAtStart = DateTime.UtcNow.Ticks;
+            QuaternionOrientationEquality(rotation1, rotation2, true, 100_000, false);
+            durationTicks = DateTime.UtcNow.Ticks - ticksAtStart;
+            Debug.Log("duration (ms): " + TimeSpan.FromTicks(durationTicks).TotalMilliseconds);
+        }
+
+        private void QuaternionOrientationEquality(Quaternion rotation1, Quaternion rotation2, bool shouldBeEqual, int iterations, bool useEulers)
+        {
+            for (int i = 0; i < iterations; ++i)
+            {
+                if (useEulers)
+                {
+                    bool isEqual = rotation1.eulerAngles == rotation2.eulerAngles;
+                    Assert.AreEqual(shouldBeEqual, isEqual);
+                }
+                else
+                {
+                    float angleDiff = Quaternion.Angle(rotation1, rotation2);
+                    bool isEqual = angleDiff < 1e-3f;
+                    Assert.AreEqual(shouldBeEqual, isEqual);
+                }
+            }
+        }
+
+
         [Test]
         public void ShaunTest()
         {

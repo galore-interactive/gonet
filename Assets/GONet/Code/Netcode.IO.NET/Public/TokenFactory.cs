@@ -13,7 +13,8 @@ namespace NetcodeIO.NET
 	/// </summary>
 	public class TokenFactory
 	{
-		internal ulong protocolID;
+        private const ulong DOES_NOT_EXPIRE = 0xFFFFFFFFFFFFFFFFUL;
+        internal ulong protocolID;
 		internal byte[] privateKey;
 
 		public TokenFactory(ulong protocolID, byte[] privateKey)
@@ -58,7 +59,7 @@ namespace NetcodeIO.NET
 
 			NetcodePrivateConnectToken privateConnectToken = new NetcodePrivateConnectToken();
 			privateConnectToken.ClientID = clientID;
-			privateConnectToken.TimeoutSeconds = serverTimeout;
+			privateConnectToken.TimeoutAfterSeconds = serverTimeout;
 
 			// generate random crypto keys
 			byte[] clientToServerKey = new byte[32];
@@ -89,7 +90,7 @@ namespace NetcodeIO.NET
 			}
 
 			ulong createTimestamp = (ulong)Math.Truncate(time);
-			ulong expireTimestamp = expirySeconds >= 0 ? ( createTimestamp + (ulong)expirySeconds ) : 0xFFFFFFFFFFFFFFFFUL;
+			ulong expireTimestamp = expirySeconds >= 0 ? ( createTimestamp + (ulong)expirySeconds ) : DOES_NOT_EXPIRE;
 
 			byte[] encryptedPrivateToken = new byte[1024];
 			PacketIO.EncryptPrivateConnectToken(privateConnectTokenBytes, protocolID, expireTimestamp, sequence, privateKey, encryptedPrivateToken);

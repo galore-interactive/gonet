@@ -157,14 +157,14 @@ namespace NetcodeIO.NET.Tests
 			// add encryption mappings and make sure they can be looked up by address
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 				assert(encryptionIndex == -1, "Encryption manager returned invalid index");
 				assert(encryptionManager.GetSendKey(encryptionIndex) == null, "Encryption manager returned invalid key");
 				assert(encryptionManager.GetReceiveKey(encryptionIndex) == null, "Encryption manager returned invalid key");
 
 				assert(encryptionManager.AddEncryptionMapping(encryptionMapping[i].address, encryptionMapping[i].SendKey, encryptionMapping[i].ReceiveKey, time, -1.0, encryptionMapping[i].TimeoutSeconds, encryptionMapping[i].ClientID), "Encryption manager failed to add mapping");
 
-				encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 
 				int timeoutSeconds = encryptionManager.GetTimeoutSeconds(encryptionIndex);
 				uint clientID = encryptionManager.GetClientID(encryptionIndex);
@@ -185,17 +185,17 @@ namespace NetcodeIO.NET.Tests
 			// removing an encryption mapping that doesn't exist should return false
 			{
 				IPEndPoint endpoint = new IPEndPoint(IPAddress.Parse("0:0:0:0:0:0:0:1"), 50000);
-				assert(encryptionManager.RemoveEncryptionMapping(endpoint, time) == false, "Encryption manager removed invalid entry");
+				assert(encryptionManager.RemoveAllEncryptionMappings(endpoint) == 0, "Encryption manager removed invalid entry");
 			}
 
 			// remove first and last encryption mappings
-			assert(encryptionManager.RemoveEncryptionMapping(encryptionMapping[0].address, time), "Encryption manager failed to remove entry");
-			assert(encryptionManager.RemoveEncryptionMapping(encryptionMapping[encryptionMapping.Length - 1].address, time), "Encryption manager failed to remove entry");
+			assert(encryptionManager.RemoveAllEncryptionMappings(encryptionMapping[0].address) > 0, "Encryption manager failed to remove entry");
+			assert(encryptionManager.RemoveAllEncryptionMappings(encryptionMapping[encryptionMapping.Length - 1].address) > 0, "Encryption manager failed to remove entry");
 
 			// ensure removed encryption mappings cannot be looked up by address
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 				byte[] sendKey = encryptionManager.GetSendKey(encryptionIndex);
 				byte[] receiveKey = encryptionManager.GetReceiveKey(encryptionIndex);
 
@@ -238,7 +238,7 @@ namespace NetcodeIO.NET.Tests
 			// ensure all encryption mappings can be looked up
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 
 				int timeoutSeconds = encryptionManager.GetTimeoutSeconds(encryptionIndex);
 				uint clientID = encryptionManager.GetClientID(encryptionIndex);
@@ -261,7 +261,7 @@ namespace NetcodeIO.NET.Tests
 
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 				byte[] sendKey = encryptionManager.GetSendKey(encryptionIndex);
 				byte[] receiveKey = encryptionManager.GetReceiveKey(encryptionIndex);
 
@@ -272,14 +272,14 @@ namespace NetcodeIO.NET.Tests
 			// add the same encryption mappings after timeout
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 				assert(encryptionIndex == -1, "Encryption manager returned invalid index");
 				assert(encryptionManager.GetSendKey(encryptionIndex) == null, "Encryption manager returned invalid key");
 				assert(encryptionManager.GetReceiveKey(encryptionIndex) == null, "Encryption manager returned invalid key");
 
 				assert(encryptionManager.AddEncryptionMapping(encryptionMapping[i].address, encryptionMapping[i].SendKey, encryptionMapping[i].ReceiveKey, time, -1.0, encryptionMapping[i].TimeoutSeconds, encryptionMapping[i].ClientID), "Encryption manager failed to add mapping");
 
-				encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 
 				int timeoutSeconds = encryptionManager.GetTimeoutSeconds(encryptionIndex);
 				uint clientID = encryptionManager.GetClientID(encryptionIndex);
@@ -301,7 +301,7 @@ namespace NetcodeIO.NET.Tests
 			encryptionManager.Reset();
 			for (int i = 0; i < encryptionMapping.Length; i++)
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[i].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[i].address, time);
 				byte[] sendKey = encryptionManager.GetSendKey(encryptionIndex);
 				byte[] receiveKey = encryptionManager.GetReceiveKey(encryptionIndex);
 
@@ -312,13 +312,13 @@ namespace NetcodeIO.NET.Tests
 			// test the expire time works as expected
 			assert(encryptionManager.AddEncryptionMapping(encryptionMapping[0].address, encryptionMapping[0].SendKey, encryptionMapping[0].ReceiveKey, time, time + 1.0, encryptionMapping[0].TimeoutSeconds, encryptionMapping[0].ClientID), "Encryption manager failed to add mapping");
 			{
-				int encryptionIndex = encryptionManager.FindEncryptionMapping(encryptionMapping[0].address, time);
+				int encryptionIndex = encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[0].address, time);
 				assert(encryptionIndex != -1, "Encryption manager failed to find entry");
 
-				assert(encryptionManager.FindEncryptionMapping(encryptionMapping[0].address, time + 1.1) == -1, "Encryption manager returned invalid entry");
-				encryptionManager.SetExpireTime(encryptionIndex, -1.0);
+				assert(encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[0].address, time + 1.1) == -1, "Encryption manager returned invalid entry");
+				encryptionManager.SetExpiresAtSeconds(encryptionIndex, -1.0);
 
-				assert(encryptionManager.FindEncryptionMapping(encryptionMapping[0].address, time) == encryptionIndex, "Encryption manager returned invalid entry");
+				assert(encryptionManager.GetEncryptionMappingIndexForTime(encryptionMapping[0].address, time) == encryptionIndex, "Encryption manager returned invalid entry");
 			}
 		}
 
@@ -379,7 +379,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -388,7 +388,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -471,7 +471,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -480,7 +480,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -548,7 +548,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			ulong clientID = 1000UL;
 			ulong tokenSequence = 0UL;
@@ -566,7 +566,7 @@ namespace NetcodeIO.NET.Tests
 
 						return socket;
 					});
-					clients[j].time = time;
+					clients[j].totalSeconds = time;
 
 					byte[] connectToken = tokenFactory.GenerateConnectToken(new IPEndPoint[] { serverEndpoint }, time,
 						30, 5, tokenSequence, clientID, new byte[256]);
@@ -693,11 +693,11 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			IPEndPoint[] testServerEndpoints = new IPEndPoint[]
 			{
@@ -788,7 +788,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			IPEndPoint[] testServerEndpoints = new IPEndPoint[]
 			{
@@ -831,7 +831,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			IPEndPoint[] testServerEndpoints = new IPEndPoint[]
 			{
@@ -869,7 +869,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -878,7 +878,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -944,7 +944,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			// server should not respond to challenge response packets. this should make the client time out with ChallengeResponseTimedOut state
 			server.debugIgnoreChallengeResponse = true;
@@ -956,7 +956,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1006,7 +1006,7 @@ namespace NetcodeIO.NET.Tests
 
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			// server should not respond to connection request packets. this should make the client time out with ConnectionRequestTimedOut state
 			server.debugIgnoreConnectionRequest = true;
@@ -1018,7 +1018,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1070,7 +1070,7 @@ namespace NetcodeIO.NET.Tests
 			// server only has room for one player - second player should be denied
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -1079,7 +1079,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1112,7 +1112,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client2.time = time;
+			client2.totalSeconds = time;
 
 			ulong clientID2 = 1001;
 
@@ -1164,7 +1164,7 @@ namespace NetcodeIO.NET.Tests
 			// server only has room for one player - second player should be denied
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -1173,7 +1173,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1237,7 +1237,7 @@ namespace NetcodeIO.NET.Tests
 			// server only has room for one player - second player should be denied
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -1246,7 +1246,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1312,7 +1312,7 @@ namespace NetcodeIO.NET.Tests
 			// server only has room for one player - second player should be denied
 			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
-			server.time = time;
+			server.totalSeconds = time;
 
 			Client client = new Client((endpoint) =>
 			{
@@ -1321,7 +1321,7 @@ namespace NetcodeIO.NET.Tests
 
 				return socket;
 			});
-			client.time = time;
+			client.totalSeconds = time;
 
 			ulong clientID = 1000;
 			byte[] userData = new byte[256];
@@ -1429,7 +1429,7 @@ namespace NetcodeIO.NET.Tests
 				int slots = rand.Next(0, NUM_CLIENTS) + 1;
 				var server = new Server(socket, slots, "127.0.0.1", BASE_SERVER_PORT + i, TEST_PROTOCOL_ID, _privateKey);
 				server.Start(false);
-				server.time = time;
+				server.totalSeconds = time;
 
 				server.OnClientMessageReceived += (sender, payload, size) =>
 				{
@@ -1473,7 +1473,7 @@ namespace NetcodeIO.NET.Tests
 				clientsConnected.Add(client, false);
 				receivedPackets.Add(client, 0);
 
-				client.time = time;
+				client.totalSeconds = time;
 
 				clients[i] = client;
 			}

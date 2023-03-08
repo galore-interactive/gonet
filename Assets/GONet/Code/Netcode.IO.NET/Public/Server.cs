@@ -2,16 +2,12 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Text;
-using System.IO;
 using System.Linq;
-using System.Collections.Generic;
-
-using Org.BouncyCastle.Crypto.TlsExt;
 
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
+using GONet;
 
 namespace NetcodeIO.NET
 {
@@ -46,7 +42,7 @@ namespace NetcodeIO.NET
 		internal NetcodeReplayProtection replayProtection;
 		internal Server server;
 
-		internal double lastResponseTime;
+		internal double lastResponseAtSeconds;
 		internal int timeoutSeconds;
 
 		public RemoteClient(Server server)
@@ -62,9 +58,9 @@ namespace NetcodeIO.NET
 			server.SendPayload(this, payload, payloadSize);
 		}
 
-		internal void Touch(double time)
+		internal void Touch(double currentSeconds)
 		{
-			lastResponseTime = time;
+			lastResponseAtSeconds = currentSeconds;
 		}
 	}
 
@@ -119,7 +115,7 @@ namespace NetcodeIO.NET
 		/// <summary>
 		/// Log level for messages
 		/// </summary>
-		public NetcodeLogLevel LogLevel = NetcodeLogLevel.Error;
+		public NetcodeLogLevel LogLevel = NetcodeLogLevel.Debug;
 
 		/// <summary>
 		/// Gets the port this server is listening on (or -1 if not listening)
@@ -135,15 +131,16 @@ namespace NetcodeIO.NET
 			}
 		}
 
-		/// <summary>
-		/// Gets or sets the internal tickrate of the server in ticks per second. Value must be between 1 and 1000.
-		/// </summary>
-		public int Tickrate
+        private int tickrate;
+        /// <summary>
+        /// Gets or sets the internal tickrate of the server in ticks per second. Value must be between 1 and 1000.
+        /// </summary>
+        public int Tickrate
 		{
 			get { return tickrate; }
 			set
 			{
-				if (value < 1 || value > 1000) throw new ArgumentOutOfRangeException();
+				if (value < 1 || value > 1000) throw new ArgumentOutOfRangeException(nameof(Tickrate));
 				tickrate = value;
 			}
 		}
@@ -191,10 +188,10 @@ namespace NetcodeIO.NET
 
 		private EncryptionManager encryptionManager;
 
-		private int tickrate;
-		internal double time;
+		double _totalSeconds;
+		internal double totalSeconds { get => _totalSeconds; set { _totalSeconds = value; /*GONet.GONetLog.Debug("totalSeconds: " + totalSeconds);*/ } }
 
-		private bool disposed = false;
+        private bool disposed = false;
 
 		#endregion
 
@@ -256,8 +253,9 @@ namespace NetcodeIO.NET
 		/// <summary>
 		/// Start the server and listen for incoming connections
 		/// </summary>
-		public void Start()
+		public void Start(int tickHertz)
 		{
+            Tickrate = tickHertz;
 			Start(true);
 		}
 
@@ -267,13 +265,19 @@ namespace NetcodeIO.NET
 
 			resetConnectTokenHistory();
 
-			this.listenSocket.Bind(this.listenEndpoint);
+			IPEndPoint any = new IPEndPoint(IPAddress.Any, this.listenEndpoint.Port);
+			this.listenSocket.Bind(any);
 			isRunning = true;
 
 			if (autoTick)
 			{
-				this.time = DateTime.UtcNow.GetTotalSeconds();
-				ThreadPool.QueueUserWorkItem(serverTick);
+				this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
+
+				Thread tickThread = new Thread(serverTick_SeparateThread);
+				tickThread.Name = "GONet Server Tick";
+				tickThread.Priority = ThreadPriority.AboveNormal;
+				tickThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
+				tickThread.Start();
 			}
 		}
 
@@ -325,21 +329,26 @@ namespace NetcodeIO.NET
 
 		#endregion
 
+		public delegate void Nathaniel();
+		public event Nathaniel TickBeginning;
+
 		#region Core
 
-		double keepAlive = 0.0;
-		internal void Tick(double time)
+		double secondsSinceLastKeepAlive = 0.0;
+		internal void Tick(double newTotalSeconds)
 		{
-			this.listenSocket.Pump();
+			TickBeginning?.Invoke();
 
-			double dt = time - this.time;
-			this.time = time;
+			listenSocket.Pump();
+
+			double deltaSeconds = newTotalSeconds - totalSeconds;
+			totalSeconds = newTotalSeconds;
 
 			// send keep alive to clients 10 times per second
-			keepAlive += dt;
-			while (keepAlive >= 0.1)
+			secondsSinceLastKeepAlive += deltaSeconds;
+			while (secondsSinceLastKeepAlive >= 0.1)
 			{
-				keepAlive -= 0.1;
+				secondsSinceLastKeepAlive -= 0.1;
 				for (int i = 0; i < clientSlots.Length; i++)
 				{
 					if (clientSlots[i] != null)
@@ -354,14 +363,13 @@ namespace NetcodeIO.NET
 			{
 				if (clientSlots[i] == null) continue;
 
-				double timeRemaining = time - clientSlots[i].lastResponseTime;
+				double timeRemaining = newTotalSeconds - clientSlots[i].lastResponseAtSeconds;
 
 				// timeout < 0 disables timeouts
 				if (clientSlots[i].timeoutSeconds >= 0 &&
-					(time - clientSlots[i].lastResponseTime) >= clientSlots[i].timeoutSeconds)
+					(newTotalSeconds - clientSlots[i].lastResponseAtSeconds) >= clientSlots[i].timeoutSeconds)
 				{
-					if (OnClientDisconnected != null)
-						OnClientDisconnected(clientSlots[i]);
+					OnClientDisconnected?.Invoke(clientSlots[i]);
 
 					log("Client {0} timed out", NetcodeLogLevel.Debug, clientSlots[i].RemoteEndpoint.ToString());
 					disconnectClient(clientSlots[i]);
@@ -370,22 +378,43 @@ namespace NetcodeIO.NET
 
 			// process datagram queue
 			Datagram packet;
-			while (listenSocket != null && listenSocket.Read(out packet))
-			{
-				processDatagram(packet.payload, packet.payloadSize, packet.sender);
+            int countAvailable = listenSocket == null ? 0 : listenSocket.AvailableToReadCount;
+            int countProcessed = 0;
+            while (countProcessed < countAvailable && listenSocket.Read(out packet))
+            {
+                processDatagram(packet.payload, packet.payloadSize, packet.sender);
 				packet.Release();
+				++countProcessed;
 			}
 		}
 
-		private void serverTick(Object stateInfo)
+		private void serverTick_SeparateThread(Object stateInfo)
 		{
+			long lastStartTicks = DateTime.UtcNow.Ticks;
+			double tickLength = 1.0 / tickrate;
+			long tickDurationTicks = TimeSpan.FromSeconds(tickLength).Ticks;
+			
 			while (isRunning)
 			{
-				Tick(DateTime.UtcNow.GetTotalSeconds());
+                try
+                {
+					var utcNow = DateTime.UtcNow;
+					lastStartTicks = utcNow.Ticks;
 
-				// sleep until next tick
-				double tickLength = 1.0 / tickrate;
-				Thread.Sleep((int)(tickLength * 1000));
+					Tick(utcNow.GetTotalSeconds());
+                }
+                catch (Exception e)
+                {
+                    GONet.GONetLog.Error(string.Concat("Unexpected error while ticking in separate thread.  Exception.Type: ", e.GetType().Name, " Exception.Message: ", e.Message, " \nException.StackTrace: ", e.StackTrace));
+                }
+                finally
+                {
+					long ticksToSleep = tickDurationTicks - (DateTime.UtcNow.Ticks - lastStartTicks);
+					if (ticksToSleep > 0)
+					{
+						Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
+					}
+				}
 			}
 		}
 
@@ -431,7 +460,7 @@ namespace NetcodeIO.NET
 		// check the packet against the client's replay protection, returning true if packet was replayed, false otherwise
 		private bool checkReplay(NetcodePacketHeader header, EndPoint sender)
 		{
-			var cryptIdx = encryptionManager.FindEncryptionMapping(sender, time);
+			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
             if (cryptIdx == -1) {
                 log("Replay protection failed to find encryption mapping", NetcodeLogLevel.Debug);
                 return true;
@@ -457,7 +486,7 @@ namespace NetcodeIO.NET
 			}
 
 			// encryption mapping was not registered, so don't bother
-			int cryptIdx = encryptionManager.FindEncryptionMapping(sender, time);
+			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
 				log("No crytpo key for sender", NetcodeLogLevel.Debug);
@@ -478,19 +507,18 @@ namespace NetcodeIO.NET
 
 			clientSlots[clientIndex] = null;
 
-			// remove encryption mapping
-			encryptionManager.RemoveEncryptionMapping(sender, time);
+			encryptionManager.RemoveAllEncryptionMappings(sender);
 
             // make sure all other clients still have their encryption mappings
-            foreach (RemoteClient otherClient in clientSlots) {
+            foreach (RemoteClient otherClient in clientSlots)
+            {
                 if (otherClient == null) continue;
-                if (encryptionManager.FindEncryptionMapping(otherClient.RemoteEndpoint, time) == -1)
+                if (encryptionManager.GetEncryptionMappingIndexForTime(otherClient.RemoteEndpoint, totalSeconds) == -1)
                     log("Encryption mapping removed wrong mapping!", NetcodeLogLevel.Debug);
             }
 
 			// trigger client disconnect callback
-			if (OnClientDisconnected != null)
-				OnClientDisconnected(client);
+			OnClientDisconnected?.Invoke(client);
 
 			log("Client {0} disconnected", NetcodeLogLevel.Info, client.RemoteEndpoint);
 		}
@@ -504,7 +532,7 @@ namespace NetcodeIO.NET
 			}
 
 			// encryption mapping was not registered, so don't bother
-			int cryptIdx = encryptionManager.FindEncryptionMapping(sender, time);
+			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
 				log("No crytpo key for sender", NetcodeLogLevel.Debug);
@@ -522,8 +550,7 @@ namespace NetcodeIO.NET
 			var client = clientSlots[clientIndex];
 
 			// trigger callback
-			if (OnClientMessageReceived != null)
-				OnClientMessageReceived(client, payloadPacket.Payload, payloadPacket.Length);
+			OnClientMessageReceived?.Invoke(client, payloadPacket.Payload, payloadPacket.Length);
 
 			payloadPacket.Release();
 		}
@@ -533,15 +560,15 @@ namespace NetcodeIO.NET
 		{
 			if (checkReplay(header, sender))
 			{
-                log("Detected replay in keep-alive", NetcodeLogLevel.Debug);
+                log("Detected replay in keep-alive", NetcodeLogLevel.Error);
 				return;
 			}
 
 			// encryption mapping was not registered, so don't bother
-			int cryptIdx = encryptionManager.FindEncryptionMapping(sender, time);
+			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
-				log("No crytpo key for sender", NetcodeLogLevel.Debug);
+				log("No crytpo key for sender", NetcodeLogLevel.Error);
 				return;
 			}
 
@@ -551,55 +578,54 @@ namespace NetcodeIO.NET
 			var keepAlivePacket = new NetcodeKeepAlivePacket() { Header = header };
 			if (!keepAlivePacket.Read(reader, size - (int)reader.ReadPosition, decryptKey, protocolID))
 			{
-				log("Failed to decrypt", NetcodeLogLevel.Debug);
+				log(string.Concat("Failed to decrypt..sender: ", sender.ToString()), NetcodeLogLevel.Error);
 				return;
 			}
 
 			if (keepAlivePacket.ClientIndex >= maxSlots)
 			{
-				log("Invalid client index", NetcodeLogLevel.Debug);
+				log("Invalid client index", NetcodeLogLevel.Error);
 				return;
 			}
 
 			var client = this.clientSlots[(int)keepAlivePacket.ClientIndex];
             if (client == null) {
-                log("Failed to find client for endpoint", NetcodeLogLevel.Debug);
+                log("Failed to find client for endpoint", NetcodeLogLevel.Error);
                 return;
             }
 
 			if (!client.RemoteEndpoint.Equals(sender))
 			{
-				log("Client does not match sender", NetcodeLogLevel.Debug);
+				log("Client does not match sender", NetcodeLogLevel.Error);
 				return;
 			}
 
 			if (!client.Confirmed)
 			{
 				// trigger callback
-				if (OnClientConnected != null)
-					OnClientConnected(client);
+				OnClientConnected?.Invoke(client);
 
 				log("Client {0} connected", NetcodeLogLevel.Info, client.RemoteEndpoint);
 			}
 
 			client.Confirmed = true;
 
-			client.Touch(time);
+			client.Touch(totalSeconds);
 
-			int idx = encryptionManager.FindEncryptionMapping(client.RemoteEndpoint, time);
-			encryptionManager.Touch(idx, client.RemoteEndpoint, time);
+			int index = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
+			encryptionManager.Touch(index, client.RemoteEndpoint, totalSeconds);
 		}
 
 		// process an incoming connection response packet
 		private void processConnectionResponse(ByteArrayReaderWriter reader, NetcodePacketHeader header, int size, EndPoint sender)
 		{
-			log("Got connection response", NetcodeLogLevel.Debug);
+			log("Got connection response from sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 
 			// encryption mapping was not registered, so don't bother
-			int cryptIdx = encryptionManager.FindEncryptionMapping(sender, time);
+			int cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(sender, totalSeconds);
 			if (cryptIdx == -1)
 			{
-				log("No crytpo key for sender", NetcodeLogLevel.Debug);
+				log("No crytpo key for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
 				return;
 			}
 
@@ -609,14 +635,14 @@ namespace NetcodeIO.NET
 			var connectionResponsePacket = new NetcodeConnectionChallengeResponsePacket() { Header = header };
 			if (!connectionResponsePacket.Read(reader, size - (int)reader.ReadPosition, decryptKey, protocolID))
 			{
-				log("Failed to decrypt packet", NetcodeLogLevel.Debug);
+				log("Failed to decrypt packet for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				return;
 			}
 
 			var challengeToken = new NetcodeChallengeToken();
 			if (!challengeToken.Read(connectionResponsePacket.ChallengeTokenBytes, connectionResponsePacket.ChallengeTokenSequence, challengeKey))
 			{
-				log("Failed to read challenge token", NetcodeLogLevel.Debug);
+				log("Failed to read challenge token for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionResponsePacket.Release();
 				return;
 			}
@@ -639,7 +665,7 @@ namespace NetcodeIO.NET
 			int nextSlot = getFreeClientSlot();
 			if (nextSlot == -1)
 			{
-				log("Server full, denying connection", NetcodeLogLevel.Info);
+				log("Server full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 				denyConnection(sender, encryptionManager.GetSendKey(cryptIdx));
 				return;
 			}
@@ -664,7 +690,7 @@ namespace NetcodeIO.NET
 			client.UserData = challengeToken.UserData;
 			client.Confirmed = false;
 
-			client.Touch(time);
+			client.Touch(totalSeconds);
 
 			// respond with a connection keep alive packet
 			sendKeepAlive(client);
@@ -673,19 +699,19 @@ namespace NetcodeIO.NET
 		// process an incoming connection request packet
 		private void processConnectionRequest(ByteArrayReaderWriter reader, int size, EndPoint sender)
 		{
-			log("Got connection request", NetcodeLogLevel.Debug);
+			log("Got connection request for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 
 			var connectionRequestPacket = new NetcodeConnectionRequestPacket();
 			if (!connectionRequestPacket.Read(reader, size - (int)reader.ReadPosition, protocolID))
 			{
-				log("Failed to read request", NetcodeLogLevel.Debug);
+				log("Failed to read request for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				return;
 			}
 
 			// expiration timestamp should be greater than current timestamp
-			if (connectionRequestPacket.Expiration <= (ulong)Math.Truncate(time))
+			if (connectionRequestPacket.Expiration <= (ulong)Math.Truncate(totalSeconds))
 			{
-				log("Connect token expired", NetcodeLogLevel.Debug);
+				log("Connect token expired for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionRequestPacket.Release();
 				return;
 			}
@@ -693,7 +719,7 @@ namespace NetcodeIO.NET
 			var privateConnectToken = new NetcodePrivateConnectToken();
 			if (!privateConnectToken.Read(connectionRequestPacket.ConnectTokenBytes, privateKey, protocolID, connectionRequestPacket.Expiration, connectionRequestPacket.TokenSequenceNum))
 			{
-				log("Failed to read private token", NetcodeLogLevel.Debug);
+				log("Failed to read private token for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				connectionRequestPacket.Release();
 				return;
 			}
@@ -725,9 +751,9 @@ namespace NetcodeIO.NET
 			// compares the last 16 bytes (token mac)
 			byte[] token_mac = BufferPool.GetBuffer(Defines.MAC_SIZE);
 			System.Array.Copy(connectionRequestPacket.ConnectTokenBytes, Defines.NETCODE_CONNECT_TOKEN_PRIVATE_BYTES - Defines.MAC_SIZE, token_mac, 0, Defines.MAC_SIZE);
-			if (!findOrAddConnectToken(sender, token_mac, time))
+			if (!findOrAddConnectToken(sender, token_mac, totalSeconds))
 			{
-				log("Token already used", NetcodeLogLevel.Debug);
+				log("Token already used for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
 				BufferPool.ReturnBuffer(token_mac);
 				return;
 			}
@@ -739,7 +765,7 @@ namespace NetcodeIO.NET
 			if (nextSlot == -1)
 			{
 				denyConnection(sender, privateConnectToken.ServerToClientKey);
-				log("Server is full, denying connection", NetcodeLogLevel.Info);
+				log("Server is full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
 				return;
 			}
 
@@ -747,15 +773,17 @@ namespace NetcodeIO.NET
 			// packets received from this endpoint are to be decrypted with the client-to-server key
 			// packets sent to this endpoint are to be encrypted with the server-to-client key
 			// if no messages are received within timeout from this endpoint, it is disconnected (unless timeout is negative)
-			if (!encryptionManager.AddEncryptionMapping(sender,
-				privateConnectToken.ServerToClientKey,
-				privateConnectToken.ClientToServerKey,
-				time,
-				time + 30,
-				privateConnectToken.TimeoutSeconds,
-				0))
+			if (!encryptionManager.
+                AddEncryptionMapping(
+                    sender,
+				    privateConnectToken.ServerToClientKey,
+				    privateConnectToken.ClientToServerKey,
+				    totalSeconds,
+				    totalSeconds + 30,
+				    privateConnectToken.TimeoutAfterSeconds,
+				    0))
 			{
-				log("Failed to add encryption mapping", NetcodeLogLevel.Error);
+				log("Failed to add encryption mapping for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
 				return;
 			}
 
@@ -789,7 +817,7 @@ namespace NetcodeIO.NET
 				}
 			}
 
-			var cryptIdx = encryptionManager.FindEncryptionMapping(client.RemoteEndpoint, time);
+			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
 			if (cryptIdx == -1)
 			{
 				return;
@@ -799,9 +827,7 @@ namespace NetcodeIO.NET
 
 			for (int i = 0; i < Defines.NUM_DISCONNECT_PACKETS; i++)
 			{
-				serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionDisconnect }, (writer) =>
-				{
-				}, client.RemoteEndpoint, cryptKey);
+				serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionDisconnect }, NoOpWrite, client.RemoteEndpoint, cryptKey);
 			}
 		}
 
@@ -810,33 +836,56 @@ namespace NetcodeIO.NET
 		{
 			if (cryptKey == null)
 			{
-				var cryptIdx = encryptionManager.FindEncryptionMapping(endpoint, time);
+				var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(endpoint, totalSeconds);
 				if (cryptIdx == -1) return;
 
 				cryptKey = encryptionManager.GetSendKey(cryptIdx);
 			}
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionDenied }, (writer) =>
-			{
-			}, endpoint, cryptKey);
+            serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionDenied }, NoOpWrite, endpoint, cryptKey);
 		}
 
-		// send a payload to a client
-		private void sendPayloadToClient(RemoteClient client, byte[] payload, int payloadSize)
+        /// <summary>
+        /// Does nothing.
+        /// </summary>
+        private void NoOpWrite(ByteArrayReaderWriter writer) { }
+
+
+		/* TODO come back to figure this refactor out to avoid GC for calls like writer => writer.WriteBuffer(payload, payloadSize)
+		internal interface IReadWritePacket { }
+
+		internal ref struct PayloadPacket : IReadWritePacket
+        {
+			public byte[] payload;
+			public int payloadSize;
+
+
+		}
+		*/
+
+        // send a payload to a client
+        private void sendPayloadToClient(RemoteClient client, byte[] payload, int payloadSize)
 		{
 			// if the client isn't confirmed, send a keep-alive packet before this packet
 			if (!client.Confirmed)
 				sendKeepAlive(client);
 
-			var cryptIdx = encryptionManager.FindEncryptionMapping(client.RemoteEndpoint, time);
-			if (cryptIdx == -1) return;
+			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
+            if (cryptIdx == -1)
+            {
+                GONet.GONetLog.Warning("This is some bogus turdmeal.  Trying to send payload to client, but no encryption mapping is going go cause not sending it.  Double you tea, Eff?");
+                return;
+            }
 
-			var cryptKey = encryptionManager.GetSendKey(cryptIdx);
+            byte[] cryptKey = encryptionManager.GetSendKey(cryptIdx);
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, (writer) =>
-			{
-				writer.WriteBuffer(payload, payloadSize);
-			}, client.RemoteEndpoint, cryptKey);
+			// TODO this is part of the come back from above PayloadPacket payloadPacket = new PayloadPacket() { payload = payload, payloadSize = payloadSize };
+
+			serializePacket(
+				new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionPayload }, 
+				writer => writer.WriteBuffer(payload, payloadSize), 
+				client.RemoteEndpoint, 
+				cryptKey);
 		}
 
 		// send a keep-alive packet to the client
@@ -844,15 +893,12 @@ namespace NetcodeIO.NET
 		{
 			var packet = new NetcodeKeepAlivePacket() { ClientIndex = client.ClientIndex, MaxSlots = (uint)this.maxSlots };
 
-			var cryptIdx = encryptionManager.FindEncryptionMapping(client.RemoteEndpoint, time);
+			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
 			if (cryptIdx == -1) return;
 
 			var cryptKey = encryptionManager.GetSendKey(cryptIdx);
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionKeepAlive }, (writer) =>
-			{
-				packet.Write(writer);
-			}, client.RemoteEndpoint, cryptKey);
+			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionKeepAlive }, writer => packet.Write(writer), client.RemoteEndpoint, cryptKey);
 		}
 
 		// sends a connection challenge packet to the endpoint
@@ -888,15 +934,12 @@ namespace NetcodeIO.NET
 			challengePacket.ChallengeTokenSequence = challengeSequence;
 			challengePacket.ChallengeTokenBytes = encryptedToken;
 
-			var cryptIdx = encryptionManager.FindEncryptionMapping(endpoint, time);
+			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(endpoint, totalSeconds);
 			if (cryptIdx == -1) return;
 
 			var cryptKey = encryptionManager.GetSendKey(cryptIdx);
 
-			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionChallenge }, (writer) =>
-			{
-				challengePacket.Write(writer);
-			}, endpoint, cryptKey);
+			serializePacket(new NetcodePacketHeader() { PacketType = NetcodePacketType.ConnectionChallenge }, writer => challengePacket.Write(writer), endpoint, cryptKey);
 
 			BufferPool.ReturnBuffer(tokenBytes);
 			BufferPool.ReturnBuffer(encryptedToken);
@@ -925,8 +968,9 @@ namespace NetcodeIO.NET
 				packetLen = (int)packetWriter.WritePosition;
 			}
 
-			// send packet
-			listenSocket.SendTo(packetBuffer, packetLen, endpoint);
+            // send packet
+            //GONet.GONetLog.Debug("sending...packetLen: " + packetLen);
+            listenSocket.SendTo(packetBuffer, packetLen, endpoint);
 
 			BufferPool.ReturnBuffer(packetBuffer);
 			BufferPool.ReturnBuffer(encryptedPacketBuffer);
@@ -1028,16 +1072,38 @@ namespace NetcodeIO.NET
 			if (logLevel > this.LogLevel)
 				return;
 
-			Console.WriteLine(log);
-		}
+            switch (logLevel)
+            {
+                case NetcodeLogLevel.Debug:
+                    GONet.GONetLog.Debug(log);
+                    break;
+                case NetcodeLogLevel.Info:
+                    GONet.GONetLog.Info(log);
+                    break;
+                case NetcodeLogLevel.Error:
+                    GONet.GONetLog.Error(log);
+                    break;
+            }
+        }
 
 		private void log(string log, NetcodeLogLevel logLevel, params object[] args)
 		{
 			if (logLevel > this.LogLevel)
 				return;
 
-			Console.WriteLine(string.Format(log, args));
-		}
+            switch (logLevel)
+            {
+                case NetcodeLogLevel.Debug:
+                    GONet.GONetLog.Debug(string.Format(log, args));
+                    break;
+                case NetcodeLogLevel.Info:
+                    GONet.GONetLog.Info(string.Format(log, args));
+                    break;
+                case NetcodeLogLevel.Error:
+                    GONet.GONetLog.Error(string.Format(log, args));
+                    break;
+            }
+        }
 
 		#endregion
 	}

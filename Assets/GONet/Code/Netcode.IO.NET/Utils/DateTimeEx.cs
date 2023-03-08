@@ -7,9 +7,11 @@ namespace NetcodeIO.NET.Utils
 {
 	internal static class DateTimeEx
 	{
-		public static double GetTotalSeconds(this DateTime time)
+        static readonly DateTime epoch = new DateTime(1970, 1, 1);
+
+        public static double GetTotalSeconds(this DateTime time)
 		{
-			return (time.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+            return time.Subtract(epoch).TotalSeconds;
 		}
 
 		/// <summary>

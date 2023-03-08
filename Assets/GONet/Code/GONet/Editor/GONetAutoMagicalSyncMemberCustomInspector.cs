@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Generation;
 using GONet.Utils;
 using System.Collections.Generic;
 using System.Linq;
@@ -94,6 +95,28 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
                 GUI.enabled = pre;
             }
 
+            { // ShouldHideDuringRemoteInstantiate
+                var pre = GUI.enabled;
+                GUI.enabled = !Application.isPlaying;
+                EditorGUILayout.BeginHorizontal();
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.ShouldHideDuringRemoteInstantiate));
+                const string TT = @"This is an option (good for projectiles) to deal with there being an inherent delay of <see cref=""GONetMain.valueBlendingBufferLeadSeconds""/> from the time a
+remote instantiation of this <see cref=""GONetParticipant""/> (and <see cref=""IsMine""/> is false) occurs and the time auto-magical sync data starts processing for value blending 
+(i.e., <see cref=""GONetAutoMagicalSyncSettings_ProfileTemplate.ShouldBlendBetweenValuesReceived""/> and <see cref=""GONetAutoMagicalSyncAttribute.ShouldBlendBetweenValuesReceived""/>).
+
+When this option is set to true, all <see cref=""Renderer""/> components on this (including children) are turned off during the buffer lead time delay and then turned back on.
+
+If this option does not exactly suit your needs and you want something similar, then just subscribe using <see cref=""GONetMain.EventBus""/> to the <see cref=""GONetParticipantStartedEvent""/>
+and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRemote""/> set to true and you can implement your own option to deal with this situation.";
+                GUIContent tooltip = new GUIContent(StringUtils.AddSpacesBeforeUppercase(nameof(GONetParticipant.ShouldHideDuringRemoteInstantiate), 1), TT);
+                if (EditorGUILayout.PropertyField(serializedProperty, tooltip))
+                {
+                    // TODO why does this method return bool?  do we need to do something!
+                }
+                EditorGUILayout.EndHorizontal();
+                GUI.enabled = pre;
+            }
+
             if (Application.isPlaying) // this value is only really relevant during play (not to mention, the way we determine this is faulty otherwise...false positives everywhere)
             { // design time?
                 {
@@ -112,6 +135,17 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
                     EditorGUILayout.LabelField(tooltip);
                     string value = targetGONetParticipant.GONetId == GONetParticipant.GONetId_Unset ? NOT_SET : targetGONetParticipant.GONetId.ToString();
                     EditorGUILayout.TextField(value);
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                if (targetGONetParticipant.GONetIdAtInstantiation != targetGONetParticipant.GONetId)
+                { // GoNetIdAtInstantiation
+                    EditorGUILayout.BeginHorizontal();
+                    const string GONET_ID = "GO Net Id (At Instantiation)";
+                    const string TT = "This is the original/first GONetId assigned, but it has changed due to someone else assuming authority over it (e.g., the server via GONetMain.Server_AssumeAuthorityOver()).";
+                    GUIContent tooltip = new GUIContent(GONET_ID, TT);
+                    EditorGUILayout.LabelField(tooltip);
+                    EditorGUILayout.TextField(targetGONetParticipant.GONetIdAtInstantiation.ToString());
                     EditorGUILayout.EndHorizontal();
                 }
 
@@ -141,6 +175,22 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
                     const string IS_MINE = "Is Mine?";
                     EditorGUILayout.LabelField(IS_MINE);
                     EditorGUILayout.Toggle(GONetMain.IsMine(targetGONetParticipant));
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                if (targetGONetParticipant.RemotelyControlledByAuthorityId != GONetMain.OwnerAuthorityId_Unset)
+                { // RemotelyControlledByAuthorityId && IsMine_ToRemotelyControl
+                    EditorGUILayout.BeginHorizontal();
+                    const string REMOTELY_CONTROLLED_BY_AUTHORITY_ID = "Remotely Controlled by Authority Id";
+                    EditorGUILayout.LabelField(REMOTELY_CONTROLLED_BY_AUTHORITY_ID);
+                    string value = targetGONetParticipant.RemotelyControlledByAuthorityId.ToString();
+                    EditorGUILayout.TextField(value);
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    const string IS_REMOTELY_CONTROLLED_BY_ME = "Is Mine (for Remote Control)?";
+                    EditorGUILayout.LabelField(IS_REMOTELY_CONTROLLED_BY_ME);
+                    EditorGUILayout.Toggle(targetGONetParticipant.IsMine_ToRemotelyControl);
                     EditorGUILayout.EndHorizontal();
                 }
             }
@@ -210,6 +260,19 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
                                         GUILayout.MinWidth(70), GUILayout.ExpandWidth(true));
 
                                     GONetAutoMagicalSyncAttribute autoSyncMember_SyncAttribute = (GONetAutoMagicalSyncAttribute)autoSyncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+
+                                    { // is at rest?
+                                        GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = GONetMain.GetSyncCompanionByGNP(targetGONetParticipant);
+
+                                        byte index = 0;
+                                        if (syncCompanion != null && syncCompanion.TryGetIndexByMemberName(autoSyncMember.Name, out index))
+                                        {
+                                            bool isAtRest = syncCompanion != null ? syncCompanion.IsValueAtRest(index) : false;
+                                            EditorGUILayout.LabelField("At_Rest?");
+                                            EditorGUILayout.Toggle(isAtRest);
+                                        }
+                                    }
+
                                     DrawGONetSyncProfileTemplateButton(autoSyncMember_SyncAttribute.SettingsProfileTemplateName, siblingMonoBehaviour);
 
                                     EditorGUILayout.EndHorizontal();
@@ -224,74 +287,104 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
 
 
                 Animator animator = targetGONetParticipant.GetComponent<Animator>();
-                if (animator != null && animator.parameterCount > 0)
+                if (animator != null)
                 {
-                    if (targetGONetParticipant.animatorSyncSupport == null)
-                    {
-                        targetGONetParticipant.animatorSyncSupport = new GONetParticipant.AnimatorControllerParameterMap();
+                    AnimatorControllerParameter[] parameters = animator.parameters;
+                    int parameterCount = animator.parameterCount;
+
+                    if (animator.runtimeAnimatorController != null)
+                    { // IMPORTANT: in editor, looks like animator.parameterCount is [sometimes!...figured out when...it is only when the Animator window is open and its controller is selected...editor tries to do tricky stuff that whacks this all out for some reason] 0 even when shit is there....hence the usage of animator.runtimeAnimatorController.parameters instead of animator.parameters
+                        parameters = (AnimatorControllerParameter[])animator.runtimeAnimatorController.GetType().GetProperty(nameof(Animator.parameters), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(animator.runtimeAnimatorController);
+                        if (parameters == null)
+                        {
+                            throw new System.Exception("animator.runtimeAnimatorController != null but not able to get the parameters off of it, which is required");
+                        }
+                        parameterCount = parameters.Length;
                     }
 
-                    bool isfoldie;
-                    string animatorControllerName = animator.runtimeAnimatorController.name;
-                    isFoldedByTypeMemberNameMap.TryGetValue(animatorControllerName, out isfoldie);
-
-                    EditorGUILayout.BeginHorizontal();
-
-                    EditorGUILayout.BeginHorizontal(GUILayout.MinWidth(140));
-                    const string ANIMATOR_INTRINSICS = "Animator (Intrinsics)";
-                    isFoldedByTypeMemberNameMap[animatorControllerName] = EditorGUILayout.Foldout(isfoldie, ANIMATOR_INTRINSICS);
-                    EditorGUILayout.EndHorizontal();
-
-                    DrawGONetSyncProfileTemplateButton(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS);
-
-                    EditorGUILayout.EndHorizontal();
-
-                    if (isFoldedByTypeMemberNameMap[animatorControllerName])
+                    if (parameterCount > 0)
                     {
-                        EditorGUI.indentLevel++;
 
-                        bool guiEnabledPrevious_inner = GUI.enabled;
-                        GUI.enabled = false;
+                        if (targetGONetParticipant.animatorSyncSupport == null)
+                        {
+                            targetGONetParticipant.animatorSyncSupport = new GONetParticipant.AnimatorControllerParameterMap();
+                        }
+
+                        bool isfoldie;
+                        string animatorControllerName = animator.runtimeAnimatorController.name;
+                        isFoldedByTypeMemberNameMap.TryGetValue(animatorControllerName, out isfoldie);
 
                         EditorGUILayout.BeginHorizontal();
-                        const string ControllerLabel = "Controller";
-                        EditorGUILayout.LabelField(ControllerLabel);
-                        EditorGUILayout.TextField(animatorControllerName);
+
+                        EditorGUILayout.BeginHorizontal(GUILayout.MinWidth(140));
+                        const string ANIMATOR_INTRINSICS = "Animator (Intrinsics)";
+                        isFoldedByTypeMemberNameMap[animatorControllerName] = EditorGUILayout.Foldout(isfoldie, ANIMATOR_INTRINSICS);
                         EditorGUILayout.EndHorizontal();
 
-                        GUI.enabled = guiEnabledPrevious_inner;
+                        DrawGONetSyncProfileTemplateButton(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___ANIMATOR_CONTROLLER_PARAMETERS);
 
-                        if (Application.isPlaying)
+                        EditorGUILayout.EndHorizontal();
+
+                        if (isFoldedByTypeMemberNameMap[animatorControllerName])
                         {
-                            guiEnabledPrevious_inner = GUI.enabled;
+                            EditorGUI.indentLevel++;
+
+                            bool guiEnabledPrevious_inner = GUI.enabled;
                             GUI.enabled = false;
-                        }
-
-                        for (int i = 0; i < animator.parameterCount; ++i)
-                        {
-                            AnimatorControllerParameter animatorControllerParameter = animator.parameters[i];
-                            string parameterSyncMap_key = animatorControllerParameter.name;
-                            if (!targetGONetParticipant.animatorSyncSupport.ContainsKey(parameterSyncMap_key))
-                            {
-                                targetGONetParticipant.animatorSyncSupport[parameterSyncMap_key] = new GONetParticipant.AnimatorControllerParameter()
-                                {
-                                    valueType = animatorControllerParameter.type,
-                                    isSyncd = false
-                                };
-                            }
-                            int parameterSyncMap_keyIndex = targetGONetParticipant.animatorSyncSupport.GetCustomKeyIndex(parameterSyncMap_key);
 
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Syncd: ", parameterSyncMap_key));
-                            SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.animatorSyncSupport)}.values.Array.data[{parameterSyncMap_keyIndex}].{nameof(GONetParticipant.AnimatorControllerParameter.isSyncd)}");
-                            EditorGUILayout.PropertyField(specificInnerMapValue_serializedProperty, GUIContent.none, false); // IMPORTANT: without this, editing prefabs would never save/persist changes!
+                            const string ControllerLabel = "Controller";
+                            EditorGUILayout.LabelField(ControllerLabel);
+                            EditorGUILayout.TextField(animatorControllerName);
                             EditorGUILayout.EndHorizontal();
 
+                            GUI.enabled = guiEnabledPrevious_inner;
+
+                            if (Application.isPlaying)
+                            {
+                                guiEnabledPrevious_inner = GUI.enabled;
+                                GUI.enabled = false;
+                            }
+
+                            for (int i = 0; i < parameterCount; ++i)
+                            {
+                                AnimatorControllerParameter animatorControllerParameter = parameters[i];
+                                bool isAnimParamTypeSupportedInGONet = animatorControllerParameter.type != AnimatorControllerParameterType.Trigger;
+                                string parameterSyncMap_key = animatorControllerParameter.name;
+                                if (!targetGONetParticipant.animatorSyncSupport.ContainsKey(parameterSyncMap_key))
+                                {
+                                    targetGONetParticipant.animatorSyncSupport[parameterSyncMap_key] = new GONetParticipant.AnimatorControllerParameter()
+                                    {
+                                        valueType = animatorControllerParameter.type,
+                                        isSyncd = false
+                                    };
+                                }
+                                int parameterSyncMap_keyIndex = targetGONetParticipant.animatorSyncSupport.GetCustomKeyIndex(parameterSyncMap_key);
+
+                                bool guiItemPrior = GUI.enabled;
+                                if (!isAnimParamTypeSupportedInGONet)
+                                {
+                                    // Currently trigger type is not supported as we do not know how to monitor and network when trigger occurs...still thinking, but until then we do NOT want to give the appearance that we can allow it, so do not show it in UI as editable, but at least show it with a note so users know what is going on
+                                    GUI.enabled = false;
+                                }
+                                EditorGUILayout.BeginHorizontal();
+                                string labelString = string.Concat("Is Syncd: ", parameterSyncMap_key);
+                                GUIContent labelContent = new GUIContent(labelString, string.Empty);
+                                if (!isAnimParamTypeSupportedInGONet)
+                                {
+                                    labelContent.tooltip = "Currently, the trigger type is not supported as we do not know how to monitor and network when trigger occurs...still thinking, but until then, we do NOT want to give the appearance that we can allow it, so only show it in UI as readonly.  At least users can see it greyed out, see this tooltip and know what is going on.";
+                                }
+                                EditorGUILayout.LabelField(labelContent);
+                                SerializedProperty specificInnerMapValue_serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.animatorSyncSupport)}.values.Array.data[{parameterSyncMap_keyIndex}].{nameof(GONetParticipant.AnimatorControllerParameter.isSyncd)}");
+                                EditorGUILayout.PropertyField(specificInnerMapValue_serializedProperty, GUIContent.none, false); // IMPORTANT: without this, editing prefabs would never save/persist changes!
+                                EditorGUILayout.EndHorizontal();
+                                GUI.enabled = guiItemPrior;
+                            }
+
+                            GUI.enabled = guiEnabledPrevious_inner;
+
+                            EditorGUI.indentLevel--;
                         }
-
-                        GUI.enabled = guiEnabledPrevious_inner;
-
-                        EditorGUI.indentLevel--;
                     }
                 }
 
@@ -366,7 +459,7 @@ IMPORTANT: This is not going have an effect if/when changed during a running gam
         {
             if (clickableDisabledLabelStyle == null)
             {
-                clickableDisabledLabelStyle  = new GUIStyle(GUI.skin.textField);
+                clickableDisabledLabelStyle = new GUIStyle(GUI.skin.textField);
                 clickableDisabledLabelStyle.normal.textColor = Color.grey; // make it look disabled
             }
             return clickableDisabledLabelStyle;

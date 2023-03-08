@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -27,11 +27,22 @@ namespace GONet.Utils
         const string SAME_NAME_SIBLING_PREFIX = "_+3";
         static readonly int SAME_NAME_SIBLING_PREFIX_LENGTH = SAME_NAME_SIBLING_PREFIX.Length;
         const string SAME_NAME_SIBLING_SUFFIX = "N06";
+
+        const string GONETID_PREFIX = "~3y";
+        static readonly int GONETID_PREFIX_LENGTH = GONETID_PREFIX.Length;
+        const string GONETID_SUFFIX = "3|]";
+        static readonly int GONETID_SUFFIX_LENGTH = GONETID_SUFFIX.Length;
+
         private const string DONT_DESTROY_ON_LOAD_SCENE = "DontDestroyOnLoad";
         static readonly ArrayPool<GameObject> goArrayPool = new ArrayPool<GameObject>(100, 5, 2, 50);
 
         /// <summary>
-        /// Example return value: "MyAwesomeSceneName/SomeRootObjectName/SomeChildName/SomeLeafName"
+        /// Example return values:
+        /// ---"MyAwesomeSceneName/SomeRootObjectName/SomeChildName/SomeLeafName"
+        /// ---"MyAwesomeSceneName/SomeRootObjectName/SomeChildName_+34N06/SomeLeafName" // multiple at same level with same name SomeChildName and the correct one is the 4th one
+        /// ---"MyAwesomeSceneName/SomeRootObjectName/SomeChildName~3y1280013|]_+34N06/SomeLeafName" // multiple at same level with same name SomeChildName and the correct one is the 4th one AND it is a GNP with GONetId (at instantiation) of 128001
+        /// ---"MyAwesomeSceneName/SomeRootObjectName/SomeChildName/SomeLeafName~3y1034253|]" // there is only one at this level with name SomeLeafName and it is a GNP with GONetId (at instantiation) of 103425
+        /// 
         /// This is useful for uniquely identifying <see cref="GameObject"/>s with the same value across the network, because <see cref="UnityEngine.Object.GetInstanceID"/> will NOT be same across network.
         /// IMPORTANT: The return value from this method will ONLY work the reverse way when passing it as an arg to <see cref="FindByFullUniquePath(string)"/>!
         /// </summary>
@@ -43,6 +54,12 @@ namespace GONet.Utils
             }
 
             string path = string.Concat(PATH_SEPARATOR, gameObject.name);
+
+            GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
+            if ((object)gonetParticipant != null && gonetParticipant.DoesGONetIdContainAllComponents())
+            {
+                path = string.Concat(path, GONETID_PREFIX, gonetParticipant.GONetIdAtInstantiation, GONETID_SUFFIX);
+            }
 
             int siblingCount, mySiblingIndex;
             if (DoIHaveSiblingsOfSameName(gameObject, out siblingCount, out mySiblingIndex))
@@ -141,6 +158,8 @@ namespace GONet.Utils
 
         /// <summary>
         /// PRE: <paramref name="uniqueFullPath"/> was created by calling <see cref="GetFullUniquePath(GameObject)"/>!
+        /// 
+        /// TODO Use <see cref="GONetMain.recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map"/> to help find any GNPs referenced that were here just a minute ago, but not now
         /// </summary>
         public static GameObject FindByFullUniquePath(string uniqueFullPath)
         {
@@ -156,6 +175,19 @@ namespace GONet.Utils
             for (int iUniquePart = 1; iUniquePart < count; ++iUniquePart)
             {
                 string uniquePathPart = uniquePathParts[iUniquePart];
+
+                bool hasGONetIdAtInstantiation = false;
+                uint gonetIdAtInstantiation = GONetParticipant.GONetId_Unset;
+                int idPrefxIndex = uniquePathPart.LastIndexOf(GONETID_PREFIX);
+                int idSuffixIndex = uniquePathPart.LastIndexOf(GONETID_SUFFIX);
+                if (idPrefxIndex != -1 && idSuffixIndex > idPrefxIndex)
+                {
+                    int iStart = idPrefxIndex + GONETID_PREFIX_LENGTH;
+                    hasGONetIdAtInstantiation = uint.TryParse(uniquePathPart.Substring(iStart, idSuffixIndex - iStart), out gonetIdAtInstantiation);
+
+                    uniquePathPart = uniquePathPart.Remove(idPrefxIndex, (idSuffixIndex + GONETID_SUFFIX_LENGTH) - idPrefxIndex);
+                }
+
                 if (uniquePathPart.EndsWith(SAME_NAME_SIBLING_SUFFIX))
                 {
                     int iPrefixStart = uniquePathPart.LastIndexOf(SAME_NAME_SIBLING_PREFIX);
@@ -164,7 +196,7 @@ namespace GONet.Utils
                     int uniqueSiblingIndex = int.Parse(uniquePathPart.Substring(iPrefixStart + SAME_NAME_SIBLING_PREFIX_LENGTH, indexLength));
                     string gameObjectNameOriginal = uniquePathPart.Substring(0, iPrefixStart);
 
-                    gameObject = GetUniqueSibling(sceneName, gameObject, gameObjectNameOriginal, uniqueSiblingIndex);
+                    gameObject = GetUniqueSibling(sceneName, gameObject, gameObjectNameOriginal, uniqueSiblingIndex, hasGONetIdAtInstantiation, gonetIdAtInstantiation);
                 }
                 else
                 {
@@ -195,6 +227,15 @@ namespace GONet.Utils
                         gameObject = gameObject.transform.Find(uniquePathPart).gameObject;
                     }
                 }
+
+                if (hasGONetIdAtInstantiation && gameObject != null)
+                {
+                    GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
+                    if ((object)gonetParticipant == null || (gonetParticipant.GONetIdAtInstantiation != gonetIdAtInstantiation && !GONetMain.WasDefinedInScene(gonetParticipant)))
+                    {
+                        GONetLog.Warning("We found the wrong GNP or did not find one at all.  uniqueFullPath: " + uniqueFullPath + " gonetParticipant.GONetIdAtInstantiation: " + ((object)gonetParticipant == null ? "<null>" : gonetParticipant.GONetIdAtInstantiation.ToString()));
+                    }
+                }
             }
 
             return gameObject;
@@ -209,10 +250,11 @@ namespace GONet.Utils
         /// <param name="gameObjectNameOriginal">does NOT contain <see cref="SAME_NAME_SIBLING_PREFIX"/> or <see cref="SAME_NAME_SIBLING_SUFFIX"/></param>
         /// <param name="uniqueSiblingIndex"></param>
         /// <returns></returns>
-        private static GameObject GetUniqueSibling(string sceneName, GameObject parent, string gameObjectNameOriginal, int uniqueSiblingIndex)
+        private static GameObject GetUniqueSibling(string sceneName, GameObject parent, string gameObjectNameOriginal, int uniqueSiblingIndex, bool hasGONetIdAtInstantiation, uint gonetIdAtInstantiation)
         {
             int actualSiblingCount_consideringOversizedPool;
 
+            GONetParticipant gnpWithMatchingIdAtInstantiation = null;
             GameObject[] siblings;
             int overallCount;
             bool areSiblingsFromPool = false;
@@ -242,6 +284,15 @@ namespace GONet.Utils
             {
                 GameObject sibling = siblings[i];
 
+                if (hasGONetIdAtInstantiation && (object)gnpWithMatchingIdAtInstantiation == null)
+                {
+                    GONetParticipant gnp = sibling.GetComponent<GONetParticipant>();
+                    if ((object)gnp != null && gnp.GONetIdAtInstantiation == gonetIdAtInstantiation)
+                    {
+                        gnpWithMatchingIdAtInstantiation = gnp;
+                    }
+                }
+
                 if (siblings[i].name == gameObjectNameOriginal)
                 {
                     if (sameNameSiblingCount == uniqueSiblingIndex)
@@ -256,14 +307,40 @@ namespace GONet.Utils
 
             if ((object)uniqueSibling == null)
             {
-                const string NOT = "Sibling not found. gameObjectNameOriginal: ";
-                const string IDX = " uniqueSiblingIndex: ";
-                GONetLog.Warning(string.Concat(NOT, gameObjectNameOriginal, IDX, uniqueSiblingIndex));
+                if (hasGONetIdAtInstantiation && (object)gnpWithMatchingIdAtInstantiation != null)
+                {
+                    uniqueSibling = gnpWithMatchingIdAtInstantiation.gameObject;
+                }
+
+                if ((object)uniqueSibling == null)
+                {
+                    const string NOT = "Sibling not found. gameObjectNameOriginal: ";
+                    const string IDX = " uniqueSiblingIndex: ";
+                    const string GNID = " gonetIdAtInstantiation: ";
+                    GONetLog.Warning(string.Concat(NOT, gameObjectNameOriginal, IDX, uniqueSiblingIndex, GNID, gonetIdAtInstantiation));
+                }
             }
 
             if (areSiblingsFromPool)
             {
                 goArrayPool.Return(siblings);
+            }
+
+            if (hasGONetIdAtInstantiation && (object)uniqueSibling != null && (object)gnpWithMatchingIdAtInstantiation != null)
+            {
+                GONetParticipant uniqueSiblingGNP = uniqueSibling.GetComponent<GONetParticipant>();
+                if ((object)uniqueSiblingGNP == null)
+                {
+                    const string WRONG = "Well, our matching did not add up and the data we were given did not get accounted for correctly.  We identified a matching sibling that is not a GONetParticipant and we were expecting to match with GONetIdAtInstantiation!";
+                    GONetLog.Error(WRONG);
+                }
+                else if (uniqueSiblingGNP.GONetIdAtInstantiation != gnpWithMatchingIdAtInstantiation.GONetIdAtInstantiation)
+                {
+                    const string FIX = "We force fixed a mismatch of sibling.  This mismatch likely occurred due to destroying of a GameObject in the hierarchy that was key to uniquely identifying this thing; however, luckily, we had enough additiona information with the GONetIdAtInstantiation to deal with it and we are all good now!";
+                    GONetLog.Info(FIX);
+
+                    uniqueSibling = gnpWithMatchingIdAtInstantiation.gameObject;
+                }
             }
 
             return uniqueSibling;

@@ -94,7 +94,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             }
         }
 
-		public virtual void Reset()
+        public virtual void Reset()
         {
             SetKey(workingKey);
         }

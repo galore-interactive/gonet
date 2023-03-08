@@ -94,7 +94,7 @@ namespace Org.BouncyCastle.Crypto.Engines
             }
         }
 
-		public virtual string AlgorithmName
+        public virtual string AlgorithmName
         {
             get { return "ISAAC"; }
         }

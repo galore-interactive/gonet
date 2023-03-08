@@ -216,6 +216,17 @@ namespace Org.BouncyCastle.Math.Raw
             z[6] = x[6];
         }
 
+        public static void Copy(uint[] x, int xOff, uint[] z, int zOff)
+        {
+            z[zOff + 0] = x[xOff + 0];
+            z[zOff + 1] = x[xOff + 1];
+            z[zOff + 2] = x[xOff + 2];
+            z[zOff + 3] = x[xOff + 3];
+            z[zOff + 4] = x[xOff + 4];
+            z[zOff + 5] = x[xOff + 5];
+            z[zOff + 6] = x[xOff + 6];
+        }
+
         public static uint[] Create()
         {
             return new uint[7];
@@ -498,9 +509,10 @@ namespace Org.BouncyCastle.Math.Raw
                 c += x_i * y_6 + zz[i + 6];
                 zz[i + 6] = (uint)c;
                 c >>= 32;
-                c += zc + zz[i + 7];
-                zz[i + 7] = (uint)c;
-                zc = c >> 32;
+
+                zc += c + zz[i + 7];
+                zz[i + 7] = (uint)zc;
+                zc >>= 32;
             }
             return (uint)zc;
         }
@@ -540,9 +552,10 @@ namespace Org.BouncyCastle.Math.Raw
                 c += x_i * y_6 + zz[zzOff + 6];
                 zz[zzOff + 6] = (uint)c;
                 c >>= 32;
-                c += zc + zz[zzOff + 7];
-                zz[zzOff + 7] = (uint)c;
-                zc = c >> 32;
+
+                zc += c + zz[zzOff + 7];
+                zz[zzOff + 7] = (uint)zc;
+                zc >>= 32;
                 ++zzOff;
             }
             return (uint)zc;

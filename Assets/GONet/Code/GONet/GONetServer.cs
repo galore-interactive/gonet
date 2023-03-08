@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -21,39 +21,43 @@ using GONet.Utils;
 using NetcodeIO.NET;
 
 using GONetChannelId = System.Byte;
+using NetcodeIO.NET.Utils;
 
 namespace GONet
 {
     public class GONetServer
     {
-        public int MaxSlots { get; private set; }
+        public int MaxClientCount { get; private set; }
 
         Server server;
         public uint numConnections = 0;
-        public GONetRemoteClient[] remoteClients;
+        public readonly List<GONetRemoteClient> remoteClients;
         readonly Dictionary<ushort, GONetRemoteClient> remoteClientsByAuthorityId = new Dictionary<ushort, GONetRemoteClient>(10);
         readonly Dictionary<RemoteClient, GONetRemoteClient> remoteClientToGONetConnectionMap = new Dictionary<RemoteClient, GONetRemoteClient>(10);
         readonly ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
+        readonly ConcurrentQueue<RemoteClient> newlyDisconnectedClients = new ConcurrentQueue<RemoteClient>();
 
         public delegate void ClientActionDelegate(GONetConnection_ServerToClient gonetConnection_ServerToClient);
         /// <summary>
         /// This *will* be called from main Unity thread.
+        /// Also, consider subscribing to <see cref="RemoteClientStateChangedEvent"/>.
         /// </summary>
         public event ClientActionDelegate ClientConnected;
 
-        public GONetServer(int maxSlots, string address, int port)
+        public GONetServer(int maxClientCount, string address, int port)
         {
-            MaxSlots = maxSlots;
+            MaxClientCount = maxClientCount;
 
-            server = new Server(maxSlots, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
+            server = new Server(maxClientCount, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
-            remoteClients = new GONetRemoteClient[maxSlots];
+            remoteClients = new List<GONetRemoteClient>(maxClientCount);
 
             server.LogLevel = NetcodeLogLevel.Debug;
 
             server.OnClientConnected += OnClientConnected;
             server.OnClientDisconnected += OnClientDisconnected;
             server.OnClientMessageReceived += OnClientMessageReceived;
+            server.TickBeginning += Server_TickBeginning_PossibleSeparateThread;
 
             if (NetworkUtils.IsIPAddressOnLocalMachine(address))
             {
@@ -69,18 +73,50 @@ namespace GONet
         }
 
         /// <summary>
+        /// NOTE: <paramref name="initiatingClientConnectionUID"/> correlates to <see cref="RemoteClientStateChangedEvent.InitiatingClientConnectionUID"/> and <see cref="ClientStateChangedEvent.InitiatingClientConnectionUID"/>.
+        /// </summary>
+        public bool TryGetClientByConnectionUID(ulong initiatingClientConnectionUID, out GONetRemoteClient remoteClient)
+        {
+            if (initiatingClientConnectionUID != 0)
+            {
+                int count = remoteClients.Count;
+                for (int i = 0; i < count; ++i)
+                {
+                    var client = remoteClients[i];
+                    if (client != null && client.ConnectionToClient != null && client.ConnectionToClient.InitiatingClientConnectionUID == initiatingClientConnectionUID)
+                    {
+                        remoteClient = client;
+                        return true;
+                    }
+                }
+            }
+
+            remoteClient = null;
+            return false;
+        }
+
+        private void Server_TickBeginning_PossibleSeparateThread()
+        {
+            for (int iConnection = 0; iConnection < numConnections; ++iConnection)
+            {
+                GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
+                gONetConnection_ServerToClient.ProcessSendBuffer_IfAppropriate();
+            }
+        }
+
+        /// <summary>
         /// If the server can start, it will and return true......returns false otherwise.
         /// </summary>
         public bool Start()
         {
             try
             {
-                server.Start();
+                server.Start(90); // NOTE: this starts a separate thread where the server's Tick method is called
                 GONetMain.isServerOverride = true; // wherever the server is running is automatically considered "the" server
             }
-            catch (Exception)
+            catch (Exception e)
             { // one main reason why here is if a server is already started on this machine on port....so this process will turn into a client
-                // TODO log
+                GONetLog.Error($"Attempting to start server failed due to exception of type: {e.GetType().Name} with message: {e.Message}");
                 return false;
             }
 
@@ -98,7 +134,7 @@ namespace GONet
                 gONetConnection_ServerToClient.Update(); // have to do this in order for anything to really be processed, in or out.
             }
 
-            ProcessNewClientConnections_MainUnityThread();
+            ProcessClientsNewlyConnectedDisconnected_MainUnityThread();
         }
 
         public void SendBytesToAllClients(byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
@@ -143,6 +179,8 @@ namespace GONet
         {
             const string DIS = "client *DIS*connected";
             GONetLog.Debug(DIS);
+
+            newlyDisconnectedClients.Enqueue(client);
         }
 
         /// <summary>
@@ -156,7 +194,33 @@ namespace GONet
             newlyConnectedClients.Enqueue(client);
         }
 
-        private void ProcessNewClientConnections_MainUnityThread()
+        /// <summary>
+        /// So, this bubbles it up and fires a GONet event for them (i.e., <see cref="RemoteClientStateChangedEvent"/>).
+        /// </summary>
+        private void OnClientConnectionStateChanged_BubbleEventUp(RemoteClient client, bool justConnected)
+        {
+            ClientState previous = justConnected ? ClientState.Disconnected: ClientState.Connected;
+            ClientState newState = justConnected ? ClientState.Connected : ClientState.Disconnected;
+
+            ulong clientID = 0;
+            if (remoteClientToGONetConnectionMap.ContainsKey(client) && remoteClientToGONetConnectionMap[client].ConnectionToClient != null)
+            {
+                clientID = remoteClientToGONetConnectionMap[client].ConnectionToClient.InitiatingClientConnectionUID;
+            }
+            else
+            {
+                const string WHY = "Client connection state changed, but not able to look up the related client information!!!  Check into this.";
+                GONetLog.Error(WHY);
+            }
+
+            const string CLIENT = "Client connection state changed to: ";
+            const string AUTH = ".  My client guid: ";
+            GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), newState), AUTH, clientID));
+
+            GONetMain.EventBus.PublishASAP(new RemoteClientStateChangedEvent(GONetMain.Time.ElapsedTicks, clientID, previous, newState));
+        }
+
+        private void ProcessClientsNewlyConnectedDisconnected_MainUnityThread()
         {
             int count = newlyConnectedClients.Count;
             for (int i = 0; i < count && !newlyConnectedClients.IsEmpty; ++i)
@@ -164,22 +228,44 @@ namespace GONet
                 RemoteClient client;
                 if (newlyConnectedClients.TryDequeue(out client))
                 {
-                    ProcessNewClientConnection_MainUnityThread(client);
+                    ProcessClientNewlyConnected_MainUnityThread(client);
+                } // else TODO warn
+            }
+
+            count = newlyDisconnectedClients.Count;
+            for (int i = 0; i < count && !newlyDisconnectedClients.IsEmpty; ++i)
+            {
+                RemoteClient client;
+                if (newlyDisconnectedClients.TryDequeue(out client))
+                {
+                    ProcessClientNewlyDisconnected_MainUnityThread(client);
                 } // else TODO warn
             }
         }
 
-        private void ProcessNewClientConnection_MainUnityThread(RemoteClient client)
+        private void ProcessClientNewlyConnected_MainUnityThread(RemoteClient client)
         {
-            if (numConnections < MaxSlots)
+            if (numConnections < MaxClientCount)
             {
                 GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client);
                 GONetRemoteClient remoteClient = new GONetRemoteClient(client, gonetConnection_ServerToClient);
-                remoteClients[numConnections++] = remoteClient;
+                remoteClients.Add(remoteClient);
+                ++numConnections;
                 remoteClientToGONetConnectionMap[client] = remoteClient;
 
                 ClientConnected?.Invoke(gonetConnection_ServerToClient);
-            }
+            } // else TODO warn
+        }
+
+        private void ProcessClientNewlyDisconnected_MainUnityThread(RemoteClient client)
+        {
+            GONetRemoteClient gonetRemoteClient;
+            if (remoteClientToGONetConnectionMap.TryGetValue(client, out gonetRemoteClient) && remoteClients.Remove(gonetRemoteClient))
+            {
+                --numConnections;
+            } // else TODO warn
+
+            remoteClientToGONetConnectionMap.Remove(client);
         }
 
         public void Stop()

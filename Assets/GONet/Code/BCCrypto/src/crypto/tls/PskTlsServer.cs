@@ -28,7 +28,7 @@ namespace Org.BouncyCastle.Crypto.Tls
 
         protected virtual DHParameters GetDHParameters()
         {
-            return DHStandardGroups.rfc3526_2048;
+            return DHStandardGroups.rfc7919_ffdhe2048;
         }
 
         protected override int[] GetCipherSuites()
@@ -87,7 +87,7 @@ namespace Org.BouncyCastle.Crypto.Tls
         protected virtual TlsKeyExchange CreatePskKeyExchange(int keyExchange)
         {
             return new TlsPskKeyExchange(keyExchange, mSupportedSignatureAlgorithms, null, mPskIdentityManager,
-                GetDHParameters(), mNamedCurves, mClientECPointFormats, mServerECPointFormats);
+                null, GetDHParameters(), mNamedCurves, mClientECPointFormats, mServerECPointFormats);
         }
     }
 }

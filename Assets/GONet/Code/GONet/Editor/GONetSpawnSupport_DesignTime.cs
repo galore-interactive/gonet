@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -49,6 +49,7 @@ namespace GONet.Editor
         {
             RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX); // clear it now as it will be built back up below
 
+            Resources.LoadAll<GONetParticipant>(string.Empty); // IMPORTANT: have to load them all up for else the following call will not "find" them all and only the ones that happened to be loaded already would be found/processed
             foreach (var gonetParticipant in Resources.FindObjectsOfTypeAll<GONetParticipant>())
             {
                 OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
@@ -84,7 +85,12 @@ namespace GONet.Editor
 
         private static void OnHierarchyChanged_EnsureDesignTimeLocationsCurrent_SceneOnly()
         {
-            if (!Application.isPlaying) // it would not be design time if we are playing (in editor) now would it?
+            bool isHierarchyChangingDueToExitingPlayModeInEditor = 
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue && 
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode &&
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount; // IMPORTANT: this is how we know it "just" changed from play to edit mode...otherwise we could never run the logic we want after exiting the play mode and we start messing around with the hierarchy
+
+            if (!Application.isPlaying && !isHierarchyChangingDueToExitingPlayModeInEditor) // it would not be design time if we are playing (in editor) now would it?
             {
                 bool somethingChanged = false;
                 int count = EditorSceneManager.loadedSceneCount;

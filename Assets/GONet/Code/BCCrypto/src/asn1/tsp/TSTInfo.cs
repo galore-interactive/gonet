@@ -21,35 +21,13 @@ namespace Org.BouncyCastle.Asn1.Tsp
 		private readonly GeneralName			tsa;
 		private readonly X509Extensions			extensions;
 
-		public static TstInfo GetInstance(
-			object o)
+		public static TstInfo GetInstance(object obj)
 		{
-			if (o == null || o is TstInfo)
-			{
-				return (TstInfo) o;
-			}
-
-			if (o is Asn1Sequence)
-			{
-				return new TstInfo((Asn1Sequence) o);
-			}
-
-			if (o is Asn1OctetString)
-			{
-				try
-				{
-					byte[] octets = ((Asn1OctetString)o).GetOctets();
-					return GetInstance(Asn1Object.FromByteArray(octets));
-				}
-				catch (IOException)
-				{
-					throw new ArgumentException(
-						"Bad object format in 'TstInfo' factory.");
-				}
-			}
-
-			throw new ArgumentException(
-				"Unknown object in 'TstInfo' factory: " + Platform.GetTypeName(o));
+            if (obj is TstInfo)
+                return (TstInfo)obj;
+            if (obj == null)
+                return null;
+            return new TstInfo(Asn1Sequence.GetInstance(obj));
 		}
 
 		private TstInfo(
@@ -214,37 +192,20 @@ namespace Org.BouncyCastle.Asn1.Tsp
 		 *
 		 * </pre>
 		 */
-		public override Asn1Object ToAsn1Object()
-		{
-			Asn1EncodableVector v = new Asn1EncodableVector(
-				version, tsaPolicyId, messageImprint, serialNumber, genTime);
+        public override Asn1Object ToAsn1Object()
+        {
+            Asn1EncodableVector v = new Asn1EncodableVector(version, tsaPolicyId, messageImprint, serialNumber, genTime);
+            v.AddOptional(accuracy);
 
-			if (accuracy != null)
-			{
-				v.Add(accuracy);
-			}
+            if (ordering != null && ordering.IsTrue)
+            {
+                v.Add(ordering);
+            }
 
-			if (ordering != null && ordering.IsTrue)
-			{
-				v.Add(ordering);
-			}
-
-			if (nonce != null)
-			{
-				v.Add(nonce);
-			}
-
-			if (tsa != null)
-			{
-				v.Add(new DerTaggedObject(true, 0, tsa));
-			}
-
-			if (extensions != null)
-			{
-				v.Add(new DerTaggedObject(false, 1, extensions));
-			}
-
-			return new DerSequence(v);
-		}
+            v.AddOptional(nonce);
+            v.AddOptionalTagged(true, 0, tsa);
+            v.AddOptionalTagged(false, 1, extensions);
+            return new DerSequence(v);
+        }
 	}
 }

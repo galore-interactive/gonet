@@ -1,32 +1,47 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Net;
 
-using NetcodeIO.NET.Internal;
+using System.Runtime.CompilerServices;
 
 namespace NetcodeIO.NET.Utils
 {
 	internal static class MiscUtils
 	{
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CompareAddress(this IPEndPoint lhs, IPEndPoint rhs)
 		{
 			return lhs.Address.Equals(rhs.Address);
 		}
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CompareEndpoint(this IPEndPoint lhs, IPEndPoint rhs, int port)
 		{
-			return lhs.Address.Equals(rhs.Address) && lhs.Port == port;
+			return lhs.Port == port && lhs.Address.Equals(rhs.Address);
 		}
 
-		public static bool AddressEqual(EndPoint lhs, EndPoint rhs)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool AreEndPointsEqual(EndPoint lhs, EndPoint rhs)
 		{
-			if (lhs == null) return false;
+            IPEndPoint lhsIP = lhs as IPEndPoint;
+            IPEndPoint rhsIP = rhs as IPEndPoint;
 
-			return lhs.Equals(rhs);
+            return lhsIP == null
+                ? false
+                : (rhsIP == null ? (lhs == null ? false : lhs.Equals(rhs)) : CompareEndpoint(lhsIP, rhsIP, rhsIP.Port));
 		}
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AddressEqual(EndPoint lhs, EndPoint rhs)
+        {
+            IPEndPoint lhsIP = lhs as IPEndPoint;
+            IPEndPoint rhsIP = rhs as IPEndPoint;
+
+            return lhsIP == null
+                ? false
+                : (rhsIP == null ? (lhs == null ? false : lhs.Equals(rhs)) : CompareAddress(lhsIP, rhsIP));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool MatchChars(char[] chars, string match)
 		{
 			if (chars.Length != match.Length) return false;
@@ -37,6 +52,7 @@ namespace NetcodeIO.NET.Utils
 			return true;
 		}
 		
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool ByteArraysEqual(byte[] lhs, byte[] rhs)
 		{
 			if (lhs.Length != rhs.Length) return false;
@@ -46,6 +62,7 @@ namespace NetcodeIO.NET.Utils
 			return true;
 		}
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static int SequenceBytesRequired(ulong sequence)
 		{
 			int sequenceBytes = 0;
@@ -62,6 +79,7 @@ namespace NetcodeIO.NET.Utils
 			return sequenceBytes;
 		}
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CompareByteArraysConstantTime(byte[] lhs, byte[] rhs)
 		{
 			int min = Math.Min(lhs.Length, rhs.Length);
@@ -75,6 +93,7 @@ namespace NetcodeIO.NET.Utils
 		}
 
 #if UNSAFE
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public unsafe static bool CompareHMACConstantTime(byte[] lhs, byte[] rhs)
 		{
 			if (lhs.Length != Defines.MAC_SIZE || rhs.Length != Defines.MAC_SIZE)
@@ -101,6 +120,7 @@ namespace NetcodeIO.NET.Utils
 			return compare;
 		}
 #else
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CompareHMACConstantTime(byte[] lhs, byte[] rhs)
 		{
 			if (lhs.Length != Defines.MAC_SIZE || rhs.Length != Defines.MAC_SIZE)

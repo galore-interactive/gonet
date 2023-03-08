@@ -1,6 +1,7 @@
 using System;
 
 using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Math;
 
 namespace Org.BouncyCastle.Asn1.X509
 {
@@ -68,7 +69,7 @@ namespace Org.BouncyCastle.Asn1.X509
 			//
 			// some certficates don't include a version number - we assume v1
 			//
-			if (seq[0] is DerTaggedObject)
+			if (seq[0] is Asn1TaggedObject)
 			{
 				version = DerInteger.GetInstance((Asn1TaggedObject)seq[0], true);
 			}
@@ -77,6 +78,22 @@ namespace Org.BouncyCastle.Asn1.X509
 				seqStart = -1;          // field 0 is missing!
 				version = new DerInteger(0);
 			}
+
+            bool isV1 = false;
+            bool isV2 = false;
+
+            if (version.Value.Equals(BigInteger.Zero))
+            {
+                isV1 = true;
+            }
+            else if (version.Value.Equals(BigInteger.One))
+            {
+                isV2 = true;
+            }
+            else if (!version.Value.Equals(BigInteger.Two))
+            {
+                throw new ArgumentException("version number not recognised");
+            }
 
 			serialNumber = DerInteger.GetInstance(seq[seqStart + 1]);
 
@@ -98,28 +115,45 @@ namespace Org.BouncyCastle.Asn1.X509
 			//
 			subjectPublicKeyInfo = SubjectPublicKeyInfo.GetInstance(seq[seqStart + 6]);
 
-			for (int extras = seq.Count - (seqStart + 6) - 1; extras > 0; extras--)
-			{
-				DerTaggedObject extra = (DerTaggedObject) seq[seqStart + 6 + extras];
+            int extras = seq.Count - (seqStart + 6) - 1;
+            if (extras != 0 && isV1)
+                throw new ArgumentException("version 1 certificate contains extra data");
 
+            while (extras > 0)
+			{
+                Asn1TaggedObject extra = Asn1TaggedObject.GetInstance(seq[seqStart + 6 + extras]);
 				switch (extra.TagNo)
 				{
-					case 1:
-						issuerUniqueID = DerBitString.GetInstance(extra, false);
-						break;
-					case 2:
-						subjectUniqueID = DerBitString.GetInstance(extra, false);
-						break;
-					case 3:
-						extensions = X509Extensions.GetInstance(extra);
-						break;
-				}
+				case 1:
+                {
+					issuerUniqueID = DerBitString.GetInstance(extra, false);
+					break;
+                }
+                case 2:
+                {
+                    subjectUniqueID = DerBitString.GetInstance(extra, false);
+                    break;
+                }
+				case 3:
+                {
+                    if (isV2)
+                        throw new ArgumentException("version 2 certificate cannot contain extensions");
+
+                    extensions = X509Extensions.GetInstance(Asn1Sequence.GetInstance(extra, true));
+					break;
+                }
+                default:
+                {
+                    throw new ArgumentException("Unknown tag encountered in structure: " + extra.TagNo);
+                }
+                }
+                extras--;
 			}
 		}
 
 		public int Version
 		{
-			get { return version.Value.IntValue + 1; }
+            get { return version.IntValueExact + 1; }
 		}
 
 		public DerInteger VersionNumber

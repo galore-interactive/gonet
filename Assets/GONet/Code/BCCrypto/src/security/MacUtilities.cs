@@ -4,7 +4,9 @@ using System.Globalization;
 
 using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.Iana;
+using Org.BouncyCastle.Asn1.Nist;
 using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Asn1.Rosstandart;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
@@ -37,6 +39,14 @@ namespace Org.BouncyCastle.Security
             algorithms[PkcsObjectIdentifiers.IdHmacWithSha256.Id] = "HMAC-SHA256";
             algorithms[PkcsObjectIdentifiers.IdHmacWithSha384.Id] = "HMAC-SHA384";
             algorithms[PkcsObjectIdentifiers.IdHmacWithSha512.Id] = "HMAC-SHA512";
+
+            algorithms[NistObjectIdentifiers.IdHMacWithSha3_224.Id] = "HMAC-SHA3-224";
+            algorithms[NistObjectIdentifiers.IdHMacWithSha3_256.Id] = "HMAC-SHA3-256";
+            algorithms[NistObjectIdentifiers.IdHMacWithSha3_384.Id] = "HMAC-SHA3-384";
+            algorithms[NistObjectIdentifiers.IdHMacWithSha3_512.Id] = "HMAC-SHA3-512";
+
+            algorithms[RosstandartObjectIdentifiers.id_tc26_hmac_gost_3411_12_256.Id] = "HMAC-GOST3411-2012-256";
+            algorithms[RosstandartObjectIdentifiers.id_tc26_hmac_gost_3411_12_512.Id] = "HMAC-GOST3411-2012-512";
 
             // TODO AESMAC?
 
@@ -73,28 +83,28 @@ namespace Org.BouncyCastle.Security
             algorithms["1.3.14.3.2.26"] = "PBEWITHHMACSHA1";
         }
 
-//		/// <summary>
-//		/// Returns a ObjectIdentifier for a given digest mechanism.
-//		/// </summary>
-//		/// <param name="mechanism">A string representation of the digest meanism.</param>
-//		/// <returns>A DerObjectIdentifier, null if the Oid is not available.</returns>
-//		public static DerObjectIdentifier GetObjectIdentifier(
-//			string mechanism)
-//		{
-//			mechanism = (string) algorithms[Platform.ToUpperInvariant(mechanism)];
-//
-//			if (mechanism != null)
-//			{
-//				return (DerObjectIdentifier)oids[mechanism];
-//			}
-//
-//			return null;
-//		}
+        //		/// <summary>
+        //		/// Returns a ObjectIdentifier for a given digest mechanism.
+        //		/// </summary>
+        //		/// <param name="mechanism">A string representation of the digest meanism.</param>
+        //		/// <returns>A DerObjectIdentifier, null if the Oid is not available.</returns>
+        //		public static DerObjectIdentifier GetObjectIdentifier(
+        //			string mechanism)
+        //		{
+        //			mechanism = (string) algorithms[Platform.ToUpperInvariant(mechanism)];
+        //
+        //			if (mechanism != null)
+        //			{
+        //				return (DerObjectIdentifier)oids[mechanism];
+        //			}
+        //
+        //			return null;
+        //		}
 
-//		public static ICollection Algorithms
-//		{
-//			get { return oids.Keys; }
-//		}
+        //		public static ICollection Algorithms
+        //		{
+        //			get { return oids.Keys; }
+        //		}
 
         public static IMac GetMac(
             DerObjectIdentifier id)
@@ -247,13 +257,12 @@ namespace Org.BouncyCastle.Security
             return b;
         }
 
-		public static int DoFinalOut(IMac mac, byte[] outBuffer)
-		{
-			mac.DoFinal(outBuffer, 0);
-			return mac.GetMacSize();
-		}
+        public static void DoFinal(IMac macIn, byte[] macOut, int macSize)
+        {
+            macIn.DoFinal(macOut, 0);
+        }
 
-		public static byte[] DoFinal(IMac mac, byte[] input)
+        public static byte[] DoFinal(IMac mac, byte[] input)
         {
             mac.BlockUpdate(input, 0, input.Length);
             return DoFinal(mac);

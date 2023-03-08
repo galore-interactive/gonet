@@ -24,8 +24,18 @@ namespace Org.BouncyCastle.Asn1
         {
             if (obj == null || obj is DerObjectIdentifier)
                 return (DerObjectIdentifier) obj;
+
+            if (obj is Asn1Encodable)
+            {
+                Asn1Object asn1Obj = ((Asn1Encodable)obj).ToAsn1Object();
+
+                if (asn1Obj is DerObjectIdentifier)
+                    return (DerObjectIdentifier)asn1Obj;
+            }
+
             if (obj is byte[])
                 return FromOctetString((byte[])obj);
+
             throw new ArgumentException("illegal object in GetInstance: " + Platform.GetTypeName(obj), "obj");
         }
 
@@ -42,7 +52,14 @@ namespace Org.BouncyCastle.Asn1
             Asn1TaggedObject	obj,
             bool				explicitly)
         {
-            return GetInstance(obj.GetObject());
+            Asn1Object o = obj.GetObject();
+
+            if (explicitly || o is DerObjectIdentifier)
+            {
+                return GetInstance(o);
+            }
+
+            return FromOctetString(Asn1OctetString.GetInstance(o).GetOctets());
         }
 
         public DerObjectIdentifier(
@@ -203,36 +220,36 @@ namespace Org.BouncyCastle.Asn1
             return identifier;
         }
 
-        private static bool IsValidBranchID(
-            String branchID, int start)
+        private static bool IsValidBranchID(string branchID, int start)
         {
-            bool periodAllowed = false;
+            int digitCount = 0;
 
             int pos = branchID.Length;
             while (--pos >= start)
             {
                 char ch = branchID[pos];
 
-                // TODO Leading zeroes?
-                if ('0' <= ch && ch <= '9')
-                {
-                    periodAllowed = true;
-                    continue;
-                }
-
                 if (ch == '.')
                 {
-                    if (!periodAllowed)
+                    if (0 == digitCount || (digitCount > 1 && branchID[pos + 1] == '0'))
                         return false;
 
-                    periodAllowed = false;
-                    continue;
+                    digitCount = 0;
                 }
-
-                return false;
+                else if ('0' <= ch && ch <= '9')
+                {
+                    ++digitCount;
+                }
+                else
+                {
+                    return false;
+                }
             }
 
-            return periodAllowed;
+            if (0 == digitCount || (digitCount > 1 && branchID[pos + 1] == '0'))
+                return false;
+
+            return true;
         }
 
         private static bool IsValidIdentifier(string identifier)

@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -14,10 +14,11 @@
  */
 
 using GONet;
+using NetcodeIO.NET;
 using System;
 using UnityEngine;
 
-public class GONetSampleSpawner : MonoBehaviour
+public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
 {
     public GONetSampleClientOrServer GONetServerPREFAB;
     public GONetSampleClientOrServer GONetClientPREFAB;
@@ -25,10 +26,84 @@ public class GONetSampleSpawner : MonoBehaviour
     public GONetParticipant authorityPrefab;
 
     private bool hasServerSpawned;
+    private bool hasClientSpawned;
 
-    private void Start()
+    #region sample event subscription for client (connection) state changes
+
+    protected override void Awake()
     {
-        ProcessCmdLine();
+        base.Awake();
+
+        EventBus.Subscribe<ClientStateChangedEvent>(OnClientStateChanged_LogIt);
+        EventBus.Subscribe<RemoteClientStateChangedEvent>(OnRemoteClientStateChanged_LogIt);
+    }
+
+    private void OnRemoteClientStateChanged_LogIt(GONetEventEnvelope<RemoteClientStateChangedEvent> eventEnvelope)
+    {
+        GONetLog.Append($"As indicated by the server, GONet client with InitiatingClientConnectionUID: {eventEnvelope.Event.InitiatingClientConnectionUID} has changed state to: {Enum.GetName(typeof(ClientState), eventEnvelope.Event.StateNow)}");
+
+        if (IsClient)
+        {
+            if (eventEnvelope.Event.InitiatingClientConnectionUID == GONetMain.GONetClient.InitiatingClientConnectionUID)
+            {
+                const string MY = " and it is my client.";
+                GONetLog.Append(MY);
+            }
+            else
+            {
+                const string NOT = " and it is NOT my client (i.e., some other client's status changed).";
+                GONetLog.Append(NOT);
+            }
+        }
+        else
+        {
+            const string SRVR = " and this is the server acknowledging it to myself.";
+            GONetLog.Append(SRVR);
+        }
+
+        GONetLog.Append_FlushDebug();
+    }
+
+    private void OnClientStateChanged_LogIt(GONetEventEnvelope<ClientStateChangedEvent> eventEnvelope)
+    {
+        GONetLog.Append($"As indicated by the initiating client, GONet client with InitiatingClientConnectionUID: {eventEnvelope.Event.InitiatingClientConnectionUID} indicated it has changed state to: {Enum.GetName(typeof(ClientState), eventEnvelope.Event.StateNow)}");
+
+        if (IsClient)
+        {
+            if (eventEnvelope.Event.InitiatingClientConnectionUID == GONetMain.GONetClient.InitiatingClientConnectionUID)
+            {
+                const string MY = " and it is my client.";
+                GONetLog.Append(MY);
+            }
+            else
+            {
+                const string NOT = " and it is NOT my client (i.e., some other client's status changed).";
+                GONetLog.Append(NOT);
+            }
+        }
+        else
+        {
+            const string SRVR = " and this is the server acknowledging it.";
+            GONetLog.Append(SRVR);
+        }
+
+        GONetLog.Append_FlushDebug();
+    }
+
+    #endregion
+
+    protected override void Start()
+    {
+        base.Start();
+        
+        if (Application.platform == RuntimePlatform.Android) // NOTE: for sample's sake, this check and inner block will make all android machines clients...change as your needs dictate!
+        {
+            InstantiateClientIfNotAlready();
+        }
+        else
+        { // now that platform support is expanding, this below really probably only applies to PC/Windows (via BAT script) and Mac/Linux (via shell script)...not sure
+            ProcessCmdLine();
+        }
     }
 
     void ProcessCmdLine()
@@ -40,15 +115,14 @@ public class GONetSampleSpawner : MonoBehaviour
             const string SERVER = "-server";
             if (arg == SERVER)
             {
-                Instantiate(GONetServerPREFAB);
-                hasServerSpawned = true;
+                InstantiateServerIfNotAlready();
             }
             else
             {
                 const string CLIENT = "-client";
                 if (arg == CLIENT)
                 {
-                    Instantiate(GONetClientPREFAB);
+                    InstantiateClientIfNotAlready();
                 }
             }
         }
@@ -58,18 +132,35 @@ public class GONetSampleSpawner : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
         {
-            Instantiate(GONetClientPREFAB);
+            InstantiateClientIfNotAlready();
         }
 
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S) && !hasServerSpawned)
+        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S))
         {
-            Instantiate(GONetServerPREFAB);
-            hasServerSpawned = true;
+            InstantiateServerIfNotAlready();
         }
 
         if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
             Instantiate(authorityPrefab, transform.position, transform.rotation);
+        }
+    }
+
+    private void InstantiateServerIfNotAlready()
+    {
+        if (!hasServerSpawned)
+        {
+            Instantiate(GONetServerPREFAB);
+            hasServerSpawned = true;
+        }
+    }
+
+    internal void InstantiateClientIfNotAlready()
+    {
+        if (!hasClientSpawned)
+        {
+            Instantiate(GONetClientPREFAB);
+            hasClientSpawned = true;
         }
     }
 }

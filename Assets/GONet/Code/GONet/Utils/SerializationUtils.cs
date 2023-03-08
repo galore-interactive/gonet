@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -27,7 +27,8 @@ namespace GONet.Utils
     public static class SerializationUtils
     {
         public const int MTU = 1400;
-        private const int MTU_X2 = MTU << 1;
+        public const int MTU_x8 = MTU << 3;
+        public const int MTU_x32 = MTU << 5;
 
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
 
@@ -60,7 +61,7 @@ namespace GONet.Utils
             ArrayPool<byte> arrayPool;
             if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
             {
-                arrayPool = new ArrayPool<byte>(25, 5, MTU, MTU_X2);
+                arrayPool = new ArrayPool<byte>(25, 1, MTU_x8, MTU_x32);
                 byteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
             }
             return arrayPool.Borrow(minimumSize);

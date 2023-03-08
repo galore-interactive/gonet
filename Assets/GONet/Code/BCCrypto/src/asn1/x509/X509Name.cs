@@ -159,6 +159,11 @@ namespace Org.BouncyCastle.Asn1.X509
         public static readonly DerObjectIdentifier TelephoneNumber = X509ObjectIdentifiers.id_at_telephoneNumber;
 
         /**
+         * id-at-organizationIdentifier
+         */
+        public static readonly DerObjectIdentifier OrganizationIdentifier = X509ObjectIdentifiers.id_at_organizationIdentifier;
+
+        /**
          * id-at-name
          */
         public static readonly DerObjectIdentifier Name = X509ObjectIdentifiers.id_at_name;
@@ -359,13 +364,11 @@ namespace Org.BouncyCastle.Asn1.X509
         public static X509Name GetInstance(
             object obj)
         {
-            if (obj == null || obj is X509Name)
+            if (obj is X509Name)
                 return (X509Name)obj;
-
-            if (obj != null)
-                return new X509Name(Asn1Sequence.GetInstance(obj));
-
-            throw new ArgumentException("null object in factory", "obj");
+            if (obj == null)
+                return null;
+            return new X509Name(Asn1Sequence.GetInstance(obj));
         }
 
         protected X509Name()
@@ -923,7 +926,7 @@ namespace Org.BouncyCastle.Asn1.X509
         {
             try
             {
-                return Asn1Object.FromByteArray(Hex.Decode(v.Substring(1)));
+                return Asn1Object.FromByteArray(Hex.DecodeStrict(v, 1, v.Length - 1));
             }
             catch (IOException e)
             {

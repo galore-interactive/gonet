@@ -13,17 +13,22 @@ MonoBehaviour:
   m_Name: _GONet_Transform_Position
   m_EditorClassIdentifier: 
   SyncChangesASAP: 0
-  SyncChangesFrequencyOccurrences: 30
+  SyncChangesFrequencyOccurrences: 20
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
-  QuantizeDownToBitCount: 0
-  QuantizeLowerBound: -5000
-  QuantizeUpperBound: 5000
+  QuantizeDownToBitCount: 11
+  QuantizeLowerBound: -1
+  QuantizeUpperBound: 1
+  QuantizationResultingPrecision: 0.0009765625 (i.e., 0.977 millimeters)
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides:
   - ValueType: 12
     CustomSerializerType:
       _classRef: GONet.Vector3Serializer, Assembly-CSharp
+  SyncValueTypeValueBlendingOverrides:
+  - ValueType: 12
+    CustomValueBlendingType:
+      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Vector3, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

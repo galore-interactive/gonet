@@ -101,8 +101,13 @@ namespace Org.BouncyCastle.Math.EC
         }
     }
 
-    public class FpFieldElement
+    public abstract class AbstractFpFieldElement
         : ECFieldElement
+    {
+    }
+
+    public class FpFieldElement
+        : AbstractFpFieldElement
     {
         private readonly BigInteger q, r, x;
 
@@ -536,6 +541,76 @@ namespace Org.BouncyCastle.Math.EC
         }
     }
 
+    public abstract class AbstractF2mFieldElement
+        :   ECFieldElement
+    {
+        public virtual ECFieldElement HalfTrace()
+        {
+            int m = FieldSize;
+            if ((m & 1) == 0)
+                throw new InvalidOperationException("Half-trace only defined for odd m");
+
+            //ECFieldElement ht = this;
+            //for (int i = 1; i < m; i += 2)
+            //{
+            //    ht = ht.SquarePow(2).Add(this);
+            //}
+
+            int n = (m + 1) >> 1;
+            int k = 31 - Integers.NumberOfLeadingZeros(n);
+            int nk = 1;
+
+            ECFieldElement ht = this;
+            while (k > 0)
+            {
+                ht = ht.SquarePow(nk << 1).Add(ht);
+                nk = n >> --k;
+                if (0 != (nk & 1))
+                {
+                    ht = ht.SquarePow(2).Add(this);
+                }
+            }
+
+            return ht;
+        }
+
+        public virtual bool HasFastTrace
+        {
+            get { return false; }
+        }
+
+        public virtual int Trace()
+        {
+            int m = FieldSize;
+
+            //ECFieldElement tr = this;
+            //for (int i = 1; i < m; ++i)
+            //{
+            //    tr = tr.Square().Add(this);
+            //}
+
+            int k = 31 - Integers.NumberOfLeadingZeros(m);
+            int mk = 1;
+
+            ECFieldElement tr = this;
+            while (k > 0)
+            {
+                tr = tr.SquarePow(mk).Add(tr);
+                mk = m >> --k;
+                if (0 != (mk & 1))
+                {
+                    tr = tr.Square().Add(this);
+                }
+            }
+
+            if (tr.IsZero)
+                return 0;
+            if (tr.IsOne)
+                return 1;
+            throw new InvalidOperationException("Internal error in trace calculation");
+        }
+    }
+
     /**
      * Class representing the Elements of the finite field
      * <code>F<sub>2<sup>m</sup></sub></code> in polynomial basis (PB)
@@ -544,7 +619,7 @@ namespace Org.BouncyCastle.Math.EC
      * representation is not supported.
      */
     public class F2mFieldElement
-        : ECFieldElement
+        :   AbstractF2mFieldElement
     {
         /**
          * Indicates gaussian normal basis representation (GNB). Number chosen
@@ -579,23 +654,24 @@ namespace Org.BouncyCastle.Math.EC
         /**
          * The <code>LongArray</code> holding the bits.
          */
-        private LongArray x;
+        internal LongArray x;
 
         /**
-            * Constructor for Ppb.
-            * @param m  The exponent <code>m</code> of
-            * <code>F<sub>2<sup>m</sup></sub></code>.
-            * @param k1 The integer <code>k1</code> where <code>x<sup>m</sup> +
-            * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
-            * represents the reduction polynomial <code>f(z)</code>.
-            * @param k2 The integer <code>k2</code> where <code>x<sup>m</sup> +
-            * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
-            * represents the reduction polynomial <code>f(z)</code>.
-            * @param k3 The integer <code>k3</code> where <code>x<sup>m</sup> +
-            * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
-            * represents the reduction polynomial <code>f(z)</code>.
-            * @param x The BigInteger representing the value of the field element.
-            */
+         * Constructor for Ppb.
+         * @param m  The exponent <code>m</code> of
+         * <code>F<sub>2<sup>m</sup></sub></code>.
+         * @param k1 The integer <code>k1</code> where <code>x<sup>m</sup> +
+         * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
+         * represents the reduction polynomial <code>f(z)</code>.
+         * @param k2 The integer <code>k2</code> where <code>x<sup>m</sup> +
+         * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
+         * represents the reduction polynomial <code>f(z)</code>.
+         * @param k3 The integer <code>k3</code> where <code>x<sup>m</sup> +
+         * x<sup>k3</sup> + x<sup>k2</sup> + x<sup>k1</sup> + 1</code>
+         * represents the reduction polynomial <code>f(z)</code>.
+         * @param x The BigInteger representing the value of the field element.
+         */
+        [Obsolete("Use ECCurve.FromBigInteger to construct field elements")]
         public F2mFieldElement(
             int			m,
             int			k1,
@@ -627,14 +703,15 @@ namespace Org.BouncyCastle.Math.EC
         }
 
         /**
-            * Constructor for Tpb.
-            * @param m  The exponent <code>m</code> of
-            * <code>F<sub>2<sup>m</sup></sub></code>.
-            * @param k The integer <code>k</code> where <code>x<sup>m</sup> +
-            * x<sup>k</sup> + 1</code> represents the reduction
-            * polynomial <code>f(z)</code>.
-            * @param x The BigInteger representing the value of the field element.
-            */
+         * Constructor for Tpb.
+         * @param m  The exponent <code>m</code> of
+         * <code>F<sub>2<sup>m</sup></sub></code>.
+         * @param k The integer <code>k</code> where <code>x<sup>m</sup> +
+         * x<sup>k</sup> + 1</code> represents the reduction
+         * polynomial <code>f(z)</code>.
+         * @param x The BigInteger representing the value of the field element.
+         */
+        [Obsolete("Use ECCurve.FromBigInteger to construct field elements")]
         public F2mFieldElement(
             int			m,
             int			k,
@@ -644,7 +721,7 @@ namespace Org.BouncyCastle.Math.EC
             // Set k1 to k, and set k2 and k3 to 0
         }
 
-        private F2mFieldElement(int m, int[] ks, LongArray x)
+        internal F2mFieldElement(int m, int[] ks, LongArray x)
         {
             this.m = m;
             this.representation = (ks.Length == 1) ? Tpb : Ppb;

@@ -255,10 +255,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   codeGenerationId: 1
+  animatorSyncSupport:
+    keys: []
+    values: []
+  IsRigidBodyOwnerOnlyControlled: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
   designTimeLocation: scene://SampleScene2/Directional Light
-  runtimeUID: 0
 --- !u!108 &1743745983
 Light:
   m_ObjectHideFlags: 0
@@ -311,65 +314,3 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
---- !u!1 &2004607298
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2004607301}
-  - component: {fileID: 2004607300}
-  - component: {fileID: 2004607299}
-  m_Layer: 0
-  m_Name: Stoochie
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2004607299
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2004607298}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d8ad7c876a5216f459cf9797adedb967, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  stoochieWallace: 
---- !u!114 &2004607300
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2004607298}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  codeGenerationId: 3
-  IsPositionSyncd: 0
-  IsRotationSyncd: 0
-  designTimeLocation: scene://SampleScene2/Stoochie
-  runtimeUID: 0
---- !u!4 &2004607301
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2004607298}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 30.144913, y: 2.3399231, z: -68.09898}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

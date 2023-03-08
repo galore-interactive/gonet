@@ -9,6 +9,8 @@ namespace ReliableNetcode
 {
     internal abstract class MessageChannel
     {
+        protected ReliablePacketController packetController;
+
         public abstract int ChannelID { get; }
 
         public Action<byte[], int> TransmitCallback;
@@ -18,10 +20,21 @@ namespace ReliableNetcode
         public abstract void Update(double newTime);
         public abstract void ReceivePacket(byte[] buffer, int bufferLength);
         public abstract void SendMessage(byte[] buffer, int bufferLength);
+
+        public virtual string GetUsageStatistics()
+        {
+            return packetController == null ? string.Empty : packetController.GetUsageStatistics();
+        }
+
+        public virtual void ProcessSendBuffer_IfAppropriate()
+        {
+        }
     }
 
-    // an unreliable implementation of MessageChannel
-    // does not make any guarantees about message reliability except for ignoring duplicate messages
+    /// <summary>
+    /// an unreliable implementation of <see cref="MessageChannel"/>
+    /// does not make any guarantees about message reliability except for ignoring duplicate messages
+    /// </summary>
     internal class UnreliableMessageChannel : MessageChannel
     {
         public override int ChannelID
@@ -33,7 +46,6 @@ namespace ReliableNetcode
         }
 
         private ReliableConfig config;
-        private ReliablePacketController packetController;
         private SequenceBuffer<ReceivedPacketData> receiveBuffer;
 
         public UnreliableMessageChannel()
@@ -75,66 +87,9 @@ namespace ReliableNetcode
         }
     }
 
-    // an unreliable-ordered implementation of MessageChannel
-    // does not make any guarantees that a message will arrive, BUT does guarantee that messages will be received in chronological order
-    internal class UnreliableOrderedMessageChannel : MessageChannel
-    {
-        public override int ChannelID
-        {
-            get
-            {
-                return (int)QosType.UnreliableOrdered;
-            }
-        }
-
-        private ReliableConfig config;
-        private ReliablePacketController packetController;
-
-        private ushort nextSequence = 0;
-
-        public UnreliableOrderedMessageChannel()
-        {
-            config = ReliableConfig.DefaultConfig();
-            config.TransmitPacketCallback = (buffer, size) => {
-                TransmitCallback(buffer, size);
-            };
-            config.ProcessPacketCallback = processPacket;
-
-            packetController = new ReliablePacketController(config, DateTime.UtcNow.GetTotalSeconds());
-        }
-
-        public override void Reset()
-        {
-            nextSequence = 0;
-            packetController.Reset();
-        }
-
-        public override void Update(double newTimeSeconds)
-        {
-            packetController.Update(newTimeSeconds);
-        }
-
-        public override void ReceivePacket(byte[] buffer, int bufferLength)
-        {
-            packetController.ReceivePacket(buffer, bufferLength);
-        }
-
-        public override void SendMessage(byte[] buffer, int bufferLength)
-        {
-            packetController.SendPacket(buffer, bufferLength, (byte)ChannelID);
-        }
-
-        protected void processPacket(ushort sequence, byte[] buffer, int length)
-        {
-            // only process a packet if it is the next packet we expect, or it is newer.
-            if (sequence == nextSequence || PacketIO.SequenceGreaterThan(sequence, nextSequence)) {
-                nextSequence = (ushort)(sequence + 1);
-                ReceiveCallback(buffer, length);
-            }
-        }
-    }
-
-    // a reliable ordered implementation of MessageChannel
+    /// <summary>
+    /// a reliable ordered implementation of <see cref="MessageChannel"/>
+    /// </summary>
     internal class ReliableMessageChannel : MessageChannel
     {
         internal class BufferedPacket
@@ -166,7 +121,6 @@ namespace ReliableNetcode
         public float ReceivedBandwidthKBPS => packetController.ReceivedBandwidthKBPS;
 
         private ReliableConfig config;
-        private ReliablePacketController packetController;
         private bool congestionControl = false;
         private double congestionDisableTimer;
         private double congestionDisableInterval;
@@ -186,6 +140,7 @@ namespace ReliableNetcode
         private volatile ushort oldestUnacked;
         private volatile ushort sequence;
         private volatile ushort nextReceive;
+        private volatile bool isTimeToProcessSendBuffer;
 
         public ReliableMessageChannel()
         {
@@ -300,6 +255,15 @@ namespace ReliableNetcode
             double flushInterval = congestionControl ? CONGESTED_SEND_RATE_HZ : NORMAL_SEND_RATE_HZ;
 
             if (timeSeconds - lastBufferFlush >= flushInterval) {
+                isTimeToProcessSendBuffer = true;
+            }
+        }
+
+        public override void ProcessSendBuffer_IfAppropriate()
+        {
+            if (isTimeToProcessSendBuffer)
+            {
+                isTimeToProcessSendBuffer = false;
                 lastBufferFlush = timeSeconds;
                 processSendBuffer();
             }
@@ -529,6 +493,38 @@ namespace ReliableNetcode
                     }
                 }
             }
+        }
+
+        public override string GetUsageStatistics()
+        {
+            StringBuilder stringBuilder = new StringBuilder(2000);
+
+            const string SB = " sendBuffer.Size: ";
+            const string RB = " receiveBuffer.Size: ";
+            const string AB = " ackBuffer: ";
+            const string LBF = " lastBufferFlush: ";
+            const string LMS = " lastMessageSend: ";
+            const string TS = " timeSeconds: ";
+            const string OU = " oldestUnacked: ";
+            const string SEQ = " sequence: ";
+            const string NR = " nextReceive: ";
+            const string LCST = " lastCongestionSwitchTime: ";
+
+            stringBuilder
+                .Append(base.GetUsageStatistics())
+                .Append(SB).Append(sendBuffer.Size)
+                .Append(RB).Append(receiveBuffer.Size)
+                .Append(AB).Append(ackBuffer.Size)
+                .Append(LBF).Append(lastBufferFlush)
+                .Append(LMS).Append(lastMessageSend)
+                .Append(TS).Append(timeSeconds)
+                .Append(OU).Append(oldestUnacked)
+                .Append(SEQ).Append(sequence)
+                .Append(NR).Append(nextReceive)
+                .Append(LCST).Append(lastCongestionSwitchTime)
+                ; 
+
+            return stringBuilder.ToString();
         }
     }
 }

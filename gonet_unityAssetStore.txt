@@ -37,7 +37,7 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*Configurable value quantization: choose # bits to occupy and auto-magically quantizes/compresses to fit (great for LOD, <em>see below</em>)
 <br><br><strong>(PRO Only) Record+Replay GONet sessions:</strong>
 <br>*(PRO Only) Everything GONet sends and receives is recorded (server and clients alike)
-<br>*(PRO Only) Replay is great for: (eSports) In-game instant replay, Location Based Entertainment takeaway not to mention development troubleshooting and bug reproduction (i.e., a <em>"save your bacon"</em> feature)
+<br>*(PRO Only) Replay the recorded gameplay. Great for: (eSports) In-game instant replay, Location Based Entertainment takeaway not to mention development troubleshooting and bug reproduction (i.e., a <em>"save your bacon"</em> feature)
 <br>*(PRO Only) Recorded session data feeds into time series, statistics-based graphs for analysis during development and perhaps more importantly after game is released
 <br><br><strong>(PRO Only) Level of Detail (LOD) management:</strong>
 <br>*(PRO Only) Control the Who/What/When/Where/Why/How of data detail
@@ -66,6 +66,10 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*(PRO Only) Access to extensive example projects with detailed documentation
 <br>*(Premium Only) GONet support team working directly with your team with off-site and on-site options
 <br>*(Premium Only) GONet custom feature requests
+<br><br><strong>General:</strong>
+<br>*RigidBody support
+<br>*Run-time authority transition (e.g., client to server for projectiles)
+<br>*Source code (well commented and debuggable C#)
 <br><br><strong>Logging:</strong>
 <br>*Built atop the robust, well-known log4net api/library
 <br>*Writes to Console in editor and to "logs/gonet.log" file in builds
@@ -79,6 +83,18 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 
 
 <br><br>
+Let GONet take on the most difficult burden you face, so your team can focus on interesting creative matters.  GONet integrates nicely into existing game project code bases and effortlessly for those lucky to be in green field development.
+<br><br>
+Manual and API Documentation 
+Please discuss GONet in the forum
+Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We have a multi-tiered support structure to suit your needs, from trivial to highly involved.  Our implementation experts will help you from getting off the ground up to crossing the finish line with you.
+<br><br>
+<br>We are certain a <strong>TL;DR</strong> should be up there somewhere.  Well, sorry about that and thanks for making all the way!  When it comes to getting your game networked and multi-player capable, you need to know what you are getting yourself into.  GONet is the real deal.
+
+
+
+
+<br><br>
 ??????
 <br><strong>Network topologies:</strong>
 <br>*Local ("couch multiplayer"): multiple players/inputs/viewport on same machine *** this means multiple client instances in same process...maybe not this one!
@@ -89,16 +105,6 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*Interpolation (got this up top)
 <br>*Delta compression (can accomplish with recorded send data....need to add recorded received too..share then reconcile?)
 ??????
-
-<br><br>
-Let GONet take on the most difficult burden you face, so your team can focus on interesting creative matters.  GONet integrates nicely into existing game project code bases and effortlessly for those lucky to be in green field development.
-<br><br>
-Manual and API Documentation 
-Please discuss GONet in the forum
-Contact support to discuss consulting assistance for implementation/integration/migration with your game project team.  We have a multi-tiered support structure to suit your needs, from trivial to highly involved.  Our implementation experts will help you from getting off the ground up to crossing the finish line with you.
-<br><br>
-<br>We are certain a <strong>TL;DR</strong> should be up there somewhere.  Well, sorry about that and thanks for making all the way!  When it comes to getting your game networked and multi-player capable, you need to know what you are getting yourself into.  GONet is the real deal.
-
 
 
 

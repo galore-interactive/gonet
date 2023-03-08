@@ -4,6 +4,7 @@
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp.dll" #>
 <#@ assembly name="$(ProjectDir)Library\ScriptAssemblies\Assembly-CSharp-Editor.dll" #>
 
+<#@ import namespace="System.Globalization" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Text" #>
 <#@ import namespace="System.Collections.Generic" #>
@@ -14,7 +15,7 @@
 
 /* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -67,6 +68,7 @@ namespace GONet
         }
     }
 
+	List<string> tmpTypeFullNames_ALL = new List<string>(tmpTypeFullNames);
 	int iPersistentEvents = 0;
 	foreach (string tmpTypeFullName in tmpTypeFullNames.OrderBy(x => x))
     {
@@ -154,7 +156,7 @@ namespace GONet
 		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valuePrevious;
 		[MessagePack.Key(7)] public <#=memberKVP.Value.Item1#> valueNew;
 
-        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 5);
+        static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<<#=className#>> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<<#=className#>>();
         static System.Threading.Thread borrowThread;
 
@@ -237,6 +239,18 @@ namespace GONet.Generation
 
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness = hahaThisIsTrulyTheRealness_Events;
 			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.theRealness_copy = hahaThisIsTrulyTheRealness_Events_Copy;
+
+			GONet_SyncEvent_ValueChangeProcessed_Generated_Factory.allUniqueSyncEventTypes = new List<Type>()
+			{
+<#
+		foreach (string syncEventTypeFullName in tmpTypeFullNames_ALL.OrderBy(x => x))
+        {
+#>
+				typeof(<#=syncEventTypeFullName#>),
+<#
+        }
+#>
+			};
 		}
 
 		static internal HashSet<GONet.Utils.QuantizerSettingsGroup> hahaThisIsTrulyTheRealness_quantizerSettings()
@@ -255,7 +269,7 @@ namespace GONet.Generation
 			{
 				GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 #>
-			var item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#> = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString() + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
+			var item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#> = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 			settings.Add(item_codeGenerationId<#=uniqueEntry.codeGenerationId#>_single<#=iSingle#>_singleMember<#=iSingleMember#>);
 
 <#
@@ -306,11 +320,20 @@ namespace GONet.Generation
 #>
                             case <#=iOverall#>:
 								{
-								<# if (singleMember.animatorControllerParameterId == 0) { #>
-									var valueNew = companion.<#=uniqueSnap.componentTypeName#>.<#=singleMember.memberName#>;
-								<# } else { #>
-									<#=memberTypeFullName#> valueNew = companion.<#=uniqueSnap.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
-								<# } #>
+									<#=memberTypeFullName#> valueNew;
+									GONetSyncableValue valueNew_mostRecentChangeAtTime;
+									if (explanation == SyncEvent_ValueChangeProcessedExplanation.InboundFromOther && companion.valuesChangesSupport[syncMemberIndex].TryGetMostRecentChangeAtTime(elapsedTicks, out valueNew_mostRecentChangeAtTime))
+									{
+										valueNew = valueNew_mostRecentChangeAtTime.<#=memberTypeFullName.Replace(".", "_")#>;
+									}
+									else
+									{
+									<# if (singleMember.animatorControllerParameterId == 0) { #>
+										valueNew = companion.<#=uniqueSnap.componentTypeName#>.<#=singleMember.memberName#>;
+									<# } else { #>
+										valueNew = companion.<#=uniqueSnap.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
+									<# } #>
+									}
 <#
 									const string SYNC_EV = "SyncEvent_";
 									const string UNDIE = "_";

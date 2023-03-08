@@ -1,6 +1,6 @@
 ﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
+ * Proprietary and confidential, email: contactus@unitygo.net
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -23,8 +23,6 @@ namespace GONet.Utils
     /// It is known the precision of <see cref="DateTime.Now"/> and <see cref="DateTime.UtcNow"/> is low (@ ~15ms), 
     /// which is not acceptable in many cases (especially in games).
     /// Use this class when high precision timing matters.
-    /// 
-    /// Due to the current implementation of the auto resync, thread safety should be examined further.
     /// </summary>
     public static class HighResolutionTimeUtils
     {
@@ -41,6 +39,9 @@ namespace GONet.Utils
         /// </summary>
         private static readonly long AUTO_RESYNC_AFTER_TICKS = TimeSpan.FromSeconds(10).Ticks;
         private static readonly float AUTO_RESYNC_AFTER_TICKS_FLOAT = (float)AUTO_RESYNC_AFTER_TICKS;
+
+        private static readonly object resync = new object();
+        private static volatile int resyncCounter = 0;
 
         static HighResolutionTimeUtils()
         {
@@ -98,22 +99,31 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Resync()
         {
-            DateTime now = DateTime.Now;
-            long nowTicksBeforeResync = hasResyncd ? lastResyncTime.Ticks + highResolutionStopwatch.Elapsed.Ticks : now.Ticks;
+            int resyncCounter_PRE = resyncCounter;
+            lock (resync)
+            {
+                if (resyncCounter == resyncCounter_PRE) // this would be false is another thread was also trying to do this at the same time!
+                {
+                    ++resyncCounter;
 
-            ///////////////////////////////////////////////////////////////////////////////////////
-            // RE-Sync:
-            lastResyncTime = now;
-            lastResyncTimeUtc = DateTime.UtcNow;
-            highResolutionStopwatch = Stopwatch.StartNew();
-            ///////////////////////////////////////////////////////////////////////////////////////
+                    DateTime now = DateTime.Now;
+                    long nowTicksBeforeResync = hasResyncd ? lastResyncTime.Ticks + highResolutionStopwatch.Elapsed.Ticks : now.Ticks;
 
-            long nowTicksAfterResync = lastResyncTime.Ticks;
-            lastResyncDiffTicks = nowTicksAfterResync - nowTicksBeforeResync;
+                    ///////////////////////////////////////////////////////////////////////////////////////
+                    // RE-Sync:
+                    lastResyncTime = now;
+                    lastResyncTimeUtc = DateTime.UtcNow;
+                    highResolutionStopwatch = Stopwatch.StartNew();
+                    ///////////////////////////////////////////////////////////////////////////////////////
 
-            //GONetLog.Debug("lastResyncDiffTicks (well, as ms): " + TimeSpan.FromTicks(lastResyncDiffTicks).TotalMilliseconds);
+                    long nowTicksAfterResync = lastResyncTime.Ticks;
+                    lastResyncDiffTicks = nowTicksAfterResync - nowTicksBeforeResync;
 
-            hasResyncd = true;
+                    //GONetLog.Debug("lastResyncDiffTicks (well, as ms): " + TimeSpan.FromTicks(lastResyncDiffTicks).TotalMilliseconds);
+
+                    hasResyncd = true;
+                }
+            }
         }
     }
 }
