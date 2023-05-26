@@ -436,7 +436,7 @@ namespace GONet
         /// </param>
         private List<EventHandlerAndFilterer> LookupSpecificTypeHandlers_FULLY_CACHED(Type eventType, bool includeChildClasses = true)
         {
-            HashSet<EventHandlerAndFilterer> specificTypeHandlers_tmp = specificTypeHandlers_tmp_publishCallDepthIndex[genericEnvelope_publishCallDepth];
+            var specificTypeHandlers_tmp = specificTypeHandlers_tmp_publishCallDepthIndex[genericEnvelope_publishCallDepth];
             specificTypeHandlers_tmp.Clear();
 
             List<EventHandlerAndFilterer> handlers = null;
@@ -446,90 +446,46 @@ namespace GONet
                 Type eventTypeCurrent = eventType;
                 while (eventTypeCurrent != typeof(object))
                 {
-                    if (handlersByEventType_IncludingChildren.TryGetValue(eventTypeCurrent, out handlers))
-                    {
-                        //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
-                        { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
-                            int handlerCount = handlers.Count;
-                            for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
-                            {
-                                specificTypeHandlers_tmp.Add(handlers[iHandler]);
-                            }
-                        }
-                    }
-                    eventTypeCurrent = eventTypeCurrent.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
+                    AddHandlersToList(eventTypeCurrent);
+                    eventTypeCurrent = eventTypeCurrent.BaseType;
                 }
 
-                Type eventInterface;
                 Type[] eventInterfaces = GetInterfaces(eventType);
                 int length = eventInterfaces.Length;
-                for (int i = length - 1; i >= 0; --i) // somehow iterating backward is very important for success in how we stored/manage this information....so just go with it and all is well
+                for (int i = length - 1; i >= 0; --i)
                 {
-                    eventInterface = eventInterfaces[i];
+                    Type eventInterface = eventInterfaces[i];
                     while (eventInterface != null)
                     {
-                        if (handlersByEventType_IncludingChildren.TryGetValue(eventInterface, out handlers))
-                        {
-                            //return handlers; // this is the original way that caused some unit tests to fail...so we go with the below to ensure all get returned!
-                            { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
-                                int handlerCount = handlers.Count;
-                                for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
-                                {
-                                    specificTypeHandlers_tmp.Add(handlers[iHandler]);
-                                }
-                            }
-                        }
-                        eventInterface = eventInterface.BaseType; // keep going up the class hierarchy until we find the first hit...that will contain all relevant observers...even for base classes up hierarchy based on our calls to Update_observersByEventType_IncludingChildren_Deep() earlier on during subscribes
+                        AddHandlersToList(eventInterface);
+                        eventInterface = eventInterface.BaseType;
                     }
-                }
-
-                { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
-                    List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = specificTypeHandlers_tmpList_publishCallDepthIndex[genericEnvelope_publishCallDepth];
-                    specificTypeHandlers_tmpList.Clear();
-                    using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
-                    {
-                        while (enumerator.MoveNext())
-                        {
-                            specificTypeHandlers_tmpList.Add(enumerator.Current);
-                        }
-                    }
-                    GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
-
-                    return specificTypeHandlers_tmpList;
                 }
             }
             else
             {
-                if (handlersByEventType_SpecificOnly.TryGetValue(eventType, out handlers))
+                AddHandlersToList(eventType);
+            }
+
+            void AddHandlersToList(Type currentType)
+            {
+                if (handlersByEventType_IncludingChildren.TryGetValue(currentType, out handlers))
                 {
-                    { // this block is the GC friendly version of: handlers.ForEach(h => specificTypeHandlers_tmp.Add(h));
-                        int handlerCount = handlers.Count;
-                        for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
-                        {
-                            specificTypeHandlers_tmp.Add(handlers[iHandler]);
-                        }
-                    }
-
-                    { // we have to maintain subscription priority order.....and since the hashset is needed to ensure uniqueness and cannot sort hashset, we transfer to list and then sort list
-                        List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = specificTypeHandlers_tmpList_publishCallDepthIndex[genericEnvelope_publishCallDepth];
-                        specificTypeHandlers_tmpList.Clear();
-                        using (var enumerator = specificTypeHandlers_tmp.GetEnumerator())
-                        {
-                            while (enumerator.MoveNext())
-                            {
-                                specificTypeHandlers_tmpList.Add(enumerator.Current);
-                            }
-                        }
-                        GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
-
-                        return specificTypeHandlers_tmpList;
+                    int handlerCount = handlers.Count;
+                    for (int iHandler = 0; iHandler < handlerCount; ++iHandler)
+                    {
+                        specificTypeHandlers_tmp.Add(handlers[iHandler]);
                     }
                 }
             }
 
-            return null;
+            List<EventHandlerAndFilterer> specificTypeHandlers_tmpList = specificTypeHandlers_tmpList_publishCallDepthIndex[genericEnvelope_publishCallDepth];
+            specificTypeHandlers_tmpList.Clear();
 
-            // since the filterPredicate cannot safely be compared for equality against another, don't cache the observable mapped to it and return a new observable each time // TODO for better storage/lookup efficiency's sake look into a way to compare filters
+            specificTypeHandlers_tmpList.AddRange(specificTypeHandlers_tmp);
+            GCLessAlgorithms.QuickSort(specificTypeHandlers_tmpList, EventHandlerAndFilterer.SubscriptionPriorityComparer);
+
+            return specificTypeHandlers_tmpList.Count > 0 ? specificTypeHandlers_tmpList : null;
         }
 
         static readonly Dictionary<Type, Type[]> interfacesByType = new Dictionary<Type, Type[]>(100);

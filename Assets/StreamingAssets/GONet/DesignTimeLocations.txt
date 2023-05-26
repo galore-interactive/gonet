@@ -1,6 +1,4 @@
 project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab
 project://Assets/GONet/Sample/Projectile/Resources/CannonBall.prefab
-scene://NewScene/GONet_GlobalContext
 scene://ProjectileTest/GONet_GlobalContext
-scene://SampleScene2/Directional Light
