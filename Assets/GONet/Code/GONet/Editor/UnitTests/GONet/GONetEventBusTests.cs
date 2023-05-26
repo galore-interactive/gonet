@@ -342,6 +342,40 @@ namespace GONet
             s2.Unsubscribe();
         }
 
+        public class TestEvent : IGONetEvent
+        {
+            long IGONetEvent.OccurredAtElapsedTicks => 0;
+        }
+
+        [Test]
+        public void HandlersAreCalledInOrderOfPriority()
+        {
+            // Arrange
+            TestEvent testEvent = new TestEvent();
+            List<int> handlerOrder = new List<int>();
+
+            void Handler1(GONetEventEnvelope<TestEvent> eventEnvelope) => handlerOrder.Add(1);
+            void Handler2(GONetEventEnvelope<TestEvent> eventEnvelope) => handlerOrder.Add(2);
+            void Handler3(GONetEventEnvelope<TestEvent> eventEnvelope) => handlerOrder.Add(3);
+
+            var subscription1 = GONetMain.EventBus.Subscribe<TestEvent>(Handler1);
+            var subscription2 = GONetMain.EventBus.Subscribe<TestEvent>(Handler2);
+            var subscription3 = GONetMain.EventBus.Subscribe<TestEvent>(Handler3);
+
+            subscription1.SetSubscriptionPriority(3);
+            subscription2.SetSubscriptionPriority(1);
+            subscription3.SetSubscriptionPriority(2);
+
+            // Act
+            GONetMain.EventBus.Publish(testEvent);
+
+            // Assert
+            Assert.AreEqual(3, handlerOrder.Count);
+            Assert.AreEqual(2, handlerOrder[0]);
+            Assert.AreEqual(3, handlerOrder[1]);
+            Assert.AreEqual(1, handlerOrder[2]);
+        }
+
         private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
             Assert.AreEqual(0, GONetMain.EventBus.Publish(new GONetParticipantDisabledEvent()));
