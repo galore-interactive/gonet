@@ -1,6 +1,6 @@
-﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
+﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential, email: contactus@unitygo.net
+ * Proprietary and confidential, email: contactus@galoreinteractive.com
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -3368,7 +3368,7 @@ namespace GONet
             try
             {
                 foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
-                        .Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+                        .Select(a => a.GetLoadableTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
                 {
                     foreach (var type in types)
                     {

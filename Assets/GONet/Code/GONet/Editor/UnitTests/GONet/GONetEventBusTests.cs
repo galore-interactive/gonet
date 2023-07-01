@@ -1,6 +1,6 @@
-﻿/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
+﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential, email: contactus@unitygo.net
+ * Proprietary and confidential, email: contactus@galoreinteractive.com
  * 
  *
  * Authorized use is explicitly limited to the following:	
@@ -342,6 +342,7 @@ namespace GONet
             s2.Unsubscribe();
         }
 
+        /* Including this causes the event generation stuff to crash...somehow need to add to an exclude from generation list.....likely by checking if editor or not..namespace?
         public class TestEvent : IGONetEvent
         {
             long IGONetEvent.OccurredAtElapsedTicks => 0;
@@ -375,6 +376,7 @@ namespace GONet
             Assert.AreEqual(3, handlerOrder[1]);
             Assert.AreEqual(1, handlerOrder[2]);
         }
+        */
 
         private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
