@@ -36,10 +36,10 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
         {
             this.Write("\r\n");
             this.Write("\r\n");
-            this.Write("\r\n/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Intera" +
+            this.Write("\r\n/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Intera" +
                     "ctive LLC - All Rights Reserved\r\n * Unauthorized copying of this file, via any m" +
                     "edium is strictly prohibited\r\n * Proprietary and confidential, email: contactus@" +
-                    "unitygo.net\r\n * \r\n *\r\n * Authorized use is explicitly limited to the following:\t" +
+                    "galoreinteractive.com\r\n * \r\n *\r\n * Authorized use is explicitly limited to the following:\t" +
                     "\r\n * -The ability to view and reference source code without changing it\r\n * -The" +
                     " ability to enhance debugging with source code access\r\n * -The ability to distri" +
                     "bute products based on original sources for non-commercial purposes, whereas thi" +
@@ -79,7 +79,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 	HashSet<string> tmpTypeFullNames = new HashSet<string>(syncEventTypeFullNames);
 	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
-				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+				.Select(a => a.GetLoadableTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
     {
         foreach (var type in types)
         {
@@ -124,7 +124,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 	tmpTypeFullNames = new HashSet<string>(syncEventTypeFullNames);
 	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
-				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(ITransientEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+				.Select(a => a.GetLoadableTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(ITransientEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
     {
         foreach (var type in types)
         {
@@ -168,7 +168,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 	tmpTypeFullNames = new HashSet<string>();
 	foreach (var types in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName)
-				.Select(a => a.GetTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IPersistentEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
+				.Select(a => a.GetLoadableTypes().Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IPersistentEvent)) && !t.IsAbstract).OrderBy(t2 => t2.FullName)))
     {
         foreach (var type in types)
         {

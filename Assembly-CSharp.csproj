@@ -1870,6 +1870,7 @@
     <None Include="Assets\Amazon\Plugins\AWSSDK.Core.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\Amazon\Plugins\System.Memory.xml" />
+    <None Include="Assets\GONet\Third-Party Notices.txt.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
   </ItemGroup>
   <ItemGroup>

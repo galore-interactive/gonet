@@ -1,9 +1,9 @@
 
 
 
-/* GONet (TM pending, serial number 88592370), Copyright (c) 2019 Galore Interactive LLC - All Rights Reserved
+/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential, email: contactus@unitygo.net
+ * Proprietary and confidential, email: contactus@galoreinteractive.com
  * 
  *
  * Authorized use is explicitly limited to the following:	
