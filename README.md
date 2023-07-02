@@ -1,14 +1,14 @@
 # GONet
-Networking library for Unity GameObjects.  Developed and used during 2019 and 2020.  No longer actively maintained, but perhaps it could be of use.
+Networking library for Unity GameObjects.  Initially developed and used during 2019 and 2020.  Starting in 2023, the project is taking a new upward trajectory to focus on making the happiest multiplayer devs and game company CFOs in the world.  Just watch!
 
-Here is the Unity Asset Store description from when it was active there:
+Here is the Unity Asset Store description:
 
 GONet is the Unity3D GameObject Networking solution with tight, developer-friendly integration into the Unity architecture/runtime.  If you need to network something and a GameObject is involved, GONet is the answer.
 <br><br>
 <strong>TL;DR</strong>
 <br>State of affairs for multiplayer/networking in Unity:
-<br>*UNet is in end-of-life long term support (LTS) - not to be used
-<br>*DOTS NetCode can be a real challenge to adopt
+<br>*Netcode for GameObjects (NGO) can leave much to be desired
+<br>*(NetCode for) Entities can be a real challenge to adopt
 <br>*Other multiplayer/networking options do an ~OK~ job of integrating with Unity (some things done well and others not so well)
 <br>*You need a robust Unity-centric networking library <strong>now</strong> to deliver your multiplayer game to fans
 <br>*GONet == solution (auto-magical data sync & value blending & compression & encryption, extensible pub/sub events, pure C# w/ all source code) 
