@@ -17,6 +17,8 @@ namespace GONet.Editor
             const string GONET_EDITOR_SUPPORT = "GONet Editor Support";
             GUIContent titleContent = new GUIContent(GONET_EDITOR_SUPPORT);
             editorWindow.titleContent = titleContent;
+
+            InitializeGUIStyles();
         }
 
         internal const string ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH = "Assets/GONet/Resources/GONet/SyncSettingsProfiles/";
@@ -27,6 +29,18 @@ namespace GONet.Editor
 
         string gonetIdText;
         string gonetIdText_raw;
+
+        private static GUIStyle sectionHeaderGUIStyle = null;
+
+        private static void InitializeGUIStyles()
+        {
+            sectionHeaderGUIStyle = new GUIStyle();
+            sectionHeaderGUIStyle.alignment = TextAnchor.MiddleCenter;
+            sectionHeaderGUIStyle.fontStyle = FontStyle.Normal;
+            sectionHeaderGUIStyle.normal.textColor = Color.white;
+            sectionHeaderGUIStyle.fontSize = 18;
+            sectionHeaderGUIStyle.fontStyle = FontStyle.Bold;
+        }
 
         private void OnGUI()
         {
@@ -111,31 +125,73 @@ namespace GONet.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Separator();
+            EditorGUILayout.Separator();
+            EditorGUILayout.Separator();
+            EditorGUILayout.LabelField("Refresh GONet's code generation", sectionHeaderGUIStyle);
+            EditorGUILayout.Separator();
 
-            EditorGUILayout.BeginHorizontal();
+            const string REFRESH_TEXT = "GONet's code generation process is mostly automatic, triggered by specific Unity actions to ensure that GONet remains synchronized with the user's " +
+                                        "networked code changes. However, there are situations where manual intervention is necessary to initiate this process.\nThere are two primary use " +
+                                        "cases when users will need to manually refresh GONet's code generation:\n\n1. Before Entering Play Mode: It's essential to refresh GONet's code " +
+                                        "generation manually if any changes (creation, modification, or deletion) related to GONet have been made since last manual refresh. This step " +
+                                        "guarantees that the networked code is up-to-date and accurately reflects recent changes.\n\n2. When changing 'GONetAutoMagicalSync' fields: This " +
+                                        "manual action is required when creating, modifying, or deleting a public field with the 'GONetAutoMagicalSync' attribute attached. Specially, when " +
+                                        "the GameObject of that component also contains a 'GONetParticipant' component. By doing so, you ensure that synchronization is correctly established " +
+                                        "between the components and their networked behavior. Also, by refreshing code generation, the user will have access to the related SyncEvent_GeneratedType " +
+                                        "value in case the user wants to subscribe using GONetEventBus.Subscribe method.\n\nThese manual interventions ensure the integrity of your networked code in GONet, guaranteeing " +
+                                        "that it remains synchronized with your Unity project's changes";
+            EditorGUILayout.HelpBox(REFRESH_TEXT, MessageType.None);
+
+            if (GUILayout.Button("Refresh GONet code generation"))
+            {
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+            }
+
+            EditorGUILayout.Separator();
+            EditorGUILayout.Separator();
+            EditorGUILayout.Separator();
+            EditorGUILayout.LabelField("Fix GONet's code generation", sectionHeaderGUIStyle);
+            EditorGUILayout.Separator();
+
             EditorStyles.label.wordWrap = true;
-            const string FIX_TEXT = "Sometimes, code generation can get out of whack (i.e., when deleting/removing things in scene/project that are related to GONet) and the generated code will have compilation errors as a result.  If you go to manually edit the generated code to fix the compilation errors, you will quickly see that the code generation routine will come back and generate the code again and the compilation errors will return just as before.  The solution is to click this button to fix the issue to cause GONet code generation to start all over again, forgetting what it had cached previously to aid in code generation and redo it all fresh.  This should fix things.  If not, please feel free to contact customer support by emailing contactus@galoreinteractive.com.  NOTE: After clicking this button you will have to focus away from the Unity Editor window and then bring focus back so Unity will recognize the changes and recompile etc...";
-            EditorGUILayout.LabelField(FIX_TEXT);
+            const string FIX_TEXT = "Sometimes, code generation can get out of whack (i.e., when deleting/removing things in scene/project that are related to GONet) and the generated code will have " +
+                                    "compilation errors as a result.  If you go to manually edit the generated code to fix the compilation errors, you will quickly see that the code generation " +
+                                    "routine will come back and generate the code again and the compilation errors will return just as before.  The solution is to click this button to fix the issue " +
+                                    "to cause GONet code generation to start all over again, forgetting what it had cached previously to aid in code generation and redo it all fresh. " +
+                                    "This should fix things.  If not, please feel free to contact customer support by emailing contactus@galoreinteractive.com. " +
+                                    "NOTE: After clicking this button you will have to focus away from the Unity Editor window and then bring focus back so Unity will recognize the changes and " +
+                                    "recompile etc...";
+            EditorGUILayout.HelpBox(FIX_TEXT, MessageType.Warning);
             if (GUILayout.Button("Fix GONet Generated Code"))
             {
                 FixGONetGeneratedCode();
             }
-            EditorGUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Generate Runtime only scripts"))
+            {
+                GenerateRuntimeOnlyScripts();
+            }
+            if (GUILayout.Button("Delete Runtime only scripts"))
+            {
+                DeleteRuntimeOnlyScripts();
+            }
         }
 
         private void FixGONetGeneratedCode()
         {
-            if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.SNAPS_FILE))
+            if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH))
             {
-                File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.SNAPS_FILE);
+                File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
             }
 
-            if (Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
+            if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH))
             {
-                foreach (string filePath in Directory.GetFiles(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
-                {
-                    File.Delete(filePath);
-                }
+                File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
+            }
+
+            if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ASSET_FOLDER_SNAPS_FILE))
+            {
+                File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ASSET_FOLDER_SNAPS_FILE);
             }
 
             const string UNITY_LIBRARY_SCRIPT_ASSEMBLIES = "Library/ScriptAssemblies";
@@ -146,6 +202,19 @@ namespace GONet.Editor
                     File.Delete(filePath);
                 }
             }
+
+            if (Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
+            {
+                foreach (string filePath in Directory.GetFiles(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
+                {
+                    File.Delete(filePath);
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
         }
 
         internal static T CreateSyncSettingsProfileAsset<T>(string assetName) where T : ScriptableObject
@@ -164,6 +233,16 @@ namespace GONet.Editor
             Selection.activeObject = asset;
 
             return asset;
+        }
+
+        private void GenerateRuntimeOnlyScripts()
+        {
+            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GenerateFiles();
+        }
+
+        private void DeleteRuntimeOnlyScripts()
+        {
+            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.DeleteGeneratedFiles();
         }
     }
 }

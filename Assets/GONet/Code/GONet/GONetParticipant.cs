@@ -28,7 +28,7 @@ namespace GONet
     /// <summary>
     /// This is required to be present on any <see cref="GameObject"/> you want to have participate in GONet activities.
     /// </summary>
-    [DisallowMultipleComponent, ExecuteInEditMode]
+    [DisallowMultipleComponent, ExecuteInEditMode, DefaultExecutionOrder(-199)]
     public sealed class GONetParticipant : MonoBehaviour
     {
         #region constants

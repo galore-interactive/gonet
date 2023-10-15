@@ -14,6 +14,7 @@
  */
 
 using Assets.GONet.Code.GONet.Editor.Generation;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -21,9 +22,9 @@ namespace GONet.Generation
 {
     internal static class BobWad_Generated_Generator
     {
-        internal static void GenerateClass(byte maxCodeGenerationId, List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence)
+        internal static void GenerateClass(byte[] usedCodegenIds, List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence, List<Type> allUniqueIGONetEventStructTypes)
         {
-            var t4Template = new BobWad_GeneratedTemplate(maxCodeGenerationId, allUniqueSnapsForPersistence);
+            var t4Template = new BobWad_GeneratedTemplate(usedCodegenIds, allUniqueSnapsForPersistence, allUniqueIGONetEventStructTypes);
             string generatedClassText = t4Template.TransformText();
 
             if (!Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
@@ -32,6 +33,23 @@ namespace GONet.Generation
             }
             const string GEN_D = "_Generated.cs";
             string writeToPath = string.Concat(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH, nameof(BobWad), GEN_D);
+            File.WriteAllText(writeToPath, generatedClassText);
+        }
+    }
+
+    internal static class SyncEvent_GeneratedTypes_Generator
+    {
+        internal static void GenerateEnum(List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnapsForPersistence)
+        {
+            var t4TemplateEnum = new SyncEvent_GeneratedTypes_GeneratedTemplate(allUniqueSnapsForPersistence);
+            string generatedClassText = t4TemplateEnum.TransformText();
+
+            if (!Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
+            {
+                Directory.CreateDirectory(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH);
+            }
+
+            string writeToPath = string.Concat(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH, nameof(SyncEvent_GeneratedTypes), ".cs");
             File.WriteAllText(writeToPath, generatedClassText);
         }
     }

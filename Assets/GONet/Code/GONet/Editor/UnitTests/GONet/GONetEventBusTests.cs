@@ -16,6 +16,7 @@
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -34,6 +35,8 @@ namespace GONet
 
         LinkedList<string> orderedSubscriptions;
 
+        //Only define this preprocessor directive if you have already generated the runtime only scripts.
+#if MANUAL_UNIT_TESTING_SYNC_EVENTS
         [Test]
         public void SubscriptionPriorityYieldsProperCallOrderToHandlers()
         {
@@ -56,7 +59,7 @@ namespace GONet
             var subscription1 = GONetEventBus.Instance.Subscribe<IGONetEvent>(OnIGONetEvent);
             subscription1.SetSubscriptionPriority(-10);
 
-            var subscription5 = GONetEventBus.Instance.Subscribe<SyncEvent_GONetParticipant_IsRotationSyncd>(OnIsRotEvent);
+            var subscription5 = GONetEventBus.Instance.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_IsRotationSyncd, OnIsRotEvent);
             subscription5.SetSubscriptionPriority(10);
 
 
@@ -269,6 +272,8 @@ namespace GONet
         [Test]
         public void SubscriptionsAccountForGenericsAndInterfacesProperly()
         {
+            orderedSubscriptions = new LinkedList<string>();
+
             iGONetEventSubscriptionsFulfilled = 0;
             iPersistentEventSubscriptionsFulfilled = 0;
             iTransientEventSubscriptionsFulfilled = 0;
@@ -282,9 +287,9 @@ namespace GONet
             var s2 = GONetEventBus.Instance.Subscribe<IPersistentEvent>(OnIPersistentEvent);
             var s3 = GONetEventBus.Instance.Subscribe<ITransientEvent>(OnITransientEvent);
             var s4 = GONetEventBus.Instance.Subscribe<InstantiateGONetParticipantEvent>(OnInstantiationEvent);
-            var s5 = GONetEventBus.Instance.Subscribe<SyncEvent_GONetParticipant_IsRotationSyncd>(OnIsRotEvent);
+            var s5 = GONetEventBus.Instance.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_IsRotationSyncd, OnIsRotEvent);
             var s6 = GONetEventBus.Instance.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncEvent);
-            
+
             IGONetEvent iGONetEvent = new InstantiateGONetParticipantEvent();
             GONetEventBus.Instance.Publish(iGONetEvent); // +1 persistent, +1 iGONet, +1 instantiation
 
@@ -326,6 +331,7 @@ namespace GONet
             s5.Unsubscribe();
             s6.Unsubscribe();
         }
+#endif
 
         [Test]
         public void PublishCallDepth()
@@ -342,7 +348,7 @@ namespace GONet
             s2.Unsubscribe();
         }
 
-        /* Including this causes the event generation stuff to crash...somehow need to add to an exclude from generation list.....likely by checking if editor or not..namespace?
+        // Including this causes the event generation stuff to crash...somehow need to add to an exclude from generation list.....likely by checking if editor or not..namespace?
         public class TestEvent : IGONetEvent
         {
             long IGONetEvent.OccurredAtElapsedTicks => 0;
@@ -376,7 +382,6 @@ namespace GONet
             Assert.AreEqual(3, handlerOrder[1]);
             Assert.AreEqual(1, handlerOrder[2]);
         }
-        */
 
         private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
@@ -395,7 +400,7 @@ namespace GONet
             orderedSubscriptions.AddLast(nameof(OnSyncEvent));
         }
 
-        private void OnIsRotEvent(GONetEventEnvelope<SyncEvent_GONetParticipant_IsRotationSyncd> eventEnvelope)
+        private void OnIsRotEvent(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             ++isRotSubscriptionsFulfilled;
 

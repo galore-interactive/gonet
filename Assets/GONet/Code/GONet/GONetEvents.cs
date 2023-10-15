@@ -36,7 +36,19 @@ namespace GONet
     /// <summary>
     /// Implement this to this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
     /// </summary>
-    public partial interface ITransientEvent : IGONetEvent { }
+    public partial interface ITransientEvent : IGONetEvent
+    {
+        /// <summary>
+        /// GONet sends all events to all other machines in the simulation/game by default.
+        /// This need to return true if this event (type) is supposed to only be sent to the
+        /// singular/first recipient (and not subsequently relayed to the others connected to it) 
+        /// when one of the following typical APIs is called:
+        /// -<see cref="GONetMain.SendBytesToRemoteConnection(GONetConnection, byte[], int, byte)"/>
+        /// -<see cref="GONetConnection.SendMessageOverChannel(byte[], int, byte)"/>
+        /// </summary>
+        [IgnoreMember]
+        bool IsSingularRecipientOnly { get => false; } // TODO consider moving this up to IGONetEvent if applicable to IPersistentEvent as well
+    }
 
     /// <summary>
     /// Implement this for persistent events..opposite of extending <see cref="ITransientEvent"/> (see the comments there for more).
@@ -94,6 +106,19 @@ namespace GONet
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
+    [MessagePackObject]
+    public struct ClientRemotelyControlledGONetIdServerBatchAssignmentEvent : ITransientEvent
+    {
+        [IgnoreMember]
+        public bool IsSingularRecipientOnly => true;
+
+        [IgnoreMember]
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        [Key(0)]
+        public uint GONetIdRawBatchStart { get; set; }
+    }
+
     /// <summary>
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
     /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
@@ -112,6 +137,7 @@ namespace GONet
 
     /// <summary>
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its Start() method called and it is ready to be used by other game logic.
+    /// IMPORTANT: When this is fired/published, this is the first time it is certain that the <see cref="GONetParticipant.GONetId"/> value is fully assigned!
     /// </summary>
     public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
@@ -641,6 +667,10 @@ namespace GONet
         [Key(4)] public byte SyncMemberIndex;
         [Key(5)] public SyncEvent_ValueChangeProcessedExplanation Explanation;
 
+        [IgnoreMember] public abstract GONetSyncableValue ValuePrevious { get; }
+        [IgnoreMember] public abstract GONetSyncableValue ValueNew { get; }
+        [IgnoreMember] public abstract SyncEvent_GeneratedTypes SyncEvent_GeneratedType { get; }
+
         /// <summary>
         /// Do NOT use!  This is for object pooling and MessagePack only.
         /// </summary>
@@ -665,15 +695,19 @@ namespace GONet
     [MessagePackObject]
     public sealed class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
     {
-        [Key(6)]        public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember]  public long ElapsedTicks_Previous { get; private set; }
+        [Key(6)] public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember] public long ElapsedTicks_Previous { get; private set; }
 
-        [Key(7)]        public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember]  public long ElapsedTicks_New { get; private set; }
+        [Key(7)] public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [IgnoreMember] public long ElapsedTicks_New { get; private set; }
 
-        [Key(8)]        public double RoundTripSeconds_Latest { get; set; }
-        [Key(9)]        public double RoundTripSeconds_RecentAverage { get; set; }
-        [Key(10)]       public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
+        [Key(8)] public double RoundTripSeconds_Latest { get; set; }
+        [Key(9)] public double RoundTripSeconds_RecentAverage { get; set; }
+        [Key(10)] public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
+
+        [IgnoreMember] public override GONetSyncableValue ValuePrevious => ElapsedTicks_Previous;
+        [IgnoreMember] public override GONetSyncableValue ValueNew => ElapsedTicks_New;
+        [IgnoreMember] public override SyncEvent_GeneratedTypes SyncEvent_GeneratedType => throw new NotImplementedException();
 
         static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
         static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();

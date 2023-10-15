@@ -15,7 +15,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -25,6 +25,16 @@ namespace GONet.Utils
 {
     public static class StringUtils
     {
+        private static string[] cSharpReservedKeywords = { "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked",
+                                                           "class", "const", "continue", "decimal", "default", "delegate", "do", "double",
+                                                           "else", "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float",
+                                                           "for", "foreach", "goto", "if", "implicit", "in", "int", "interface", "internal",
+                                                           "is", "lock", "long", "namespace", "new", "null", "object", "operator", "out",
+                                                           "override", "params", "private", "protected", "public", "readonly", "ref", "return",
+                                                           "sbyte", "sealed", "short", "sizeof", "stackalloc", "static", "string", "struct",
+                                                           "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked",
+                                                           "unsafe", "ushort", "using", "virtual", "void", "volatile", "while" };
+
         /// <summary>
         /// TAKEN from .NET 4
         /// </summary>
@@ -226,6 +236,57 @@ namespace GONet.Utils
             char secondsASCII2 = (char)(seconds2 + NUMERIC_VALUES_TO_ASCII);
 
             appendTo.Append(minutesASCII1).Append(minutesASCII2).Append(COLON).Append(secondsASCII1).Append(secondsASCII2);
+        }
+
+        /// <summary>
+        /// Checks if an string is valid to be converted into C# compiled code. In order to pass this check, the string must follow the following rules:<br/>
+        /// 1. It does not start with a digit {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}.<br/>
+        /// 2. It is not null nor empty.<br/>
+        /// 3. It does not contain any white spaces { }.<br/>
+        /// 4. It is not any C# reserved keywords (Check the array field called <see cref="cSharpReservedKeywords"/>)<br/>
+        /// 5. It does not contain any Unicode Non Spacing Mark character https://www.fileformat.info/info/unicode/category/Mn/list.htm<br/>
+        /// 6. It does not contain any Unicode Enclosing Mark character https://www.fileformat.info/info/unicode/category/Me/list.htm<br/>
+        /// </summary>
+        /// <param name="stringToValidate">The string to validate</param>
+        /// <returns></returns>
+        public static bool IsStringValidForCSharpNamingConventions(string stringToValidate)
+        {
+            //Check if the string is null, empty or full of white spaces.
+            if (string.IsNullOrWhiteSpace(stringToValidate))
+            {
+                return false;
+            }
+
+            //Check if the string starts with a digit number.
+            if (char.IsDigit(stringToValidate[0]))
+            {
+                return false;
+            }
+
+            //Check if the string contains any white spaces.
+            if(stringToValidate.Any(char.IsWhiteSpace))
+            {
+                return false;
+            }
+
+            //Check if the string is a C# reserved keyword
+            if(Array.Exists(cSharpReservedKeywords, keyword => keyword == stringToValidate))
+            {
+                return false;
+            }
+
+            //Check if the string contains any Unicode Non Spacing or Enclosing Marks such as accents and other uncommon symbols.
+            string normalized = stringToValidate.Normalize(NormalizationForm.FormD);
+            foreach (char c in normalized)
+            {
+                UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (category == UnicodeCategory.NonSpacingMark || category == UnicodeCategory.EnclosingMark)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

@@ -104,6 +104,56 @@ namespace GONet.Utils
             return false;
         }
 
+        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector2 averageAcceleration)
+        {
+            averageAcceleration = new Vector2();
+
+            if (valueCount > 1)
+            {
+                Vector2 totalVelocity = Vector2.zero;
+                float totalSeconds = 0;
+                for (int i = 0; i < valueCount - 1; ++i)
+                {
+                    Vector2 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector2;
+                    Vector2 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector2;
+                    Vector2 velocity = val_1 - val_2;
+                    totalVelocity += velocity;
+                    totalSeconds += (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange - valueBuffer[i + 1].elapsedTicksAtChange).TotalSeconds;
+                }
+
+                averageAcceleration = totalVelocity / totalSeconds;
+
+                return true;
+            }
+
+            return false;
+        }
+
+        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector4 averageAcceleration)
+        {
+            averageAcceleration = new Vector4();
+
+            if (valueCount > 1)
+            {
+                Vector4 totalVelocity = Vector4.zero;
+                float totalSeconds = 0;
+                for (int i = 0; i < valueCount - 1; ++i)
+                {
+                    Vector4 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector3;
+                    Vector4 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector3;
+                    Vector4 velocity = val_1 - val_2;
+                    totalVelocity += velocity;
+                    totalSeconds += (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange - valueBuffer[i + 1].elapsedTicksAtChange).TotalSeconds;
+                }
+
+                averageAcceleration = totalVelocity / totalSeconds;
+
+                return true;
+            }
+
+            return false;
+        }
+
         internal static bool DetermineTimeBetweenStats(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out float min, out float average, out float max)
         {
             min = float.MaxValue;
@@ -202,8 +252,100 @@ namespace GONet.Utils
             return extrapolatedViaAcceleration;
         }
 
+        internal static Vector2 GetVector2AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector2 acceleration)
+        {
+            NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
+            Vector2 q0 = q0_snap.numericValue.UnityEngine_Vector2;
+
+            NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
+            Vector2 q1 = q1_snap.numericValue.UnityEngine_Vector2;
+
+            NumericValueChangeSnapshot q2_snap = newest;
+            Vector2 q2 = newest.numericValue.UnityEngine_Vector2;
+
+            Vector2 diff_q2_q1 = q2 - q1;
+            float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector2 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
+
+            Vector2 diff_q1_q0 = q1 - q0;
+            float diff_q1_q0_seconds = (float)TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector2 velocity_q1_q0 = diff_q1_q0 / diff_q1_q0_seconds;
+
+            acceleration = (velocity_q2_q1 - velocity_q1_q0);
+
+            float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector2 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
+
+            // s = 	s0 + v0t + ½at^2
+            var s0 = q2;
+            var v0 = velocity_q2_q1;
+            var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
+            Vector2 extrapolatedViaAcceleration = s;
+
+            //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
+
+            //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
+
+            return extrapolatedViaAcceleration;
+        }
+
+        internal static Vector4 GetVector4AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector4 acceleration)
+        {
+            NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
+            Vector4 q0 = q0_snap.numericValue.UnityEngine_Vector4;
+
+            NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
+            Vector4 q1 = q1_snap.numericValue.UnityEngine_Vector4;
+
+            NumericValueChangeSnapshot q2_snap = newest;
+            Vector4 q2 = newest.numericValue.UnityEngine_Vector4;
+
+            Vector4 diff_q2_q1 = q2 - q1;
+            float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector4 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
+
+            Vector4 diff_q1_q0 = q1 - q0;
+            float diff_q1_q0_seconds = (float)TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector4 velocity_q1_q0 = diff_q1_q0 / diff_q1_q0_seconds;
+
+            acceleration = (velocity_q2_q1 - velocity_q1_q0);
+
+            float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
+            Vector4 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
+
+            // s = 	s0 + v0t + ½at^2
+            var s0 = q2;
+            var v0 = velocity_q2_q1;
+            var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
+            Vector4 extrapolatedViaAcceleration = s;
+
+            //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
+
+            //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
+
+            return extrapolatedViaAcceleration;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static Vector3 GetQuadraticBezierValue(Vector3 p0, Vector3 p1, Vector3 p2, float t)
+        {
+            float u = 1 - t;
+            float uSquared = u * u;
+            float tSquared = t * t;
+            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static Vector2 GetQuadraticBezierValue(Vector2 p0, Vector2 p1, Vector2 p2, float t)
+        {
+            float u = 1 - t;
+            float uSquared = u * u;
+            float tSquared = t * t;
+            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static Vector4 GetQuadraticBezierValue(Vector4 p0, Vector4 p1, Vector4 p2, float t)
         {
             float u = 1 - t;
             float uSquared = u * u;

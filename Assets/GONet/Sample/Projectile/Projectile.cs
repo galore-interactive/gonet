@@ -97,7 +97,7 @@ namespace GONet.Sample
         {
             base.Start();
 
-            GONetMain.EventBus.Subscribe<SyncEvent_Transform_position>(OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
+            GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
         }
 
         private void Time_TimeSetFromAuthority(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks)
@@ -105,11 +105,11 @@ namespace GONet.Sample
             simulatedNonAuthorityTime.SetFromAuthority(toElapsedTicks);
         }
 
-        private void OnSendingMyTransform(GONetEventEnvelope<SyncEvent_Transform_position> eventEnvelope)
+        private void OnSendingMyTransform(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             //GONetLog.Debug("sending my transform: " + eventEnvelope.Event.valueNew + " time: " + eventEnvelope.Event.OccurredAtElapsedSeconds);
 
-            sentPositionBuffer.Enqueue(eventEnvelope.Event.valueNew);
+            sentPositionBuffer.Enqueue(eventEnvelope.Event.ValueNew.UnityEngine_Vector3);
             sentTimeInTicksBuffer.Enqueue(eventEnvelope.Event.OccurredAtElapsedTicks);
 
             if (sentPositionBuffer.Count > buffer_capacitySize)

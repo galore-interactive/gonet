@@ -28,7 +28,7 @@ namespace GONet
         Player_Standard = 1 << 0,
 
         /// <summary>
-        /// This would be set for (a) client-server topology with a client host (i.e., no dedigated server) or (b) peer to peer client host
+        /// This would be set for (a) client-server topology with a client host (i.e., no dedicated server) or (b) peer to peer client host
         /// </summary>
         ServerHost = 1 << 1,
 
@@ -83,8 +83,22 @@ namespace GONet
             }
         }
 
-        public delegate void InitializedWithServerDelegate(GONetClient client);
-        public event InitializedWithServerDelegate InitializedWithServer;
+        public delegate void ClientDelegate(GONetClient client);
+        public event ClientDelegate InitializedWithServer;
+
+        /// <summary>
+        /// This *will* be called from main Unity thread.
+        /// Also, consider subscribing to <see cref="ClientStateChangedEvent"/> to be informed of changes 
+        /// that go beyond just connect/disconnect (e.g., all other values of <see cref="ClientState"/>).
+        /// </summary>
+        public event ClientDelegate ClientConnected;
+
+        /// <summary>
+        /// This *will* be called from main Unity thread.
+        /// Also, consider subscribing to <see cref="ClientStateChangedEvent"/> to be informed of changes 
+        /// that go beyond just connect/disconnect (e.g., all other values of <see cref="ClientState"/>).
+        /// </summary>
+        public event ClientDelegate ClientDisconnected;
 
         /// <summary>
         /// This auto-assigned UID is used to correlate this client's connection to the server both on client side and server side.
@@ -105,6 +119,11 @@ namespace GONet
 
             client.OnStateChanged += OnStateChanged_BubbleEventUp;
             client.TickBeginning += Client_TickBeginning_PossibleSeparateThread;
+
+            // Since the OnStateChanged_BubbleEventUp can occur on non-main Unity thread, this
+            // provides a way to process (i.e., invoke public event) on the main thread since
+            // GONet event bus subscriptions are processed on the main thread.
+            GONetMain.EventBus.Subscribe<ClientStateChangedEvent>(OnStateChanged_BubbleEventUp_MainThread);
         }
 
         private void Client_TickBeginning_PossibleSeparateThread()
@@ -163,9 +182,23 @@ namespace GONet
             const string AUTH = ".  My client guid: ";
             GONetLog.Debug(string.Concat(CLIENT, Enum.GetName(typeof(ClientState), state), AUTH, connectionToServer.InitiatingClientConnectionUID));
 
+            // NOTE: The following will cause OnStateChanged_BubbleEventUp_MainThread to be called:
             if (previous != state)
             {
                 GONetMain.EventBus.PublishASAP(new ClientStateChangedEvent(GONetMain.Time.ElapsedTicks, connectionToServer.InitiatingClientConnectionUID, previous, state));
+            }
+        }
+
+        private void OnStateChanged_BubbleEventUp_MainThread(GONetEventEnvelope<ClientStateChangedEvent> eventEnvelope)
+        {
+            switch (eventEnvelope.Event.StateNow)
+            {
+                case ClientState.Connected:
+                    ClientConnected?.Invoke(this);
+                    break;
+                case ClientState.Disconnected:
+                    ClientDisconnected?.Invoke(this);
+                    break;
             }
         }
     }

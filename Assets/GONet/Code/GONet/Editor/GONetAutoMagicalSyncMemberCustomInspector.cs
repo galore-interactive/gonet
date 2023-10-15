@@ -15,10 +15,12 @@
 
 using GONet.Generation;
 using GONet.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -287,24 +289,10 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
 
 
                 Animator animator = targetGONetParticipant.GetComponent<Animator>();
-                if (animator != null)
+                if (AnimationEditorUtils.TryGetAnimatorControllerParameters(animator, out var parameters))
                 {
-                    AnimatorControllerParameter[] parameters = animator.parameters;
-                    int parameterCount = animator.parameterCount;
-
-                    if (animator.runtimeAnimatorController != null)
-                    { // IMPORTANT: in editor, looks like animator.parameterCount is [sometimes!...figured out when...it is only when the Animator window is open and its controller is selected...editor tries to do tricky stuff that whacks this all out for some reason] 0 even when shit is there....hence the usage of animator.runtimeAnimatorController.parameters instead of animator.parameters
-                        parameters = (AnimatorControllerParameter[])animator.runtimeAnimatorController.GetType().GetProperty(nameof(Animator.parameters), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(animator.runtimeAnimatorController);
-                        if (parameters == null)
-                        {
-                            throw new System.Exception("animator.runtimeAnimatorController != null but not able to get the parameters off of it, which is required");
-                        }
-                        parameterCount = parameters.Length;
-                    }
-
-                    if (parameterCount > 0)
+                    if (parameters != null && parameters.Length > 0)
                     {
-
                         if (targetGONetParticipant.animatorSyncSupport == null)
                         {
                             targetGONetParticipant.animatorSyncSupport = new GONetParticipant.AnimatorControllerParameterMap();
@@ -346,8 +334,15 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                                 GUI.enabled = false;
                             }
 
-                            for (int i = 0; i < parameterCount; ++i)
+                            for (int i = 0; i < parameters.Length; ++i)
                             {
+                                if (!StringUtils.IsStringValidForCSharpNamingConventions(parameters[i].name))
+                                {
+                                    GONetLog.Error($"The animation parameter name '{parameters[i].name}' is not valid. Skipping this parameter. Please, check the rules that a string must follow in order to be valid. You can find them within the class StringUtils.IsStringValidForCSharpNamingConventions");
+                                    Debug.LogError($"The animation parameter name '{parameters[i].name}' is not valid. Skipping this parameter. Please, check the rules that a string must follow in order to be valid. You can find them within the class StringUtils.IsStringValidForCSharpNamingConventions");
+                                    continue;
+                                }
+
                                 AnimatorControllerParameter animatorControllerParameter = parameters[i];
                                 bool isAnimParamTypeSupportedInGONet = animatorControllerParameter.type != AnimatorControllerParameterType.Trigger;
                                 string parameterSyncMap_key = animatorControllerParameter.name;
@@ -492,7 +487,7 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
             {
                 if (tooltip == TOOLTIP_PROFILE)
                 {
-                    Object mainAsset = AssetDatabase.LoadMainAssetAtPath(string.Concat(
+                    UnityEngine.Object mainAsset = AssetDatabase.LoadMainAssetAtPath(string.Concat(
                         GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH,
                         settingsProfileTemplateName,
                         GONetEditorWindow.ASSET_FILE_EXTENSION));

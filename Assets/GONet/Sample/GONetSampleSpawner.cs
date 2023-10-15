@@ -146,7 +146,7 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
         }
     }
 
-    private void InstantiateServerIfNotAlready()
+    public void InstantiateServerIfNotAlready()
     {
         if (!hasServerSpawned)
         {
@@ -155,7 +155,7 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
         }
     }
 
-    internal void InstantiateClientIfNotAlready()
+    public void InstantiateClientIfNotAlready()
     {
         if (!hasClientSpawned)
         {
