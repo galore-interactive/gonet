@@ -82,24 +82,49 @@ namespace GONet
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+            if(bitsPerComponent == DEFAULT_BITS_PER_COMPONENT)
+            {
+                float x;
+                bitStream_readFrom.ReadFloat(out x);
+                float y;
+                bitStream_readFrom.ReadFloat(out y);
 
-            return new Vector2(quantizer.Unquantize(x), quantizer.Unquantize(y));
+                return new Vector2(x, y);
+            }
+            else
+            {
+                uint x;
+                bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+                uint y;
+                bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+
+                return new Vector2(quantizer.Unquantize(x), quantizer.Unquantize(y));
+            }
         }
 
         public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
         {
             Vector2 vector2 = value.UnityEngine_Vector2;
 
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.y), bitsPerComponent);
+            if(bitsPerComponent == DEFAULT_BITS_PER_COMPONENT)
+            {
+                bitStream_appendTo.WriteFloat(vector2.x);
+                bitStream_appendTo.WriteFloat(vector2.y);
+            }
+            else
+            {
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.x), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector2.y), bitsPerComponent);
+            }
         }
 
         public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
         {
+            if(!isQuantizationInitialized)
+            {
+                return valueA == valueB;
+            }
+
             Vector2 vector2A = valueA.UnityEngine_Vector2;
             Vector2 vector2B = valueB.UnityEngine_Vector2;
 
@@ -132,12 +157,14 @@ namespace GONet
 
                 bitsPerComponent = quantizeDownToBitCount;
                 quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerComponent, true);
+
+                isQuantizationInitialized = true;
             }
         }
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
-            bool areFloatsFullSized = bitsPerComponent == 32;
+            bool areFloatsFullSized = bitsPerComponent == DEFAULT_BITS_PER_COMPONENT;
             if (areFloatsFullSized) // i.e., nothing to unquantize
             {
                 float x;
@@ -166,7 +193,7 @@ namespace GONet
         {
             Vector3 vector3 = value.UnityEngine_Vector3;
 
-            bool areFloatsFullSized = bitsPerComponent == 32;
+            bool areFloatsFullSized = bitsPerComponent == DEFAULT_BITS_PER_COMPONENT;
             if (areFloatsFullSized) // i.e., nothing to quantize
             {
                 bitStream_appendTo.WriteFloat(vector3.x);
@@ -183,6 +210,11 @@ namespace GONet
 
         public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
         {
+            if(!isQuantizationInitialized)
+            {
+                return valueA == valueB;
+            }
+
             Vector3 vector3A = valueA.UnityEngine_Vector3;
             Vector3 vector3B = valueB.UnityEngine_Vector3;
 
@@ -216,35 +248,68 @@ namespace GONet
 
                 bitsPerComponent = quantizeDownToBitCount;
                 quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerComponent, true);
+
+                isQuantizationInitialized = true;
             }
         }
 
         public GONetSyncableValue Deserialize(Utils.BitByBitByteArrayBuilder bitStream_readFrom)
         {
-            uint x;
-            bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
-            uint y;
-            bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
-            uint z;
-            bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
-            uint w;
-            bitStream_readFrom.ReadUInt(out w, bitsPerComponent);
+            if (bitsPerComponent == DEFAULT_BITS_PER_COMPONENT)
+            {
+                float x;
+                bitStream_readFrom.ReadFloat(out x);
+                float y;
+                bitStream_readFrom.ReadFloat(out y);
+                float z;
+                bitStream_readFrom.ReadFloat(out z);
+                float w;
+                bitStream_readFrom.ReadFloat(out w);
 
-            return new Vector4(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z), quantizer.Unquantize(w));
+                return new Vector4(x, y, z, w);
+            }
+            else
+            {
+                uint x;
+                bitStream_readFrom.ReadUInt(out x, bitsPerComponent);
+                uint y;
+                bitStream_readFrom.ReadUInt(out y, bitsPerComponent);
+                uint z;
+                bitStream_readFrom.ReadUInt(out z, bitsPerComponent);
+                uint w;
+                bitStream_readFrom.ReadUInt(out w, bitsPerComponent);
+
+                return new Vector4(quantizer.Unquantize(x), quantizer.Unquantize(y), quantizer.Unquantize(z), quantizer.Unquantize(w));
+            }
         }
 
         public void Serialize(Utils.BitByBitByteArrayBuilder bitStream_appendTo, GONetParticipant gonetParticipant, GONetSyncableValue value)
         {
             Vector4 vector4 = value.UnityEngine_Vector4;
 
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.x), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.y), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.z), bitsPerComponent);
-            bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.w), bitsPerComponent);
+            if(bitsPerComponent == DEFAULT_BITS_PER_COMPONENT)
+            {
+                bitStream_appendTo.WriteFloat(vector4.x);
+                bitStream_appendTo.WriteFloat(vector4.y);
+                bitStream_appendTo.WriteFloat(vector4.z);
+                bitStream_appendTo.WriteFloat(vector4.w);
+            }
+            else
+            {
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.x), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.y), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.z), bitsPerComponent);
+                bitStream_appendTo.WriteUInt(quantizer.Quantize(vector4.w), bitsPerComponent);
+            }
         }
 
         public bool AreEqualConsideringQuantization(GONetSyncableValue valueA, GONetSyncableValue valueB)
         {
+            if(!isQuantizationInitialized)
+            {
+                return valueA == valueB;
+            }
+
             Vector4 vector4A = valueA.UnityEngine_Vector4;
             Vector4 vector4B = valueB.UnityEngine_Vector4;
 
@@ -287,6 +352,8 @@ namespace GONet
 
                 bitsPerSmallestThreeItem = quantizeDownToBitCount;
                 quantizer = new Quantizer(quantizeLowerBound, quantizeUpperBound, bitsPerSmallestThreeItem, true);
+
+                isQuantizationInitialized = true;
             }
         }
 

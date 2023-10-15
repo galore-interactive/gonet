@@ -20,6 +20,7 @@ using System.Runtime.CompilerServices;
 using GONet.Utils;
 using System.Collections.Concurrent;
 using UnityEngine;
+using ReliableNetcode;
 
 namespace GONet
 {
@@ -32,6 +33,16 @@ namespace GONet
         /// It could be from a remote machine (i.e., <see cref="IsSourceRemote"/> will be true) or from this local machine (i.e., <see cref="IsFromMe"/> will be true).
         /// </summary>
         public virtual ushort SourceAuthorityId { get; set; }
+
+        /// <summary>
+        /// This ONLY should be used when the <see cref="SourceAuthorityId"/> is the server, in other words, when <see cref="IsSourceRemote"/> is false! This array contains the target remote client Ids that the server is going to transmit this event to.
+        /// </summary>
+        public virtual ushort TargetClientAuthorityId { get; internal set; }
+
+        /// <summary>
+        /// Tells GONet if this event should be transmitted Reliably or Unreliably
+        /// </summary>
+        public virtual bool IsReliable { get; protected set; }
 
         /// <summary>
         /// Indicates whether or not the event in this envelope initiated from a remote machine (as opposed to being from this/mine local machine).
@@ -63,6 +74,8 @@ namespace GONet
         /// It could be from a remote machine (i.e., <see cref="IsSourceRemote"/> will be true) or from this local machine (i.e., <see cref="IsFromMe"/> will be true).
         /// </summary>
         public override ushort SourceAuthorityId { get; set; }
+        public override ushort TargetClientAuthorityId { get; internal set; }
+        public override bool IsReliable { get; protected set; }
 
         /// <summary>
         /// Indicates whether or not the event in this envelope initiated from a remote machine (as opposed to being from this/mine local machine).
@@ -75,6 +88,8 @@ namespace GONet
         /// This will always return the opposite of <see cref="IsSourceRemote"/>.
         /// </summary>
         public override bool IsFromMe => SourceAuthorityId == GONetMain.MyAuthorityId;
+
+        public bool IsSingularRecipientOnly => eventTyped is ITransientEvent ? ((ITransientEvent)eventTyped).IsSingularRecipientOnly : false;
 
         T eventTyped;
 
@@ -91,6 +106,8 @@ namespace GONet
             envelope.Event = eventTyped;
             envelope.SourceAuthorityId = sourceAuthorityId;
             envelope.GONetParticipant = gonetParticipant;
+            envelope.IsReliable = true;
+            envelope.TargetClientAuthorityId = GONetMain.OwnerAuthorityId_Unset;
 
             return envelope;
         }
@@ -100,10 +117,12 @@ namespace GONet
             pool.Return(borrowed);
         }
 
-        internal void Init(T @event, ushort sourceAuthorityId)
+        internal void Init(T @event, ushort sourceAuthorityId, ushort targetClientAuthorityId, bool isReliable)
         {
             Event = @event;
             SourceAuthorityId = sourceAuthorityId;
+            TargetClientAuthorityId = targetClientAuthorityId;
+            IsReliable = isReliable;
 
             SyncEvent_ValueChangeProcessed syncEvent = @event as SyncEvent_ValueChangeProcessed;
             if (syncEvent == null)
@@ -156,6 +175,8 @@ namespace GONet
         readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_SpecificOnly = new Dictionary<Type, List<EventHandlerAndFilterer>>();
         readonly Dictionary<Type, List<EventHandlerAndFilterer>> handlersByEventType_IncludingChildren = new Dictionary<Type, List<EventHandlerAndFilterer>>();
 
+        private readonly Dictionary<SyncEvent_GeneratedTypes, Type> eventEnumTypeToEventTypeMap;
+
         private GONetEventBus()
         {
             for (int i = 0; i < genericEnvelopes_publishCallDepthIndex.Length; ++i)
@@ -163,6 +184,23 @@ namespace GONet
                 genericEnvelopes_publishCallDepthIndex[i] = new GONetEventEnvelope<IGONetEvent>();
                 specificTypeHandlers_tmp_publishCallDepthIndex[i] = new HashSet<EventHandlerAndFilterer>();
                 specificTypeHandlers_tmpList_publishCallDepthIndex[i] = new List<EventHandlerAndFilterer>(100);
+            }
+
+            eventEnumTypeToEventTypeMap = new Dictionary<SyncEvent_GeneratedTypes, Type>();
+            InitializeEventMap();
+        }
+
+        private void InitializeEventMap()
+        {
+            foreach (SyncEvent_GeneratedTypes eventType in Enum.GetValues(typeof(SyncEvent_GeneratedTypes)))
+            {
+                Type @type = Type.GetType("GONet." + eventType.ToString());
+                eventEnumTypeToEventTypeMap[eventType] = @type;
+
+                if (@type == null)
+                {
+                    GONetLog.Warning("Not valid type for: " + eventType.ToString());
+                }
             }
         }
 
@@ -183,7 +221,7 @@ namespace GONet
         /// IMPORTANT: Only call this from the main Unity thread!  If you need to call from a non main Unity thread, use/call <see cref="PublishASAP{T}(T)"/> instead.
         /// </summary>
         /// <returns>0 if all went well, otherwise the number of failures/exceptions occurred during individual subscription/handler processing</returns>
-        public int Publish<T>(T @event, ushort? remoteSourceAuthorityId = default) where T : IGONetEvent
+        public int Publish<T>(T @event, ushort? remoteSourceAuthorityId = default, ushort targetClientAuthorityId = GONetMain.OwnerAuthorityId_Unset, bool shouldPublishReliably = true) where T : IGONetEvent
         {
             int exceptionsThrown = 0;
 
@@ -200,7 +238,7 @@ namespace GONet
                     ushort sourceAuthorityId = remoteSourceAuthorityId.HasValue ? remoteSourceAuthorityId.Value : GONetMain.MyAuthorityId;
 
                     GONetEventEnvelope<IGONetEvent> genericEnvelope = genericEnvelopes_publishCallDepthIndex[genericEnvelope_publishCallDepth];
-                    genericEnvelope.Init(@event, sourceAuthorityId);
+                    genericEnvelope.Init(@event, sourceAuthorityId, targetClientAuthorityId, shouldPublishReliably);
 
                     for (int i = 0; i < handlerCount; ++i)
                     {
@@ -286,7 +324,68 @@ namespace GONet
         }
 
         /// <summary>
+        /// <para>Use this method to subscribe to events categorized as 'SyncEvent'. These events originate exclusively from GONetAutoMagicalSync fields when their values change</para>
         /// <para>IMPORTANT: It is vitally important that <paramref name="handler"/> code does NOT keep a reference to the envelope or the event inside the envelope.  These items are managed by an object pool for performance reasons.  If for some reason the handler needs to do operations against data inside the envelope or event after that method call is complete (e.g., in a method later on or in a coroutine or another thread) you have to either (a) copy data off of it into other variables or (b) make a copy and if you do that it is your responsibility to return it to the proper pool afterward.  TODO FIXME: add more info as to location of proper pools!</para>
+        /// <para>IMPORTANT: Only call this from the main Unity thread!</para>
+        /// </summary>
+        public Subscription<SyncEvent_ValueChangeProcessed> Subscribe(SyncEvent_GeneratedTypes eventEnumType, HandleEventDelegate<SyncEvent_ValueChangeProcessed> handler, EventFilterDelegate<SyncEvent_ValueChangeProcessed> filter = null)
+        {
+            GONetMain.EnsureMainThread_IfPlaying();
+
+            if (handler == null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            Type eventType = eventEnumTypeToEventTypeMap[eventEnumType];
+
+            List<EventHandlerAndFilterer> handlersForType = GetTypeHandlers_SpecificOnly(eventType);
+            var handlerAndPredicate = new EventHandlerAndFilterer(
+                new HandlerWrapper<SyncEvent_ValueChangeProcessed>(handler).Handle,
+                filter == null ? (EventFilterDelegate<IGONetEvent>)null : new FilterWrapper<SyncEvent_ValueChangeProcessed>(filter).Filter
+            );
+
+            return SubscribeInternal(eventType, handlersForType, handlerAndPredicate);
+        }
+
+        /// <summary>
+        /// NOTE: Finds/Creates list of observers for specific event type and returns it.
+        /// </summary>
+        private List<EventHandlerAndFilterer> GetTypeHandlers_SpecificOnly(Type eventType)
+        {
+            List<EventHandlerAndFilterer> handlers = null;
+            if (!handlersByEventType_SpecificOnly.TryGetValue(eventType, out handlers))
+            {
+                handlers = new List<EventHandlerAndFilterer>();
+                handlersByEventType_SpecificOnly[eventType] = handlers;
+            }
+
+            return handlers;
+
+            // since the filterPredicate cannot safely be compared for equality against another, don't cache the observable mapped to it and return a new observable each time // TODO for better storage/lookup efficiency's sake look into a way to compare filters
+        }
+
+        private Subscription<SyncEvent_ValueChangeProcessed> SubscribeInternal(Type eventType, List<EventHandlerAndFilterer> existingHandlersForSpecificType, EventHandlerAndFilterer newHandlerAndPredicate)
+        {
+            existingHandlersForSpecificType.Add(newHandlerAndPredicate);
+
+            Update_handlersByEventType_IncludingChildren_Deep(eventType);
+
+            ResortSubscribersByPriority();
+
+            var subscription = new Subscription<SyncEvent_ValueChangeProcessed>(
+                newHandlerAndPredicate,
+                existingHandlersForSpecificType,
+                () => Update_handlersByEventType_IncludingChildren_Deep(eventType));
+
+            subscription.IsSubscriptionActive = true;
+
+            return subscription;
+        }
+
+        /// <summary>
+        /// <para>Use this method to subscribe to events that are not categorized as 'SyncEvent'. If you want to subscribe to SyncEvents use the <see cref="Subscribe(SyncEvent_GeneratedTypes, HandleEventDelegate{SyncEvent_ValueChangeProcessed}, EventFilterDelegate{SyncEvent_ValueChangeProcessed})"/> method.</para>
+        /// <para>IMPORTANT: It is vitally important that <paramref name="handler"/> code does NOT keep a reference to the envelope or the event inside the envelope. These items are managed by an object pool for performance reasons.  If for some reason the handler needs to do operations against data inside the envelope or event after that method call is complete (e.g., in a method later on or in a coroutine or another thread) you have to either (a) copy data off of it into other variables or (b) make a copy and if you do that it is your responsibility to return it to the proper pool afterward. TODO FIXME: add more info as to location of proper pools!</para>
         /// <para>IMPORTANT: Only call this from the main Unity thread!</para>
         /// </summary>
         public Subscription<T> Subscribe<T>(HandleEventDelegate<T> handler, EventFilterDelegate<T> filter = null) where T : IGONetEvent
@@ -544,6 +643,7 @@ namespace GONet
                 // GONetLog.Debug("DREETS  pre borrow...eventEnvelope.EventUntyped.type: " + eventEnvelope.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
 
                 GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
+                envelopeTyped.TargetClientAuthorityId = eventEnvelope.TargetClientAuthorityId;
 
                 // GONetLog.Debug("DREETS  POST borrow..envelopeTyped.EventUntyped.type: " + envelopeTyped.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
                 wrappedHandler(envelopeTyped);

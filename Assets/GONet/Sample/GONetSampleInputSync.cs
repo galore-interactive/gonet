@@ -408,15 +408,15 @@ namespace GONet.Sample
 
         private void MonitorInputChanges()
         {
-            GetKey_W = Input.GetKey(KeyCode.W);
-            GetKey_A = Input.GetKey(KeyCode.A);
-            GetKey_S = Input.GetKey(KeyCode.S);
-            GetKey_D = Input.GetKey(KeyCode.D);
+            //GetKey_W = Input.GetKey(KeyCode.W);
+            //GetKey_A = Input.GetKey(KeyCode.A);
+            //GetKey_S = Input.GetKey(KeyCode.S);
+            //GetKey_D = Input.GetKey(KeyCode.D);
 
-            GetKey_LeftArrow = Input.GetKey(KeyCode.LeftArrow);
-            GetKey_RightArrow = Input.GetKey(KeyCode.RightArrow);
-            GetKey_UpArrow = Input.GetKey(KeyCode.UpArrow);
-            GetKey_DownArrow = Input.GetKey(KeyCode.DownArrow);
+            //GetKey_LeftArrow = Input.GetKey(KeyCode.LeftArrow);
+            //GetKey_RightArrow = Input.GetKey(KeyCode.RightArrow);
+            //GetKey_UpArrow = Input.GetKey(KeyCode.UpArrow);
+            //GetKey_DownArrow = Input.GetKey(KeyCode.DownArrow);
 
             #region unused stuff left in for reference
             /* Comment all this out since we are not using it...just putting it here for convenience if you need it.

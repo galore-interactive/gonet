@@ -134,7 +134,6 @@ namespace GONet
 
             AddIfAppropriate(gonetParticipant);
 
-
             ushort toBeRemotelyControlledByAuthorityId;
             if (GONetMain.IsServer && GONetSpawnSupport_Runtime.Server_TryGetMarkToBeRemotelyControlledBy(gonetParticipant, out toBeRemotelyControlledByAuthorityId))
             {

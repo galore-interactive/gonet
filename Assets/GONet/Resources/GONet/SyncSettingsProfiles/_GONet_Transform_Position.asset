@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: _GONet_Transform_Position
   m_EditorClassIdentifier: 
   SyncChangesASAP: 0
-  SyncChangesFrequencyOccurrences: 20
+  SyncChangesFrequencyOccurrences: 50
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1

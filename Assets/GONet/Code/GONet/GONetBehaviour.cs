@@ -22,13 +22,27 @@ namespace GONet
     /// <summary>
     /// Provides a base class with commonly used hooks into the GONet API that might be easier to use for beginners before they are familiar with GONet's event api (i.e., <see cref="GONetMain.EventBus"/>).
     /// </summary>
-    [DisallowMultipleComponent]
     public abstract class GONetBehaviour : MonoBehaviour
     {
+        [Tooltip("GONet will send a 'tick' at each of the unique synchronization schedules as defined in various profiles (i.e., GONet => GONet Editor Support => Create New Sync Settings Profile) used when syncing values.")]
+        [SerializeField] private bool isTickReceiver;
+        public bool IsTickReceiver
+        {
+            get => isTickReceiver;
+            set
+            {
+                isTickReceiver = value;
+                if (isTickReceiver)
+                {
+                    GONetMain.AddTickReceiver(this);
+                }
+            }
+        }
+
         private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
         private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
         private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
-        private Subscription<SyncEvent_GONetParticipant_OwnerAuthorityId> gonetSubscriptionOwnerAuthorityId;
+        private Subscription<SyncEvent_ValueChangeProcessed> gonetSubscriptionOwnerAuthorityId;
 
         /// <summary>
         /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
@@ -50,7 +64,20 @@ namespace GONet
             gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
             gonetSubscriptionStarted = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => OnGONetParticipantStarted(envelope.GONetParticipant));
             gonetSubscriptionDisabled = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(envelope => OnGONetParticipantDisabled(envelope.GONetParticipant));
-            gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.valuePrevious, envelope.Event.valueNew));
+            gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.ValuePrevious.System_UInt16, envelope.Event.ValueNew.System_UInt16));
+        }
+
+        protected virtual void OnEnable()
+        {
+            if (IsTickReceiver)
+            {
+                GONetMain.AddTickReceiver(this);
+            }
+        }
+
+        protected virtual void OnDisable()
+        {
+            GONetMain.RemoveTickReceiver(this);
         }
 
         private void OnGONetParticipant_OwnerAuthorityIdChanged(GONetParticipant gonetParticipant, uint gonetId, ushort valuePrevious, ushort valueNew)
@@ -102,6 +129,10 @@ namespace GONet
 
         public virtual void OnGONetParticipantEnabled(GONetParticipant gonetParticipant) { }
 
+        /// <summary>
+        /// IMPORTANT: When this is called, this is the first time it is certain that the 
+        ///            <see cref="GONetParticipant.GONetId"/> value is fully assigned!
+        /// </summary>
         public virtual void OnGONetParticipantStarted(GONetParticipant gonetParticipant) { }
 
         public virtual void OnGONetParticipantDisabled(GONetParticipant gonetParticipant) { }
@@ -113,6 +144,11 @@ namespace GONet
         /// </summary>
         /// <param name="gonetParticipant"></param>
         public virtual void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant) { }
+
+        /// <param name="uniqueTickHz">how many times a second this unique frequency is called at...there are many possibilities since each GONet sync settings profile can have its frequency set to a different value</param>
+        /// <param name="elapsedSeconds"></param>
+        /// <param name="deltaTime">seconds passed since last call to this</param>
+        internal virtual void Tick(short uniqueTickHz, double elapsedSeconds, double deltaTime) { }
     }
 
     /// <summary>
@@ -203,6 +239,10 @@ namespace GONet
 
         public virtual void OnGONetParticipantEnabled() { }
 
+        /// <summary>
+        /// IMPORTANT: When this is called, this is the first time it is certain that the 
+        ///            <see cref="GONetParticipant.GONetId"/> value is fully assigned!
+        /// </summary>
         public virtual void OnGONetParticipantStarted() { }
 
         public virtual void OnGONetParticipantDisabled() { }

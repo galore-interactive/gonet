@@ -63,11 +63,13 @@ namespace GONet.Sample
 
         private void Update()
         {
+            /* input sync was updated to new input system and some other stuff was commented out....need revisit this:
             MoveCameraIfMyInputDicates();
 
             CalculateEveryonesCameraPositionFromInputs();
 
             UpdateMinimap();
+            */
         }
 
         private void MoveCameraIfMyInputDicates()

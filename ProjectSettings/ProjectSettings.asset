@@ -3,7 +3,7 @@
 --- !u!129 &1
 PlayerSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 23
+  serializedVersion: 24
   productGUID: ca0f433bd1535a8468423702abf60ca6
   AndroidProfiler: 0
   AndroidFilterTouchesWhenObscured: 0
@@ -145,6 +145,7 @@ PlayerSettings:
     enable360StereoCapture: 0
   isWsaHolographicRemotingEnabled: 0
   enableFrameTimingStats: 0
+  enableOpenGLProfilerGPURecorders: 1
   useHDRDisplay: 0
   D3DHDRBitDepth: 0
   m_ColorGamuts: 00000000
@@ -161,7 +162,7 @@ PlayerSettings:
     tvOS: 0
   overrideDefaultApplicationIdentifier: 1
   AndroidBundleVersionCode: 1
-  AndroidMinSdkVersion: 19
+  AndroidMinSdkVersion: 22
   AndroidTargetSdkVersion: 0
   AndroidPreferredInstallLocation: 1
   aotOptions: 
@@ -176,10 +177,10 @@ PlayerSettings:
   StripUnusedMeshComponents: 1
   VertexChannelCompressionMask: 4054
   iPhoneSdkVersion: 988
-  iOSTargetOSVersionString: 11.0
+  iOSTargetOSVersionString: 12.0
   tvOSSdkVersion: 0
   tvOSRequireExtendedGameController: 0
-  tvOSTargetOSVersionString: 11.0
+  tvOSTargetOSVersionString: 12.0
   uIPrerenderedIcon: 0
   uIRequiresPersistentWiFi: 0
   uIRequiresFullScreen: 1
@@ -217,6 +218,7 @@ PlayerSettings:
   iOSLaunchScreeniPadCustomStoryboardPath: 
   iOSDeviceRequirements: []
   iOSURLSchemes: []
+  macOSURLSchemes: []
   iOSBackgroundModes: 0
   iOSMetalForceHardShadows: 0
   metalEditorSupport: 1
@@ -361,6 +363,103 @@ PlayerSettings:
       m_Height: 36
       m_Kind: 1
       m_SubKind: 
+  - m_BuildTarget: iPhone
+    m_Icons:
+    - m_Textures: []
+      m_Width: 180
+      m_Height: 180
+      m_Kind: 0
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 120
+      m_Height: 120
+      m_Kind: 0
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 167
+      m_Height: 167
+      m_Kind: 0
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 152
+      m_Height: 152
+      m_Kind: 0
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 76
+      m_Height: 76
+      m_Kind: 0
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 120
+      m_Height: 120
+      m_Kind: 3
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 80
+      m_Height: 80
+      m_Kind: 3
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 80
+      m_Height: 80
+      m_Kind: 3
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 40
+      m_Height: 40
+      m_Kind: 3
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 87
+      m_Height: 87
+      m_Kind: 1
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 58
+      m_Height: 58
+      m_Kind: 1
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 29
+      m_Height: 29
+      m_Kind: 1
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 58
+      m_Height: 58
+      m_Kind: 1
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 29
+      m_Height: 29
+      m_Kind: 1
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 60
+      m_Height: 60
+      m_Kind: 2
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 40
+      m_Height: 40
+      m_Kind: 2
+      m_SubKind: iPhone
+    - m_Textures: []
+      m_Width: 40
+      m_Height: 40
+      m_Kind: 2
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 20
+      m_Height: 20
+      m_Kind: 2
+      m_SubKind: iPad
+    - m_Textures: []
+      m_Width: 1024
+      m_Height: 1024
+      m_Kind: 4
+      m_SubKind: App Store
   m_BuildTargetBatching:
   - m_BuildTarget: Standalone
     m_StaticBatching: 1
@@ -377,6 +476,7 @@ PlayerSettings:
   - m_BuildTarget: WebGL
     m_StaticBatching: 0
     m_DynamicBatching: 0
+  m_BuildTargetShaderSettings: []
   m_BuildTargetGraphicsJobs:
   - m_BuildTarget: GameCoreScarlettSupport
     m_GraphicsJobs: 0
@@ -436,6 +536,8 @@ PlayerSettings:
     m_Devices:
     - Oculus
     - OpenVR
+  m_DefaultShaderChunkSizeInMB: 16
+  m_DefaultShaderChunkCount: 0
   openGLRequireES31: 0
   openGLRequireES31AEP: 0
   openGLRequireES32: 0
@@ -447,6 +549,7 @@ PlayerSettings:
   m_BuildTargetGroupLightmapEncodingQuality: []
   m_BuildTargetGroupLightmapSettings: []
   m_BuildTargetNormalMapEncoding: []
+  m_BuildTargetDefaultTextureCompressionFormat: []
   playModeTestRunnerEnabled: 0
   runPlayModeTestAsEditModeTest: 0
   actionOnDotNetUnhandledException: 1
@@ -465,6 +568,7 @@ PlayerSettings:
   switchScreenResolutionBehavior: 2
   switchUseCPUProfiler: 0
   switchUseGOLDLinker: 0
+  switchLTOSetting: 0
   switchApplicationID: 0x01004b9000490000
   switchNSODependencies: 
   switchTitleNames_0: 
@@ -540,7 +644,6 @@ PlayerSettings:
   switchReleaseVersion: 0
   switchDisplayVersion: 1.0.0
   switchStartupUserAccount: 0
-  switchTouchScreenUsage: 0
   switchSupportedLanguagesMask: 0
   switchLogoType: 0
   switchApplicationErrorCodeCategory: 
@@ -582,6 +685,7 @@ PlayerSettings:
   switchNativeFsCacheSize: 32
   switchIsHoldTypeHorizontal: 0
   switchSupportedNpadCount: 8
+  switchEnableTouchScreen: 1
   switchSocketConfigEnabled: 0
   switchTcpInitialSendBufferSize: 32
   switchTcpInitialReceiveBufferSize: 64
@@ -694,10 +798,9 @@ PlayerSettings:
   webGLLinkerTarget: 0
   webGLThreadsSupport: 0
   webGLDecompressionFallback: 0
+  webGLPowerPreference: 2
   scriptingDefineSymbols:
     1: UNITY_POST_PROCESSING_STACK_V2;LOG_INFO;LOG_DEBUG;LOG_WARNING;LOG_ERROR;LOG_FATAL
-    4: UNITY_POST_PROCESSING_STACK_V2
-    7: UNITY_POST_PROCESSING_STACK_V2;LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL
     13: UNITY_POST_PROCESSING_STACK_V2
     17: UNITY_POST_PROCESSING_STACK_V2
     18: UNITY_POST_PROCESSING_STACK_V2
@@ -708,18 +811,33 @@ PlayerSettings:
     25: UNITY_POST_PROCESSING_STACK_V2
     26: UNITY_POST_PROCESSING_STACK_V2
     27: UNITY_POST_PROCESSING_STACK_V2
+    4: UNITY_POST_PROCESSING_STACK_V2
+    7: UNITY_POST_PROCESSING_STACK_V2;LOG_DEBUG;LOG_INFO;LOG_WARNING;LOG_ERROR;LOG_FATAL
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
     Standalone: 0
   il2cppCompilerConfiguration: {}
-  managedStrippingLevel: {}
+  managedStrippingLevel:
+    EmbeddedLinux: 1
+    GameCoreScarlett: 1
+    GameCoreXboxOne: 1
+    Lumin: 1
+    Nintendo Switch: 1
+    PS4: 1
+    PS5: 1
+    Stadia: 1
+    WebGL: 1
+    Windows Store Apps: 1
+    XboxOne: 1
+    iPhone: 1
+    tvOS: 1
   incrementalIl2cppBuild: {}
   suppressCommonWarnings: 1
   allowUnsafeCode: 1
   useDeterministicCompilation: 1
-  useReferenceAssemblies: 1
   enableRoslynAnalyzers: 1
+  selectedPlatform: 0
   additionalIl2CppArgs: 
   scriptingRuntimeVersion: 1
   gcIncremental: 1
@@ -807,4 +925,6 @@ PlayerSettings:
   organizationId: 
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 1
+  playerDataPath: 
+  forceSRGBBlit: 1
   virtualTexturingSupportEnabled: 0

@@ -44,6 +44,12 @@ namespace GONet
         /// </summary>
         public event ClientActionDelegate ClientConnected;
 
+        /// <summary>
+        /// This *will* be called from main Unity thread.
+        /// Also, consider subscribing to <see cref="RemoteClientStateChangedEvent"/>.
+        /// </summary>
+        public event ClientActionDelegate ClientDisconnected;
+
         public GONetServer(int maxClientCount, string address, int port)
         {
             MaxClientCount = maxClientCount;
@@ -145,6 +151,12 @@ namespace GONet
 
                 gONetConnection_ServerToClient.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
             }
+        }
+
+        public void SendBytesToClient(GONetRemoteClient remoteClient, byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
+        {
+            GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClient.ConnectionToClient;
+            gONetConnection_ServerToClient.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
         }
 
         public void ForEachClient(Action<GONetConnection_ServerToClient> doThis)
@@ -266,6 +278,7 @@ namespace GONet
             } // else TODO warn
 
             remoteClientToGONetConnectionMap.Remove(client);
+            ClientDisconnected?.Invoke(gonetRemoteClient.ConnectionToClient);
         }
 
         public void Stop()

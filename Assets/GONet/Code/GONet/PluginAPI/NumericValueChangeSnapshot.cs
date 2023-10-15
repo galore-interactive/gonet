@@ -41,6 +41,8 @@ namespace GONet.PluginAPI
         {
             if (value.GONetSyncType == GONetSyncableValueTypes.System_Single ||
                 value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2 ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4 ||
                 value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion) // TODO move this to some public static list for folks to reference! e.g. Allowed Blendy Value Types
             {
                 return new NumericValueChangeSnapshot(elapsedTicksAtChange, value);

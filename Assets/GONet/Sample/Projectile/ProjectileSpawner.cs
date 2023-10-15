@@ -74,7 +74,9 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (shouldInstantiateBasedOnInput)
             {
-                GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation); // used to be: //Instantiate(projectilPrefab, transform.position, transform.rotation);
+                GONetParticipant gnp = 
+                    GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation);
+                GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it.  Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
             }
         }
 

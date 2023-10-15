@@ -107,7 +107,7 @@ namespace GONet
                 AddIfAppropriate(gnp);
             }
 
-            GONetMain.EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnGNPAuthorityChanged_CheckIfStilllMine);
+            GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, OnGNPAuthorityChanged_CheckIfStilllMine);
 
             StartCoroutine(AddToLookupOnceAuthorityIdKnown(this));
         }
@@ -171,7 +171,7 @@ namespace GONet
             return someGNP.OwnerAuthorityId == gonetParticipant.OwnerAuthorityId;
         }
 
-        private void OnGNPAuthorityChanged_CheckIfStilllMine(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
+        private void OnGNPAuthorityChanged_CheckIfStilllMine(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             if ((object)eventEnvelope.GONetParticipant != null && // not sure why this would be the case there, but have to double check..no likie the null
                 IsRelatedToThisLocality(eventEnvelope.GONetParticipant))

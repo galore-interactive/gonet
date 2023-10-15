@@ -136,7 +136,7 @@ namespace GONet
             const string ENV = "Environment.ProcessorCount: ";
             GONetLog.Info(ENV + Environment.ProcessorCount);
 
-            IsUnityApplicationEditor = Application.isEditor;
+            //IsUnityApplicationEditor = Application.isEditor;
             mainUnityThread = Thread.CurrentThread;
             Application.quitting += Application_quitting_TakeNote;
 
@@ -312,7 +312,7 @@ namespace GONet
             }
         }
 
-        public static bool IsUnityApplicationEditor { get; private set; } = false;
+        public static bool IsUnityApplicationEditor => Application.isEditor;
 
         /// <summary>
         /// IMPORTANT: This will NOT include ALL events that implement <see cref="IPersistentEvent"/> as it may sound *IF* anything cancelled out another/previous event (i.e., <see cref="ICancelOutOtherEvents"/>).
@@ -336,7 +336,8 @@ namespace GONet
                 { // just ensure this data structure has enough internal memory stuffs now so no allocations and GC crap has to happen later!
                     for (int i = 0; i < SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE; ++i)
                     {
-                        queue_needsReturnToPool.Enqueue(new SyncEvent_GONetParticipant_GONetId());
+                        var randomlySelectedType = new SyncEvent_Time_ElapsedTicks_SetFromAuthority();
+                        queue_needsReturnToPool.Enqueue(randomlySelectedType);
                     }
 
                     SyncEvent_ValueChangeProcessed item;
@@ -537,11 +538,17 @@ namespace GONet
         /// <para>
         /// If you want the value blending to go smoothly, you can ensure only to call this once <see cref="Server_HasEnoughValueBlendHistoryToSmoothly_AssumeAuthorityOver(GONetParticipant)"/> returns true.
         /// This can still be called and work out just ~fine when that method returns false, but there might be a one-frame warp/teleport from old values to new for the original/previous owner
+        /// 
+        /// This method will result in the extrapolation of synced GONetAutoMagicalSync values from <paramref name="gonetParticipant"/> that employ value blending techniques on the client side.
+        /// This implies that no lead time buffer will be utilized within the value blending technique causing the best effort to match the value on the server/owner machine at the current time.
         /// </para>
         /// <para>POST: *if* this method returns true, the value of <paramref name="gonetParticipant"/>'s <see cref="GONetParticipant.OwnerAuthorityId"/> will be changed to <see cref="MyAuthorityId"/> AND a new value for <see cref="GONetParticipant.gonetId_raw"/> will be assigned.</para>
         /// </summary>
         public static bool Server_AssumeAuthorityOver(GONetParticipant gonetParticipant)
         {
+            GONetLog.Debug("Server assuming authority over GNP.  Is Mine Already (i.e., client used server assigned GONetIdRaw batch)? " + IsMine(gonetParticipant));
+            // TODO need to implement the logic for automatically getting the initiating client a new batch if it is running low
+
             if (IsServer && gonetParticipant.OwnerAuthorityId != OwnerAuthorityId_Unset && !IsMine(gonetParticipant))
             {
                 Server_AssumeAuthorityOver_MakeCurrentAndStopValueBlending(gonetParticipant);
@@ -601,12 +608,12 @@ namespace GONet
             }
         }
 
-        private static void OnOwnerAuthorityIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_OwnerAuthorityId> eventEnvelope)
+        private static void OnOwnerAuthorityIdChanged(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             ////GONetLog.Debug("DREETS pork");
 
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
-            OnGONetIdComponentChanged_EnsureMapKeysUpdated(gonetParticipant, eventEnvelope.Event.valuePrevious);
+            OnGONetIdComponentChanged_EnsureMapKeysUpdated(gonetParticipant, eventEnvelope.Event.ValuePrevious.System_UInt16);
 
             if ((object)gonetParticipant != null && gonetParticipant.gonetId_raw != GONetParticipant.GONetId_Unset)
             {
@@ -645,16 +652,16 @@ namespace GONet
             }
         }
 
-        private static void OnGONetIdChanged(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
+        private static void OnGONetIdChanged(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             ////GONetLog.Debug("DREETS pork");
 
-            OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.valuePrevious);
+            OnGONetIdComponentChanged_EnsureMapKeysUpdated(eventEnvelope.GONetParticipant, eventEnvelope.Event.ValuePrevious.System_UInt32);
 
             OnGONetIdChanged_UpdatePersistentInstantiationEvents(eventEnvelope);
         }
 
-        private unsafe static void OnGONetIdChanged_UpdatePersistentInstantiationEvents(GONetEventEnvelope<SyncEvent_GONetParticipant_GONetId> eventEnvelope)
+        private unsafe static void OnGONetIdChanged_UpdatePersistentInstantiationEvents(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             LinkedListNode<IPersistentEvent> current = persistentEventsThisSession.First;
 
@@ -664,10 +671,10 @@ namespace GONet
                 if (persistentEvent is InstantiateGONetParticipantEvent)
                 {
                     InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)persistentEvent;
-                    SyncEvent_GONetParticipant_GONetId newGONetIdEvent = eventEnvelope.Event;
-                    if (instantiationEvent.GONetId == newGONetIdEvent.valuePrevious)
+                    SyncEvent_ValueChangeProcessed newGONetIdEvent = eventEnvelope.Event;
+                    if (instantiationEvent.GONetId == newGONetIdEvent.ValuePrevious.System_UInt32)
                     {
-                        instantiationEvent.GONetId = newGONetIdEvent.valueNew;
+                        instantiationEvent.GONetId = newGONetIdEvent.ValueNew.System_UInt32;
 
                         // this is a struct and the copy over of the value is not going to stick inside the persistentEventsThisSession...so we do linked list stuffities to replace old
 
@@ -763,10 +770,12 @@ namespace GONet
 
             EventBus.Subscribe<SyncEvent_ValueChangeProcessed>(OnSyncValueChangeProcessed_Persist_Local);
 
-            EventBus.Subscribe<SyncEvent_GONetParticipant_GONetId>(OnGONetIdChanged);
-            EventBus.Subscribe<SyncEvent_GONetParticipant_OwnerAuthorityId>(OnOwnerAuthorityIdChanged);
+            EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_GONetId, OnGONetIdChanged);
+            EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, OnOwnerAuthorityIdChanged);
 
             EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
+            
+            EventBus.Subscribe<ClientRemotelyControlledGONetIdServerBatchAssignmentEvent>(Client_AssignNewClientGONetIdRawBatch);
         }
 
         private static void OnNewBaselineValue_Remote(GONetEventEnvelope<ValueMonitoringSupport_NewBaselineEvent> eventEnvelope)
@@ -878,36 +887,63 @@ namespace GONet
         /// </summary>
         private static void OnAnyEvent_RelayToRemoteConnections_IfAppropriate(GONetEventEnvelope<IGONetEvent> eventEnvelope)
         {
-            if (eventEnvelope.Event is ILocalOnlyPublish)
+            if (eventEnvelope.Event is ILocalOnlyPublish ||                                            //If this event implements ILocalOnlyPublish means that it will only be published locally and it will not be remotely transmitted.
+                (eventEnvelope.IsSingularRecipientOnly && IsServer && eventEnvelope.IsSourceRemote) || //If this event has arrived to the server from a remote source and it does not need to be relayed then do not keep executing this method.
+                (IsClient && eventEnvelope.IsSourceRemote))                                            //If an event from a remote source (the server) has arrived to the client, it does not need to relay it to any other connection. That is a server side feature only.
             {
                 return;
             }
 
-            if (IsServer && eventEnvelope.IsSourceRemote) // in this case we have to be more selective and avoid sending to the remote originator!
+            //Get bytes from memory pool
+            int returnBytesUsedCount;
+            byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+
+            //Decide the Reliability of the event transmission based on the envelope
+            GONetChannelId channelId = eventEnvelope.IsReliable ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable;
+
+            //If the event was not generated by server and we are the server, we relay it to our connections except the event's remote originator.
+            if (IsServer && eventEnvelope.IsSourceRemote)
             {
-                int returnBytesUsedCount;
-                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
-
-                uint count = _gonetServer.numConnections;// remoteClients.Length;
-                for (int i = 0; i < count; ++i)
-                {
-                    GONetConnection_ServerToClient remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
-                    if (remoteClientConnection.OwnerAuthorityId != eventEnvelope.SourceAuthorityId)
-                    {
-                        GONetChannelId channelId = GONetChannel.EventSingles_Reliable; // TODO FIXME the envelope should have this on it as well if remote source
-                        SendBytesToRemoteConnection(remoteClientConnection, bytes, returnBytesUsedCount, channelId);
-                    }
-                }
-
-                SerializationUtils.ReturnByteArray(bytes);
+                SendBytesToRemoteConnectionsExceptSourceRemote(eventEnvelope.SourceAuthorityId, bytes, returnBytesUsedCount, channelId);
             }
             else if (IsServer || !eventEnvelope.IsSourceRemote)
             {
-                int returnBytesUsedCount;
-                byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount);
-                bool shouldSendRelilably = true; // TODO support unreliable events?
-                SendBytesToRemoteConnections(bytes, returnBytesUsedCount, shouldSendRelilably ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable);
-                SerializationUtils.ReturnByteArray(bytes);
+                //If we are a client we broadcast it to our connections (which are only the server)
+                if(IsClient)
+                {
+                    SendBytesToRemoteConnections(bytes, returnBytesUsedCount, channelId);
+                }
+                else
+                {
+                    bool shouldBroadcast = eventEnvelope.TargetClientAuthorityId == OwnerAuthorityId_Unset;
+                    if (shouldBroadcast)
+                    {
+                        SendBytesToRemoteConnections(bytes, returnBytesUsedCount, channelId);
+                    }
+                    else
+                    {
+                        GONetRemoteClient remoteClient = gonetServer.GetRemoteClientByAuthorityId(eventEnvelope.TargetClientAuthorityId);
+                        SendBytesToRemoteConnection(remoteClient.ConnectionToClient, bytes, returnBytesUsedCount, channelId);
+                    }
+                }
+            }
+
+            //Return borrowed bytes to memory pool
+            SerializationUtils.ReturnByteArray(bytes);
+        }
+
+        private static void SendBytesToRemoteConnectionsExceptSourceRemote(ushort remoteSourceAuthorityId, byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
+        {
+            GONetConnection_ServerToClient remoteClientConnection = null;
+            uint count = _gonetServer.numConnections;
+
+            for (int i = 0; i < count; ++i)
+            {
+                remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
+                if (remoteClientConnection.OwnerAuthorityId != remoteSourceAuthorityId)
+                {
+                    SendBytesToRemoteConnection(remoteClientConnection, bytes, bytesUsedCount, channelId);
+                }
             }
         }
 
@@ -1123,7 +1159,14 @@ namespace GONet
         {
             if (IsClient)
             {
-                return GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
+                GONetParticipant gonetParticipant = 
+                    GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
+
+                // In order for the caller to immediately see that this is remotely controlled, set this here locally and server will do the same after processing
+                // TODO make sure this local change does not mess up the one that occurs on server to propogate to all others
+                gonetParticipant.RemotelyControlledByAuthorityId = MyAuthorityId;
+
+                return gonetParticipant;
             }
 
             return null;
@@ -1894,7 +1937,24 @@ namespace GONet
 
             public long ElapsedTicks { get; private set; }
             double elapsedSeconds = ElapsedSecondsUnset;
+
+            /// <summary>
+            /// <para>This value is as close to the "same" across ALL machines in the game session (server and clients alike).</para>
+            /// 
+            /// <para>
+            /// If you want to know how far back in time the client is simulating to account for the buffered values in 
+            /// order to have smoothed/real data to display (i.e., <see cref="GONetGlobal.valueBlendingBufferLeadTimeMilliseconds"/>
+            /// as set in the Inspector), then use <see cref="ElapsedSeconds_ClientSimulation"/> instead of this.
+            /// </para>
+            /// </summary>
             public double ElapsedSeconds => elapsedSeconds;
+
+            /// <summary>
+            /// Use this if you want to know how far back in time from the actual time of <see cref="ElapsedSeconds"/> that the 
+            /// client is simulating to account for the buffered values in order to have smoothed/real data to display 
+            /// (i.e., <see cref="GONetGlobal.valueBlendingBufferLeadTimeMilliseconds"/> as set in the Inspector).
+            /// </summary>
+            public double ElapsedSeconds_ClientSimulation => elapsedSeconds - valueBlendingBufferLeadSeconds;
 
             float lastUpdateSeconds;
             /// <summary>
@@ -2091,7 +2151,7 @@ namespace GONet
                         ////////////////////////////////////////////////////////////////////////////
 
                         //GONetLog.Debug("received something....networkData.bytesUsedCount: " + networkData.bytesUsedCount);
-
+                        
                         {  // body:
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
                             {
@@ -2234,6 +2294,7 @@ namespace GONet
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
         {
             Server_AssignNewClientAuthorityId(connectionToClient);
+            Server_AssignNewClientGONetIdRawBatch(connectionToClient);
             Server_SendClientPersistentEventsSinceStart(connectionToClient);
             Server_SendClientCurrentState_AllAutoMagicalSync(connectionToClient);
             Server_SendClientIndicationOfInitializationCompletion(connectionToClient); // NOTE: sending this will cause the client to instantiate its GONetLocal
@@ -2285,11 +2346,37 @@ namespace GONet
             }
         }
 
+        private static void Server_AssignNewClientGONetIdRawBatch(GONetConnection_ServerToClient connectionToClient)
+        {
+            var @event = new ClientRemotelyControlledGONetIdServerBatchAssignmentEvent();
+            uint batchStart = lastAssignedGONetIdRaw + 1;
+            @event.GONetIdRawBatchStart = batchStart;
+            
+            client_finalServerGONetIdForRemoteControl_batchStartValues.Add(batchStart);
+            lastAssignedGONetIdRaw += CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+            
+            EventBus.Publish(@event, targetClientAuthorityId: connectionToClient.OwnerAuthorityId);
+        }
+
+        private static void Client_AssignNewClientGONetIdRawBatch(
+            GONetEventEnvelope<ClientRemotelyControlledGONetIdServerBatchAssignmentEvent> eventEnvelope)
+        {
+            if (IsClient)
+            {
+                client_finalServerGONetIdForRemoteControl_batchStartValues.Add(eventEnvelope.Event.GONetIdRawBatchStart);
+            }
+        }
+
         #endregion
 
         #region what once was GONetAutoMagicalSyncManager
 
-        static uint lastAssignedGONetId = GONetParticipant.GONetId_Unset;
+        static uint lastAssignedGONetIdRaw = GONetParticipant.GONetIdRaw_Unset;
+        static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
+        static readonly List<uint> client_finalServerGONetIdForRemoteControl_batchStartValues = new List<uint>();
+        static readonly Stack<int> client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack = new Stack<int>();
+        const int CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE = 100;
+
         /// <summary>
         /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
         /// The key into this is the <see cref="GONetParticipant.codeGenerationId"/>.
@@ -2531,7 +2618,12 @@ namespace GONet
                     return;
                 }
 
-                if (syncCompanion.gonetParticipant.IsNoLongerMine)
+                //TODO FIX ME Revisit
+                /*Since an IsMine_ToRemotelyControl entity is going to be controlled by the server based on the client inputs we don't want to interpolate this entity but extrapolate it.
+                  If we interpolate it, not only will we be adding at least a visual lag equal to RTT ms but also an additional useBufferLeadTicks ms from the interpolation buffer.
+                  This can make the entity feel really unresponsive. However, if the user only trust extrapolation, although the visual lag is not going to be that much, the behaviour
+                  could feel glitchy based on the issues that extrapolation techniques bring to the table.*/
+                if (syncCompanion.gonetParticipant.IsMine_ToRemotelyControl)
                 {
                     useBufferLeadTicks = 0;
                 }
@@ -2565,13 +2657,24 @@ namespace GONet
 
         internal struct SyncBundleUniqueGrouping
         {
+            /// <summary>
+            /// How many seconds between each scheduled call?
+            /// </summary>
             internal readonly float scheduleFrequency;
+            /// <summary>
+            /// How many times a second is the scheduled frequency?
+            /// </summary>
+            internal readonly short scheduleFrequencyHz;
             internal readonly AutoMagicalSyncReliability reliability;
             internal readonly bool mustRunOnUnityMainThread;
 
             internal SyncBundleUniqueGrouping(float scheduleFrequency, AutoMagicalSyncReliability reliability, bool mustRunOnUnityMainThread)
             {
                 this.scheduleFrequency = scheduleFrequency;
+
+                float v = 1.0f / scheduleFrequency;
+                scheduleFrequencyHz = (short)(v + 0.5f);
+
                 this.reliability = reliability;
                 this.mustRunOnUnityMainThread = mustRunOnUnityMainThread;
             }
@@ -2649,7 +2752,7 @@ namespace GONet
                         {
                             var autoSyncProcessingSupport =
                                 new AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable(uniqueSyncGrouping, activeAutoSyncCompanionsByCodeGenerationIdMap); // IMPORTANT: this starts the thread!
-
+                            autoSyncProcessingSupport.AboutToProcess += AutoSyncProcessingSupport_AboutToProcess;
                             autoSyncProcessingSupportByFrequencyMap[uniqueSyncGrouping] = autoSyncProcessingSupport;
 
                             if (uniqueSyncGrouping.mustRunOnUnityMainThread)
@@ -2669,6 +2772,40 @@ namespace GONet
                 var enableEvent = new GONetParticipantEnabledEvent(gonetIdThatIsGoingToBePopulated);
                 PublishEventAsSoonAsGONetIdAssigned(enableEvent, gonetParticipant);
             }
+        }
+
+        private static readonly Dictionary<SyncBundleUniqueGrouping, long> autoSyncUniqueGroupingToLastElapsedTicks =
+            new Dictionary<SyncBundleUniqueGrouping, long>();
+
+        private static void AutoSyncProcessingSupport_AboutToProcess(in SyncBundleUniqueGrouping uniqueGrouping, long elapsedTicks)
+        {
+            if (!autoSyncUniqueGroupingToLastElapsedTicks.TryGetValue(uniqueGrouping, out long uniqueElapsedTicks_previous))
+            {
+                uniqueElapsedTicks_previous = elapsedTicks;
+            }
+
+            double uniqueElapsedSeconds = TimeSpan.FromTicks(elapsedTicks).TotalSeconds;
+            double uniqueDeltaSeconds = TimeSpan.FromTicks(elapsedTicks - uniqueElapsedTicks_previous).TotalSeconds;
+
+            { // account for some tick receivers adding or removing during a call to tick, which must avoid updating collection while enumerating it
+                foreach (var tickReceiver in tickReceivers_awaitingAdd)
+                {
+                    tickReceivers.Add(tickReceiver);
+                }
+                tickReceivers_awaitingAdd.Clear();
+                foreach (var tickReceiver in tickReceivers_awaitingRemove)
+                {
+                    tickReceivers.Remove(tickReceiver);
+                }
+                tickReceivers_awaitingRemove.Clear();
+            }
+
+            foreach (var tickReceiver in tickReceivers)
+            {
+                tickReceiver.Tick(uniqueGrouping.scheduleFrequencyHz, uniqueElapsedSeconds, uniqueDeltaSeconds);
+            }
+
+            autoSyncUniqueGroupingToLastElapsedTicks[uniqueGrouping] = elapsedTicks;
         }
 
         /// <summary>
@@ -2736,13 +2873,20 @@ namespace GONet
             else
             {
                 //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
-
+                
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
-                    gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
-                    AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+                    if (IsClient && GONetSpawnSupport_Runtime.IsMarkedToBeRemotelyControlled(gonetParticipant))
+                    {
+                        Client_DoAutoPropogateInstantiationPrep_RemotelyControlled(gonetParticipant);
+                    }
+                    else
+                    {
+                        gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+                    }
 
+                    AssignGONetIdRaw_IfAppropriate(gonetParticipant);
                     AutoPropagateInitialInstantiation(gonetParticipant);
                 }
                 else
@@ -2754,6 +2898,65 @@ namespace GONet
 
             var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
             PublishEventAsSoonAsGONetIdAssigned(startEvent, gonetParticipant);
+        }
+
+        /// <summary>
+        /// PRE: Already known that <paramref name="gonetParticipant"/> has <see cref="GONetParticipant.IsMine_ToRemotelyControl"/> true.
+        /// PRE: <see cref="MyAuthorityId"/> is set to final value and is not <see cref="OwnerAuthorityId_Unset"/> in case it is needed as a fallback (i.e., when not enough values in id batch from server).
+        /// 
+        /// TODO: look into calling this method inside of <see cref="Client_InstantiateToBeRemotelyControlledByMe(GONetParticipant, Vector3, Quaternion)"/> instead of where it is called from now...this would allow for the final GONetId to be set/known immediately!
+        /// </summary>
+        private static void Client_DoAutoPropogateInstantiationPrep_RemotelyControlled(GONetParticipant gonetParticipant)
+        {
+            uint nextRemoteControlIdFromServer = client_lastServerGONetIdRawForRemoteControl == GONetParticipant.GONetIdRaw_Unset ? GONetParticipant.GONetIdRaw_Unset : client_lastServerGONetIdRawForRemoteControl + 1;
+            int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
+                if (nextRemoteControlIdFromServer == GONetParticipant.GONetIdRaw_Unset)
+                {
+                    nextRemoteControlIdFromServer = min_inclusive;
+                }
+                else
+                {
+                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+                    if (nextRemoteControlIdFromServer >= min_inclusive && nextRemoteControlIdFromServer < max_exclusive)
+                    {
+                        // good to go within the limits/range of this batch, nothing left to do/look for here
+                        break;
+                    }
+                    else if (nextRemoteControlIdFromServer == max_exclusive) // if just/already assigned end of range of this batch
+                    {
+                        // reset next and mark this batch for removal since we used all the items inside it at this point
+                        client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Push(i);
+                        nextRemoteControlIdFromServer = GONetParticipant.GONetIdRaw_Unset;
+                    }
+                    else
+                    {
+                        // this condition should not be possible
+                        GONetLog.Error("Not possible....guess it was.  oops....figure this one out!");
+                    }
+                }
+            }
+
+            count = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                int index = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Pop();
+                client_finalServerGONetIdForRemoteControl_batchStartValues.RemoveAt(index);
+            }
+
+            if (nextRemoteControlIdFromServer != GONetParticipant.GONetIdRaw_Unset)
+            {
+                gonetParticipant.OwnerAuthorityId = OwnerAuthorityId_Server;
+                client_lastServerGONetIdRawForRemoteControl = nextRemoteControlIdFromServer;
+            }
+            else
+            {
+                GONetLog.Warning($"Client instantiating something to remotely control, but no enough server assigned GONetIdRaw values to use.  Will default to client owned initially and auto-switch to server once server side.");
+                gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+                client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
+            }
         }
 
         /// <summary>
@@ -2799,9 +3002,9 @@ namespace GONet
         {
             if (shouldForceChangeEventIfAlreadySet || gonetParticipant.gonetId_raw == GONetParticipant.GONetId_Unset) // TODO need to avoid this when this guy is coming from replay too! gonetParticipant.WasInstantiated true is all we have now...will have WasFromReplay later
             {
-                if (lastAssignedGONetId < GONetParticipant.GONetId_Raw_MaxValue)
+                if (lastAssignedGONetIdRaw < GONetParticipant.GONetId_Raw_MaxValue)
                 {
-                    uint gonetId_raw = ++lastAssignedGONetId;
+                    uint gonetId_raw = GetNextAvailableGONetIdRaw(gonetParticipant);
                     gonetParticipant.GONetId = (gonetId_raw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED) | gonetParticipant.OwnerAuthorityId;
                 }
                 else
@@ -2809,6 +3012,38 @@ namespace GONet
                     throw new OverflowException("Unable to assign a new GONetId, because lastAssignedGONetId has reached the max value of GONetParticipant.GONetId_Raw_MaxValue, which is: " + GONetParticipant.GONetId_Raw_MaxValue);
                 }
             }
+        }
+
+        private static uint GetNextAvailableGONetIdRaw(GONetParticipant gonetParticipant)
+        {
+            ++lastAssignedGONetIdRaw;
+            
+            if (IsServer)
+            {
+                int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
+                for (int i = 0; i < count; ++i)
+                {
+                    uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
+                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+                    bool isNewValueInBatch = lastAssignedGONetIdRaw >= min_inclusive && lastAssignedGONetIdRaw < max_exclusive;
+                    if (isNewValueInBatch)
+                    {
+                        // if it was in a batch set it to the value just after the current batch
+                        lastAssignedGONetIdRaw = max_exclusive;
+                    }
+                }
+            }
+            else
+            {
+                bool isForRemotelyControlledOnClient = IsClient && gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Server;
+                if (isForRemotelyControlledOnClient && client_lastServerGONetIdRawForRemoteControl != GONetParticipant.GONetIdRaw_Unset)
+                {
+                    --lastAssignedGONetIdRaw; // undo the now unwanted action we did above in method
+                    return client_lastServerGONetIdRawForRemoteControl;
+                }
+            }
+
+            return lastAssignedGONetIdRaw;
         }
 
         private static void AutoPropagateInitialInstantiation(GONetParticipant gonetParticipant)
@@ -2970,6 +3205,9 @@ namespace GONet
 
             static readonly long END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS = TimeSpan.FromSeconds(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS).Ticks;
 
+            internal delegate void ProcessContext(in SyncBundleUniqueGrouping uniqueGrouping, long elapsedTicks);
+            internal event ProcessContext AboutToProcess;
+
             SyncBundleUniqueGrouping uniqueGrouping;
             long scheduleFrequencyTicks;
             Dictionary<byte, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> everythingMap_evenStuffNotOnThisScheduleFrequency;
@@ -3109,6 +3347,9 @@ namespace GONet
                         myThread_Time.Update();
                     }
                     long myTicks = myThread_Time.ElapsedTicks;
+
+                    AboutToProcess?.Invoke(uniqueGrouping, myTicks);
+
                     // loop over everythingMap_evenStuffNotOnThisScheduleFrequency only processing the items inside that match scheduleFrequency
                     syncValuesToSend.Clear();
                     valuesNowAtRestToBroadcast.Clear();
@@ -3843,7 +4084,7 @@ namespace GONet
                 }
                 catch (Exception e)
                 {
-                    GONetLog.Error("BOOM! bitStream_headerAlreadyRead    position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
+                    GONetLog.Error("BOOM! bitStream_headerAlreadyRead  " + e.StackTrace + "  position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
 
                     throw e;
                 }
@@ -3900,6 +4141,19 @@ namespace GONet
                 }
             }
             return result;
+        }
+
+        private static readonly HashSet<GONetBehaviour> tickReceivers = new HashSet<GONetBehaviour>();
+        private static readonly HashSet<GONetBehaviour> tickReceivers_awaitingAdd = new HashSet<GONetBehaviour>();
+        private static readonly HashSet<GONetBehaviour> tickReceivers_awaitingRemove = new HashSet<GONetBehaviour>();
+        internal static void AddTickReceiver(GONetBehaviour gONetBehaviour)
+        {
+            tickReceivers_awaitingAdd.Add(gONetBehaviour);
+        }
+
+        internal static void RemoveTickReceiver(GONetBehaviour gONetBehaviour)
+        {
+            tickReceivers_awaitingRemove.Add(gONetBehaviour);
         }
     }
 

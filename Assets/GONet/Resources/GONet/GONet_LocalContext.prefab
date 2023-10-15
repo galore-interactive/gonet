@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 813501420998215093}
   - component: {fileID: 5118336138822136954}
   - component: {fileID: 6351736879446647969}
-  - component: {fileID: 7643086083297997714}
   m_Layer: 0
   m_Name: GONet_LocalContext
   m_TagString: Untagged
@@ -30,6 +29,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 4.320548, y: 2.5862284, z: 6.2367}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 4
+  codeGenerationId: 1
   animatorSyncSupport:
     keys: []
     values: []
@@ -68,6 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c1069873881c12b4881efed2b6a6d3a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isTickReceiver: 0
 --- !u!114 &6351736879446647969
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -80,16 +81,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4036bcecddd421947a85c833702a01b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &7643086083297997714
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1664306667400202712}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a371f9581286c9046aa358e6ce54eac4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  IsBeingControlledViaManualOverride: 0
