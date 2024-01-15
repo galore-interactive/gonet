@@ -16,7 +16,7 @@
 using GONet;
 using GONet.Generation;
 using GONet.Utils;
-using MessagePack;
+using MemoryPack;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -126,7 +126,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                 }
 
                 {
-                    const string FILE_PATH = "Assets/GONet/Code/GONet/Generation/syncEventGeneratedTypes.bin";
+                    const string FILE_PATH = "Assets/GONet/Code/GONet/Generation/syncEventGeneratedTypes" + GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.BINARY_FILE_SUFFIX;
                     //Load syncEvents generated types from bin file
                     SyncEvent_GeneratedTypesFromBin syncEvent_GeneratedTypesFromBin = LoadAllGeneratedTypesFromPersistenceFile(FILE_PATH);
                     syncEventGeneratedTypesMap = syncEvent_GeneratedTypesFromBin.syncEventGeneratedTypesMap;
@@ -207,16 +207,18 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             }
 
             int returnBytesUsedCount;
-            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount);
+            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount, out bool doesNeedToReturn);
             FileUtils.WriteBytesToFile(filePath, snapsFileBytes, returnBytesUsedCount, FileMode.Truncate);
-            SerializationUtils.ReturnByteArray(snapsFileBytes);
+            if (doesNeedToReturn)
+            {
+                SerializationUtils.ReturnByteArray(snapsFileBytes);
+            }
         }
     }
 
-    [MessagePackObject]
-    public class SyncEvent_GeneratedTypesFromBin
+    [MemoryPackable]
+    public partial class SyncEvent_GeneratedTypesFromBin
     {
-        [Key(0)]
         public Dictionary<int, string> syncEventGeneratedTypesMap;
 
         public SyncEvent_GeneratedTypesFromBin()
@@ -224,6 +226,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             syncEventGeneratedTypesMap = new Dictionary<int, string>();
         }
 
+        [MemoryPack.MemoryPackConstructor]
         public SyncEvent_GeneratedTypesFromBin(Dictionary<int, string> syncEventGeneratedTypesMap)
         {
             this.syncEventGeneratedTypesMap = syncEventGeneratedTypesMap;
@@ -324,7 +327,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                 }
 
                 {
-                    const string FILE_PATH = "Assets/GONet/Code/GONet/Generation/syncEventGeneratedTypes.bin";
+                    const string FILE_PATH = "Assets/GONet/Code/GONet/Generation/syncEventGeneratedTypes" + GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.BINARY_FILE_SUFFIX;
 
                     //Load syncEvents generated types from bin file
                     SyncEvent_GeneratedTypesFromBin syncEvent_GeneratedTypesFromBin = LoadAllGeneratedTypesFromPersistenceFile(FILE_PATH);
@@ -388,14 +391,14 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             if (File.Exists(filePath))
             {
                 byte[] snapsFileBytes = File.ReadAllBytes(filePath);
-                var l = SerializationUtils.DeserializeFromBytes<SyncEvent_GeneratedTypesFromBin>(snapsFileBytes);
+                if (snapsFileBytes != null && snapsFileBytes.Length > 0)
+                {
+                    var l = SerializationUtils.DeserializeFromBytes<SyncEvent_GeneratedTypesFromBin>(snapsFileBytes);
+                    return l;
+                }
+            }
 
-                return l;
-            }
-            else
-            {
-                return new SyncEvent_GeneratedTypesFromBin();
-            }
+            return new SyncEvent_GeneratedTypesFromBin();
         }
 
         private static void SaveGeneratedTypesToPersistenceFile(SyncEvent_GeneratedTypesFromBin allSnaps, string filePath)
@@ -406,9 +409,12 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
             }
 
             int returnBytesUsedCount;
-            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount);
+            byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount, out bool doesNeedToReturn);
             FileUtils.WriteBytesToFile(filePath, snapsFileBytes, returnBytesUsedCount, FileMode.Truncate);
-            SerializationUtils.ReturnByteArray(snapsFileBytes);
+            if (doesNeedToReturn)
+            {
+                SerializationUtils.ReturnByteArray(snapsFileBytes);
+            }
         }
 
         public virtual string TransformText()

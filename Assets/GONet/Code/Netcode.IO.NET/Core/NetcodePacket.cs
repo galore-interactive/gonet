@@ -533,14 +533,14 @@ namespace NetcodeIO.NET
 			if (length != Defines.MAC_SIZE)
 				return false;
 
-			byte[] tempBuffer = BufferPool.GetBuffer(0);
+			byte[] tempBuffer = BufferPool.GetBuffer(length);
 			try
 			{
 				PacketIO.ReadPacketData(Header, stream, length, protocolID, key, tempBuffer);
 			}
 			catch
 			{
-				BufferPool.ReturnBuffer(tempBuffer);
+                BufferPool.ReturnBuffer(tempBuffer);
 				return false;
 			}
 

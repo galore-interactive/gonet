@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: _GONet_Transform_Position
   m_EditorClassIdentifier: 
   SyncChangesASAP: 0
-  SyncChangesFrequencyOccurrences: 50
+  SyncChangesFrequencyOccurrences: 24
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
@@ -30,5 +30,6 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 12
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Vector3, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter,
+        Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

@@ -15,7 +15,6 @@
 
 using System;
 using GONet.Utils;
-using MessagePack;
 using MessagePack.LZ4;
 using System.Collections.Concurrent;
 using System.Threading;

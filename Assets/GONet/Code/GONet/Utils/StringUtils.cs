@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -287,6 +288,21 @@ namespace GONet.Utils
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// REMINDER: wrap in using to get cleanup when going out of scope
+        /// </summary>
+        /// <param name="string"></param>
+        /// <returns></returns>
+        public static Stream GenerateStreamFromString(string @string)
+        {
+            var stream = new MemoryStream();
+            var writer = new StreamWriter(stream);
+            writer.Write(@string);
+            writer.Flush();
+            stream.Position = 0;
+            return stream;
         }
     }
 }

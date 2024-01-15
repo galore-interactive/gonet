@@ -13,8 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-using MessagePack;
-using MessagePack.Resolvers;
+using MemoryPack;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -34,6 +33,7 @@ namespace GONet.Utils
 
         static SerializationUtils()
         {
+            /* TODO need to see if anything like the following is relevant for MemoryPack:
             //MessagePackSerializer.SetDefaultResolver();
 
             CompositeResolver.RegisterAndSetAsDefault(
@@ -47,6 +47,7 @@ namespace GONet.Utils
                 StandardResolver.Instance,
                 ContractlessStandardResolver.Instance
             );
+            */
         }
 
 
@@ -91,10 +92,16 @@ namespace GONet.Utils
         /// This is the best general purpose object serializer GONet can provide.
         /// IMPORTANT: As soon as you are done with the returned byte[], pass it to <see cref="ReturnByteArray(byte[])"/> and make sure it is returned from the same thread as this method is called from!
         /// </summary>
-        public static byte[] SerializeToBytes<T>(T @object, out int returnBytesUsedCount)
+        public static byte[] SerializeToBytes<T>(T @object, out int returnBytesUsedCount, out bool doesNeedToReturnToPool)
         {
-            return MessagePackSerializer.Serialize<T>(@object, borrowByteArray_messagePackFunc, out returnBytesUsedCount);
-            //return MessagePackSerializer.Serialize(@object, StandardResolverAllowPrivate.Instance);
+            return MemoryPackSerializer.Serialize<T>(@object, borrowByteArray_messagePackFunc, out returnBytesUsedCount, out doesNeedToReturnToPool);
+
+            /*{
+                byte[] serialized = MemoryPackSerializer.Serialize<T>(@object);
+                returnBytesUsedCount = serialized.Length;
+                doesNeedToReturnToPool = false;
+                return serialized;
+            }*/
         }
 
         /// <summary>
@@ -102,12 +109,7 @@ namespace GONet.Utils
         /// </summary>
         public static T DeserializeFromBytes<T>(byte[] bytes)
         {
-            return MessagePackSerializer.Deserialize<T>(bytes);
-        }
-
-        public static T DeserializeFromBytes<T>(byte[] bytes, int offset, out int bytesRead)
-        {
-            return MessagePackSerializer.Deserialize<T>(bytes, offset, MessagePackSerializer.DefaultResolver, out bytesRead);
+            return MemoryPackSerializer.Deserialize<T>(bytes);
         }
 
         /// <summary>
@@ -115,7 +117,7 @@ namespace GONet.Utils
         /// </summary>
         public static T DeserializeFromBytes<T>(ArraySegment<byte> bytes)
         {
-            return MessagePackSerializer.Deserialize<T>(bytes);
+            return MemoryPackSerializer.Deserialize<T>(bytes);
         }
     }
 }

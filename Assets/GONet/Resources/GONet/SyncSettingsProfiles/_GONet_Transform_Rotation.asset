@@ -13,13 +13,14 @@ MonoBehaviour:
   m_Name: _GONet_Transform_Rotation
   m_EditorClassIdentifier: 
   SyncChangesASAP: 0
-  SyncChangesFrequencyOccurrences: 20
+  SyncChangesFrequencyOccurrences: 24
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
   QuantizeDownToBitCount: 0
   QuantizeLowerBound: -1.7014117e+38
   QuantizeUpperBound: 1.7014117e+38
+  QuantizationResultingPrecision: <full precision - no quantization will occur>
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides:
@@ -29,5 +30,6 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 14
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Quaternion, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Quaternion_ExtrapolateWithLowPassSmoothingFilter,
+        Assembly-CSharp
   ShouldSkipSyncRegistrationId: 1

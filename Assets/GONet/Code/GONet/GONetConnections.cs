@@ -51,7 +51,6 @@ namespace GONet
             internal set
             {
                 rtt_latest = value;
-                UnityEngine.Debug.LogWarning(rtt_latest);
                 if (++iLast_rtt_recent == RTT_HISTORY_COUNT)
                 {
                     iLast_rtt_recent = 0;

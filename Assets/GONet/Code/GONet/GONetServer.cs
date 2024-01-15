@@ -45,7 +45,7 @@ namespace GONet
         public event ClientActionDelegate ClientConnected;
 
         /// <summary>
-        /// This *will* be called from main Unity thread.
+        /// This *will* be called from main Unity thread AFTER all internal stuff updated and cleaned up (i.e., data removed).
         /// Also, consider subscribing to <see cref="RemoteClientStateChangedEvent"/>.
         /// </summary>
         public event ClientActionDelegate ClientDisconnected;
@@ -271,9 +271,11 @@ namespace GONet
 
         private void ProcessClientNewlyDisconnected_MainUnityThread(RemoteClient client)
         {
-            GONetRemoteClient gonetRemoteClient;
-            if (remoteClientToGONetConnectionMap.TryGetValue(client, out gonetRemoteClient) && remoteClients.Remove(gonetRemoteClient))
+            if (remoteClientToGONetConnectionMap.TryGetValue(client, out GONetRemoteClient gonetRemoteClient) && 
+                remoteClients.Remove(gonetRemoteClient))
             {
+                remoteClientsByAuthorityId.Remove(gonetRemoteClient.ConnectionToClient.OwnerAuthorityId);
+
                 --numConnections;
             } // else TODO warn
 
@@ -289,6 +291,11 @@ namespace GONet
         public GONetRemoteClient GetRemoteClientByConnection(GONetConnection_ServerToClient connectionToClient)
         {
             return remoteClients.FirstOrDefault(x => x.ConnectionToClient == connectionToClient);
+        }
+
+        public bool TryGetRemoteClientByAuthorityId(ushort authorityId, out GONetRemoteClient gonetRemoteClient)
+        {
+            return remoteClientsByAuthorityId.TryGetValue(authorityId, out gonetRemoteClient);
         }
 
         public GONetRemoteClient GetRemoteClientByAuthorityId(ushort authorityId)

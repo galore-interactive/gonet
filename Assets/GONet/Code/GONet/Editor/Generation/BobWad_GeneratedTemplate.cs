@@ -107,7 +107,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-                this.Write("\t[MessagePack.Union(");
+                this.Write("\t[MemoryPack.MemoryPackUnion(");
 
 #line 76 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                 this.Write(this.ToStringHelper.ToStringWithCulture((++iPersistentEvents - 1).ToString()));
@@ -130,7 +130,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-            this.Write("\tpublic partial interface IGONetEvent { }\r\n\r\n\r\n");
+            this.Write("\t[MemoryPack.MemoryPackable] public partial interface IGONetEvent { }\r\n\r\n\r\n");
 
 #line 82 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
@@ -147,7 +147,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-                this.Write("\t[MessagePack.Union(");
+                this.Write("\t[MemoryPack.MemoryPackUnion(");
 
 #line 97 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                 this.Write(this.ToStringHelper.ToStringWithCulture((++iPersistentEvents - 1).ToString()));
@@ -170,7 +170,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-            this.Write("\tpublic partial interface ITransientEvent : IGONetEvent { }\r\n\r\n\r\n");
+            this.Write("\t[MemoryPack.MemoryPackable] public partial interface ITransientEvent : IGONetEvent { }\r\n\r\n\r\n");
 
 #line 103 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
@@ -187,7 +187,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-                this.Write("\t[MessagePack.Union(");
+                this.Write("\t[MemoryPack.MemoryPackUnion(");
 
 #line 118 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                 this.Write(this.ToStringHelper.ToStringWithCulture((++iPersistentEvents - 1).ToString()));
@@ -210,7 +210,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-            this.Write("\tpublic partial interface IPersistentEvent : IGONetEvent { }\r\n\r\n\t");
+            this.Write("\t[MemoryPack.MemoryPackable] public partial interface IPersistentEvent : IGONetEvent { }\r\n\r\n\t");
 
 #line 123 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
 
@@ -221,7 +221,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
 #line default
 #line hidden
-                this.Write("\t[MessagePack.Union(");
+                this.Write("\t[MemoryPack.MemoryPackUnion(");
 
 #line 128 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                 this.Write(this.ToStringHelper.ToStringWithCulture((++iPersistentEvents - 1).ToString()));
@@ -282,34 +282,34 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
     /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
     /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
     /// </summary>
-    [MessagePack.MessagePackObject]
-    internal sealed class ");
+    [MemoryPack.MemoryPackable]
+    internal sealed partial class ");
 
 #line 154 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                     this.Write(this.ToStringHelper.ToStringWithCulture(className));
 
 #line default
 #line hidden
-                    this.Write(" : SyncEvent_ValueChangeProcessed\r\n    {\r\n\t\t[MessagePack.Key(6)] public ");
+                    this.Write(" : SyncEvent_ValueChangeProcessed\r\n    {\r\n\t\tpublic ");
 
 #line 156 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                     this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
 
 #line default
 #line hidden
-                    this.Write(" valuePrevious;\r\n\t\t[MessagePack.Key(7)] public ");
+                    this.Write(" valuePrevious;\r\n\t\tpublic ");
 
 #line 157 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
                     this.Write(this.ToStringHelper.ToStringWithCulture(memberKVP.Value.Item1));
 
 #line default
 #line hidden
-                    this.Write(" valueNew;\n\t\t[MessagePack.IgnoreMember] public override GONetSyncableValue ValuePrevious => valuePrevious;" +
-                        "\n\t\t[MessagePack.IgnoreMember] public override GONetSyncableValue ValueNew => valueNew;\n");
+                    this.Write(" valueNew;\n\t\tpublic override GONetSyncableValue ValuePrevious => valuePrevious;" +
+                        "\n\t\tpublic override GONetSyncableValue ValueNew => valueNew;\n");
 
 #line default
 #line hidden
-                    this.Write("\t\t[MessagePack.IgnoreMember] public override GONet.SyncEvent_GeneratedTypes SyncEvent_GeneratedType => SyncEvent_GeneratedTypes.");
+                    this.Write("\t\tpublic override GONet.SyncEvent_GeneratedTypes SyncEvent_GeneratedType => SyncEvent_GeneratedTypes.");
 
 #line default
 #line hidden
@@ -351,7 +351,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
         static System.Threading.Thread borrowThread;
 
         /// <summary>
-        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Do NOT use!  This is for object pooling and MemoryPack only.
         /// Instead, call <see cref=""Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, ");
 
 #line 165 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"

@@ -84,10 +84,10 @@ namespace GONet
 	foreach (string tmpTypeFullName in tmpTypeFullNames.OrderBy(x => x))
     {
 	#>
-	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
+	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
 	<#
     }
-#>	public partial interface IGONetEvent { }
+#>	[MemoryPack.MemoryPackable] public partial interface IGONetEvent { }
 
 
 <#
@@ -105,10 +105,10 @@ namespace GONet
 	foreach (string tmpTypeFullName in tmpTypeFullNames.OrderBy(x => x))
     {
 	#>
-	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
+	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
 	<#
     }
-#>	public partial interface ITransientEvent : IGONetEvent { }
+#>	[MemoryPack.MemoryPackable] public partial interface ITransientEvent : IGONetEvent { }
 
 
 <#
@@ -126,17 +126,17 @@ namespace GONet
 	foreach (string tmpTypeFullName in tmpTypeFullNames.OrderBy(x => x))
     {
 	#>
-	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
+	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=tmpTypeFullName#>))]
 	<#
     }
-#>	public partial interface IPersistentEvent : IGONetEvent { }
+#>	[MemoryPack.MemoryPackable] public partial interface IPersistentEvent : IGONetEvent { }
 
 	<#
 	iPersistentEvents = 0;
 	foreach (string syncEventTypeFullName in syncEventTypeFullNames.OrderBy(x => x))
     {
 	#>
-	[MessagePack.Union(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=syncEventTypeFullName#>))]
+	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=syncEventTypeFullName#>))]
 	<#
     }
 #>	public abstract partial class SyncEvent_ValueChangeProcessed { }
@@ -194,22 +194,22 @@ namespace GONet
     /// <para>1) For an outbound change being sent to remote recipients (in which case, this event is published just AFTER the change has been sent to remote sources; however, the remote recipients likely have NOT received/processed it yet.)</para>
     /// <para>2) For an inbound change received from a remote source (in which case, this event is published just AFTER the change has been applied)</para>
     /// </summary>
-    [MessagePack.MessagePackObject]
-    public sealed class <#=className#> : SyncEvent_ValueChangeProcessed
+    [MemoryPack.MemoryPackable]
+    public partial sealed class <#=className#> : SyncEvent_ValueChangeProcessed
     {
-		[MessagePack.Key(6)] public <#=memberKVP.Value.Item1#> valuePrevious;
-		[MessagePack.Key(7)] public <#=memberKVP.Value.Item1#> valueNew;
+		public <#=memberKVP.Value.Item1#> valuePrevious;
+		public <#=memberKVP.Value.Item1#> valueNew;
 
-		[MessagePack.IgnoreMember] public override GONetSyncableValue ValuePrevious => valuePrevious;
-        [MessagePack.IgnoreMember] public override GONetSyncableValue ValueNew => valueNew;
-		[MessagePack.IgnoreMember] public override GONet.SyncEvent_GeneratedTypes SyncEvent_GeneratedType => SyncEvent_GeneratedTypes.<#=syncEventGeneratedTypeName#>;
+		[MemoryPack.MemoryPackIgnore] public override GONetSyncableValue ValuePrevious => valuePrevious;
+        [MemoryPack.MemoryPackIgnore] public override GONetSyncableValue ValueNew => valueNew;
+		[MemoryPack.MemoryPackIgnore] public override GONet.SyncEvent_GeneratedTypes SyncEvent_GeneratedType => SyncEvent_GeneratedTypes.<#=syncEventGeneratedTypeName#>;
 
         static readonly Utils.ObjectPool<<#=className#>> pool = new Utils.ObjectPool<<#=className#>>(GONetMain.SYNC_EVENT_QUEUE_SAVE_WHEN_FULL_SIZE + 50, 1);
         static readonly System.Collections.Concurrent.ConcurrentQueue<<#=className#>> returnQueue_onceOnBorrowThread = new System.Collections.Concurrent.ConcurrentQueue<<#=className#>>();
         static System.Threading.Thread borrowThread;
 
         /// <summary>
-        /// Do NOT use!  This is for object pooling and MessagePack only.
+        /// Do NOT use!  This is for object pooling and MemoryPack only.
         /// Instead, call <see cref="Borrow(SyncEvent_ValueChangeProcessedExplanation, long, uint, uint, byte, <#=memberKVP.Value.Item1#>, <#=memberKVP.Value.Item1#>)"/>.
         /// </summary>
         public <#=className#>() { }
