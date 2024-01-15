@@ -15,40 +15,136 @@
 
 using GONet.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace GONet
 {
     public static class GONetSpawnSupport_Runtime
     {
         public const string GONET_STREAMING_ASSETS_FOLDER = "GONet";
-        public const string DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS = GONET_STREAMING_ASSETS_FOLDER + "/DesignTimeLocations.txt";
+        public static readonly string DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS = Path.Combine(GONET_STREAMING_ASSETS_FOLDER, "DesignTimeLocations.txt");
 
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
         public const string RESOURCES = "Resources/";
 
-        private static readonly Dictionary<string, GONetParticipant> designTimeLocationToProjectTemplate = new Dictionary<string, GONetParticipant>(100);
+        private static readonly string[] ALL_END_OF_LINE_OPTIONS = new[] { "\r\n", "\r", "\n" };
 
-        private static readonly string[] EmptyStringArray = new string[0];
+        private static readonly Dictionary<string, GONetParticipant> designTimeLocationToProjectTemplate = new Dictionary<string, GONetParticipant>(100);
 
         public static IEnumerable<string> LoadDesignTimeLocationsFromPersistence()
         {
             string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+#if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_WEBGL)
+            Debug.Log($"About to check out design time file at URI {fullPath}.");
+            // As per, https://docs.unity3d.com/Manual/StreamingAssets.html :
+            // "On Android and WebGL platforms, it’s not possible to access the streaming asset files directly via file system APIs and
+            // streamingAssets path because these platforms return a URL. Use the UnityWebRequest class to access the content instead."
+            Task<string> fileContentsTask = LoadFileFromWeb_Task(fullPath);
+            if (fileContentsTask.Wait(5000))
+            {
+                string fileContents = fileContentsTask.Result;
+                return fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
+            }
+#else
+            Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
             {
                 string fileContents = File.ReadAllText(fullPath);
-                return fileContents.Split(Environment.NewLine.ToCharArray());
+                return fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
             }
+#endif
 
-            return EmptyStringArray;
+            throw new FileLoadException(fullPath);
         }
 
-        public static void CacheAllProjectDesignTimeLocations()
+        private static async Task<string> LoadFileFromWeb_Task(string uri)
         {
-            foreach (string designTimeLocation in LoadDesignTimeLocationsFromPersistence())
+            using UnityWebRequest fileRequest = UnityWebRequest.Get(uri);
+            
+            //fileRequest.SetRequestHeader("Content-Type", "text/plain");
+            //var inFlight = fileRequest.SendWebRequest();
+            
+            var inFlight = fileRequest.Send();
+            while (!inFlight.isDone)
+            {
+                await Task.Yield();
+            }
+            switch (fileRequest.result)
+            {
+                case UnityWebRequest.Result.Success:
+                    return fileRequest.downloadHandler.text;
+
+                default:
+                    throw new FileLoadException($"uri: {uri}, responseCode: {fileRequest.responseCode}, result: {fileRequest.result}");
+            }
+        }
+
+        private static IEnumerator LoadFileFromWeb_Coroutine(string uri, Action<string> processResult)
+        {
+            using UnityWebRequest fileRequest = UnityWebRequest.Get(uri);
+
+            //fileRequest.SetRequestHeader("Content-Type", "text/plain");
+            //var inFlight = fileRequest.SendWebRequest();
+
+            var inFlight = fileRequest.Send();
+            while (!inFlight.isDone)
+            {
+                yield return null;
+            }
+
+            switch (fileRequest.result)
+            {
+                case UnityWebRequest.Result.Success:
+                    processResult(fileRequest.downloadHandler.text);
+                    break;
+
+                default:
+                    throw new FileLoadException($"uri: {uri}, responseCode: {fileRequest.responseCode}, result: {fileRequest.result}");
+            }
+        }
+
+        public static void CacheAllProjectDesignTimeLocations(MonoBehaviour coroutineOwner)
+        {
+            coroutineOwner.StartCoroutine(
+                CacheAllProjectDesignTimeLocations_Coroutine(CacheAllProjectDesignTimeLocations)
+            );
+        }
+
+        private static IEnumerator CacheAllProjectDesignTimeLocations_Coroutine(Action<IEnumerable<string>> processResults)
+        {
+            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+#if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_WEBGL)
+            Debug.Log($"About to check out design time file at URI {fullPath}.");
+            // As per, https://docs.unity3d.com/Manual/StreamingAssets.html :
+            // "On Android and WebGL platforms, it’s not possible to access the streaming asset files directly via file system APIs and
+            // streamingAssets path because these platforms return a URL. Use the UnityWebRequest class to access the content instead."
+            yield return LoadFileFromWeb_Coroutine(fullPath, (fileContents) =>
+                {
+                    IEnumerable<string> lines = fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
+                    processResults(lines);
+                });
+                
+#else
+            Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
+            if (File.Exists(fullPath))
+            {
+                string fileContents = File.ReadAllText(fullPath);
+                IEnumerable<string> lines = fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
+                processResults(lines);
+            }
+            yield return null;
+#endif
+        }
+
+        private static void CacheAllProjectDesignTimeLocations(IEnumerable<string> allProjectDesignTimeLocations)
+        {
+            foreach (string designTimeLocation in allProjectDesignTimeLocations)
             {
                 if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
@@ -60,22 +156,6 @@ namespace GONet
                     }
                 }
             }
-
-            /* does not get all the goodies, because they are not all loaded leaving for ref for now
-            foreach (var gnp in Resources.LoadAll<GONetParticipant>(string.Empty))// FindObjectsOfTypeAll<GONetParticipant>())
-            //foreach (var gnp in Resources.FindObjectsOfTypeAll<GONetParticipant>())
-            {
-                if (gnp.designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
-                {
-                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(gnp.designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
-                    if ((object)template != null)
-                    {
-                        GONetLog.Debug("found template for design time location: " + gnp.designTimeLocation);
-                        designTimeLocationToProjectTemplate[gnp.designTimeLocation] = template;
-                    }
-                }
-            }
-            */
         }
 
         private static GONetParticipant LookupResourceTemplateFromProjectLocation(string projectLocation)

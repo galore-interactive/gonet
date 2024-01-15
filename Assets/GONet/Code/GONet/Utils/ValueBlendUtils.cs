@@ -29,9 +29,9 @@ namespace GONet.Utils
     {
         internal const int VALUE_COUNT_NEEDED_TO_EXTRAPOLATE = 2;
 
-        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
-            if (valueMonitoringSupport.TryGetBlendedValue(atElapsedTicks, out blendedValue))
+            if (valueMonitoringSupport.TryGetBlendedValue(atElapsedTicks, out blendedValue, out didExtrapolate))
             {
                 return true;
             }
@@ -43,10 +43,11 @@ namespace GONet.Utils
                 IGONetAutoMagicalSync_CustomValueBlending customBlending;
                 if (defaultValueBlendings_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].numericValue.GONetSyncType, out customBlending))
                 {
-                    return customBlending.TryGetBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue);
+                    return customBlending.TryGetBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolate);
                 }
             }
 
+            didExtrapolate = false;
             blendedValue = default;
             return false;
         }
@@ -240,9 +241,9 @@ namespace GONet.Utils
             Vector3 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
 
             // s = 	s0 + v0t + ½at^2
-            var s0 = q2;
-            var v0 = velocity_q2_q1;
-            var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
+            Vector3 s0 = q2;
+            Vector3 v0 = velocity_q2_q1;
+            Vector3 s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
             Vector3 extrapolatedViaAcceleration = s;
 
             //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");

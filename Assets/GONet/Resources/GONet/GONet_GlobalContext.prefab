@@ -27,13 +27,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8643402947905904701}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 30.144913, y: 2.3399231, z: -68.09898}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8643402947905904699
 MonoBehaviour:
@@ -52,8 +52,7 @@ MonoBehaviour:
     type: 3}
   GONetClientPREFAB: {fileID: 114597615443404838, guid: 4d70fba7ada04564ca38354a46d4d5f2,
     type: 3}
-  authorityPrefab: {fileID: 4427451128044106635, guid: cd51da3f44ba1a04f8b94ee6b34bd32f,
-    type: 3}
+  authorityPrefab: {fileID: 0}
 --- !u!114 &8643402947905904696
 MonoBehaviour:
   m_ObjectHideFlags: 0

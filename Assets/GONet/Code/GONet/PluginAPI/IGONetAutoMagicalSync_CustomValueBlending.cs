@@ -39,7 +39,7 @@ namespace GONet.PluginAPI
         /// IMPORTANT: <paramref name="valueBuffer"/> is a most recent "actual" value history in the form of an ordered array of <paramref name="valueCount"/> timestamp/value pairs and is sorted in most recent with lowest index to oldest with highest index order.
         /// </summary>
         /// <returns>true if a blended "best estimate" value at <paramref name="atElapsedTicks"/> was determined based on inputs and set in <paramref name="blendedValue"/>, false otherwise</returns>
-        bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue);
+        bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate);
     }
 
     #region GONet default implementations (i.e., should be good for general use cases - linear velocity and/or linear acceleration)
@@ -50,9 +50,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for floats that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -85,6 +87,7 @@ namespace GONet.PluginAPI
                                     float bezierTime = 0.5f + (interpolationTime / 2f);
                                     blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                    didExtrapolate = true;
                                 }
                                 else
                                 {
@@ -317,9 +320,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Quaternions that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -373,10 +378,12 @@ namespace GONet.PluginAPI
                                                 blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
                                             }
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -461,7 +468,8 @@ namespace GONet.PluginAPI
                                         }
                                     }
 
-                                    //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
+                                    //GONetLog.Debug("QWUAT-WAD extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
+                                    didExtrapolate = true;
                                 }
                                 else
                                 {
@@ -529,9 +537,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Vector3s with component values that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -603,17 +613,19 @@ namespace GONet.PluginAPI
                                                     overExtrapolationNewest,
                                                     timePercentageRemainingBeforeNextSync);*/
 
-                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
+                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.x}, y:{overExtrapolationNewest_adjustmentToSmooth.y}, z:{overExtrapolationNewest_adjustmentToSmooth.z})");
 
                                                 blendedValue = blendedValue.UnityEngine_Vector3 + overExtrapolationNewest_adjustmentToSmooth;
                                             }
 
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         Vector3 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out acceleration);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -647,6 +659,7 @@ namespace GONet.PluginAPI
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                         blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                         //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        didExtrapolate = true;
                                     }
                                 }
                                 else
@@ -658,7 +671,7 @@ namespace GONet.PluginAPI
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
                                 blendedValue = oldest.numericValue.UnityEngine_Vector3;
-                                //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
+                                //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(atElapsedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
@@ -676,7 +689,7 @@ namespace GONet.PluginAPI
                                             older.numericValue.UnityEngine_Vector3,
                                             newer.numericValue.UnityEngine_Vector3,
                                             interpolationTime);
-                                        //GONetLog.Debug("we loip'd 'eem");
+                                        //GONetLog.Debug($"we loip'd 'eem.  l: {older.numericValue}, r: {newer.numericValue}, t:{interpolationTime}");
                                         didWeLoip = true;
                                         break;
                                     }
@@ -695,11 +708,12 @@ namespace GONet.PluginAPI
                     }
                     else
                     {
-                        //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
+                        //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(GONetMain.Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
                         return false; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
                     }
                 }
 
+                //GONetLog.Debug("return blended: " + blendedValue);
                 return true;
             }
 
@@ -713,9 +727,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Vector2s with component values that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -793,11 +809,13 @@ namespace GONet.PluginAPI
                                             }
 
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         Vector2 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector2AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out acceleration);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -831,6 +849,7 @@ namespace GONet.PluginAPI
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                         blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                         //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        didExtrapolate = true;
                                     }
                                 }
                                 else
@@ -897,9 +916,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Vector4s with component values that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -977,11 +998,13 @@ namespace GONet.PluginAPI
                                             }
 
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         Vector4 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector4AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out acceleration);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -1015,6 +1038,7 @@ namespace GONet.PluginAPI
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                         blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                         //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        didExtrapolate = true;
                                     }
                                 }
                                 else
@@ -1085,9 +1109,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for floats that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -1120,6 +1146,7 @@ namespace GONet.PluginAPI
                                     float bezierTime = 0.5f + (interpolationTime / 2f);
                                     blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                    didExtrapolate = true;
                                 }
                                 else
                                 {
@@ -1352,9 +1379,11 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Quaternions that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
@@ -1370,7 +1399,8 @@ namespace GONet.PluginAPI
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            if (atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
+                            const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
+                            if (IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH || atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
                                 bool isEnoughInfoToExtrapolate = valueCount >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
@@ -1408,10 +1438,12 @@ namespace GONet.PluginAPI
                                                 // TODO UNCOMMENT: blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
                                             }
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -1499,6 +1531,7 @@ namespace GONet.PluginAPI
                                     blendedValue = ValueBlendUtils.GetSmoothedRotation(blendedValue.UnityEngine_Quaternion, valueBuffer, valueCount);
 
                                     //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
+                                    didExtrapolate = true;
                                 }
                                 else
                                 {
@@ -1562,16 +1595,28 @@ namespace GONet.PluginAPI
 
     public class GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter : IGONetAutoMagicalSync_CustomValueBlending
     {
+        public static bool ShouldLog = false;
+
         public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
 
         public string Description => "Provides a good blending solution for Vector3s with component values that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
-        public bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
+            didExtrapolate = false;
 
             if (valueCount > 0)
             {
+                //{ // TODO FIXME remove this temp test!!!!!
+                    int newestBufferIndex_TEMP = 0;
+                    NumericValueChangeSnapshot newest_TEMP = valueBuffer[newestBufferIndex_TEMP];
+                    //blendedValue = newest_TEMP.numericValue;
+                    //didExtrapolate = false; // false?
+                    //return true;
+                //}
+
                 { // use buffer to determine the actual value that we think is most appropriate for this moment in time
                     int newestBufferIndex = 0;
                     NumericValueChangeSnapshot newest = valueBuffer[newestBufferIndex];
@@ -1584,8 +1629,12 @@ namespace GONet.PluginAPI
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            if (atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
+                            if (ShouldLog) GONetLog.Debug("value count: " + valueCount);
+
+                            const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
+                            if (IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH || atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
+                                if (ShouldLog) GONetLog.Debug("\tif EXTRAPO");
                                 bool isEnoughInfoToExtrapolate = valueCount >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
@@ -1646,11 +1695,13 @@ namespace GONet.PluginAPI
                                             }
 
                                         }
+                                        didExtrapolate = true;
                                     }
                                     else if (valueCount > 2)
                                     {
                                         Vector3 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out acceleration);
+                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -1661,6 +1712,7 @@ namespace GONet.PluginAPI
 
                                         long atMinusNewestTicks = atElapsedTicks - newest.elapsedTicksAtChange;
                                         int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
+                                        if (extrapolationSections < 0) extrapolationSections = -extrapolationSections;
                                         long extrapolated_TicksAtChange = newest.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
                                         Vector3 extrapolated_ValueNew = newestValue + (valueDiffBetweenLastTwo * extrapolationSections);
 
@@ -1683,10 +1735,15 @@ namespace GONet.PluginAPI
                                         float remainingSectionPercentage = 1f - oneSectionPercentage;
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                         blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
-                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        //GONetLog.Debug("extroip'd....p0: " + justBeforeNewest_numericValue + " p1: " + newestValue + " p2: " + extrapolated_ValueNew + " blended: " + blendedValue + " t: " + bezierTime);
+                                        if (float.IsNaN(bezierTime) || float.IsNaN(blendedValue.UnityEngine_Vector3.x))
+                                        {
+                                            GONetLog.Warning($"extrapolationSections: {extrapolationSections}, denominator: {denominator}, atMinusNewestTicks: {atMinusNewestTicks}");
+                                        }
                                     }
 
                                     blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
+                                    didExtrapolate = true;
                                 }
                                 else
                                 {
@@ -1696,11 +1753,13 @@ namespace GONet.PluginAPI
                             }
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
+                                if (ShouldLog) GONetLog.Debug("\telse if  YOU OLD DEVIL YOU");
                                 blendedValue = oldest.numericValue.UnityEngine_Vector3;
                                 //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(adjustedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
+                                if (ShouldLog) GONetLog.Debug("\telse LOIP!");
                                 bool didWeLoip = false;
                                 for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
                                 {
@@ -1722,26 +1781,29 @@ namespace GONet.PluginAPI
                                 }
                                 if (!didWeLoip)
                                 {
-                                    GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                    if (ShouldLog) GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                 }
                             }
                         }
                         else
                         {
                             blendedValue = newestValue;
-                            GONetLog.Debug("not a vector3?");
+                            if (ShouldLog) GONetLog.Debug("not a vector3?");
                         }
                     }
                     else
                     {
-                        //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
+                        if (ShouldLog) GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(GONetMain.Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
                         return false; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
                     }
                 }
 
+                //float maguey = (newest_TEMP.numericValue.UnityEngine_Vector3 - blendedValue.UnityEngine_Vector3).magnitude;
+                //if (maguey > 0.75f) GONetLog.Debug($"\t\tdiff: bigger {maguey} , extrapo? (can: {atElapsedTicks >= newest_TEMP.elapsedTicksAtChange} vs will: {valueCount >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE})");
                 return true;
             }
 
+            if (ShouldLog) GONetLog.Debug($"NO VALUES!!! hash: {valueBuffer.GetHashCode()}");
             return false;
         }
     }

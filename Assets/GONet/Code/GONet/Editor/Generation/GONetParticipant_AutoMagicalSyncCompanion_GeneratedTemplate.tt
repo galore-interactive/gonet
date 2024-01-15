@@ -122,7 +122,7 @@ namespace GONet.Generation
 			support<#=iOverall#>.syncAttribute_SyncChangesEverySeconds = <#=singleMember.attribute.SyncChangesEverySeconds#>f;
 			support<#=iOverall#>.syncAttribute_Reliability = AutoMagicalSyncReliability.<#=singleMember.attribute.Reliability#>;
 			support<#=iOverall#>.syncAttribute_ShouldBlendBetweenValuesReceived = <#=singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false"#>;
-			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(<#=singleMember.attribute.ShouldSkipSync_RegistrationId#>, out support<#=iOverall#>.syncAttribute_ShouldSkipSync);
+			GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(<#=iOverall#>, out support<#=iOverall#>.syncAttribute_ShouldSkipSync);
 			support<#=iOverall#>.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(<#=singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f"#>, <#=singleMember.attribute.QuantizeDownToBitCount#>, true);
 
 <#			if (singleMember.attribute.CustomSerialize_Instance != null)
@@ -949,7 +949,7 @@ namespace GONet.Generation
         /// <summary>
         /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).
         /// </summary>
-        internal override void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        internal override GONet.GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
         {
 			switch (singleIndex)
 			{
@@ -1082,7 +1082,7 @@ namespace GONet.Generation
 				}
 			}#>
 				}
-				break;
+				return value;
 
 <#			++iOverall;
 		}

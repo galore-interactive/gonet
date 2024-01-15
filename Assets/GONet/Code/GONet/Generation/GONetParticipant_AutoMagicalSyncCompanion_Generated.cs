@@ -21,7 +21,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using UnityEngine;
 
 namespace GONet.Generation
 {
@@ -157,6 +156,8 @@ namespace GONet.Generation
                     {
                         if (valueChangeSupport.lastKnownValue == valueChangeSupport.lastKnownValue_previous)
                         {
+                            //Debug.Log($"AT REST possible @ index: {valueChangeSupport.index} this.type: {GetType().Name}");
+
                             //bool doesAtRestEvenApply = false; // TODO FIXME put the real processing of at rest back: valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             bool doesAtRestEvenApply = valueChangeSupport.syncAttribute_ShouldBlendBetweenValuesReceived;
                             if (doesAtRestEvenApply)
@@ -172,6 +173,7 @@ namespace GONet.Generation
                                     if (lastKnownValueAtRestBits[i] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST)
                                     {
                                         valuesAtRestToBroadcast.Add(valueChangeSupport);
+                                        //GONetLog.Debug($"I now recognize as at rest.  index: {valueChangeSupport.index}");
                                     }
                                 }
                             }
@@ -192,6 +194,10 @@ namespace GONet.Generation
                                 hasChange = true;
                             }
                         }
+                    }
+                    else
+                    {
+                        //Debug.Log($"skip wads @ index: {valueChangeSupport.index} this.type: {GetType().Name}, does match? {DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches)}");
                     }
                 }
             }
@@ -287,15 +293,30 @@ namespace GONet.Generation
         internal abstract void DeserializeInitAll(Utils.BitByBitByteArrayBuilder bitStream_readFrom, long assumedElapsedTicksAtChange);
 
         /// <summary>
-        ///  Deserializes a ginel value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
+        ///  Deserializes a single value (using <paramref name="singleIndex"/> to know which) from <paramref name="bitStream_readFrom"/>
         ///  and uses them to modify appropriate member variables internally.
         /// </summary>
-        internal abstract void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange);
+        internal void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange)
+        {
+            GONetSyncableValue value = DeserializeInitSingle_ReadOnlyNotApply(bitStream_readFrom, singleIndex);
+            InitSingle(value, singleIndex, assumedElapsedTicksAtChange);
+        }
 
         /// <summary>
         /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
         /// </summary>
-        internal virtual void DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex) { }
+        internal virtual GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        {
+            // NOTE: this return here is dummy and overrides in child classes will NOT call base.DeserializeInitSingle_ReadOnlyNotApply()
+            return default;
+        }
+
+        /// <summary>
+        /// At time of writing, this is here to take the output from <see cref="DeserializeInitSingle_ReadOnlyNotApply(BitByBitByteArrayBuilder, byte)"/>
+        /// as the input argument <paramref name="value"/> at some delayed time for whatever reason 
+        /// (e.g., after <see cref="GONetMain.valueBlendingBufferLeadSeconds"/> has transpired).
+        /// </summary>
+        internal abstract void InitSingle(GONetSyncableValue value, byte singleIndex, long assumedElapsedTicksAtChange);
 
         internal abstract void UpdateLastKnownValues(GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches);
 
@@ -409,14 +430,21 @@ namespace GONet.Generation
             }
         }
 
-        internal bool TryGetBlendedValue(byte index, NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue)
+        internal bool TryGetBlendedValue(
+            byte index, 
+            NumericValueChangeSnapshot[] valueBuffer, 
+            int valueCount, 
+            long atElapsedTicks, 
+            out GONetSyncableValue blendedValue,
+            out bool didExtrapolate)
         {
             IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
             if (customValueBlending != null)
             {
-                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue);
+                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolate);
             }
 
+            didExtrapolate = false;
             blendedValue = default;
             return false;
         }

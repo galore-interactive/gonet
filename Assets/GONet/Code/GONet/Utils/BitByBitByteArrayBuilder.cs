@@ -16,7 +16,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -24,7 +23,6 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using UnityEditor;
 
 namespace GONet.Utils
 {
@@ -78,9 +76,14 @@ namespace GONet.Utils
             Reset();
         }
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        [DllImport("libc.so")]
+#elif (UNITY_STANDALONE_LINUX || UNITY_IOS) && ENABLE_IL2CPP && !UNITY_EDITOR
+        [DllImport("libc")]
+#else
         [DllImport("msvcrt.dll")]
+#endif
         private static extern unsafe void* memset(void* ptr, int value, int num);
-
         private static unsafe void SetArrayElements(byte[] array, byte value, int elementsToSetCount)
         {
             fixed (void* ptr = array)
@@ -88,6 +91,15 @@ namespace GONet.Utils
                 memset(ptr, value, elementsToSetCount);
             }
         }
+        /* In case the above does not work, this method will work everywhere:
+        private static void SetArrayElements(byte[] array, byte value, int elementsToSetCount)
+        {
+            for (int i = 0; i < elementsToSetCount; ++i)
+            {
+                array[i] = value;
+            }
+        }
+        */
 
         /// <summary>
         /// Since the suggested use is only one of these instances per thread, this method must be called prior to any new usage for a particular purpose.

@@ -21,6 +21,7 @@ using System;
 using System.Threading;
 using System.Collections.Concurrent;
 using System.Text;
+using GONet.Utils;
 
 namespace GONet
 {
@@ -56,12 +57,41 @@ namespace GONet
 
         private static ILog _fileLogger;
 
+        private static readonly string configXml = @" <log4net>
+ 
+   <appender name=""FileAppender"" type=""log4net.Appender.RollingFileAppender"">
+     <file value=""logs\gonet.log"" />
+     <appendToFile value=""true"" />
+     <rollingStyle value=""Once"" />
+     <maxSizeRollBackups value=""10"" />
+     <maximumFileSize value=""10MB"" />
+     <staticLogFileName value=""true"" />
+     <layout type=""log4net.Layout.PatternLayout"">
+       <!-- <conversionPattern value=""%date %-5level in [%thread] %logger%newline%message%newline"" /> -->
+	   <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
+     </layout>
+   </appender>
+   
+	<appender name=""ConsoleAppender"" type=""log4net.Appender.ConsoleAppender"">
+		<layout type=""log4net.Layout.PatternLayout"">
+			   <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
+		 </layout>
+	</appender>
+ 
+   <root>
+     <level value=""ALL"" />
+     <appender-ref ref=""FileAppender"" />
+     <appender-ref ref=""ConsoleAppender"" />
+   </root>
+   
+ </log4net>
+";
+
         static GONetLog()
         {
             _fileLogger = LogManager.GetLogger(typeof(GONetLog));
-            string configPath = Path.Combine(Application.streamingAssetsPath, "GONet", "log_config.xml");
-            FileInfo info = new FileInfo(Path.Combine(Application.dataPath, configPath));
-            log4net.Config.XmlConfigurator.Configure(info);
+            using Stream configXmlStream = StringUtils.GenerateStreamFromString(configXml);
+            log4net.Config.XmlConfigurator.Configure(configXmlStream);
         }
 
         #region Append methods
@@ -235,8 +265,13 @@ namespace GONet
 
         private static string FormatMessage(string level, string message)
         {
-            const string FORMAT = "[{0}] (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{3}s) {4}";
-            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message);
+            const string FORMAT = "[{0}]{5}{6} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{3}s) {4}";
+            const string CLIENT = "[Client]";
+            const string SERVER = "[Server]";
+            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message,
+                GONetMain.IsServer ? SERVER : string.Empty,
+                GONetMain.IsClient ? CLIENT : string.Empty
+                );
         }
 
         private static void ProcessMessageViaLogger(string logString, string stackTrace, LogType type)

@@ -87,3 +87,18 @@ The following packages were updated:
   com.unity.ide.visualstudio from version 2.0.17 to 2.0.18
   com.unity.purchasing from version 4.5.2 to 4.8.0
   com.unity.timeline from version 1.4.8 to 1.6.5
+
+=== Tue Dec 26 11:53:51 2023
+
+Packages were changed.
+Update Mode: updateDependencies
+
+The following packages were added:
+  com.unity.ai.navigation@1.1.5
+The following packages were updated:
+  com.unity.analytics from version 3.6.12 to 3.8.1
+  com.unity.collab-proxy from version 2.0.4 to 2.2.0
+  com.unity.ide.rider from version 3.0.21 to 3.0.25
+  com.unity.ide.visualstudio from version 2.0.18 to 2.0.21
+  com.unity.purchasing from version 4.8.0 to 4.9.3
+  com.unity.timeline from version 1.6.5 to 1.7.6

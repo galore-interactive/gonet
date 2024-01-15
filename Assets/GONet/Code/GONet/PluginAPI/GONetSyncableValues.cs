@@ -213,11 +213,19 @@ namespace GONet
                 case GONetSyncableValueTypes.System_UInt64: return system_UInt64.ToString();
                 case GONetSyncableValueTypes.UnityEngine_Quaternion: return unityEngine_Quaternion.ToString();
                 case GONetSyncableValueTypes.UnityEngine_Vector2: return unityEngine_Vector2.ToString();
-                case GONetSyncableValueTypes.UnityEngine_Vector3: return unityEngine_Vector3.ToString();
+                case GONetSyncableValueTypes.UnityEngine_Vector3: return ToStringFull(unityEngine_Vector3);
                 case GONetSyncableValueTypes.UnityEngine_Vector4: return unityEngine_Vector4.ToString();
             }
 
             return base.ToString();
+        }
+
+        public static string ToStringFull(Vector3 vector3)
+        {
+            const string RP = ")";
+            const string LP = "(";
+            const string CS = ", ";
+            return string.Concat(LP, vector3.x, CS, vector3.y, CS, vector3.z, RP);
         }
 
         [Conditional("GONET_MEASURE_VALUES_MIN_MAX")]

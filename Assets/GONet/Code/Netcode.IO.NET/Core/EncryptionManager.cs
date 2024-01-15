@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
-
+using System.Text;
 using NetcodeIO.NET.Utils;
 
 namespace NetcodeIO.NET
@@ -50,10 +51,16 @@ namespace NetcodeIO.NET
         private int encyrptionMappings_totalCount;
 		internal encryptionMapEntry[] encryptionMappings;
 
-		public EncryptionManager(int maxClients)
+        /// <summary>
+        /// This set will contain the indexes to remove when calling to <see cref="RemoveAllEncryptionMappings"/>. Be sure to clear it before using it in case it is dirty from the previous use.
+        /// </summary>
+        private readonly HashSet<int> removedIndexes;
+
+
+        public EncryptionManager(int maxClients)
 		{
 			encryptionMappings = new encryptionMapEntry[maxClients * 4];
-            encyrptionMappings_totalCount = encryptionMappings.Length;
+			encyrptionMappings_totalCount = encryptionMappings.Length;
 
             for (int i = 0; i < encyrptionMappings_totalCount; ++i)
 			{
@@ -62,7 +69,9 @@ namespace NetcodeIO.NET
 			}
 
 			Reset();
-		}
+
+            removedIndexes = new HashSet<int>();
+        }
 
 		public void Reset()
 		{
@@ -71,7 +80,7 @@ namespace NetcodeIO.NET
 			{
 				encryptionMappings[i].Reset();
 			}
-		}
+        }
 
 		public bool AddEncryptionMapping(EndPoint address, byte[] sendKey, byte[] receiveKey, double currentSeconds, double expiresAtSeconds, int timeoutAfterSeconds, uint clientID)
 		{
@@ -114,7 +123,7 @@ namespace NetcodeIO.NET
 
 					++encyrptionMappings_usedCount;
 
-					return true;
+                    return true;
 				}
 			}
 
@@ -123,23 +132,51 @@ namespace NetcodeIO.NET
 
         /// <returns>The number of mappings removed (i.e., that match the <paramref name="address"/>).</returns>
 		public int RemoveAllEncryptionMappings(EndPoint address)
-		{
+        {
             int removedCount = 0;
+            removedIndexes.Clear();
 
-			for (int i = 0; i < encyrptionMappings_totalCount; i++)
-			{
+            for (int i = 0; i < encyrptionMappings_totalCount; i++)
+            {
                 if (!encryptionMappings[i].IsReset && MiscUtils.AreEndPointsEqual(encryptionMappings[i].Address, address))
-				{
+                {
                     encryptionMappings[i].Reset();
-                    --encyrptionMappings_usedCount;
+
+                    removedIndexes.Add(i);
                     ++removedCount;
                 }
-			}
+            }
 
-			return removedCount;
-		}
+            //Move all the following encryption mappings one position to the left in order to fill empty gaps.
+            foreach (int index in removedIndexes)
+            {
+                for (int i = index; i < encyrptionMappings_usedCount; ++i)
+                {
+                    //If it is the last one, reset it
+                    if (i == encyrptionMappings_usedCount - 1)
+                    {
+                        encryptionMappings[i].Reset();
+                    }
+                    else
+                    {
+                        encryptionMappings[i].Address = encryptionMappings[i + 1].Address;
+                        encryptionMappings[i].ExpiresAtSeconds = encryptionMappings[i + 1].ExpiresAtSeconds;
+                        encryptionMappings[i].LastAccessedAtSeconds = encryptionMappings[i + 1].LastAccessedAtSeconds;
+                        encryptionMappings[i].TimeoutAfterSeconds = encryptionMappings[i + 1].TimeoutAfterSeconds;
+                        encryptionMappings[i].ClientID = encryptionMappings[i + 1].ClientID;
 
-		public byte[] GetSendKey(int index)
+                        Buffer.BlockCopy(encryptionMappings[i + 1].SendKey, 0, encryptionMappings[i].SendKey, 0, 32);
+                        Buffer.BlockCopy(encryptionMappings[i + 1].ReceiveKey, 0, encryptionMappings[i].ReceiveKey, 0, 32);
+                    }
+                }
+
+                --encyrptionMappings_usedCount;
+            }
+
+            return removedCount;
+        }
+
+        public byte[] GetSendKey(int index)
 		{
 			if (index == -1 || index >= encyrptionMappings_totalCount) return null;
 			return encryptionMappings[index].SendKey;
@@ -194,7 +231,7 @@ namespace NetcodeIO.NET
 
 		public int GetEncryptionMappingIndexForTime(EndPoint address, double currentSeconds)
 		{
-            for (int i = 0; i < encyrptionMappings_totalCount; ++i)
+            for (int i = 0; i < encyrptionMappings_usedCount; ++i)
 			{
                 encryptionMapEntry encryptionMapping = encryptionMappings[i];
                 if (!encryptionMapping.IsReset &&
@@ -209,5 +246,24 @@ namespace NetcodeIO.NET
 
             return -1;
 		}
-	}
+
+        public string GetAllEncryptionMappingAddresses()
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            
+            for (int i = 0; i < encyrptionMappings_usedCount; ++i)
+            {
+                encryptionMapEntry encryptionMapping = encryptionMappings[i];
+                stringBuilder.Append('(')
+                    .Append(encryptionMapping.Address).Append(',')
+                    .Append(encryptionMapping.IsReset).Append(',')
+                    .Append(encryptionMapping.ExpiresAtSeconds).Append(',')
+                    .Append(encryptionMapping.LastAccessedAtSeconds).Append(',')
+                    .Append(encryptionMapping.TimeoutAfterSeconds)
+                    .Append(')');
+            }
+
+            return stringBuilder.ToString();
+        }
+    }
 }

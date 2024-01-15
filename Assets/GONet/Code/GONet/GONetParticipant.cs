@@ -373,6 +373,15 @@ namespace GONet
             return gonetId_raw != GONetId_Unset && OwnerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool DoesGONetIdContainAllComponents(uint gonetId)
+        {
+            uint gonetId_raw = (gonetId >> GONET_ID_BIT_COUNT_UNUSED);
+            ushort ownerAuthorityId = (ushort)((gonetId << GONET_ID_BIT_COUNT_USED) >> GONET_ID_BIT_COUNT_USED);
+
+            return gonetId_raw != GONetId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
+        }
+
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again

@@ -1,4 +1,4 @@
-﻿using MessagePack;
+﻿using MemoryPack;
 using System.Collections.Generic;
 using System.IO;
 
@@ -81,18 +81,21 @@ namespace GONet.Utils
         private void SaveToFile()
         {
             int returnBytesUsedCount;
-            byte[] fileBytes = SerializationUtils.SerializeToBytes(new Dicky<TKey, TValue>(dictionary), out returnBytesUsedCount);
+            byte[] fileBytes = SerializationUtils.SerializeToBytes(new Dicky<TKey, TValue>(dictionary), out returnBytesUsedCount, out bool doesNeedToReturn);
             FileUtils.WriteBytesToFile(filePath, fileBytes, returnBytesUsedCount, FileMode.Truncate);
-            SerializationUtils.ReturnByteArray(fileBytes);
+            if (doesNeedToReturn)
+            {
+                SerializationUtils.ReturnByteArray(fileBytes);
+            }
         }
     }
 
-    [MessagePackObject]
-    public class Dicky<TKey, TValue>
+    [MemoryPackable]
+    public partial class Dicky<TKey, TValue>
     {
-        [Key(0)]
         public Dictionary<TKey, TValue> dictionary;
 
+        [MemoryPackConstructor]
         public Dicky() { }
 
         public Dicky(Dictionary<TKey, TValue> dictionary)

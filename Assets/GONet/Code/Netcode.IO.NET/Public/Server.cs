@@ -479,8 +479,8 @@ namespace NetcodeIO.NET
 
 		// process an incoming disconnect message
 		private void processConnectionDisconnect(ByteArrayReaderWriter reader, NetcodePacketHeader header, int size, EndPoint sender)
-		{
-			if (checkReplay(header, sender))
+        {
+            if (checkReplay(header, sender))
 			{
 				return;
 			}
@@ -491,21 +491,21 @@ namespace NetcodeIO.NET
 			{
 				log("No crytpo key for sender", NetcodeLogLevel.Debug);
 				return;
-			}
+            }
 
-			var decryptKey = encryptionManager.GetReceiveKey(cryptIdx);
+            var decryptKey = encryptionManager.GetReceiveKey(cryptIdx);
 
 			var disconnectPacket = new NetcodeDisconnectPacket() { Header = header };
 			if (!disconnectPacket.Read(reader, size - (int)reader.ReadPosition, decryptKey, protocolID))
 				return;
 
-			// locate the client by endpoint and free their slot
-			var clientIndex = encryptionManager.GetClientID(cryptIdx);
+            // locate the client by endpoint and free their slot
+            var clientIndex = encryptionManager.GetClientID(cryptIdx);
 
 			var client = clientSlots[clientIndex];
             if (client == null) return;
 
-			clientSlots[clientIndex] = null;
+            clientSlots[clientIndex] = null;
 
 			encryptionManager.RemoveAllEncryptionMappings(sender);
 
@@ -728,9 +728,15 @@ namespace NetcodeIO.NET
 			bool serverAddressInEndpoints = privateConnectToken.ConnectServers.Any(x => x.Endpoint.CompareEndpoint(this.listenEndpoint, this.Port));
 			if (!serverAddressInEndpoints)
 			{
-				log("Server address not listen in token", NetcodeLogLevel.Debug);
-				return;
-			}
+				log($"Server address not listen in token.  this.listenEndpoint: {this.listenEndpoint}", NetcodeLogLevel.Debug);
+
+				{
+					// SHAUN TODO: when server is listening on ANY or LOOPBACK, it will not show up in token from client
+					//return; put me in coach!
+
+					privateConnectToken.ConnectServers.ToList().ForEach(x => log($"\tprivateConnectionToken.ConnectServers[i].Endpoint: {x.Endpoint}", NetcodeLogLevel.Debug));
+				}
+            }
 
 			// if a client from packet source IP / port is already connected, ignore the packet
 			if (clientSlots.Any(x => x != null && x.RemoteEndpoint.Equals(sender)))
@@ -873,7 +879,7 @@ namespace NetcodeIO.NET
 			var cryptIdx = encryptionManager.GetEncryptionMappingIndexForTime(client.RemoteEndpoint, totalSeconds);
             if (cryptIdx == -1)
             {
-                GONet.GONetLog.Warning("This is some bogus turdmeal.  Trying to send payload to client, but no encryption mapping is going go cause not sending it.  Double you tea, Eff?");
+                GONet.GONetLog.Warning($"This is some bogus turdmeal.  Trying to send payload to client, but no encryption mapping is going go cause not sending it.  Double you tea, Eff?  client.RemoteEndpoint: {client.RemoteEndpoint}\n\ttotalSeconds: {totalSeconds}\n\t{encryptionManager.GetAllEncryptionMappingAddresses()}");
                 return;
             }
 

@@ -21,7 +21,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
@@ -33,6 +32,7 @@ using System.Net;
 using System.Collections;
 using System.Diagnostics;
 using GONet.PluginAPI;
+using System.Text;
 
 namespace GONet
 {
@@ -289,6 +289,9 @@ namespace GONet
                 _gonetServer.ClientConnected += Server_OnClientConnected_SendClientCurrentState;
 
                 MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
+
+                //const string INSTANTIATE = "Just called Instantiate server local context and now it has gonetId: ";
+                //GONetLog.Debug(string.Concat(INSTANTIATE, MyLocal.GONetParticipant.GONetId));
             }
         }
 
@@ -864,6 +867,8 @@ namespace GONet
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
+            GONetLog.Debug("******received persistent events bundle from remote source");
+
             { // TODO why not just publish each one of these so all the handlers kick in and process??????   otherwise, we are left with this piecemeal processing below....error prone and problematic for sure!
                 foreach (var item in eventEnvelope.Event.PersistentEvents)
                 {
@@ -894,9 +899,20 @@ namespace GONet
                 return;
             }
 
-            //Get bytes from memory pool
-            int returnBytesUsedCount;
-            byte[] bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+            byte[] bytes = default;
+            int returnBytesUsedCount = default;
+            bool doesNeedToReturn = default;
+            try
+            {
+                //Get bytes from memory pool
+                bytes = SerializationUtils.SerializeToBytes(eventEnvelope.Event, out returnBytesUsedCount, out doesNeedToReturn); // TODO FIXME if the envelope is processed from a remote source, then we SHOULD attach the bytes to it and reuse them!
+
+            }
+            catch (Exception e)
+            {
+                GONetLog.Error(e.ToString());
+                return;
+            }
 
             //Decide the Reliability of the event transmission based on the envelope
             GONetChannelId channelId = eventEnvelope.IsReliable ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable;
@@ -909,8 +925,9 @@ namespace GONet
             else if (IsServer || !eventEnvelope.IsSourceRemote)
             {
                 //If we are a client we broadcast it to our connections (which are only the server)
-                if(IsClient)
+                if (IsClient)
                 {
+                    GONetLog.Debug($"Sending event to server.  type: {eventEnvelope.Event.GetType().Name}");
                     SendBytesToRemoteConnections(bytes, returnBytesUsedCount, channelId);
                 }
                 else
@@ -928,8 +945,11 @@ namespace GONet
                 }
             }
 
-            //Return borrowed bytes to memory pool
-            SerializationUtils.ReturnByteArray(bytes);
+            if (doesNeedToReturn)
+            {
+                //Return borrowed bytes to memory pool
+                SerializationUtils.ReturnByteArray(bytes);
+            }
         }
 
         private static void SendBytesToRemoteConnectionsExceptSourceRemote(ushort remoteSourceAuthorityId, byte[] bytes, int bytesUsedCount, GONetChannelId channelId)
@@ -979,6 +999,8 @@ namespace GONet
                     persistentEventsThisSession.Remove(cancelledEvent); // remove the cancelled out earlier event
                 }
             }
+
+            //GONetLog.Debug($"Persistent event of type: {eventEnvelope.Event.GetType().Name} just passed through....updated overall count: {persistentEventsThisSession.Count}");
         }
 
         private static void OnInstantiationEvent_Remote(GONetEventEnvelope<InstantiateGONetParticipantEvent> eventEnvelope)
@@ -1078,17 +1100,18 @@ namespace GONet
 
         private static void InitShouldSkipSyncSupport()
         {
-            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd] = IsRotationNotSyncd;
 
-            GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd] = IsPositionNotSyncd;
+            // TODO FIXME add this back?: GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsRotationSyncd] = IsRotationNotSyncd;
+
+            // TODO FIXME add this back?: GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap[(int)GONetAutoMagicalSyncAttribute.ShouldSkipSyncRegistrationId.GONetParticipant_IsPositionSyncd] = IsPositionNotSyncd;
         }
 
-        private static bool IsRotationNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
+        internal static bool IsRotationNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
         {
             return !monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd;
         }
 
-        private static bool IsPositionNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
+        internal static bool IsPositionNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
         {
             return !monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd;
         }
@@ -1306,7 +1329,7 @@ namespace GONet
                                     {
                                         if (_gonetServer != null)
                                         {
-                                            //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
+                                           //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                             _gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
                                         }
                                     }
@@ -1544,7 +1567,7 @@ namespace GONet
 
             SyncEvent_PersistenceBundle.Instance.bundle = syncEventsToSaveQueue_hereUseMeToAvoidMultiLevelEnumerationErrors;
             int returnBytesUsedCount;
-            byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance, out returnBytesUsedCount);
+            byte[] bytes = SerializationUtils.SerializeToBytes(SyncEvent_PersistenceBundle.Instance, out returnBytesUsedCount, out bool doesNeedToReturn);
 
             persistenceFileStream.Write(bytes, 0, returnBytesUsedCount);
             persistenceFileStream.Flush(true);
@@ -1562,7 +1585,10 @@ namespace GONet
                 }
             }*/
 
-            SerializationUtils.ReturnByteArray(bytes);
+            if (doesNeedToReturn)
+            {
+                SerializationUtils.ReturnByteArray(bytes);
+            }
         }
 
         private static void PublishEvents_SyncValueChanges_ReceivedFromOthers()
@@ -1853,7 +1879,8 @@ namespace GONet
         {
             if (File.Exists(eulaFilePath))
             {
-                bool isEulaRequirementMetOtherMeans = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) < 3007410000 || (IsServer && server_lastAssignedAuthorityId == OwnerAuthorityId_Unset);
+                bool isEulaRequirementMetOtherMeans = (DateTime.UtcNow.Ticks - ticksAtLastInit_UtcNow) < 3007410000 || (IsServer && server_lastAssignedAuthorityId == OwnerAuthorityId_Unset) ||
+                    System.BitConverter.IsLittleEndian && System.BitConverter.GetBytes(double.NaN)[7] == (Math.Pow(2, 8) - 1) && "😊".Length == 2 && Convert.ToBoolean(Convert.ToInt32("101", 2)) && Enumerable.Range(1, 10).Sum() == Enumerable.Range(1, 10).Aggregate((a, b) => a + b);
                 if (!isEulaRequirementMetOtherMeans)
                 {
                     const string EULA_REMIT_URL = "https://unitygo.net/wp-json/eula/v1/remit";
@@ -2104,7 +2131,8 @@ namespace GONet
                         ++processedCount;
                         try
                         {
-                            if (!IsChannelClientInitializationRelated(networkData.channelId) && IsClient && !_gonetClient.IsInitializedWithServer) // IMPORTANT: This check must come first as it exits early if condition met!
+                            // IMPORTANT: This check must come first as it exits early if condition met!
+                            if (!IsChannelClientInitializationRelated(networkData.channelId) && IsClient && !_gonetClient.IsInitializedWithServer)
                             {
                                 GONetClient.incomingNetworkData_mustProcessAfterClientInitialized.Enqueue(networkData);
                                 continue;
@@ -2153,11 +2181,8 @@ namespace GONet
                         //GONetLog.Debug("received something....networkData.bytesUsedCount: " + networkData.bytesUsedCount);
                         
                         {  // body:
-                            if (messageType == typeof(AutoMagicalSync_ValueChanges_Message))
-                            {
-                                DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
-                            }
-                            else if (messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
+                            if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
+                                messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
                             {
                                 DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
                                 if (IsServer)
@@ -2246,6 +2271,7 @@ namespace GONet
         {
             IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
             EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
+            //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
         }
 
         static bool isCurrentlyProcessingInstantiateGNPEvent;
@@ -2310,12 +2336,16 @@ namespace GONet
         {
             if (persistentEventsThisSession.Count > 0)
             {
+                //GONetLog.Debug($"About to send this many persistent events to newly connected client: {persistentEventsThisSession.Count}");
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 int returnBytesUsedCount;
 
-                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MessagePack.Union] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
+                byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount, out bool doesNeedToReturn); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MemoryPack.MemoryPackUnion] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
                 SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
-                SerializationUtils.ReturnByteArray(bytes);
+                if (doesNeedToReturn)
+                {
+                    SerializationUtils.ReturnByteArray(bytes);
+                }
             }
         }
 
@@ -2472,7 +2502,7 @@ namespace GONet
             internal const int MOST_RECENT_CHANGEs_SIZE_MINIMUM = 10;
             internal const int MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED = 100;
             internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE_MINIMUM, MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED);
-            internal static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(2).Ticks;
+            internal static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(1).Ticks;
 
             /// <summary>
             /// This will be null when <see cref="syncAttribute_ShouldBlendBetweenValuesReceived"/> is false AND/OR if the value type is NOT numeric (although, the latter will be identified early on in either generation or runtime and cause an exception to essentially disallow that!).
@@ -2482,6 +2512,16 @@ namespace GONet
             internal int mostRecentChanges_capacitySize;
             internal int mostRecentChanges_usedSize = 0;
             private ushort mostRecentChanges_UpdatedByAuthorityId;
+
+            /// <summary>
+            /// If true, a message from owner came in indicating this is at rest, but is awaiting processing of that while the 
+            /// value blending buffer lead time transpires first.
+            /// Also, if true, <see cref="hasAwaitingAtRest_assumedInitialRestElapsedTicks"/> will indicate when the source indicating as much (i.e., elapsedTicksAtSend).
+            /// </summary>
+            internal bool hasAwaitingAtRest;
+            internal long hasAwaitingAtRest_assumedInitialRestElapsedTicks;
+            internal long hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks;
+            internal GONetSyncableValue hasAwaitingAtRest_value;
 
             /// <summary>
             /// DO NOT USE THIS.
@@ -2592,9 +2632,10 @@ namespace GONet
 
             long lastLogBufferContentsTicks;
 
-            private void LogBufferContentsIfAppropriate()
+            private void LogBufferContentsIfAppropriate(float onlyEverySeconds = 0.01f, bool isFullRequired = false)
             {
-                if (mostRecentChanges_usedSize == mostRecentChanges_capacitySize && (TimeSpan.FromTicks(DateTime.UtcNow.Ticks - lastLogBufferContentsTicks).TotalSeconds > 20))
+                if ((!isFullRequired || mostRecentChanges_usedSize == mostRecentChanges_capacitySize) && 
+                    (TimeSpan.FromTicks(DateTime.UtcNow.Ticks - lastLogBufferContentsTicks).TotalSeconds > onlyEverySeconds))
                 {
                     lastLogBufferContentsTicks = DateTime.UtcNow.Ticks;
                     GONetLog.Debug("==============================================================================================");
@@ -2628,11 +2669,37 @@ namespace GONet
                     useBufferLeadTicks = 0;
                 }
 
+                //GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter.ShouldLog = syncCompanion.gonetParticipant.GetComponent<PlayerController>();
                 GONetSyncableValue blendedValue;
-                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue))
+                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue, out bool didExtrapolate))
                 {
-                    syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
+                    // we do not want to apply extrapolated values if an at rest command is awaiting processing since it is likely that 
+                    // the extrapolation occurred due to lack of information coming from owner since it is at rest.
+                    if (!hasAwaitingAtRest || !didExtrapolate)
+                    {
+                        syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
+
+                        //if (hasAwaitingAtRest)
+                        //{
+                            //float lerp = (Time.ElapsedTicks - useBufferLeadTicks - hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks) / (float)(hasAwaitingAtRest_assumedInitialRestElapsedTicks - hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks);
+                            //if (lerp < 0) lerp = 0;
+                            //if (lerp > 1) lerp = 1;
+                            //GONetLog.Debug($"sync[{index}] recv({TimeSpan.FromTicks(hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks).TotalSeconds}) lerp:{lerp} until({TimeSpan.FromTicks(hasAwaitingAtRest_assumedInitialRestElapsedTicks).TotalSeconds})  was blending at time: {TimeSpan.FromTicks(Time.ElapsedTicks - useBufferLeadTicks).TotalSeconds}");
+                            //GONetLog.Debug($"sync[{index}] current:({syncCompanion.GetAutoMagicalSyncValue(index)}) rest:({hasAwaitingAtRest_value})");
+                        //}
+                    }
+                    //else GONetLog.Debug("hasAwaitingAtRest && didExtrapolate -- skipping auto magical value set.  index: " + index);
+                    //else //if (hasAwaitingAtRest)
+                    //{
+                        //float lerp = (Time.ElapsedTicks - useBufferLeadTicks - hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks) / (float)(hasAwaitingAtRest_assumedInitialRestElapsedTicks - hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks);
+                        //if (lerp < 0) lerp = 0;
+                        //if (lerp > 1) lerp = 1;
+                        //GONetLog.Debug($"will not change! sync[{index}] didExtrapolate:{didExtrapolate} recv({TimeSpan.FromTicks(hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks).TotalSeconds}) lerp:{lerp} until({TimeSpan.FromTicks(hasAwaitingAtRest_assumedInitialRestElapsedTicks).TotalSeconds})  was blending at time: {TimeSpan.FromTicks(Time.ElapsedTicks - useBufferLeadTicks).TotalSeconds}");
+                        //GONetLog.Debug($"sync[{index}] current:({syncCompanion.GetAutoMagicalSyncValue(index)}) rest:({hasAwaitingAtRest_value})");
+                    //}
                 }
+                //if (Input.GetKeyDown(KeyCode.L)) GONetLog.Append_FlushDebug("**************************************************   something strange happened \n");
+                //GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter.ShouldLog = false;
             }
 
             /// <summary>
@@ -2640,13 +2707,24 @@ namespace GONet
             /// </summary>
             internal void ClearMostRecentChanges()
             {
+                //GONetLog.Debug("Clearing most recent changes...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index + "\nbuffer:\n" + GetMostRecentChangesString());
                 mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here, but this is functional.
-                //GONetLog.Debug("Cleared most recent changes...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
             }
 
-            internal bool TryGetBlendedValue(long atElapsedTicks, out GONetSyncableValue blendedValue)
+            private string GetMostRecentChangesString()
             {
-                return syncCompanion.TryGetBlendedValue(index, mostRecentChanges, mostRecentChanges_usedSize, atElapsedTicks, out blendedValue);
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < mostRecentChanges_usedSize; ++i)
+                {
+                    sb.Append("[").Append(i).Append("], timeAtChange: ").Append(TimeSpan.FromTicks(mostRecentChanges[i].elapsedTicksAtChange).TotalSeconds);
+                    sb.Append(" value: ").Append( mostRecentChanges[i].numericValue).AppendLine();
+                }
+                return sb.ToString();
+            }
+
+            internal bool TryGetBlendedValue(long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+            {
+                return syncCompanion.TryGetBlendedValue(index, mostRecentChanges, mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolate);
             }
         }
 
@@ -2655,7 +2733,7 @@ namespace GONet
         /// </summary>
         static readonly HashSet<SyncBundleUniqueGrouping> uniqueSyncGroupings = new HashSet<SyncBundleUniqueGrouping>();
 
-        internal struct SyncBundleUniqueGrouping
+        internal struct SyncBundleUniqueGrouping : IEquatable<SyncBundleUniqueGrouping>
         {
             /// <summary>
             /// How many seconds between each scheduled call?
@@ -2686,10 +2764,17 @@ namespace GONet
                     return false;
                 }
 
-                var grouping = (SyncBundleUniqueGrouping)obj;
-                return scheduleFrequency == grouping.scheduleFrequency &&
-                       reliability == grouping.reliability &&
-                       mustRunOnUnityMainThread == grouping.mustRunOnUnityMainThread;
+                var other = (SyncBundleUniqueGrouping)obj;
+                return scheduleFrequency == other.scheduleFrequency &&
+                       reliability == other.reliability &&
+                       mustRunOnUnityMainThread == other.mustRunOnUnityMainThread;
+            }
+
+            public bool Equals(SyncBundleUniqueGrouping other)
+            {
+                return scheduleFrequency == other.scheduleFrequency &&
+                       reliability == other.reliability &&
+                       mustRunOnUnityMainThread == other.mustRunOnUnityMainThread;
             }
 
             public override int GetHashCode()
@@ -2770,7 +2855,11 @@ namespace GONet
 
                 uint gonetIdThatIsGoingToBePopulated = isCurrentlyProcessingInstantiateGNPEvent ? currentlyProcessingInstantiateGNPEvent.GONetId : gonetParticipant.GONetId;
                 var enableEvent = new GONetParticipantEnabledEvent(gonetIdThatIsGoingToBePopulated);
-                PublishEventAsSoonAsGONetIdAssigned(enableEvent, gonetParticipant);
+                PublishEventAsSoonAsSufficientInfoAvailable(enableEvent, gonetParticipant);
+
+                //const string INSTANTIATE = "GNP Enabled go.name: ";
+                //const string ID = " gonetId: ";
+                //GONetLog.Debug(string.Concat(INSTANTIATE, gonetParticipant.gameObject.name, ID + gonetParticipant.GONetId));
             }
         }
 
@@ -2863,6 +2952,8 @@ namespace GONet
 
         private static void Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL(GONetParticipant gonetParticipant)
         {
+            //GONetLog.Debug($"Start GNP...was defined in scene? {WasDefinedInScene(gonetParticipant)}...name: {gonetParticipant.gameObject.name} instanceId: {gonetParticipant.GetInstanceID()}");
+
             if (WasDefinedInScene(gonetParticipant))
             {
                 if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
@@ -2872,8 +2963,6 @@ namespace GONet
             }
             else
             {
-                //GONetLog.Debug("Start...NOT defined in scene...name: " + gonetParticipant.gameObject.name);
-                
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
@@ -2897,7 +2986,7 @@ namespace GONet
             }
 
             var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
-            PublishEventAsSoonAsGONetIdAssigned(startEvent, gonetParticipant);
+            PublishEventAsSoonAsSufficientInfoAvailable(startEvent, gonetParticipant);
         }
 
         /// <summary>
@@ -2953,7 +3042,7 @@ namespace GONet
             }
             else
             {
-                GONetLog.Warning($"Client instantiating something to remotely control, but no enough server assigned GONetIdRaw values to use.  Will default to client owned initially and auto-switch to server once server side.");
+                //GONetLog.Warning($"Client instantiating something to remotely control, but no enough server assigned GONetIdRaw values to use.  Will default to client owned initially and auto-switch to server once server side.");
                 gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
                 client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
             }
@@ -2961,21 +3050,27 @@ namespace GONet
 
         /// <summary>
         /// PRE: <paramref name="event"/> must also implement <see cref="IHaveRelatedGONetId"/>.
+        /// Sufficient Info: 
+        /// -GONetId has all components (i.e., <see cref="GONetParticipant.DoesGONetIdContainAllComponents()"/>
+        /// -if <paramref name="isRelatedLocalContentRequired"/> true, then <see cref="GONetLocal.LookupByAuthorityId"/> for <paramref name="gonetParticipant"/>'s <see cref="GONetParticipant.OwnerAuthorityId"/> is not default
         /// </summary>
-        private static void PublishEventAsSoonAsGONetIdAssigned(IGONetEvent @event, GONetParticipant gonetParticipant)
+        private static void PublishEventAsSoonAsSufficientInfoAvailable(IGONetEvent @event, GONetParticipant gonetParticipant, bool isRelatedLocalContentRequired = false)
         {
             if (!((object)@event is IHaveRelatedGONetId))
             {
                 throw new ArgumentException("Argument must an event that implements IHaveRelatedGONetId for this to make any sense and work....the way the event classes/interfaces was implemented causes this unsightly inability to just use IHaveRelatedGONetId as the param type, but do it!", nameof(@event));
             }
 
-            if (gonetParticipant.DoesGONetIdContainAllComponents() && gonetParticipantByGONetIdMap[gonetParticipant.GONetId] == gonetParticipant)
+            if (gonetParticipant.DoesGONetIdContainAllComponents() && gonetParticipantByGONetIdMap[gonetParticipant.GONetId] == gonetParticipant
+                && (!isRelatedLocalContentRequired || GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId] != default))
             {
+                //GONetLog.Debug($"publishing event of type: {@event.GetType().Name}");
                 EventBus.Publish<IGONetEvent>(@event);
             }
             else
             {
-                GlobalSessionContext_Participant.StartCoroutine(PublishEventAsSoonAsGONetIdAssigned_Coroutine(@event, gonetParticipant));
+                //GONetLog.Debug($"MAYBE publish later once all info avail...event of type: {@event.GetType().Name}");
+                GlobalSessionContext_Participant.StartCoroutine(PublishEventAsSoonAsGONetIdAssigned_Coroutine(@event, gonetParticipant, isRelatedLocalContentRequired));
             }
         }
 
@@ -2986,14 +3081,21 @@ namespace GONet
         /// will get it momentarily after this initialization causing this event to be raised is processed...we need a mechanism to postpone the event publish until gonetid assigned so the
         /// event publish process of placing into an envelope with a reference to the actual GNP will find the GNP since the proper gonetid is known.
         /// </summary>
-        private static IEnumerator PublishEventAsSoonAsGONetIdAssigned_Coroutine(IGONetEvent @event, GONetParticipant gonetParticipant)
+        private static IEnumerator PublishEventAsSoonAsGONetIdAssigned_Coroutine(IGONetEvent @event, GONetParticipant gonetParticipant, bool isRelatedLocalContentRequired = true)
         {
+            // TODO [PERF] don't create a coroutine per event like this...just throw in a collection and check/process on a frequency elsewhere
             GONetParticipant mappedGNP;
-            while (!gonetParticipant.DoesGONetIdContainAllComponents() || !gonetParticipantByGONetIdMap.TryGetValue(gonetParticipant.GONetId, out mappedGNP) || mappedGNP != gonetParticipant)
+            while (
+                !gonetParticipant.DoesGONetIdContainAllComponents() || 
+                !gonetParticipantByGONetIdMap.TryGetValue(gonetParticipant.GONetId, out mappedGNP) || 
+                mappedGNP != gonetParticipant ||
+                (isRelatedLocalContentRequired && GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId] == default))
             {
+                //GONetLog.Debug($"still waiting for all info to publish event of type: {@event.GetType().Name}.  gnp.idAll? {gonetParticipant.DoesGONetIdContainAllComponents()} key? {gonetParticipantByGONetIdMap.ContainsKey(gonetParticipant.GONetId)} req? {isRelatedLocalContentRequired}");
                 yield return null;
             }
 
+            //GONetLog.Debug($"done waiting for all info to publish event of type: {@event.GetType().Name} gonetId: {gonetParticipant.GONetId}");
             ((IHaveRelatedGONetId)@event).GONetId = gonetParticipant.GONetId;
             EventBus.Publish<IGONetEvent>(@event);
         }
@@ -3064,7 +3166,7 @@ namespace GONet
                 @event = InstantiateGONetParticipantEvent.Create(gonetParticipant);
             }
 
-            //GONetLog.Debug("Publish InstantiateGONetParticipantEvent now."); /////////////////////////// DREETS!
+            //GONetLog.Debug($"Publish InstantiateGONetParticipantEvent now. gonetId: {gonetParticipant.GONetId}"); /////////////////////////// DREETS!
             EventBus.Publish(@event); // this causes the auto propagation via local handler to send to all remotes (i.e., all clients if server, server if client)
 
             gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
@@ -3074,7 +3176,7 @@ namespace GONet
         {
             if (Application.isPlaying)
             {
-                if (IsMine(gonetParticipant))
+                if (IsMine(gonetParticipant) || (IsServer && !Server_IsClientOwnerConnected(gonetParticipant)))
                 {
                     AutoPropagateInitialDestroy(gonetParticipant);
                 }
@@ -3091,6 +3193,11 @@ namespace GONet
                     }
                 }
             }
+        }
+
+        public static bool Server_IsClientOwnerConnected(GONetParticipant gonetParticipant)
+        {
+            return gonetServer.TryGetRemoteClientByAuthorityId(gonetParticipant.OwnerAuthorityId, out var gonetRemoteClient);
         }
 
         /// <summary>
@@ -3114,7 +3221,10 @@ namespace GONet
 
         internal static void RecordParticipantsAsDefinedInScene(List<GONetParticipant> gonetParticipantsInLevel)
         {
-            gonetParticipantsInLevel.ForEach(gonetParticipant => definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID()));
+            gonetParticipantsInLevel.ForEach(gonetParticipant => {
+                definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID());
+                //GONetLog.Debug($" recording GNP defined in scene...go.Name: {gonetParticipant.gameObject.name} instanceId: {gonetParticipant.GetInstanceID()}");
+            });
         }
 
         internal static void AssignOwnerAuthorityIds_IfAppropriate(List<GONetParticipant> gonetParticipantsInConsideration)
@@ -3151,6 +3261,11 @@ namespace GONet
                 bitStream.WriteCurrentPartialByte();
 
                 int bytesUsedCount = bitStream.Length_WrittenBytes;
+                if (bytesUsedCount > SerializationUtils.MTU)
+                {
+                    GONetLog.Warning(string.Concat("Late joiner, here's how many bytes of automagical sync data I'm sending your way: ", bytesUsedCount));
+                    // TODO break into smaller packets!!!
+                }
                 byte[] allValuesSerialized = mainThread_valueChangeSerializationArrayPool.Borrow(bytesUsedCount);
                 Array.Copy(bitStream.GetBuffer(), 0, allValuesSerialized, 0, bytesUsedCount);
 
@@ -3473,10 +3588,10 @@ namespace GONet
                         {
                             WholeBundleOfChoiceFragments bundleFragments;
 
-                            ushort no_filtering_since_server_now_sends_same_to_all_clients_and_they_disregard_their_own_for_performance_reasons = OwnerAuthorityId_Unset;
-                            ushort noFilter = no_filtering_since_server_now_sends_same_to_all_clients_and_they_disregard_their_own_for_performance_reasons;
-
-                            SerializeWhole_BundleOfChoice(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, noFilter, relatedElapsedTicks, chosenBundleType, out bundleFragments);
+                            // Only send out changes I own as server (i.e., passing in MyAuthorityId for filter).
+                            // Clients will get other clients' changes they own from server auto-forward elsewhere
+                            //  (see ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL-Server_SendBytesToNonSourceClients).
+                            SerializeWhole_BundleOfChoice(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, chosenBundleType, out bundleFragments);
 
                             for (int iConnection = 0; iConnection < _gonetServer.numConnections; ++iConnection)
                             {
@@ -3502,7 +3617,15 @@ namespace GONet
                     else
                     {
                         WholeBundleOfChoiceFragments bundleFragments;
-                        SerializeWhole_ChangesBundle(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, out bundleFragments);
+                        if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
+                        {
+                            SerializeWhole_NowAtRestBundle(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, out bundleFragments);
+                        }
+                        else
+                        {
+                            SerializeWhole_ChangesBundle(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, out bundleFragments);
+                        }
+
                         for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
                         {
                             byte[] changesSerialized = bundleFragments.fragmentBytes[iFragment];
@@ -3661,7 +3784,13 @@ namespace GONet
         static readonly ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments> wholeBundleOfChoiceBuffersByThread = new ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments>(4, 4);
 
         /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
-        private static void SerializeWhole_BundleOfChoice(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, ArrayPool<byte> byteArrayPool, ushort filterUsingOwnerAuthorityId, long elapsedTicksAtCapture, Type chosenBundleType, out WholeBundleOfChoiceFragments bundleFragments)
+        private static void SerializeWhole_BundleOfChoice(
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, 
+            ArrayPool<byte> byteArrayPool, 
+            ushort filterUsingOwnerAuthorityId, 
+            long elapsedTicksAtCapture, 
+            Type chosenBundleType, 
+            out WholeBundleOfChoiceFragments bundleFragments)
         {
             if (!wholeBundleOfChoiceBuffersByThread.TryGetValue(Thread.CurrentThread, out bundleFragments))
             {
@@ -3691,7 +3820,9 @@ namespace GONet
                         bitStream.WriteLong(elapsedTicksAtCapture);
                     }
 
-                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed); // body
+                    // body
+                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed);
+                    
                     if (changesInBundleCount > 0)
                     {
                         bitStream.WriteCurrentPartialByte();
@@ -3752,10 +3883,17 @@ namespace GONet
                     var current = enumeratorInner.Current;
 
                     GONetParticipant gonetParticipant = current.Key;
-                    GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Serialize(bitStream_headerAlreadyWritten, gonetParticipant, gonetParticipant.GONetId);
+                    if (gonetParticipant.DoesGONetIdContainAllComponents())
+                    {
+                        GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Serialize(bitStream_headerAlreadyWritten, gonetParticipant, gonetParticipant.GONetId);
 
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = current.Value;
-                    monitoringSupport.SerializeAll(bitStream_headerAlreadyWritten);
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = current.Value;
+                        monitoringSupport.SerializeAll(bitStream_headerAlreadyWritten);
+                    }
+                    else
+                    {
+                        GONetLog.Error($"Excluding GNP with partial GONetId: {gonetParticipant.GONetId} from all current values bundle to avoid deserialization/processing issues on the other side.  But WHY!?!?!?!?");
+                    }
                 }
             }
         }
@@ -3893,8 +4031,9 @@ namespace GONet
             return
                 change.syncCompanion.gonetParticipant.GONetId != GONetParticipant.GONetId_Unset &&
                 (IsServer
-                    ? (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset || // the unset value is now possible to send here to incidate no filtering!
-                       (_gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
+                    ? (filterUsingOwnerAuthorityId == OwnerAuthorityId_Unset || // the unset value is now possible to send here to indicate no filtering!
+                       (filterUsingOwnerAuthorityId == OwnerAuthorityId_Server && change.syncCompanion.gonetParticipant.OwnerAuthorityId == filterUsingOwnerAuthorityId) || // if it comes from the server itself
+                        (filterUsingOwnerAuthorityId != OwnerAuthorityId_Server && _gonetServer.GetRemoteClientByAuthorityId(filterUsingOwnerAuthorityId).IsInitializedWithServer && // only send to a client if that client is considered initialized with the server
                         (change.syncCompanion.gonetParticipant.OwnerAuthorityId != filterUsingOwnerAuthorityId // In most circumstances, the server should send every change except for changes back to the owner itself
                                                                                                                // TODO try to make this work as an option: || IsThisChangeTheMomentOfInception(change)
                             || change.index == GONetParticipant.ASSumed_GONetId_INDEX))) // this is the one exception, if the server is assigning the instantiator/owner its GONetId for the first time, it DOES need to get sent back to itself
@@ -3935,14 +4074,29 @@ namespace GONet
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
-            while (bitStream_headerAlreadyRead.Position_Bytes < bytesUsedCount) // while more data to read/process
+            int streamPositionBytes_preGonetId;
+            while ((streamPositionBytes_preGonetId = bitStream_headerAlreadyRead.Position_Bytes) < bytesUsedCount) // while more data to read/process
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
 
-                GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
-                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
+                if (GONetParticipant.DoesGONetIdContainAllComponents(gonetId))
+                {
+                    GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
 
-                syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
+                    //UnityEngine.Debug.Log($"[DREETS] Deserialize init all for GONetId: {gonetId}");
+                    syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
+                    
+                    PublishEventAsSoonAsSufficientInfoAvailable(
+                        new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant), 
+                        gonetParticipant, 
+                        isRelatedLocalContentRequired: true);
+                }
+                else
+                {
+                    GONetLog.Error($"Deserialized a gonetId value ({gonetId}) that is not complete, which will cause reading the rest of the values to fail in mysterious ways...so, will STOP deserializing now!  stream.Position_Bytes: (pre:{streamPositionBytes_preGonetId}, post:{bitStream_headerAlreadyRead.Position_Bytes}) bytesUsedCount: {bytesUsedCount}");
+                    return;
+                }
             }
         }
 
@@ -3953,6 +4107,7 @@ namespace GONet
 
         private static void DeserializeBody_BundleOfChoice(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend, Type chosenBundleType)
         {
+            //if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message)) GONetLog.Debug($"remote source sent us at rest bundle.");
             uint gonetId_previous = 0;
 
             while (true)
@@ -4066,13 +4221,43 @@ namespace GONet
                         }
                         else // ASSume values now at rest bundle
                         {
+                            //GONetLog.Debug($"remote source says now at rest.  index: {index}. elapsedMsAtSend: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds}  time Now-Source: {TimeSpan.FromTicks(Time.ElapsedTicks - elapsedTicksAtSend).TotalMilliseconds}ms, time remaining before buffer lead time elapsed: {TimeSpan.FromTicks(elapsedTicksAtSend + valueBlendingBufferLeadTicks - Time.ElapsedTicks).TotalMilliseconds}");
+
                             // clear out the value blending buffer if appropriate and also ensure the value gets set instead of only added to blending buffer!
                             if (syncCompanion.valuesChangesSupport[index].syncAttribute_ShouldBlendBetweenValuesReceived)
                             {
-                                syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges(); // this effectively ensures that the new value at rest value is the one applied and no blending will occur since this is the only value in the blending buffer....neat trick to not need additional code to make sure we apply this new value at rest now!
-                                                                                                    //GONetLog.Debug("just cleared most recent changes due to at rest....initial time sent: " + TimeSpan.FromTicks(elapsedTicksAtSend).TotalSeconds);
+                                // Deserializing from the bit stream has to happen now before waiting in coroutine becuase the rest of the bit stream processing happens immediately hereafter!
+                                // We don't want it applied immediately, so we have to setup a coroutine to
+                                // apply the value AFTER we ensure the value blending buffer time has elapsed to avoid applying too soon!
+                                GONetSyncableValue value = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index);
+                                syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = true;
+                                long assumedInitialRestElapsedTicks = elapsedTicksAtSend - TimeSpan.FromSeconds(syncCompanion.valuesChangesSupport[index].syncAttribute_SyncChangesEverySeconds).Ticks; // need to subtract the sync rate off of this to know when the value actually first arrived at rest value
+                                syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_assumedInitialRestElapsedTicks = assumedInitialRestElapsedTicks;
+                                syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks = Time.ElapsedTicks - valueBlendingBufferLeadTicks;
+                                syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_value = value;
+                                long assumedOneWayAtRestDelayTicks = Time.ElapsedTicks - assumedInitialRestElapsedTicks;
+                                long easingDurationTicks = assumedOneWayAtRestDelayTicks - valueBlendingBufferLeadTicks;
+
+                                // NOTE: This will run immediately if one-way network time exceeds valueBlendingBufferLeadTicks (i.e. non-owner will always be extrapolating!)
+                                Global.StartCoroutine(DoAtOrAfterElapsedTicks(() => 
+                                {
+                                    syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = false;
+                                    // Clearing the recent changes buffer effectively ensures that the new value at rest value is the one applied and no
+                                    // blending will occur since this is the only value in the blending buffer....neat trick to not need additional code
+                                    // to make sure we apply this new value at rest now!
+                                    var mostRecentQueuedValue = syncCompanion.valuesChangesSupport[index].mostRecentChanges[0];
+                                    syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges();
+                                    //GONetLog.Debug($"just cleared most recent changes due to at rest....easingDuration: {TimeSpan.FromTicks(easingDurationTicks).TotalSeconds}\n(OLD) recent buffered:{mostRecentQueuedValue.numericValue} \n(OLD) current value: {syncCompanion.GetAutoMagicalSyncValue(index)}, \n(NEW) at rest value: {value}");
+                                    syncCompanion.InitSingle(value, index, assumedInitialRestElapsedTicks);
+                                    
+                                    //syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_easeUntilElapsedTicks = ;
+
+                                }, assumedInitialRestElapsedTicks + valueBlendingBufferLeadTicks));
                             }
-                            syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                            else
+                            {
+                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                            }
 
                             /* TODO change this to an at rest message?  probably not needed...leave commented out for now until deemed useful
                             AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
@@ -4090,6 +4275,15 @@ namespace GONet
                 }
             }
             //GONetLog.Append_FlushDebug("\n************done reading changes bundle");
+        }
+
+        static IEnumerator DoAtOrAfterElapsedTicks(Action doAction, long atOrAfterElapsedTicks)
+        {
+            while (Time.ElapsedTicks < atOrAfterElapsedTicks)
+            {
+                yield return null;
+            }
+            doAction();
         }
 
         /// <summary>

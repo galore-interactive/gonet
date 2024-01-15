@@ -56,8 +56,8 @@ namespace GONet
         /// <para>Do NOT attempt to modify this collection as to avoid creating issues for yourself/others.</para>
         /// </summary>
         public IEnumerable<GONetParticipant> EnabledGONetParticipants => enabledGONetParticipants;
-        
-        public const string ServerIPAddress_Default = "127.0.0.1";
+
+        public static readonly string ServerIPAddress_Default = GONetMain.isServerOverride ? "0.0.0.0" : "127.0.0.1";
         public const int ServerPort_Default = 40000;
 
         public delegate void ServerConnectionInfoChanged(string serverIP, int serverPort);
@@ -111,13 +111,40 @@ namespace GONet
 
             base.Awake(); // YUK: code smell...having to break OO protocol here and call base here as it needs to come AFTER the init stuff is done in GONetMain.InitOnUnityMainThread() and unity main thread identified or exceptions will be thrown in base.Awake() when subscribing
 
-            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations();
+            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations(this);
 
             enabledGONetParticipants.Clear();
 
             if (shouldAttemptAutoStartAsClient)
             {
                 Editor_AttemptStartAsClientIfAppropriate();
+            }
+        }
+
+        public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
+        {
+            base.OnGONetClientVsServerStatusKnown(isClient, isServer, myAuthorityId);
+
+            if (isServer)
+            {
+                GONetMain.gonetServer.ClientDisconnected += Server_ClientDisconnected;
+            }
+        }
+
+        private void Server_ClientDisconnected(GONetConnection_ServerToClient gonetConnection_ServerToClient)
+        {
+            Server_MakeDoublySureAllClientOwnedGNPsDestroyed(gonetConnection_ServerToClient.OwnerAuthorityId);
+        }
+
+        private void Server_MakeDoublySureAllClientOwnedGNPsDestroyed(ushort ownerAuthorityId)
+        {
+            for (int i = enabledGONetParticipants.Count - 1;  i >= 0; --i)
+            {
+                GONetParticipant enabledGNP = enabledGONetParticipants[i];
+                if (enabledGNP.OwnerAuthorityId == ownerAuthorityId && enabledGNP && enabledGNP.gameObject)
+                {
+                    Destroy(enabledGNP.gameObject);
+                }
             }
         }
 
@@ -195,7 +222,8 @@ namespace GONet
             { // do auto-assign authority id stuffs for all gonet stuff in scene
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
-                FindAndAppend(sceneObjects, gonetParticipantsInLevel);
+                FindAndAppend(sceneObjects, gonetParticipantsInLevel, 
+                    (gnp) => gnp.designTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)
@@ -219,19 +247,19 @@ namespace GONet
             GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
         }
 
-        private static void FindAndAppend<T>(GameObject[] gameObjects, /* IN/OUT */ List<T> listToAppend)
+        private static void FindAndAppend<T>(GameObject[] gameObjects, /* IN/OUT */ List<T> listToAppend, Func<T, bool> filter)
         {
             int count = gameObjects != null ? gameObjects.Length : 0;
             for (int i = 0; i < count; ++i)
             {
                 T t = gameObjects[i].GetComponent<T>();
-                if (t != null)
+                if (t != null && filter(t))
                 {
                     listToAppend.Add(t);
                 }
                 foreach (Transform childTransform in gameObjects[i].transform)
                 {
-                    FindAndAppend(new[] { childTransform.gameObject }, listToAppend);
+                    FindAndAppend(new[] { childTransform.gameObject }, listToAppend, filter);
                 }
             }
         }

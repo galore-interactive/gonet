@@ -14,7 +14,7 @@
  */
 
 using GONet.Utils;
-using MessagePack;
+using MemoryPack;
 using NetcodeIO.NET;
 using System;
 using System.Collections.Concurrent;
@@ -46,7 +46,7 @@ namespace GONet
         /// -<see cref="GONetMain.SendBytesToRemoteConnection(GONetConnection, byte[], int, byte)"/>
         /// -<see cref="GONetConnection.SendMessageOverChannel(byte[], int, byte)"/>
         /// </summary>
-        [IgnoreMember]
+        [MemoryPackIgnore]
         bool IsSingularRecipientOnly { get => false; } // TODO consider moving this up to IGONetEvent if applicable to IPersistentEvent as well
     }
 
@@ -81,41 +81,45 @@ namespace GONet
 
     #endregion
 
-    public struct ServerSaysClientInitializationCompletion : ITransientEvent
+    [MemoryPackable]
+    public partial class ServerSaysClientInitializationCompletion : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new NotImplementedException();
     }
 
-    public struct AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
+    [MemoryPackable]
+    public partial class AutoMagicalSync_AllCurrentValues_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
-    public struct AutoMagicalSync_ValueChanges_Message : ITransientEvent
+    [MemoryPackable]
+    public partial class AutoMagicalSync_ValueChanges_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
-    public struct AutoMagicalSync_ValuesNowAtRest_Message : ITransientEvent
+    [MemoryPackable]
+    public partial class AutoMagicalSync_ValuesNowAtRest_Message : ITransientEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
-    public struct OwnerAuthorityIdAssignmentEvent : IPersistentEvent
+    [MemoryPackable]
+    public partial class OwnerAuthorityIdAssignmentEvent : IPersistentEvent
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
     }
 
-    [MessagePackObject]
-    public struct ClientRemotelyControlledGONetIdServerBatchAssignmentEvent : ITransientEvent
+    [MemoryPackable]
+    public partial class ClientRemotelyControlledGONetIdServerBatchAssignmentEvent : ITransientEvent
     {
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public bool IsSingularRecipientOnly => true;
 
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
 
-        [Key(0)]
         public uint GONetIdRawBatchStart { get; set; }
     }
 
@@ -123,7 +127,8 @@ namespace GONet
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
     /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
     /// </summary>
-    public struct GONetParticipantEnabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    [MemoryPackable]
+    public partial class GONetParticipantEnabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
 
@@ -139,11 +144,14 @@ namespace GONet
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its Start() method called and it is ready to be used by other game logic.
     /// IMPORTANT: When this is fired/published, this is the first time it is certain that the <see cref="GONetParticipant.GONetId"/> value is fully assigned!
     /// </summary>
-    public struct GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    [MemoryPackable]
+    public partial class GONetParticipantStartedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
 
         public uint GONetId { get; set; }
+
+        [MemoryPackConstructor] GONetParticipantStartedEvent() { }
 
         public GONetParticipantStartedEvent(GONetParticipant gonetParticipant)
         {
@@ -154,11 +162,14 @@ namespace GONet
     /// <summary>
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnDisable() method called and will no longer be active in the game.
     /// </summary>
-    public struct GONetParticipantDisabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
+    [MemoryPackable]
+    public partial class GONetParticipantDisabledEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
         public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
 
         public uint GONetId { get; set; }
+
+        [MemoryPackConstructor] public GONetParticipantDisabledEvent() { }
 
         public GONetParticipantDisabledEvent(GONetParticipant gonetParticipant)
         {
@@ -166,13 +177,33 @@ namespace GONet
         }
     }
 
-    [MessagePackObject]
-    public struct RequestMessage : ITransientEvent // TODO probably not always going to be considered transient
+    /// <summary>
+    /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its related 
+    /// <see cref="GONet.Generation.GONetParticipant_AutoMagicalSyncCompanion_Generated.DeserializeInitAll(BitByBitByteArrayBuilder, long)"/> 
+    /// method called.
+    /// This is useful because individual SyncEvents will NOT be fired in those cases and there may be a need to do something once initial 
+    /// values are known (from remote source/authority).
+    /// </summary>
+    [MemoryPackable]
+    public partial class GONetParticipantDeserializeInitAllCompletedEvent : ITransientEvent, ILocalOnlyPublish, IHaveRelatedGONetId
     {
-        [Key(0)]
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        public uint GONetId { get; set; }
+
+        [MemoryPackConstructor] public GONetParticipantDeserializeInitAllCompletedEvent() { }
+
+        public GONetParticipantDeserializeInitAllCompletedEvent(GONetParticipant gonetParticipant)
+        {
+            GONetId = gonetParticipant.GONetId;
+        }
+    }
+
+    [MemoryPackable]
+    public partial class RequestMessage : ITransientEvent // TODO probably not always going to be considered transient
+    {
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1)]
         public long UID;
 
         public RequestMessage(long occurredAtElapsedTicks)
@@ -183,13 +214,11 @@ namespace GONet
         }
     }
 
-    [MessagePackObject]
-    public struct ResponseMessage : ITransientEvent // TODO probably not always going to be considered transient
+    [MemoryPackable]
+    public partial class ResponseMessage : ITransientEvent // TODO probably not always going to be considered transient
     {
-        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1)]
         public long CorrelationRequestUID;
 
         public ResponseMessage(long occurredAtElapsedTicks, long correlationRequestUID)
@@ -199,41 +228,32 @@ namespace GONet
         }
     }
 
-    [MessagePackObject]
-    public struct InstantiateGONetParticipantEvent : IPersistentEvent
+    [MemoryPackable]
+    public partial class InstantiateGONetParticipantEvent : IPersistentEvent
     {
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public long OccurredAtElapsedTicks { get; set; }
 
         /// <summary>
         /// this is the information necessary to lookup the source <see cref="UnityEngine.GameObject"/> from which to use as the template in order to call <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.
         /// TODO add the persisted int->string lookup table that is updated each time a new design time location is encountered (at design time...duh)..so this can be an int!
         /// </summary>
-        [Key(0)]
         public string DesignTimeLocation;
 
-        [Key(1)]
         public uint GONetId;
 
-        [Key(2)]
         public ushort OwnerAuthorityId;
 
-        [Key(3)]
         public Vector3 Position;
 
-        [Key(4)]
         public Quaternion Rotation;
 
-        [Key(5)]
         public string InstanceName;
 
-        [Key(6)]
         public string ParentFullUniquePath;
 
-        [Key(7)]
         public uint GONetIdAtInstantiation;
 
-        [Key(8)]
         public bool ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority;
 
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
@@ -302,13 +322,12 @@ namespace GONet
     /// <summary>
     /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
     /// </summary>
-    [MessagePackObject]
-    public struct DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
+    [MemoryPackable]
+    public partial class DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
     {
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(0)]
         public uint GONetId;
 
         static readonly Type[] otherEventsTypeCancelledOut = new[] {
@@ -317,7 +336,7 @@ namespace GONet
             typeof(ValueMonitoringSupport_BaselineExpiredEvent)
         };
 
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public Type[] OtherEventTypesCancelledOut => otherEventsTypeCancelledOut;
 
         public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
@@ -343,137 +362,120 @@ namespace GONet
         }
     }
 
-    [MessagePack.Union(0, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
-    [MessagePack.Union(1, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
-    [MessagePack.Union(2, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
-    [MessagePack.Union(3, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
-    [MessagePack.Union(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
-    [MessagePack.Union(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
-    [MessagePack.Union(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
-    [MessagePack.Union(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
-    [MessagePack.Union(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
-    [MessagePack.Union(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
-    [MessagePack.Union(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
-    [MessagePack.Union(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
-    [MessagePack.Union(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
-    [MessagePack.Union(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
-    [MessagePack.Union(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
-    [MessagePackObject]
-    public abstract class ValueMonitoringSupport_NewBaselineEvent : IPersistentEvent
+    [MemoryPack.MemoryPackUnion(0, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Single))]
+    [MemoryPack.MemoryPackUnion(1, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2))]
+    [MemoryPack.MemoryPackUnion(2, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3))]
+    [MemoryPack.MemoryPackUnion(3, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4))]
+    [MemoryPack.MemoryPackUnion(4, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion))]
+    [MemoryPack.MemoryPackUnion(5, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Boolean))]
+    [MemoryPack.MemoryPackUnion(6, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Byte))]
+    [MemoryPack.MemoryPackUnion(7, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_SByte))]
+    [MemoryPack.MemoryPackUnion(8, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int16))]
+    [MemoryPack.MemoryPackUnion(9, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt16))]
+    [MemoryPack.MemoryPackUnion(10, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int32))]
+    [MemoryPack.MemoryPackUnion(11, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt32))]
+    [MemoryPack.MemoryPackUnion(12, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Int64))]
+    [MemoryPack.MemoryPackUnion(13, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_UInt64))]
+    [MemoryPack.MemoryPackUnion(14, typeof(GONet.ValueMonitoringSupport_NewBaselineEvent_System_Double))]
+    [MemoryPackable]
+    public abstract partial class ValueMonitoringSupport_NewBaselineEvent : IPersistentEvent
     {
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(0)]
         public uint GONetId { get; set; }
 
-        [Key(1)]
         public byte ValueIndex { get; set; }
     }
 
     #region ValueMonitoringSupport_NewBaselineEvent child classes for each supported type
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Single : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Single : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Single NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector2 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public UnityEngine.Vector2 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public UnityEngine.Vector3 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector4 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public UnityEngine.Vector4 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Quaternion : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public UnityEngine.Quaternion NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Boolean : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Boolean : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Boolean NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Byte : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Byte : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Byte NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_SByte : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_SByte : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.SByte NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Int16 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Int16 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Int16 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt16 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_UInt16 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.UInt16 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Int32 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Int32 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Int32 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt32 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_UInt32 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.UInt32 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Int64 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Int64 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Int64 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_UInt64 : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_UInt64 : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.UInt64 NewBaselineValue { get; set; }
     }
 
-    [MessagePackObject]
-    public class ValueMonitoringSupport_NewBaselineEvent_System_Double : ValueMonitoringSupport_NewBaselineEvent
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_NewBaselineEvent_System_Double : ValueMonitoringSupport_NewBaselineEvent
     {
-        [Key(2)]
         public System.Double NewBaselineValue { get; set; }
     }
     #endregion
@@ -488,21 +490,19 @@ namespace GONet
     /// immediately followed by publishing a corresponding instance of <see cref="ValueMonitoringSupport_NewBaselineEvent"/>.
     /// </para>
     /// </summary>
-    [MessagePackObject]
-    public struct ValueMonitoringSupport_BaselineExpiredEvent : IPersistentEvent, ICancelOutOtherEvents
+    [MemoryPackable]
+    public partial class ValueMonitoringSupport_BaselineExpiredEvent : IPersistentEvent, ICancelOutOtherEvents
     {
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(0)]
         public uint GONetId { get; set; }
 
-        [Key(1)]
         public byte ValueIndex { get; set; }
 
         static readonly Type[] otherEventTypesCancelledOut = new[] { typeof(ValueMonitoringSupport_NewBaselineEvent) };
 
-        [IgnoreMember]
+        [MemoryPackIgnore]
         public Type[] OtherEventTypesCancelledOut => otherEventTypesCancelledOut;
 
         public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
@@ -514,15 +514,16 @@ namespace GONet
         }
     }
 
-    [MessagePackObject]
-    public struct PersistentEvents_Bundle : ITransientEvent
+    [MemoryPackable]
+    public partial class PersistentEvents_Bundle : ITransientEvent
     {
-        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1)]
         public LinkedList<IPersistentEvent> PersistentEvents;
 
+        public PersistentEvents_Bundle() { }
+
+        [MemoryPackConstructor]
         public PersistentEvents_Bundle(long occurredAtElapsedTicks, LinkedList<IPersistentEvent> persistentEvents) : this()
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
@@ -530,25 +531,21 @@ namespace GONet
         }
     }
 
-    [MessagePackObject]
-    public struct ClientTypeFlagsChangedEvent : ITransientEvent
+    [MemoryPackable]
+    public partial class ClientTypeFlagsChangedEvent : ITransientEvent
     {
-        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1)]
         public ushort ClientAuthorityId { get; set; }
 
-        [Key(2)]
         public ClientTypeFlags FlagsPrevious { get; set; }
 
-        [Key(3)]
         public ClientTypeFlags FlagsNow { get; set; }
 
-        public ClientTypeFlagsChangedEvent(long occurredAtElapsedTicks, ushort myAuthorityId, ClientTypeFlags flagsPrevious, ClientTypeFlags flagsNow)
+        public ClientTypeFlagsChangedEvent(long occurredAtElapsedTicks, ushort clientAuthorityId, ClientTypeFlags flagsPrevious, ClientTypeFlags flagsNow)
         {
             OccurredAtElapsedTicks = occurredAtElapsedTicks;
-            ClientAuthorityId = myAuthorityId;
+            ClientAuthorityId = clientAuthorityId;
             FlagsPrevious = flagsPrevious;
             FlagsNow = flagsNow;
         }
@@ -557,23 +554,19 @@ namespace GONet
     /// <summary>
     /// IMPORTANT: This event is initiated (and first published) from a client once the state changes locally on that client, which is slightly different than <see cref="RemoteClientStateChangedEvent"/>
     /// </summary>
-    [MessagePackObject]
-    public struct ClientStateChangedEvent : ITransientEvent
+    [MemoryPackable]
+    public partial class ClientStateChangedEvent : ITransientEvent
     {
-        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
 
         /// <summary>
         /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
         ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
         /// </summary>
-        [Key(1)]
         public ulong InitiatingClientConnectionUID { get; set; }
 
-        [Key(2)]
         public ClientState StatePrevious { get; set; }
 
-        [Key(3)]
         public ClientState StateNow { get; set; }
 
         public ClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
@@ -590,27 +583,23 @@ namespace GONet
     ///            When this event is fired and is received/processed on a client, the client's local data representing the client state may likely NOT be updated to reflect the state change
     ///            and if it is important that the client IS updated to reflect the state change, subscribe to <see cref="ClientStateChangedEvent"/> instead.
     /// </summary>
-    [MessagePackObject]
-    public struct RemoteClientStateChangedEvent : ITransientEvent
+    [MemoryPackable]
+    public partial class RemoteClientStateChangedEvent : ITransientEvent
     {
-        [Key(0)]
         public long OccurredAtElapsedTicks { get; set; }
 
         /// <summary>
         /// NOTE: When processing this event on the server, this value can be used to lookup the corresponding <see cref="GONetRemoteClient"/> instance by 
         ///       calling <see cref="GONetServer.TryGetClientByConnectionUID(ulong, out GONetRemoteClient)"/>.
         /// </summary>
-        [Key(1)]
         public ulong InitiatingClientConnectionUID { get; set; }
 
         /// <summary>
         /// Since this event initiates server side and the server will not have as many possible states for a client, the only values this might be are:
         /// <see cref="ClientState.Connected"/> and <see cref="ClientState.Disconnected"/> TODO: see about getting all other values working as well!
         /// </summary>
-        [Key(2)]
         public ClientState StatePrevious { get; set; }
 
-        [Key(3)]
         public ClientState StateNow { get; set; }
 
         public RemoteClientStateChangedEvent(long occurredAtElapsedTicks, ulong initiatingClientConnectionUID, ClientState statePrevious, ClientState stateNow)
@@ -645,31 +634,47 @@ namespace GONet
         uint GONetId { get; set; }
     }
 
+    [MemoryPackable]
+    public partial class InternalOnlyMemoryPackComilationAssistanceForGenerated : SyncEvent_ValueChangeProcessed
+    {
+        public override GONetSyncableValue ValuePrevious => throw new NotImplementedException();
+
+        public override GONetSyncableValue ValueNew => throw new NotImplementedException();
+
+        public override SyncEvent_GeneratedTypes SyncEvent_GeneratedType => throw new NotImplementedException();
+
+        public override void Return()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     /// <summary>
     /// This represents that a sync value change has been processed locally.  Two major occassions:
     /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
-    [MessagePackObject]
+    [MemoryPack.MemoryPackUnion(ushort.MaxValue, typeof(InternalOnlyMemoryPackComilationAssistanceForGenerated))]
+    [MemoryPackable]
     public abstract partial class SyncEvent_ValueChangeProcessed : ITransientEvent, ILocalOnlyPublish, ISelfReturnEvent
     {
-        [Key(0)] public double OccurredAtElapsedSeconds { get => TimeSpan.FromTicks(OccurredAtElapsedTicks).TotalSeconds; set { OccurredAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long OccurredAtElapsedTicks { get; set; }
+        public double OccurredAtElapsedSeconds { get => TimeSpan.FromTicks(OccurredAtElapsedTicks).TotalSeconds; set { OccurredAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [MemoryPackIgnore] public long OccurredAtElapsedTicks { get; set; }
 
-        [Key(1)] public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long ProcessedAtElapsedTicks;
+        public double ProcessedAtElapsedSeconds { get => TimeSpan.FromTicks(ProcessedAtElapsedTicks).TotalSeconds; set { ProcessedAtElapsedTicks = TimeSpan.FromSeconds(value).Ticks; } }
+        [MemoryPackIgnore] public long ProcessedAtElapsedTicks;
 
-        [Key(2)] public ushort RelatedOwnerAuthorityId;
-        [Key(3)] public uint GONetId;
+        public ushort RelatedOwnerAuthorityId;
+        public uint GONetId;
 
-        [IgnoreMember] public byte CodeGenerationId;
+        [MemoryPackIgnore] public byte CodeGenerationId;
 
-        [Key(4)] public byte SyncMemberIndex;
-        [Key(5)] public SyncEvent_ValueChangeProcessedExplanation Explanation;
+        public byte SyncMemberIndex;
+        public SyncEvent_ValueChangeProcessedExplanation Explanation;
 
-        [IgnoreMember] public abstract GONetSyncableValue ValuePrevious { get; }
-        [IgnoreMember] public abstract GONetSyncableValue ValueNew { get; }
-        [IgnoreMember] public abstract SyncEvent_GeneratedTypes SyncEvent_GeneratedType { get; }
+        [MemoryPackIgnore] public abstract GONetSyncableValue ValuePrevious { get; }
+        [MemoryPackIgnore] public abstract GONetSyncableValue ValueNew { get; }
+        [MemoryPackIgnore] public abstract SyncEvent_GeneratedTypes SyncEvent_GeneratedType { get; }
 
         /// <summary>
         /// Do NOT use!  This is for object pooling and MessagePack only.
@@ -679,10 +684,10 @@ namespace GONet
         public abstract void Return();
     }
 
-    [MessagePackObject]
-    public class SyncEvent_PersistenceBundle
+    [MemoryPackable]
+    public partial class SyncEvent_PersistenceBundle
     {
-        [Key(0)] public Queue<SyncEvent_ValueChangeProcessed> bundle;
+        public Queue<SyncEvent_ValueChangeProcessed> bundle;
 
         public static readonly SyncEvent_PersistenceBundle Instance = new SyncEvent_PersistenceBundle();
     }
@@ -692,22 +697,22 @@ namespace GONet
     /// 1) For an outbound change being sent to others (in which case, this event is published AFTER the change has been sent to remote sources)
     /// 2) For an inbound change received from other (in which case, this event is published AFTER the change has been applied)
     /// </summary>
-    [MessagePackObject]
-    public sealed class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
+    [MemoryPackable]
+    public sealed partial class SyncEvent_Time_ElapsedTicks_SetFromAuthority : SyncEvent_ValueChangeProcessed
     {
-        [Key(6)] public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long ElapsedTicks_Previous { get; private set; }
+        public double ElapsedSeconds_Previous { get => TimeSpan.FromTicks(ElapsedTicks_Previous).TotalSeconds; set { ElapsedTicks_Previous = TimeSpan.FromSeconds(value).Ticks; } }
+        [MemoryPackIgnore] public long ElapsedTicks_Previous { get; private set; }
 
-        [Key(7)] public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
-        [IgnoreMember] public long ElapsedTicks_New { get; private set; }
+        public double ElapsedSeconds_New { get => TimeSpan.FromTicks(ElapsedTicks_New).TotalSeconds; set { ElapsedTicks_New = TimeSpan.FromSeconds(value).Ticks; } }
+        [MemoryPackIgnore] public long ElapsedTicks_New { get; private set; }
 
-        [Key(8)] public double RoundTripSeconds_Latest { get; set; }
-        [Key(9)] public double RoundTripSeconds_RecentAverage { get; set; }
-        [Key(10)] public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
+        public double RoundTripSeconds_Latest { get; set; }
+        public double RoundTripSeconds_RecentAverage { get; set; }
+        public float RoundTripMilliseconds_LowLevelTransportProtocol { get; set; }
 
-        [IgnoreMember] public override GONetSyncableValue ValuePrevious => ElapsedTicks_Previous;
-        [IgnoreMember] public override GONetSyncableValue ValueNew => ElapsedTicks_New;
-        [IgnoreMember] public override SyncEvent_GeneratedTypes SyncEvent_GeneratedType => throw new NotImplementedException();
+        public override GONetSyncableValue ValuePrevious => ElapsedTicks_Previous;
+        public override GONetSyncableValue ValueNew => ElapsedTicks_New;
+        public override SyncEvent_GeneratedTypes SyncEvent_GeneratedType => throw new NotImplementedException();
 
         static readonly ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority> pool = new ObjectPool<SyncEvent_Time_ElapsedTicks_SetFromAuthority>(5, 1);
         static readonly ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority> returnQueue_onceOnBorrowThread = new ConcurrentQueue<SyncEvent_Time_ElapsedTicks_SetFromAuthority>();

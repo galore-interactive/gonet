@@ -22,12 +22,13 @@ namespace GONet.Utils
 {
     public static class NetworkUtils
     {
+        const string ANY_IP = "0.0.0.0"; // Now obsolete: IPAddress.Any.Address;
         const string LOOPBACK_IP = "127.0.0.1";
         const string LOCALHOST = "localhost";
 
         public static bool IsIPAddressOnLocalMachine(string ipAddressToCheck)
         {
-            if (LOOPBACK_IP == ipAddressToCheck || LOCALHOST == ipAddressToCheck)
+            if (LOOPBACK_IP == ipAddressToCheck || LOCALHOST == ipAddressToCheck || ANY_IP == ipAddressToCheck)
             {
                 return true;
             }

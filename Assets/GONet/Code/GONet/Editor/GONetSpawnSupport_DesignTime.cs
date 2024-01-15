@@ -93,7 +93,7 @@ namespace GONet.Editor
             if (!Application.isPlaying && !isHierarchyChangingDueToExitingPlayModeInEditor) // it would not be design time if we are playing (in editor) now would it?
             {
                 bool somethingChanged = false;
-                int count = EditorSceneManager.loadedSceneCount;
+                int count = SceneManager.loadedSceneCount;
                 for (int i = 0; i < count; ++i)
                 {
                     Scene loadedScene = EditorSceneManager.GetSceneAt(i);

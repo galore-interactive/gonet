@@ -37,7 +37,7 @@ namespace GONet.Utils
                 support4.syncAttribute_SyncChangesEverySeconds = 0.05f;
                 support4.syncAttribute_Reliability = AutoMagicalSyncReliability.Unreliable;
                 support4.syncAttribute_ShouldBlendBetweenValuesReceived = true;
-                GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue(1, out support4.syncAttribute_ShouldSkipSync);
+                GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue((0, 1), out support4.syncAttribute_ShouldSkipSync);
                 support4.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
                 // cachedCustomSerializers[4] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
@@ -72,7 +72,7 @@ namespace GONet.Utils
             support4.mostRecentChanges[3] = value;
 
             GONetSyncableValue blendedValue;
-            bool isGrande = ValueBlendUtils.TryGetBlendedValue(support4, oldestTime.AddSeconds(0.0195).Ticks, out blendedValue);
+            bool isGrande = ValueBlendUtils.TryGetBlendedValue(support4, oldestTime.AddSeconds(0.0195).Ticks, out blendedValue, out bool didExtrapolate);
 
             Debug.Log("blendedValue: " + blendedValue.UnityEngine_Quaternion.eulerAngles);
         }

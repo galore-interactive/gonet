@@ -42,7 +42,9 @@ namespace GONet
         private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
         private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
         private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
+        private Subscription<GONetParticipantDeserializeInitAllCompletedEvent> gonetSubscriptionDeserializeInitAllCompleted;
         private Subscription<SyncEvent_ValueChangeProcessed> gonetSubscriptionOwnerAuthorityId;
+        
 
         /// <summary>
         /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
@@ -64,6 +66,7 @@ namespace GONet
             gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
             gonetSubscriptionStarted = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => OnGONetParticipantStarted(envelope.GONetParticipant));
             gonetSubscriptionDisabled = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(envelope => OnGONetParticipantDisabled(envelope.GONetParticipant));
+            gonetSubscriptionDeserializeInitAllCompleted = GONetMain.EventBus.Subscribe<GONetParticipantDeserializeInitAllCompletedEvent>(envelope => OnGONetParticipantDeserializeInitAllCompleted(envelope.GONetParticipant));
             gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.ValuePrevious.System_UInt16, envelope.Event.ValueNew.System_UInt16));
         }
 
@@ -105,7 +108,7 @@ namespace GONet
             {
                 yield return null;
             }
-            yield return new WaitForSecondsRealtime(0.1f);
+            yield return new WaitForSecondsRealtime(0.1f); // TODO this magic number to wait is bogus and not sure fire....we need to wait only the exact amount of "time" required and no more/no less
             OnGONetClientVsServerStatusKnown(GONetMain.IsClient, GONetMain.IsServer, GONetMain.MyAuthorityId);
         }
 
@@ -114,6 +117,7 @@ namespace GONet
             gonetSubscriptionEnabled.Unsubscribe();
             gonetSubscriptionStarted.Unsubscribe();
             gonetSubscriptionDisabled.Unsubscribe();
+            gonetSubscriptionDeserializeInitAllCompleted.Unsubscribe();
             gonetSubscriptionOwnerAuthorityId.Unsubscribe();
         }
 
@@ -134,6 +138,12 @@ namespace GONet
         ///            <see cref="GONetParticipant.GONetId"/> value is fully assigned!
         /// </summary>
         public virtual void OnGONetParticipantStarted(GONetParticipant gonetParticipant) { }
+
+        /// <summary>
+        /// NOTE: This is guaranteed to be called after the <see cref="GONetLocal"/> associated with the <paramref name="gonetParticipant"/> is available
+        ///       in <see cref="GONetLocal.LookupByAuthorityId"/>.
+        /// </summary>
+        public virtual void OnGONetParticipantDeserializeInitAllCompleted(GONetParticipant gonetParticipant) { }
 
         public virtual void OnGONetParticipantDisabled(GONetParticipant gonetParticipant) { }
 
@@ -180,6 +190,7 @@ namespace GONet
     [RequireComponent(typeof(GONetParticipant))]
     public abstract class GONetParticipantCompanionBehaviour : GONetBehaviour
     {
+        public bool IsMine => gonetParticipant.IsMine;
         public GONetParticipant GONetParticipant => gonetParticipant;
 
         protected GONetParticipant gonetParticipant;
@@ -217,6 +228,20 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// NOTE: This is guaranteed to be called after the <see cref="GONetLocal"/> associated with the <paramref name="gonetParticipant"/> is available
+        ///       in <see cref="GONetLocal.LookupByAuthorityId"/>.
+        /// </summary>
+        public override void OnGONetParticipantDeserializeInitAllCompleted(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetParticipantDeserializeInitAllCompleted(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetParticipantDeserializeInitAllCompleted();
+            }
+        }
+
         public override void OnGONetParticipantDisabled(GONetParticipant gonetParticipant)
         {
             base.OnGONetParticipantDisabled(gonetParticipant);
@@ -244,6 +269,12 @@ namespace GONet
         ///            <see cref="GONetParticipant.GONetId"/> value is fully assigned!
         /// </summary>
         public virtual void OnGONetParticipantStarted() { }
+
+        /// <summary>
+        /// NOTE: This is guaranteed to be called after the <see cref="GONetLocal"/> associated with the <see cref="gonetParticipant"/> is available
+        ///       in <see cref="GONetLocal.LookupByAuthorityId"/>.
+        /// </summary>
+        public virtual void OnGONetParticipantDeserializeInitAllCompleted() { }
 
         public virtual void OnGONetParticipantDisabled() { }
 
