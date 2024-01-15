@@ -1,5 +1,5 @@
 # GONet
-Networking library for Unity GameObjects.  Initially developed and used during 2019 and 2020.  Starting in 2023, the project is taking a new upward trajectory to focus on making the happiest multiplayer devs and game company CFOs in the world.  Just watch!
+Quickly add multiplayer capability into your game. GONet is the high-performance code base that optimizes resource utilization so you multiplayer game can do more fun stuff players love.
 
 Here is the Unity Asset Store description:
 
@@ -24,7 +24,11 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <strong>NOTE:</strong> Instead of slow runtime reflection or error-prone/confusing byte weaving, GONet utilizes (automatic) design-time code generation that is runtime debuggable. Unity-friendly multi-threading where appropriate. Works well with default settings, but tweak away as needed. <strong>REPLAY support is out of the box</strong> (PRO Only)!  And the box is not black, as <strong><em>source code is included</em></strong>.
 <br><br>
 <strong>FEATURES:</strong>
-<br><strong>Auto-magical data sync:</strong>
+<br><strong>Wide platform/runtime support:</strong>
+<br>*All managed C#, no native libraries
+<br>*Ahead of Time (AOT) compilation support (e.g., iOS)
+<br>*IL2CPP
+<br><br><strong>Auto-magical data sync:</strong>
 <br>*Transform - position/localPosition, rotation/localRotation, scale
 <br>*Animator Controller parameters
 <br>*Any MonoBehaviour fields ([SyncVar] replacement)
@@ -53,10 +57,6 @@ GONet is the Unity3D GameObject Networking solution with tight, developer-friend
 <br>*(PRO Only) Default implementation uses distance to client's main player controlled GameObject (closer = high data resolution, further = lower data resolution...down to excluded entirely)
 <br>*(PRO Only) User-defined custom overrides: decide what causes changes to a GameObject's data LOD, when it should be applied, how much it affects LOD, etc...
 <br>*(PRO Only) Facilitates large worlds and/or large numbers of networked GameObjects and sync'd values (e.g., MMO)
-<br><br><strong>Wide platform/runtime support:</strong>
-<br>*All managed C#, no native libraries
-<br>*(PRO Only) Ahead of Time (AOT) compilation support (e.g., iOS)
-<br>*(PRO Only) IL2CPP
 <br><br><strong>Network Transport:</strong>
 <br>*High level (just add GONetParticipant to GameObjects for transform/animation and [GONetAutoMagicalSync] to MonoBehaviour fields/properties and you are <em>in business</em>)
 <br>*Mid level (create/publish/subscribe custom events and also fine tune available network settings to meet particular needs)
