@@ -34,6 +34,7 @@ namespace GONet.Editor
 
         const string SCR = " (Script)";
 
+        private const string PREFAB_FILE_EXTENSION = ".prefab";
         private void OnEnable()
         {
             targetGONetParticipant = (GONetParticipant)target;
@@ -431,7 +432,7 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                         EditorUtility.SetDirty(targetGONetParticipant);
                         EditorUtility.SetDirty(targetGONetParticipant.gameObject);
 
-                        bool isPrefab = targetGONetParticipant.designTimeLocation.EndsWith(".prefab"); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
+                        bool isPrefab = targetGONetParticipant.designTimeLocation.EndsWith(PREFAB_FILE_EXTENSION); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
                         if (!isPrefab)
                         {
                             EditorUtility.SetDirty(targetGONetParticipant);
