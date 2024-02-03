@@ -15,8 +15,6 @@
 
 using GONet;
 using GONet.Sample;
-using MemoryPack;
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -25,21 +23,6 @@ public class ProjectileSpawner : GONetBehaviour
     public GONetParticipant projectilPrefab;
 
     private readonly List<Projectile> projectiles = new List<Projectile>(100);
-
-    public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
-    {
-        base.OnGONetClientVsServerStatusKnown(isClient, isServer, myAuthorityId);
-
-        if (isClient)
-        {
-            EventBus.Subscribe<StructTestEvent>(Client_OnNewGNP);
-        }
-    }
-
-    private void Client_OnNewGNP(GONetEventEnvelope<StructTestEvent> eventEnvelope)
-    {
-        Debug.Log("StructTestEvent occurred.  SomeMessage: " + eventEnvelope.Event.SomeMessage);
-    }
 
     public override void OnGONetParticipantStarted(GONetParticipant gonetParticipant)
     {
@@ -64,16 +47,6 @@ public class ProjectileSpawner : GONetBehaviour
         base.OnGONetParticipantDisabled(gonetParticipant);
 
         projectiles.Remove(gonetParticipant.GetComponent<Projectile>());
-    }
-
-    public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
-    {
-        base.OnGONetParticipantEnabled(gonetParticipant);
-
-        if (IsServer)
-        {
-            EventBus.Publish(new StructTestEvent() { SomeMessage = string.Concat(Time.frameCount, '-', DateTime.UtcNow.ToString()) });
-        }
     }
 
     private void Update()
@@ -126,13 +99,4 @@ public class ProjectileSpawner : GONetBehaviour
             }
         }
     }
-}
-
-[MemoryPackable]
-public partial class StructTestEvent : ITransientEvent
-{
-    [MemoryPackIgnore]
-    public long OccurredAtElapsedTicks => 0;
-
-    public string SomeMessage { get; set; }
 }
