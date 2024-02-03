@@ -322,6 +322,12 @@ namespace GONet
         public string DesignTimeLocation => designTimeLocation;
 
         /// <summary>
+        /// Does this GNP have all the values set from design time operations in order to support this being allowed to be included in the game at runtime?
+        /// If not, an error will be logged in Awake() to alert you as to what needs to be done to resolve this.
+        /// </summary>
+        public bool IsInternallyConfigured => !string.IsNullOrWhiteSpace(designTimeLocation) && codeGenerationId != CodeGenerationId_Unset;
+
+        /// <summary>
         /// <para>If false, the <see cref="GameObject"/> on which this is "installed" was defined in a scene.</para>
         /// <para>If true, the <see cref="GameObject"/> on which this is "installed" was added to the game via a call to some flavor of <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.</para>
         /// <para>IMPORTANT: This will have a value of true for EVERYTHING up until GONet knows for sure if it was defined in a scene or not!  If you need to be informed the moment this value is known to be false instead, register to the event <see cref="TODO FIXME add it here once available"/>.</para>
@@ -389,6 +395,13 @@ namespace GONet
         public static event GNPDelegate AwakeCalled;
         private void Awake()
         {
+            if (Application.isPlaying && !IsInternallyConfigured)
+            {
+                Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(designTimeLocation)} and {nameof(codeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation', then once that completes re-run the game build and try again.");
+                enabled = false;
+                return;
+            }
+
             AwakeCalled?.Invoke(this);
         }
 
