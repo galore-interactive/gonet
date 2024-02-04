@@ -128,23 +128,23 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
         }
     }
 
-    //private void Update()
-    //{
-    //    if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
-    //    {
-    //        InstantiateClientIfNotAlready();
-    //    }
+    private void Update()
+    {
+        if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.LeftCommand)) && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.C))
+        {
+            InstantiateClientIfNotAlready();
+        }
 
-    //    if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S))
-    //    {
-    //        InstantiateServerIfNotAlready();
-    //    }
+        if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.LeftCommand)) && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.S))
+        {
+            InstantiateServerIfNotAlready();
+        }
 
-    //    if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
-    //    {
-    //        Instantiate(authorityPrefab, transform.position, transform.rotation);
-    //    }
-    //}
+        if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.LeftCommand)) && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
+        {
+            Instantiate(authorityPrefab, transform.position, transform.rotation);
+        }
+    }
 
     public void InstantiateServerIfNotAlready()
     {
