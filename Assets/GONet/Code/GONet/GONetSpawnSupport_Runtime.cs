@@ -13,11 +13,13 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Generation;
 using GONet.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -27,7 +29,7 @@ namespace GONet
     public static class GONetSpawnSupport_Runtime
     {
         public const string GONET_STREAMING_ASSETS_FOLDER = "GONet";
-        public static readonly string DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS = Path.Combine(GONET_STREAMING_ASSETS_FOLDER, "DesignTimeLocations.txt");
+        public static readonly string DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS = Path.Combine(GONET_STREAMING_ASSETS_FOLDER, "DesignTimeMetadata.json");
 
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
@@ -35,11 +37,12 @@ namespace GONet
 
         private static readonly string[] ALL_END_OF_LINE_OPTIONS = new[] { "\r\n", "\r", "\n" };
 
-        private static readonly Dictionary<string, GONetParticipant> designTimeLocationToProjectTemplate = new Dictionary<string, GONetParticipant>(100);
+        private static readonly Dictionary<DesignTimeMetadata, GONetParticipant> designTimeMetadataToProjectTemplate = new (100);
+        private static readonly DesignTimeMetadataDictionary designTimeMetadataLookup = new();
 
-        public static IEnumerable<string> LoadDesignTimeLocationsFromPersistence()
+        public static IEnumerable<DesignTimeMetadata> LoadDesignTimeMetadataFromPersistence()
         {
-            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);
 #if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_WEBGL)
             Debug.Log($"About to check out design time file at URI {fullPath}.");
             // As per, https://docs.unity3d.com/Manual/StreamingAssets.html :
@@ -48,15 +51,17 @@ namespace GONet
             Task<string> fileContentsTask = LoadFileFromWeb_Task(fullPath);
             if (fileContentsTask.Wait(5000))
             {
-                string fileContents = fileContentsTask.Result;
-                return fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
+                string fileContentsJson = fileContentsTask.Result;
+                DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                return library.Entries;
             }
 #else
             Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
             {
-                string fileContents = File.ReadAllText(fullPath);
-                return fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
+                string fileContentsJson = File.ReadAllText(fullPath);
+                DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                return library.Entries;
             }
 #endif
 
@@ -109,50 +114,50 @@ namespace GONet
             }
         }
 
-        public static void CacheAllProjectDesignTimeLocations(MonoBehaviour coroutineOwner)
+        public static void CacheAllProjectDesignTimeMetadata(MonoBehaviour coroutineOwner)
         {
             coroutineOwner.StartCoroutine(
-                CacheAllProjectDesignTimeLocations_Coroutine(CacheAllProjectDesignTimeLocations)
+                CacheAllProjectDesignTimeMetadata_Coroutine(CacheAllProjectDesignTimeMetadata)
             );
         }
 
-        private static IEnumerator CacheAllProjectDesignTimeLocations_Coroutine(Action<IEnumerable<string>> processResults)
+        private static IEnumerator CacheAllProjectDesignTimeMetadata_Coroutine(Action<IEnumerable<DesignTimeMetadata>> processResults)
         {
-            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
+            string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);
 #if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_WEBGL)
             Debug.Log($"About to check out design time file at URI {fullPath}.");
             // As per, https://docs.unity3d.com/Manual/StreamingAssets.html :
             // "On Android and WebGL platforms, it’s not possible to access the streaming asset files directly via file system APIs and
             // streamingAssets path because these platforms return a URL. Use the UnityWebRequest class to access the content instead."
-            yield return LoadFileFromWeb_Coroutine(fullPath, (fileContents) =>
+            yield return LoadFileFromWeb_Coroutine(fullPath, (fileContentsJson) =>
                 {
-                    IEnumerable<string> lines = fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
-                    processResults(lines);
+                    DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                    processResults(library.Entries);
                 });
                 
 #else
             Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
             {
-                string fileContents = File.ReadAllText(fullPath);
-                IEnumerable<string> lines = fileContents.Split(ALL_END_OF_LINE_OPTIONS, StringSplitOptions.None);
-                processResults(lines);
+                string fileContentsJson = File.ReadAllText(fullPath);
+                DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                processResults(library.Entries);
             }
             yield return null;
 #endif
         }
 
-        private static void CacheAllProjectDesignTimeLocations(IEnumerable<string> allProjectDesignTimeLocations)
+        private static void CacheAllProjectDesignTimeMetadata(IEnumerable<DesignTimeMetadata> allProjectDesignTimeMetadata)
         {
-            foreach (string designTimeLocation in allProjectDesignTimeLocations)
+            foreach (DesignTimeMetadata designTimeMetadata in allProjectDesignTimeMetadata)
             {
-                if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
-                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeLocation.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
+                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeMetadata.Location.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
                     if ((object)template != null)
                     {
-                        GONetLog.Debug("found template for design time location: " + designTimeLocation);
-                        designTimeLocationToProjectTemplate[designTimeLocation] = template;
+                        GONetLog.Debug("found template for design time location: " + designTimeMetadata.Location);
+                        designTimeMetadataToProjectTemplate[designTimeMetadata] = template;
                     }
                 }
             }
@@ -174,22 +179,22 @@ namespace GONet
             }
         }
 
-        public static GONetParticipant LookupTemplateFromDesignTimeLocation(string designTimeLocation)
+        public static GONetParticipant LookupTemplateFromDesignTimeMetadata(DesignTimeMetadata designTimeMetadata)
         {
-            if (designTimeLocation != null)
+            if (designTimeMetadata != null)
             {
-                if (designTimeLocation.StartsWith(SCENE_HIERARCHY_PREFIX))
+                if (designTimeMetadata.Location.StartsWith(SCENE_HIERARCHY_PREFIX))
                 {
-                    string fullUniquePath = designTimeLocation.Replace(SCENE_HIERARCHY_PREFIX, string.Empty);
+                    string fullUniquePath = designTimeMetadata.Location.Replace(SCENE_HIERARCHY_PREFIX, string.Empty);
                     return HierarchyUtils.FindByFullUniquePath(fullUniquePath).GetComponent<GONetParticipant>();
                 }
-                else if (designTimeLocation.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                else if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
-                    return designTimeLocationToProjectTemplate[designTimeLocation];
+                    return designTimeMetadataToProjectTemplate[designTimeMetadata];
                 }
             }
 
-            throw new ArgumentException(string.Concat("Must include supported prefix defined as const herein. value received: ", designTimeLocation), nameof(designTimeLocation));
+            throw new ArgumentException(string.Concat("Must include supported prefix defined as const herein. value received: ", designTimeMetadata), nameof(designTimeMetadata));
         }
 
         /// <summary>
@@ -200,7 +205,7 @@ namespace GONet
             // take note of nonAuthorityAlternateOriginal to make use of this during auto
 
             GONetParticipant authorityInstance = UnityEngine.Object.Instantiate(authorityOriginal);
-            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.designTimeLocation;
+            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.DesignTimeLocation;
             return authorityInstance;
         }
 
@@ -213,7 +218,7 @@ namespace GONet
             // take note of nonAuthorityAlternateOriginal to make use of this during auto
 
             GONetParticipant authorityInstance = UnityEngine.Object.Instantiate(authorityOriginal, position, rotation);
-            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.designTimeLocation;
+            nonAuthorityDesignTimeLocationByAuthorityInstanceMap[authorityInstance] = nonAuthorityAlternateOriginal.DesignTimeLocation;
             return authorityInstance;
         }
 
@@ -264,6 +269,188 @@ namespace GONet
             GONetParticipant instanceSoonToBeOwnedByServerAndRemotelyControlledByMe = UnityEngine.Object.Instantiate(prefab, position, rotation);
             markedToBeRemotelyControlled.Add(instanceSoonToBeOwnedByServerAndRemotelyControlledByMe);
             return instanceSoonToBeOwnedByServerAndRemotelyControlledByMe;
+        }
+
+        private static readonly DesignTimeMetadata defaultDTM = new DesignTimeMetadata()
+        {
+            CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
+        };
+
+        public static IEnumerable<DesignTimeMetadata> GetAllDesignTimeMetadata() => designTimeMetadataLookup;
+
+        private static int callDepth = 0;
+        public static DesignTimeMetadata GetDesignTimeMetadata(GONetParticipant gONetParticipant)
+        {
+            try
+            {
+                ++callDepth;
+                if (callDepth > 1) return default;
+
+
+                //GONetLog.Debug($"[DREETSleeps] designTimeMetadataLookup.Count: {designTimeMetadataLookup.Count}");
+
+                if (!designTimeMetadataLookup.TryGetValue(gONetParticipant, out DesignTimeMetadata value))
+                {
+                    designTimeMetadataLookup.Set(gONetParticipant, defaultDTM);
+                    value = defaultDTM;
+                }
+                return value;
+            }
+            finally
+            {
+                --callDepth;
+            }
+        }
+
+        public static DesignTimeMetadata GetDesignTimeMetadata(string designTimeLocation)
+        {
+            try
+            {
+                ++callDepth;
+                if (callDepth > 1) return default;
+
+                if (!designTimeMetadataLookup.TryGetValue(designTimeLocation, out DesignTimeMetadata value))
+                {
+                    designTimeMetadataLookup.Set(designTimeLocation, defaultDTM);
+                    value = defaultDTM;
+                }
+                return value;
+            }
+            finally
+            {
+                --callDepth;
+            }
+        }
+
+        public static void ChangeLocation(string previousLocation, string newLocation, DesignTimeMetadata value)
+        {
+            designTimeMetadataLookup.ChangeLocation(previousLocation, newLocation, value);
+        }
+
+        internal static string GetDesignTimeMetadata_Location(GONetParticipant gONetParticipant)
+        {
+            DesignTimeMetadata metadata = GetDesignTimeMetadata(gONetParticipant);
+            if ((object)metadata == null)
+            {
+                if (callDepth == 0)
+                {
+                    Debug.LogError($"Unexpected situation.  callDepth should be > 0 to cause the inability to get the {nameof(DesignTimeMetadata)} from the {nameof(gONetParticipant)}, but callDepth is 0.");
+                }
+                return string.Empty;
+            }
+
+            return metadata.Location;
+        }
+    }
+
+    public class DesignTimeMetadataDictionary : IEnumerable<DesignTimeMetadata>
+    {
+        private static readonly Dictionary<GONetParticipant, DesignTimeMetadata> designTimeMetadataByGNP = new(256);
+        private static readonly Dictionary<string, DesignTimeMetadata> designTimeMetadataByLocation = new(256);
+
+        public int Count => designTimeMetadataByGNP.Count;
+
+        public void Set(GONetParticipant keyGNP, DesignTimeMetadata value)
+        {
+            if ((object)keyGNP == null || (object)value == default)
+            {
+                throw new ArgumentException($"BLASTPHEAMOUSE!  1: {((object)keyGNP == null)}, 2: {((object)value == default)}");
+            }
+
+            designTimeMetadataByGNP[keyGNP] = value;
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            if (string.IsNullOrWhiteSpace(keyGNP.DesignTimeLocation))
+            {
+                return;
+            }
+            designTimeMetadataByLocation[keyGNP.DesignTimeLocation] = value;
+        }
+
+        public void Set(string keyLocation, DesignTimeMetadata value)
+        {
+            if (string.IsNullOrWhiteSpace(keyLocation) || (object)value == default)
+            {
+                throw new ArgumentException("TON CLEETLE");
+            }
+
+            designTimeMetadataByLocation[keyLocation] = value;
+        }
+
+        public void ChangeLocation(string previousLocation, string newLocation, DesignTimeMetadata value)
+        {
+            if (string.IsNullOrWhiteSpace(newLocation) || (object)value == default)
+            {
+                throw new ArgumentException("BOMME BEETLE");
+            }
+
+            if (!string.IsNullOrWhiteSpace(previousLocation) && designTimeMetadataByLocation.TryGetValue(previousLocation, out var previousValue))
+            {
+                if (previousValue != value)
+                {
+                    throw new InvalidOperationException();
+                }
+
+                designTimeMetadataByLocation.Remove(previousLocation);
+            }
+
+            designTimeMetadataByLocation[newLocation] = value;
+        }
+
+        public bool TryGetValue(GONetParticipant keyGNP, out DesignTimeMetadata value)
+        {
+            if ((object)keyGNP == null)
+            {
+                throw new ArgumentException("SLAN KEATULL");
+            }
+
+            if (designTimeMetadataByGNP.TryGetValue(keyGNP, out value))
+            {
+                return true;
+            }
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////
+
+            if (string.IsNullOrWhiteSpace(keyGNP.DesignTimeLocation))
+            {
+                return false;
+            }
+
+            return designTimeMetadataByLocation.TryGetValue(keyGNP.DesignTimeLocation, out value);
+        }
+
+
+        public bool TryGetValue(string keyLocation, out DesignTimeMetadata value)
+        {
+            if (string.IsNullOrWhiteSpace(keyLocation))
+            {
+                value = default;
+                return false;
+            }
+
+            return designTimeMetadataByLocation.TryGetValue(keyLocation, out value);
+        }
+
+
+        IEnumerator<DesignTimeMetadata> IEnumerable<DesignTimeMetadata>.GetEnumerator()
+        {
+            HashSet<DesignTimeMetadata> all = new HashSet<DesignTimeMetadata>(); // TODO memory mgt improvement needed!
+
+            foreach (var dtm in designTimeMetadataByGNP.Values) all.Add(dtm);
+            foreach (var dtm in designTimeMetadataByLocation.Values) all.Add(dtm);
+
+            return all.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            HashSet<DesignTimeMetadata> all = new HashSet<DesignTimeMetadata>(); // TODO memory mgt improvement needed!
+
+            foreach (var dtm in designTimeMetadataByGNP.Values) all.Add(dtm);
+            foreach (var dtm in designTimeMetadataByLocation.Values) all.Add(dtm);
+
+            return all.GetEnumerator();
         }
     }
 }

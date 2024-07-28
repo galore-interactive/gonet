@@ -71,7 +71,7 @@ namespace GONet.Editor
                 EditorGUILayout.BeginHorizontal();
                 const string CODE_GEN_ID = "Code Generation Id";
                 EditorGUILayout.LabelField(CODE_GEN_ID);
-                string value = targetGONetParticipant.codeGenerationId == GONetParticipant.CodeGenerationId_Unset ? NOT_SET : targetGONetParticipant.codeGenerationId.ToString();
+                string value = targetGONetParticipant.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset ? NOT_SET : targetGONetParticipant.CodeGenerationId.ToString();
                 EditorGUILayout.TextField(value);
                 EditorGUILayout.EndHorizontal();
             }
@@ -432,7 +432,7 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                         EditorUtility.SetDirty(targetGONetParticipant);
                         EditorUtility.SetDirty(targetGONetParticipant.gameObject);
 
-                        bool isPrefab = targetGONetParticipant.designTimeLocation.EndsWith(PREFAB_FILE_EXTENSION); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
+                        bool isPrefab = targetGONetParticipant.DesignTimeLocation.EndsWith(PREFAB_FILE_EXTENSION); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
                         if (!isPrefab)
                         {
                             EditorUtility.SetDirty(targetGONetParticipant);
