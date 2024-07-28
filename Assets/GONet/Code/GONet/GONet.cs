@@ -516,7 +516,7 @@ namespace GONet
 
             Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
             GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
-            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions) &&
                 autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
             {
                 byte valuesCount = autoSyncCompanion.valuesCount;
@@ -577,7 +577,7 @@ namespace GONet
         {
             Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
             GONetParticipant_AutoMagicalSyncCompanion_Generated autoSyncCompanion;
-            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions) &&
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions) &&
                 autoSyncCompanions.TryGetValue(gonetParticipant, out autoSyncCompanion))
             {
                 byte valuesCount = autoSyncCompanion.valuesCount;
@@ -793,7 +793,7 @@ namespace GONet
             if (gonetParticipantByGONetIdMap.TryGetValue(@event.GONetId, out gnp)
                 || gonetParticipantByGONetIdMap.TryGetValue(GetGONetIdAtInstantiation(@event.GONetId), out gnp)) // IMPORTANT: this is here because a newly connecting client will process this new baseline with all the other persistent events, but it is done before the new gonetId assignment is made for gnps that were assumed authority by server and have a new gonetId
             {
-                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gnp.codeGenerationId][gnp];
+                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gnp.CodeGenerationId][gnp];
 
                 AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = syncCompanion.valuesChangesSupport[@event.ValueIndex];
                 //GONetSyncableValue baselineValue_previous = valueChangeSupport.baselineValue_current;
@@ -1519,7 +1519,7 @@ namespace GONet
                         GONetLog.Debug("gnp now not unity null...gnp.gonetId: " + gnp.GONetId);
 
                         Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap;
-                        if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out companionMap))
+                        if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.CodeGenerationId, out companionMap))
                         {
                             if (companionMap.ContainsKey(gnp))
                             {
@@ -2289,7 +2289,7 @@ namespace GONet
             isCurrentlyProcessingInstantiateGNPEvent = true;
             currentlyProcessingInstantiateGNPEvent = instantiateEvent;
 
-            GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeLocation(instantiateEvent.DesignTimeLocation);
+            GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeMetadata(instantiateEvent.DesignTimeLocation);
             GONetParticipant instance =
                 string.IsNullOrWhiteSpace(instantiateEvent.ParentFullUniquePath)
                     ? UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation)
@@ -2409,7 +2409,7 @@ namespace GONet
 
         /// <summary>
         /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
-        /// The key into this is the <see cref="GONetParticipant.codeGenerationId"/>.
+        /// The key into this is the <see cref="GONetParticipant.CodeGenerationId"/>.
         /// </summary>
         static readonly Dictionary<GONetCodeGenerationId, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>> activeAutoSyncCompanionsByCodeGenerationIdMap =
             new Dictionary<GONetCodeGenerationId, Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>>(byte.MaxValue);
@@ -2428,7 +2428,7 @@ namespace GONet
             GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = null;
 
             Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> collection;
-            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.codeGenerationId, out collection))
+            if (activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gnp.CodeGenerationId, out collection))
             {
                 collection.TryGetValue(gnp, out syncCompanion);
             }
@@ -2796,10 +2796,10 @@ namespace GONet
             {
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
-                    if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions))
+                    if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions))
                     {
                         autoSyncCompanions = new Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>(1000);
-                        activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId] = autoSyncCompanions; // NOTE: This is the only place we add to the outer dictionary and this is always run in the main unity thread, THEREFORE no need for Concurrent....just on the inner ones
+                        activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.CodeGenerationId] = autoSyncCompanions; // NOTE: This is the only place we add to the outer dictionary and this is always run in the main unity thread, THEREFORE no need for Concurrent....just on the inner ones
                     }
                     GONetParticipant_AutoMagicalSyncCompanion_Generated companion = GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.CreateInstance(gonetParticipant);
                     autoSyncCompanions[gonetParticipant] = companion; // NOTE: This is the only place where the inner dictionary is added to and is ensured to run on unity main thread since OnEnable, so no need for concurrency as long as we can say the same about removes
@@ -2903,13 +2903,13 @@ namespace GONet
         private static void OnGONetIdAtInstantiationChanged_DoSomeMapMaintenanceForKeyLookupPerformanceLater(GONetParticipant gonetParticipant)
         {
             Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions_uintKeyForPerformance;
-            if (!activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance.TryGetValue(gonetParticipant.codeGenerationId, out autoSyncCompanions_uintKeyForPerformance))
+            if (!activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions_uintKeyForPerformance))
             {
                 autoSyncCompanions_uintKeyForPerformance = new Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated>(1000);
-                activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.codeGenerationId] = autoSyncCompanions_uintKeyForPerformance; // NOTE: This is the only place we add to the outer dictionary and this is always run in the main unity thread, THEREFORE no need for Concurrent....just on the inner ones
+                activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.CodeGenerationId] = autoSyncCompanions_uintKeyForPerformance; // NOTE: This is the only place we add to the outer dictionary and this is always run in the main unity thread, THEREFORE no need for Concurrent....just on the inner ones
             }
 
-            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+            Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.CodeGenerationId];
             autoSyncCompanions_uintKeyForPerformance[gonetParticipant.GONetIdAtInstantiation] = autoSyncCompanions[gonetParticipant]; // NOTE: This is the only place where the inner dictionary is added to and is ensured to run on unity main thread since OnEnable, so no need for concurrency as long as we can say the same about removes
         }
 
@@ -4082,7 +4082,7 @@ namespace GONet
                 if (GONetParticipant.DoesGONetIdContainAllComponents(gonetId))
                 {
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId][gonetParticipant];
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.CodeGenerationId][gonetParticipant];
 
                     //UnityEngine.Debug.Log($"[DREETS] Deserialize init all for GONetId: {gonetId}");
                     syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
@@ -4187,7 +4187,7 @@ namespace GONet
 
 
                 //Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.codeGenerationId];
+                Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.CodeGenerationId];
 
                 if (gonetParticipant == null)
                 {
@@ -4294,7 +4294,7 @@ namespace GONet
             if (Application.isPlaying && gonetParticipant.IsInternallyConfigured) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
                 { // auto-magical sync related housekeeping
-                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
+                    Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.CodeGenerationId];
                     GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
                     if (!autoSyncCompanions.TryGetValue(gonetParticipant, out syncCompanion) || !autoSyncCompanions.Remove(gonetParticipant)) // NOTE: This is the only place where the inner dictionary is removed from and is ensured to run on unity main thread since OnDisable, so no need for concurrency as long as we can say the same about adds
                     {

@@ -25,6 +25,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using static UnityEditor.FilePathAttribute;
 
 namespace GONet.Editor
 {
@@ -74,12 +75,12 @@ namespace GONet.Editor
                     // this seems unnecessary and problematic for project assets: 
                     EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
 
-                    //gonetParticipant.designTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
+                    //gonetParticipant.DesignTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
                 }
             }
-            else if ((object)gonetParticipant != null && !string.IsNullOrWhiteSpace(gonetParticipant.designTimeLocation))
+            else if ((object)gonetParticipant != null && !string.IsNullOrWhiteSpace(gonetParticipant.DesignTimeLocation))
             {
-                EnsureExistsInPersistence(gonetParticipant.designTimeLocation);
+                EnsureExistsInPersistence(gonetParticipant.DesignTimeLocation);
             }
         }
 
@@ -107,7 +108,7 @@ namespace GONet.Editor
                         foreach (var gonetParticipant in rootGO.GetComponentsInChildren<GONetParticipant>())
                         {
                             string fullUniquePath = string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject));
-                            if (fullUniquePath != gonetParticipant.designTimeLocation)
+                            if (fullUniquePath != gonetParticipant.DesignTimeLocation)
                             {
                                 somethingChanged = true;
                                 EnsureDesignTimeLocationCurrent(gonetParticipant, fullUniquePath); // have to do proper unity serialization stuff for this to stick!
@@ -122,19 +123,20 @@ namespace GONet.Editor
 
                 if (somethingChanged)
                 {
-                    EditorSceneManager.MarkAllScenesDirty();
+                    // NOTE: there is no longer anything else to do since we save the data outside the GNP itself in the DesignTimeLocations.json
+                    //EditorSceneManager.MarkAllScenesDirty();
                     //EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo(); // this may be too much....they will save when they want to...normally
                 }
             }
         }
 
-        static void EnsureExistsInPersistence(string designTimeLocation)
+        internal static void EnsureExistsInPersistence(DesignTimeMetadata designTimeLocation)
         {
-            IEnumerable<string> all = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
+            IEnumerable<DesignTimeMetadata> all = GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
 
-            if (!all.Contains(designTimeLocation))
+            if (!all.Any(x => x.Location == designTimeLocation.Location))
             {
-                var newAll = new List<string>(all);
+                var newAll = new List<DesignTimeMetadata>(all);
 
                 newAll.Add(designTimeLocation);
 
@@ -144,9 +146,9 @@ namespace GONet.Editor
 
         static void RemoveFromPersistence_WherePrefixMatches(string prefixToMatch)
         {
-            IEnumerable<string> all = GONetSpawnSupport_Runtime.LoadDesignTimeLocationsFromPersistence();
+            IEnumerable<DesignTimeMetadata> all = GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
 
-            all = all.Where(x => !x.StartsWith(prefixToMatch));
+            all = all.Where(x => !x.Location.StartsWith(prefixToMatch));
 
             OverwritePersistenceWith(all);
         }
@@ -158,40 +160,43 @@ namespace GONet.Editor
         {
             string goName = gonetParticipant.gameObject.name; // IMPORTANT: after a call to serializedObject.ApplyModifiedProperties(), gonetParticipant is unity "null" and this line MUst come before that!
 
+            /*
             SerializedObject serializedObject = new SerializedObject(gonetParticipant); // use the damned unity serializtion stuff or be doomed to fail on saving stuff to scene as you hope/expect!!!
-            SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.designTimeLocation));
+            SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.DesignTimeLocation));
             serializedObject.Update();
             serializedProperty.stringValue = currentLocation; // set it this way or else it will NOT work with prefabs!
-            gonetParticipant.designTimeLocation = currentLocation; // doubly sure
+            gonetParticipant.DesignTimeLocation = currentLocation; // doubly sure
             serializedObject.ApplyModifiedProperties();
+            */
 
             GONetLog.Debug("set design time location for name: " + goName + " to NEW value: " + currentLocation);
 
-            EnsureExistsInPersistence(currentLocation);
+            DesignTimeMetadata designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
+            designTimeMetadata.Location = currentLocation;
+            designTimeMetadata.UnityGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(gonetParticipant));
+
+            EnsureExistsInPersistence(designTimeMetadata);
         }
 
         /// <summary>
         /// POST: contents of <see cref="allDesignTimeLocationsEncountered"/> persisted.
         /// </summary>
-        private static void OverwritePersistenceWith(IEnumerable<string> newCompleteDesignTimeLocations)
+        private static void OverwritePersistenceWith(IEnumerable<DesignTimeMetadata> newCompleteDesignTimeLocations)
         {
-            StringBuilder fileContents = new StringBuilder(5000);
-            foreach (string designTimeLocation in newCompleteDesignTimeLocations.OrderBy(x => x))
-            {
-                if (!string.IsNullOrWhiteSpace(designTimeLocation))
-                {
-                    fileContents.Append(designTimeLocation).Append(Environment.NewLine);
-                }
-            }
-
             string directory = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.GONET_STREAMING_ASSETS_FOLDER);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
 
-            string fullPath = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.DESIGN_TIME_LOCATIONS_FILE_POST_STREAMING_ASSETS);
-            File.WriteAllText(fullPath, fileContents.ToString());
+            DesignTimeMetadataLibrary designTimeMetadataLibrary = new DesignTimeMetadataLibrary()
+            {
+                Entries = newCompleteDesignTimeLocations.Where(x => !string.IsNullOrWhiteSpace(x.Location)).OrderBy(x => x.Location).ToArray(),
+            };
+
+            string fullPath = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);
+            GONetLog.Debug($"writing all text to: {fullPath}");
+            File.WriteAllText(fullPath, JsonUtility.ToJson(designTimeMetadataLibrary, prettyPrint: true));
         }
     }
 }

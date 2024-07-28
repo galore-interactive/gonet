@@ -261,7 +261,7 @@ namespace GONet
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
-            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.DesignTimeLocation = gonetParticipant.DesignTimeLocation;
             @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;
@@ -302,7 +302,7 @@ namespace GONet
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
-            @event.DesignTimeLocation = gonetParticipant.designTimeLocation;
+            @event.DesignTimeLocation = gonetParticipant.DesignTimeLocation;
             @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;

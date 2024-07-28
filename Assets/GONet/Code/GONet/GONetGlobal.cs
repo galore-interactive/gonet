@@ -111,7 +111,7 @@ namespace GONet
 
             base.Awake(); // YUK: code smell...having to break OO protocol here and call base here as it needs to come AFTER the init stuff is done in GONetMain.InitOnUnityMainThread() and unity main thread identified or exceptions will be thrown in base.Awake() when subscribing
 
-            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeLocations(this);
+            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeMetadata(this);
 
             enabledGONetParticipants.Clear();
 
@@ -223,7 +223,7 @@ namespace GONet
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, 
-                    (gnp) => gnp.designTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
+                    (gnp) => gnp.DesignTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)

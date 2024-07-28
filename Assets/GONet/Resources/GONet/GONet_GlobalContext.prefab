@@ -65,7 +65,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 1
   animatorSyncSupport:
     keys: []
     values: []
@@ -74,7 +73,6 @@ MonoBehaviour:
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
-  designTimeLocation: project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 --- !u!114 &8643402947905904697
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -332,6 +332,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\crmf\ProofOfPossession.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\AbstractTlsServer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509ExtensionBase.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Generation\DesignTimeMetadata.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\jpake\JPakeRound1Payload.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\ZOutputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\tsp\Accuracy.cs" />

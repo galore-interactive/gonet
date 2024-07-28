@@ -49,11 +49,11 @@ namespace GONet
 
         #endregion
 
-        /// <summary>
-        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
-        /// </summary>
-        [SerializeField, HideInInspector]
-        public GONetCodeGenerationId codeGenerationId = CodeGenerationId_Unset;
+        public GONetCodeGenerationId CodeGenerationId
+        {
+            get => GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId;
+            internal set => GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId = value;
+        }
 
         [Serializable]
         public class AnimatorControllerParameter
@@ -312,20 +312,13 @@ namespace GONet
         [GONetAutoMagicalSync]
         public bool IsRotationSyncd = false; // TODO Maybe change to RotationSyncStrategy, defaulting to 'Excluded' if more than 2 options required/wanted
 
-        /// <summary>
-        /// public: Do NOT use this.  It is internal to GONet!
-        /// This is ONLY accurate information during design time.  The location can easily change during runtime.
-        /// This is used for referential purposes only and mainly for auto-propagate spawn support.
-        /// </summary>
-        [SerializeField, HideInInspector]
-        public string designTimeLocation;
-        public string DesignTimeLocation => designTimeLocation;
+        public string DesignTimeLocation => GONetSpawnSupport_Runtime.GetDesignTimeMetadata_Location(this);
 
         /// <summary>
         /// Does this GNP have all the values set from design time operations in order to support this being allowed to be included in the game at runtime?
         /// If not, an error will be logged in Awake() to alert you as to what needs to be done to resolve this.
         /// </summary>
-        public bool IsInternallyConfigured => !string.IsNullOrWhiteSpace(designTimeLocation) && codeGenerationId != CodeGenerationId_Unset;
+        public bool IsInternallyConfigured => !string.IsNullOrWhiteSpace(DesignTimeLocation) && CodeGenerationId != CodeGenerationId_Unset;
 
         /// <summary>
         /// <para>If false, the <see cref="GameObject"/> on which this is "installed" was defined in a scene.</para>
@@ -397,7 +390,7 @@ namespace GONet
         {
             if (Application.isPlaying && !IsInternallyConfigured)
             {
-                Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(designTimeLocation)} and {nameof(codeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation', then once that completes re-run the game build and try again.");
+                Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(DesignTimeLocation)} and {nameof(CodeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation', then once that completes re-run the game build and try again.");
                 enabled = false;
                 return;
             }

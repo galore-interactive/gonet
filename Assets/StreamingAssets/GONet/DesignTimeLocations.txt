@@ -1,4 +1,5 @@
 project://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab
 project://Assets/GONet/Resources/GONet/GONet_LocalContext.prefab
 project://Assets/GONet/Sample/Projectile/Resources/CannonBall.prefab
+project://Assets/GONet/Sample/Projectile/Resources/CannonBall_NestedGNPs.prefab
 scene://ProjectileTest/GONet_GlobalContext
