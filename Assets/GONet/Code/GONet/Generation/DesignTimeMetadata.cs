@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GONet.Utils;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GONetCodeGenerationId = System.Byte;
@@ -56,6 +57,12 @@ namespace GONet.Generation
         }
 
         public static implicit operator string(DesignTimeMetadata metadata) => metadata.Location;
+
+        public static string GetFullUniquePathInScene(GONetParticipant gnpInScene)
+        {
+            return string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gnpInScene.gameObject));
+
+        }
     }
 
     [Serializable]

@@ -17,6 +17,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using GONet.Generation;
 using GONet.Serializables;
 using GONet.Utils;
 using UnityEngine;
@@ -48,6 +49,9 @@ namespace GONet
         public const GONetCodeGenerationId CodeGenerationId_Unset = 0;
 
         #endregion
+
+        [SerializeField]
+        internal string UnityGuid;
 
         public GONetCodeGenerationId CodeGenerationId
         {
@@ -320,6 +324,8 @@ namespace GONet
         /// </summary>
         public bool IsInternallyConfigured => !string.IsNullOrWhiteSpace(DesignTimeLocation) && CodeGenerationId != CodeGenerationId_Unset;
 
+        internal bool IsDesignTimeMetadataInitd { get; set; }
+
         /// <summary>
         /// <para>If false, the <see cref="GameObject"/> on which this is "installed" was defined in a scene.</para>
         /// <para>If true, the <see cref="GameObject"/> on which this is "installed" was added to the game via a call to some flavor of <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.</para>
@@ -381,21 +387,23 @@ namespace GONet
             return gonetId_raw != GONetId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
         }
 
-        /// <summary>
-        /// IMPORTANT: Do NOT use this.
-        /// TODO: make the main dll internals visible to editor dll so this can be made internal again
-        /// </summary>
-        public static event GNPDelegate AwakeCalled;
         private void Awake()
         {
-            if (Application.isPlaying && !IsInternallyConfigured)
+            if (Application.isPlaying)
+            {
+                StartCoroutine(AwakeCoroutine());
+            }
+        }
+
+        private IEnumerator AwakeCoroutine()
+        {
+            yield return GONetMain.OnAwake_ApplyDesignTimeMetadata(this);
+
+            if (!IsInternallyConfigured)
             {
                 Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(DesignTimeLocation)} and {nameof(CodeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation', then once that completes re-run the game build and try again.");
                 enabled = false;
-                return;
             }
-
-            AwakeCalled?.Invoke(this);
         }
 
         /// <summary>

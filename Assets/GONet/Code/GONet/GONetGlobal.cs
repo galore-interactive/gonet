@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Generation;
 using GONet.Utils;
 using System;
 using System.Collections;
@@ -26,6 +27,7 @@ namespace GONet
     /// Very important, in fact required, that this get added to one and only one <see cref="GameObject"/> in the first scene loaded in your game.
     /// This is where all the links into Unity life cycle stuffs start for GONet at large.
     /// </summary>
+    [DefaultExecutionOrder(-32000)]
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
     public sealed class GONetGlobal : GONetParticipantCompanionBehaviour
@@ -222,8 +224,16 @@ namespace GONet
             { // do auto-assign authority id stuffs for all gonet stuff in scene
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
-                FindAndAppend(sceneObjects, gonetParticipantsInLevel, 
-                    (gnp) => gnp.DesignTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
+
+                GONetLog.Debug($"dreetsi scene loaded...processing gnps to know which are spawned/not....is cached? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}");
+
+                FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
+
+                foreach (GONetParticipant gnp in gonetParticipantsInLevel)
+                {
+                    GONetMain.OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(gnp);
+                }
+                
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)
@@ -234,6 +244,19 @@ namespace GONet
                 {
                     StartCoroutine(AssignOwnerAuthorityIds_WhenAppropriate(gonetParticipantsInLevel));
                 }
+            }
+
+            bool WasInstantiated(GONetParticipant gONetParticipant)
+            {
+                // OLD WAY that no longer applies since this info is not stored on GNP
+                //(gnp) => gnp.DesignTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
+
+                //string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
+                //return !GONetSpawnSupport_Runtime.AnyDesignTimeMetadata(fullUniquePath);
+
+                // TODO FIXME figure out what case exists where all the GNPs in a newly loaded scene do not ALL get considered NOT spawned/instantiated!!!!
+
+                return false;
             }
         }
 

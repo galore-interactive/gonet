@@ -897,7 +897,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 1341588593}
         m_TargetAssemblyTypeName: GONetSampleSpawner, Assembly-CSharp
         m_MethodName: InstantiateClientIfNotAlready
         m_Mode: 1
@@ -2340,6 +2340,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: UnityGuid
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904696, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: designTimeLocation
@@ -4937,6 +4942,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1317087461}
   m_CullTransparentMesh: 0
+--- !u!114 &1341588593 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8643402947905904699, guid: 56c1b12035c5c034f81a7b4c212a379e,
+    type: 3}
+  m_PrefabInstance: {fileID: 586176743}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5102918c78ec2042a1f15388950a7d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1454079902
 GameObject:
   m_ObjectHideFlags: 0
@@ -6868,7 +6885,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 1341588593}
         m_TargetAssemblyTypeName: GONetSampleSpawner, Assembly-CSharp
         m_MethodName: InstantiateServerIfNotAlready
         m_Mode: 1
