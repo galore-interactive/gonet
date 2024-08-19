@@ -107,7 +107,7 @@ namespace GONet.Editor
                     {
                         foreach (var gonetParticipant in rootGO.GetComponentsInChildren<GONetParticipant>())
                         {
-                            string fullUniquePath = string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gonetParticipant.gameObject));
+                            string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
                             if (fullUniquePath != gonetParticipant.DesignTimeLocation)
                             {
                                 somethingChanged = true;
@@ -173,7 +173,18 @@ namespace GONet.Editor
 
             DesignTimeMetadata designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
             designTimeMetadata.Location = currentLocation;
-            designTimeMetadata.UnityGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(gonetParticipant));
+            
+            string unityGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(gonetParticipant));
+            designTimeMetadata.UnityGuid = unityGuid;
+
+            {
+                SerializedObject serializedObject = new SerializedObject(gonetParticipant); // use the damned unity serializtion stuff or be doomed to fail on saving stuff to scene as you hope/expect!!!
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.UnityGuid));
+                serializedObject.Update();
+                serializedProperty.stringValue = unityGuid; // set it this way or else it will NOT work with prefabs!
+                gonetParticipant.UnityGuid = unityGuid;
+                serializedObject.ApplyModifiedProperties();
+            }
 
             EnsureExistsInPersistence(designTimeMetadata);
         }

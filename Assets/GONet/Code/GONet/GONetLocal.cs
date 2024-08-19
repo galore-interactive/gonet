@@ -24,6 +24,7 @@ namespace GONet
     /// <summary>
     /// One of these is automatically spawned for each machine in the network game during GONet initialization.
     /// </summary>
+    [DefaultExecutionOrder(32000)]
     [RequireComponent(typeof(GONetParticipant))]
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
     public class GONetLocal : GONetParticipantCompanionBehaviour, IEnumerable<KeyValuePair<ushort, GONetLocal>>

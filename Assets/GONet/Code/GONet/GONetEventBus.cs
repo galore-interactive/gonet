@@ -186,7 +186,7 @@ namespace GONet
                 specificTypeHandlers_tmpList_publishCallDepthIndex[i] = new List<EventHandlerAndFilterer>(100);
             }
 
-            eventEnumTypeToEventTypeMap = new Dictionary<SyncEvent_GeneratedTypes, Type>();
+            eventEnumTypeToEventTypeMap = new();
             InitializeEventMap();
         }
 
@@ -194,12 +194,14 @@ namespace GONet
         {
             foreach (SyncEvent_GeneratedTypes eventType in Enum.GetValues(typeof(SyncEvent_GeneratedTypes)))
             {
-                Type @type = Type.GetType("GONet." + eventType.ToString());
+                const string GONET_NAMESPACE_PREFIX = "GONet.";
+                Type @type = Type.GetType(string.Concat(GONET_NAMESPACE_PREFIX, eventType.ToString()));
+
                 eventEnumTypeToEventTypeMap[eventType] = @type;
 
                 if (@type == null)
                 {
-                    GONetLog.Warning("Not valid type for: " + eventType.ToString());
+                    GONetLog.Error("Not valid type for: " + eventType.ToString());
                 }
             }
         }

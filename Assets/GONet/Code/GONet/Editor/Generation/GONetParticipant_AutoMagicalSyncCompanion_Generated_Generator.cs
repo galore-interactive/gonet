@@ -281,7 +281,14 @@ namespace GONet.Generation
 
 
             /* v1.3.1 TURN OFF automatic code generation related activities in preference for only doing it during a build to avoid excessive actions that are only really required to be done for builds
-            //TODO add comment about why are we doing this.
+                // TODO add comment about why are we doing this......   
+            */
+            // One main reason we do still need to do this (i.e., disregard the comment from v1.3.1 turning this off) is
+            // GONetEventBus.InitializeEventMap() method requires all the generated SyncEvent_Xxx classes be present for Subscribe to sync events to work...
+            // And honestly, the more I think about it in this moment (2024 AUG 17), all these generated files ARE always needed during runtime of the game../
+            // So, I cannot actually fathom what I was thinking when removing it for v1.3.1 ... I mean, I understand I was trying to reduce all the gonet operations 
+            // occurring in the editor that development teams might find aggrevating, but we need the generated files when playing!!!  We have done other work
+            // since the v1.3.1 days to reduce the operations and we should be in good shape....this has to stay!
             if (state == PlayModeStateChange.ExitingEditMode)
             {
                 GenerateFiles();
@@ -290,7 +297,6 @@ namespace GONet.Generation
             {
                 DeleteGeneratedFiles();
             }
-            */
         }
 
         internal static bool IsInstantiationOfPrefab(UnityEngine.Object @object)
@@ -743,6 +749,7 @@ namespace GONet.Generation
                 }
             }
 
+            GONetLog.Debug($"dreetsi enum");
             GenerateSyncEventEnum(allUniqueSnaps);
 
             //Save the updated unique snaps in their corresponding binary files

@@ -2787,15 +2787,34 @@ namespace GONet
             }
         }
 
-        /// <summary>
-        /// Call me in the <paramref name="gonetParticipant"/>'s OnEnable method.
-        /// </summary>
-        internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        internal static IEnumerable OnAwake_ApplyDesignTimeMetadata(GONetParticipant gonetParticipant)
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
+                while (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+                {
+                    GONetLog.Warning($"dreetsi");
+                    yield return null;
+                }
+                GONetLog.Warning($"dreetsi   --- now we poop!");
+
+                InitDesignTimeMetadata_IfNeeded(gonetParticipant);
+            }
+        }
+
+        private static void OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        /// <summary>
+        /// Call me in the <paramref name="gonetParticipant"/>'s OnEnable method.
+        /// </summary>
+        /// internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        {
+            if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
+            {
+                InitDesignTimeMetadata_IfNeeded(gonetParticipant);
+
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
+                    GONetLog.Debug($"dreetsi  cache? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}, go.name: {gonetParticipant.gameObject.name}, genId: {gonetParticipant.CodeGenerationId}");
                     if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions))
                     {
                         autoSyncCompanions = new Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>(1000);
@@ -2860,6 +2879,15 @@ namespace GONet
                 //const string INSTANTIATE = "GNP Enabled go.name: ";
                 //const string ID = " gonetId: ";
                 //GONetLog.Debug(string.Concat(INSTANTIATE, gonetParticipant.gameObject.name, ID + gonetParticipant.GONetId));
+            }
+        }
+
+        private static void InitDesignTimeMetadata_IfNeeded(GONetParticipant gonetParticipant)
+        {
+            if (!gonetParticipant.IsDesignTimeMetadataInitd)
+            {
+                string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
+                GONetSpawnSupport_Runtime.InitDesignTimeMetadata(fullUniquePath, gonetParticipant);
             }
         }
 
@@ -3223,6 +3251,7 @@ namespace GONet
         {
             gonetParticipantsInLevel.ForEach(gonetParticipant => {
                 definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID());
+                OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(gonetParticipant);
                 //GONetLog.Debug($" recording GNP defined in scene...go.Name: {gonetParticipant.gameObject.name} instanceId: {gonetParticipant.GetInstanceID()}");
             });
         }
