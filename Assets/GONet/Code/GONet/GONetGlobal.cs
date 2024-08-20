@@ -229,11 +229,6 @@ namespace GONet
 
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
 
-                foreach (GONetParticipant gnp in gonetParticipantsInLevel)
-                {
-                    GONetMain.OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(gnp);
-                }
-                
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)
