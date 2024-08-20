@@ -332,7 +332,7 @@ namespace GONet
         {
             try
             {
-                GONetLog.Debug($"dreetsi init. depth: {callDepth}, fullPathInScene: {fullPathInScene}, gnp.spawned? {gONetParticipant.WasInstantiated} is cached? {IsDesignTimeMetadataCached}");
+                GONetLog.Debug($"dreetsi init. depth: {callDepth}, fullPathInScene: {fullPathInScene}, gnp.guid: {gONetParticipant.UnityGuid}, gnp.spawned? {gONetParticipant.WasInstantiated} is cached? {IsDesignTimeMetadataCached}");
 
                 //IsDesignTimeMetadataCached = true; string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
 
@@ -340,11 +340,17 @@ namespace GONet
                 if (callDepth > 1) return;
 
                 DesignTimeMetadata metadata = default;
-                if (gONetParticipant.WasInstantiated)
+                if (!string.IsNullOrWhiteSpace(gONetParticipant.UnityGuid)) //(gONetParticipant.WasInstantiated)
                 {
+                    // NOTE: inside here this GNP could either appear in the scene or have been spawned, but since it has a UnityGuid, we know it is a prefab
+
                     if (!designTimeMetadataLookup.TryGetValueByUnityGuid(gONetParticipant.UnityGuid, out metadata))
                     {
-                        GONetLog.Error($"dreetsi  snafooery");
+                        metadata = designTimeMetadataToProjectTemplate.Keys.FirstOrDefault(x => x.UnityGuid == gONetParticipant.UnityGuid);
+                        if (metadata == default)
+                        {
+                            GONetLog.Error($"dreetsi  snafooery");
+                        }
                     }
                 }
                 else
@@ -511,15 +517,23 @@ namespace GONet
                 return false;
             }
 
-            var matchKVP = designTimeMetadataByLocation.FirstOrDefault(x => x.Value.UnityGuid == unityGuid);
-
-            if (matchKVP.Equals(default(KeyValuePair<string, DesignTimeMetadata>)))
+            KeyValuePair<GONetParticipant, DesignTimeMetadata> matchKVP_byGNP = 
+                designTimeMetadataByGNP.FirstOrDefault(x => x.Key.UnityGuid == unityGuid || x.Value.UnityGuid == unityGuid);
+            if (matchKVP_byGNP.Equals(default(KeyValuePair<GONetParticipant, DesignTimeMetadata>)))
             {
-                value = default;
-                return false;
+                KeyValuePair<string, DesignTimeMetadata> matchKVP_byLocation = 
+                    designTimeMetadataByLocation.FirstOrDefault(x => x.Value.UnityGuid == unityGuid);
+                if (matchKVP_byLocation.Equals(default(KeyValuePair<string, DesignTimeMetadata>)))
+                {
+                    value = default;
+                    return false;
+                }
+
+                value = matchKVP_byLocation.Value;
+                return true;
             }
 
-            value = matchKVP.Value;
+            value = matchKVP_byGNP.Value;
             return true;
         }
 

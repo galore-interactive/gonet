@@ -359,7 +359,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 1
+  UnityGuid: 3ca87ecdc713ad64992714377edc8f8f
   animatorSyncSupport:
     keys: []
     values: []
@@ -368,7 +368,6 @@ MonoBehaviour:
   ShouldHideDuringRemoteInstantiate: 1
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: project://Assets/GONet/Sample/Projectile/Resources/CannonBall_NestedGNPs.prefab
 --- !u!114 &1420838009900293922
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -713,7 +712,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  codeGenerationId: 0
+  UnityGuid: 3ca87ecdc713ad64992714377edc8f8f
   animatorSyncSupport:
     keys: []
     values: []
@@ -722,4 +721,3 @@ MonoBehaviour:
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 1
   IsRotationSyncd: 1
-  designTimeLocation: project://Assets/GONet/Sample/Projectile/Resources/CannonBall_NestedGNPs.prefab

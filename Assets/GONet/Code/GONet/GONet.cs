@@ -2787,8 +2787,9 @@ namespace GONet
             }
         }
 
-        internal static IEnumerable OnAwake_ApplyDesignTimeMetadata(GONetParticipant gonetParticipant)
+        internal static IEnumerator OnAwake_ApplyDesignTimeMetadata(GONetParticipant gonetParticipant)
         {
+            GONetLog.Debug($"dreetsi cikd wash sod installed");
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
                 while (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
@@ -2802,15 +2803,34 @@ namespace GONet
             }
         }
 
-        private static void OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         /// <summary>
         /// Call me in the <paramref name="gonetParticipant"/>'s OnEnable method.
         /// </summary>
-        /// internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        internal static void OnEnable_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        {
+            // IMPORTANT: We no longer can call this at this time becauase due to the latest implementation of how desigh time location is
+            //            stored/processed, the WasInstantiated is not known at this point and if we called the method below bad things would happen
+            //            because the WasInstantiated is needed to be known in order to figure out design time metadata like code gen id which is needed for next method to work.
+            //            Instead, check out OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking
+            //StartMonitoringForAutoMagicalNetworking(gonetParticipant);
+        }
+
+        private static void OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
+        {
+            StartMonitoringForAutoMagicalNetworking(gonetParticipant);
+        }
+
+        private static void StartMonitoringForAutoMagicalNetworking(GONetParticipant gonetParticipant)
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
                 InitDesignTimeMetadata_IfNeeded(gonetParticipant);
+
+                if (gonetParticipant.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset ||
+                    gonetParticipant.DidStartMonitoringForAutoMagicalNetworking)
+                {
+                    return;
+                }
 
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
@@ -2879,6 +2899,8 @@ namespace GONet
                 //const string INSTANTIATE = "GNP Enabled go.name: ";
                 //const string ID = " gonetId: ";
                 //GONetLog.Debug(string.Concat(INSTANTIATE, gonetParticipant.gameObject.name, ID + gonetParticipant.GONetId));
+
+                gonetParticipant.DidStartMonitoringForAutoMagicalNetworking = true;
             }
         }
 

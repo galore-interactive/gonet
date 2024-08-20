@@ -357,6 +357,8 @@ namespace GONet
             }
         }
 
+        internal bool DidStartMonitoringForAutoMagicalNetworking { get; set; }
+
         /// <summary>
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
         /// </summary>
@@ -397,6 +399,7 @@ namespace GONet
 
         private IEnumerator AwakeCoroutine()
         {
+            GONetLog.Debug($"dreetsi cikd wash");
             yield return GONetMain.OnAwake_ApplyDesignTimeMetadata(this);
 
             if (!IsInternallyConfigured)
