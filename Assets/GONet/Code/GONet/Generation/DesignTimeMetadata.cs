@@ -35,7 +35,7 @@ namespace GONet.Generation
             set
             {
                 codeGenerationId = value;
-                GONetLog.Debug($"codeGenerationId: {value}, location: {location}");
+                //GONetLog.Debug($"codeGenerationId: {value}, location: {location}");
             }
         }
 

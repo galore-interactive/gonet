@@ -146,7 +146,7 @@ namespace GONet.Generation
         {
             bool hasChange = false;
 
-            GONetLog.Debug($"gnp.name: {gonetParticipant.name} IsOKToStartAutoMagicalProcessing: {gonetParticipant.IsOKToStartAutoMagicalProcessing}");
+            //GONetLog.Debug($"gnp.name: {gonetParticipant.name} IsOKToStartAutoMagicalProcessing: {gonetParticipant.IsOKToStartAutoMagicalProcessing}");
             if (gonetParticipant.IsOKToStartAutoMagicalProcessing)
             {
                 for (int i = 0; i < valuesCount; ++i)
@@ -198,7 +198,7 @@ namespace GONet.Generation
                     }
                     else
                     {
-                        GONetLog.Debug($"skip wads @ index: {valueChangeSupport.index} this.type: {GetType().Name}, does match? {DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches)}");
+                        //GONetLog.Debug($"skip wads @ index: {valueChangeSupport.index} this.type: {GetType().Name}, does match? {DoesMatchUniqueGrouping(valueChangeSupport, onlyMatchIfUniqueGroupingMatches)}");
                     }
                 }
             }
@@ -299,7 +299,7 @@ namespace GONet.Generation
         /// </summary>
         internal void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange)
         {
-            GONetLog.Debug($"********************should be doing some init single index: {singleIndex}");
+            //GONetLog.Debug($"********************should be doing some init single index: {singleIndex}");
             GONetSyncableValue value = DeserializeInitSingle_ReadOnlyNotApply(bitStream_readFrom, singleIndex);
             InitSingle(value, singleIndex, assumedElapsedTicksAtChange);
         }
@@ -441,7 +441,7 @@ namespace GONet.Generation
             out bool didExtrapolate)
         {
             IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
-            GONetLog.Debug($"grease null blender? {(customValueBlending == null)} @ index: {index}");
+            //GONetLog.Debug($"grease null blender? {(customValueBlending == null)} @ index: {index}");
             if (customValueBlending != null)
             {
                 return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolate);

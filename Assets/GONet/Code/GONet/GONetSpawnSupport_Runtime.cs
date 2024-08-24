@@ -118,7 +118,7 @@ namespace GONet
 
         public static void CacheAllProjectDesignTimeMetadata(MonoBehaviour coroutineOwner)
         {
-            GONetLog.Debug("dreetsi cache begin");
+            //GONetLog.Debug("dreetsi cache begin");
             IsDesignTimeMetadataCached = false;
             coroutineOwner.StartCoroutine(
                 CacheAllProjectDesignTimeMetadata_Coroutine(CacheAllDesignTimeMetadata)
@@ -127,7 +127,7 @@ namespace GONet
 
         private static IEnumerator CacheAllProjectDesignTimeMetadata_Coroutine(Action<IEnumerable<DesignTimeMetadata>> processResults)
         {
-            GONetLog.Debug("dreetsi cache rotten");
+            //GONetLog.Debug("dreetsi cache rotten");
 
             string fullPath = Path.Combine(Application.streamingAssetsPath, DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);
 #if !UNITY_EDITOR && (UNITY_ANDROID || UNITY_WEBGL)
@@ -143,7 +143,7 @@ namespace GONet
             IsDesignTimeMetadataCached = true; // IMPORTANT: TODO FIXME this being in a coroutine is problematic because of what is waiting for this to be true...ought to block the main thread actually.....we should do this on another thread and block main thread until it this is true
                 
 #else
-            Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
+            //Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
             {
                 string fileContentsJson = File.ReadAllText(fullPath);
@@ -165,13 +165,13 @@ namespace GONet
                     GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeMetadata.Location.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
                     if ((object)template != null)
                     {
-                        GONetLog.Debug("found TEMPLATE for design time location: " + designTimeMetadata.Location);
+                        //GONetLog.Debug("found TEMPLATE for design time location: " + designTimeMetadata.Location);
                         designTimeMetadataToProjectTemplate[designTimeMetadata] = template;
                     }
                 }
                 else if (designTimeMetadata.Location.StartsWith(SCENE_HIERARCHY_PREFIX))
                 {
-                    GONetLog.Debug($"associating SCENE design time location: {designTimeMetadata.Location}");
+                    //GONetLog.Debug($"associating SCENE design time location: {designTimeMetadata.Location}");
                     designTimeMetadataLookup.Set(designTimeMetadata.Location, designTimeMetadata);
                 }
             }
@@ -312,7 +312,7 @@ namespace GONet
                             CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                         }
                         : defaultDTM_EditorNotPlayMode;
-                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
+                    //GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
                     designTimeMetadataLookup.Set(gONetParticipant, metadata);
                     value = metadata;
                 }
@@ -332,7 +332,7 @@ namespace GONet
         {
             try
             {
-                GONetLog.Debug($"dreetsi init. depth: {callDepth}, fullPathInScene: {fullPathInScene}, gnp.guid: {gONetParticipant.UnityGuid}, gnp.spawned? {gONetParticipant.WasInstantiated} is cached? {IsDesignTimeMetadataCached}");
+                //GONetLog.Debug($"dreetsi init. depth: {callDepth}, fullPathInScene: {fullPathInScene}, gnp.guid: {gONetParticipant.UnityGuid}, gnp.spawned? {gONetParticipant.WasInstantiated} is cached? {IsDesignTimeMetadataCached}");
 
                 //IsDesignTimeMetadataCached = true; string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
 
@@ -360,7 +360,7 @@ namespace GONet
                 designTimeMetadataLookup.Set(gONetParticipant, metadata);
 
                 gONetParticipant.IsDesignTimeMetadataInitd = true;
-                GONetLog.Debug($"dreetsi init dTM.. loc: {metadata.Location}, getId: {metadata.CodeGenerationId}");
+                //GONetLog.Debug($"dreetsi init dTM.. loc: {metadata.Location}, getId: {metadata.CodeGenerationId}");
             }
             finally
             {
@@ -388,7 +388,7 @@ namespace GONet
                             CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                         }
                         : defaultDTM_EditorNotPlayMode;
-                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
+                    //GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
                     designTimeMetadataLookup.Set(designTimeLocation, metadata);
                     value = metadata;
                 }

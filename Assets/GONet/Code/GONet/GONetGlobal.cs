@@ -225,7 +225,7 @@ namespace GONet
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
 
-                GONetLog.Debug($"dreetsi scene loaded...processing gnps to know which are spawned/not....is cached? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}");
+                //GONetLog.Debug($"dreetsi scene loaded...processing gnps to know which are spawned/not....is cached? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}");
 
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
 

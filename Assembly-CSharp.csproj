@@ -375,6 +375,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\Pkcs5S2ParametersGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\TargetInformation.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\SingleResp.cs" />
+    <Compile Include="Assets\GONet\Sample\CircularMotion.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\smime\SMIMECapabilitiesAttribute.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\Rfc3280CertPathUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DERSequenceParser.cs" />

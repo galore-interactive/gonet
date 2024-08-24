@@ -867,7 +867,7 @@ namespace GONet
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
-            GONetLog.Debug("******received persistent events bundle from remote source");
+            //GONetLog.Debug("******received persistent events bundle from remote source");
 
             { // TODO why not just publish each one of these so all the handlers kick in and process??????   otherwise, we are left with this piecemeal processing below....error prone and problematic for sure!
                 foreach (var item in eventEnvelope.Event.PersistentEvents)
@@ -927,7 +927,7 @@ namespace GONet
                 //If we are a client we broadcast it to our connections (which are only the server)
                 if (IsClient)
                 {
-                    GONetLog.Debug($"Sending event to server.  type: {eventEnvelope.Event.GetType().Name}");
+                    //GONetLog.Debug($"Sending event to server.  type: {eventEnvelope.Event.GetType().Name}");
                     SendBytesToRemoteConnections(bytes, returnBytesUsedCount, channelId);
                 }
                 else
@@ -2223,8 +2223,8 @@ namespace GONet
 
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
                                 {
-                                    const string REC = " ***************************** this client received from server my assigned ownerAuthorityId: ";
-                                    GONetLog.Debug(string.Concat(REC, ownerAuthorityId));
+                                    //const string REC = " ***************************** this client received from server my assigned ownerAuthorityId: ";
+                                    //GONetLog.Debug(string.Concat(REC, ownerAuthorityId));
 
                                     MyAuthorityId = ownerAuthorityId;
                                 } // else log warning?
@@ -2289,7 +2289,7 @@ namespace GONet
             isCurrentlyProcessingInstantiateGNPEvent = true;
             currentlyProcessingInstantiateGNPEvent = instantiateEvent;
 
-            GONetLog.Debug($"dreetsi instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
+            //GONetLog.Debug($"dreetsi instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
 
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeMetadata(instantiateEvent.DesignTimeLocation);
             template.wasInstantiatedForce = true; // the instantiated one will get this
@@ -2304,10 +2304,10 @@ namespace GONet
                 instance.gameObject.name = instantiateEvent.InstanceName;
             }
 
-            const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
-            const string ID = " event.gonetId: ";
-            const string FORCE = " wasInstantiatedForce: ";
-            GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name, ID, instantiateEvent.GONetId, FORCE, instance.wasInstantiatedForce));
+            //const string INSTANTIATE = "Instantiate_Remote, Instantiate complete....go.name: ";
+            //const string ID = " event.gonetId: ";
+            //const string FORCE = " wasInstantiatedForce: ";
+            //GONetLog.Debug(string.Concat(INSTANTIATE, instance.gameObject.name, ID, instantiateEvent.GONetId, FORCE, instance.wasInstantiatedForce));
 
             instance.OwnerAuthorityId = instantiateEvent.OwnerAuthorityId;
             if (instantiateEvent.GONetId != GONetParticipant.GONetId_Unset)
@@ -2540,13 +2540,13 @@ namespace GONet
             /// </summary>
             internal void AddToMostRecentChangeQueue_IfAppropriate(long elapsedTicksAtChange, GONetSyncableValue value)
             {
-                GONetLog.Debug($"lets see if we add...cap: {mostRecentChanges_capacitySize}");
+                //GONetLog.Debug($"lets see if we add...cap: {mostRecentChanges_capacitySize}");
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
                     var item = mostRecentChanges[i];
                     if (item.elapsedTicksAtChange == elapsedTicksAtChange)
                     {
-                        GONetLog.Debug($"lets see if we add...nope");
+                        //GONetLog.Debug($"lets see if we add...nope");
                         return; // avoid adding in new items with same timestamp as an existing item as it will mess up value blending, NOTE: This probably only happens just after an 'at rest'
                     }
 
@@ -2571,7 +2571,7 @@ namespace GONet
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
                             ++mostRecentChanges_usedSize;
-                            GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
+                            //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
                         }
                         //LogBufferContentsIfAppropriate();
                         return;
@@ -2582,7 +2582,7 @@ namespace GONet
                 {
                     mostRecentChanges[mostRecentChanges_usedSize] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                     ++mostRecentChanges_usedSize;
-                    GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
+                    //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
                 }
 
                 //LogBufferContentsIfAppropriate();
@@ -2604,7 +2604,7 @@ namespace GONet
 
                         if (isLikelyBeingProcessedPriorToExpectedUpcomingNewBaseline)
                         {
-                            GONetLog.Debug("the new value being placed in buffer is happening prior to applying the new baseline!");
+                            //GONetLog.Debug("the new value being placed in buffer is happening prior to applying the new baseline!");
 
                             Vector3 replacementValue = valueNew.UnityEngine_Vector3;
 
@@ -2796,15 +2796,15 @@ namespace GONet
 
         internal static IEnumerator OnAwake_ApplyDesignTimeMetadata(GONetParticipant gonetParticipant)
         {
-            GONetLog.Debug($"dreetsi cikd wash sod installed");
+            //GONetLog.Debug($"dreetsi cikd wash sod installed");
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
                 while (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
                 {
-                    GONetLog.Warning($"dreetsi");
+                    //GONetLog.Warning($"dreetsi");
                     yield return null;
                 }
-                GONetLog.Warning($"dreetsi   --- now we poop!");
+                //GONetLog.Debug($"dreetsi   --- now we poop!");
 
                 InitDesignTimeMetadata_IfNeeded(gonetParticipant);
             }
@@ -2821,7 +2821,7 @@ namespace GONet
             //            Instead, check out OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking
             //StartMonitoringForAutoMagicalNetworking(gonetParticipant);
 
-            GONetLog.Debug($"gnp.name: {gonetParticipant.name} WasInstantiatedForce: {gonetParticipant.wasInstantiatedForce}");
+            //GONetLog.Debug($"gnp.name: {gonetParticipant.name} WasInstantiatedForce: {gonetParticipant.wasInstantiatedForce}");
             if (gonetParticipant.wasInstantiatedForce)
             {
                 // we now know this was instantiated (from remote source as that is the only time WasInstantiatedForce is true)....scene stuff gets this called automatically elsewhere
@@ -2843,13 +2843,13 @@ namespace GONet
                 if (gonetParticipant.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset ||
                     gonetParticipant.DidStartMonitoringForAutoMagicalNetworking)
                 {
-                    GONetLog.Debug($"dreetsi never never in life.  code gen id: {gonetParticipant.CodeGenerationId}, did start? {gonetParticipant.DidStartMonitoringForAutoMagicalNetworking}");
+                    //GONetLog.Debug($"dreetsi never never in life.  code gen id: {gonetParticipant.CodeGenerationId}, did start? {gonetParticipant.DidStartMonitoringForAutoMagicalNetworking}");
                     return;
                 }
 
                 { // auto-magical sync related housekeeping
                     Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions;
-                    GONetLog.Debug($"dreetsi  cache? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}, go.name: {gonetParticipant.gameObject.name}, genId: {gonetParticipant.CodeGenerationId}");
+                    //GONetLog.Debug($"dreetsi  cache? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}, go.name: {gonetParticipant.gameObject.name}, genId: {gonetParticipant.CodeGenerationId}");
                     if (!activeAutoSyncCompanionsByCodeGenerationIdMap.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions))
                     {
                         autoSyncCompanions = new Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated>(1000);
@@ -2911,9 +2911,9 @@ namespace GONet
                 var enableEvent = new GONetParticipantEnabledEvent(gonetIdThatIsGoingToBePopulated);
                 PublishEventAsSoonAsSufficientInfoAvailable(enableEvent, gonetParticipant);
 
-                const string INSTANTIATE = "GNP Enabled go.name: ";
-                const string ID = " gonetId: ";
-                GONetLog.Debug(string.Concat(INSTANTIATE, gonetParticipant.gameObject.name, ID + gonetParticipant.GONetId));
+                //const string INSTANTIATE = "GNP Enabled go.name: ";
+                //const string ID = " gonetId: ";
+                //GONetLog.Debug(string.Concat(INSTANTIATE, gonetParticipant.gameObject.name, ID + gonetParticipant.GONetId));
 
                 gonetParticipant.DidStartMonitoringForAutoMagicalNetworking = true;
             }
@@ -2967,7 +2967,7 @@ namespace GONet
         /// </summary>
         private static void OnGONetIdAtInstantiationChanged_DoSomeMapMaintenanceForKeyLookupPerformanceLater(GONetParticipant gonetParticipant)
         {
-            GONetLog.Debug($"DREETSi update map. gnp.name: {gonetParticipant.name}, genId: {gonetParticipant.CodeGenerationId}, gonetid@instantiation: {gonetParticipant.GONetIdAtInstantiation}, now: {gonetParticipant.GONetId}");
+            //GONetLog.Debug($"DREETSi update map. gnp.name: {gonetParticipant.name}, genId: {gonetParticipant.CodeGenerationId}, gonetid@instantiation: {gonetParticipant.GONetIdAtInstantiation}, now: {gonetParticipant.GONetId}");
 
             Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> autoSyncCompanions_uintKeyForPerformance;
             if (!activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance.TryGetValue(gonetParticipant.CodeGenerationId, out autoSyncCompanions_uintKeyForPerformance))
@@ -3645,12 +3645,12 @@ namespace GONet
             {
                 int bundleFragmentsMadeCount = 0;
                 int count = syncValuesForBundles.Count;
-                GONetLog.Debug($"????????send changed auto-magical sync values to all connections..count: {count}");
+                //GONetLog.Debug($"????????send changed auto-magical sync values to all connections..count: {count}");
                 if (count > 0)
                 {
                     GONetChannelId useThisChannelId = chosenBundleType == typeof(AutoMagicalSync_ValueChanges_Message) ? uniqueGrouping_valueChanges_channelId : uniqueGrouping_valuesNowAtRest_channelId;  // TODO this is fairly hardcoded and limited in terms of options, but right now this is all...and need to just move on to test how it will work before making this more configurable
 
-                    GONetLog.Debug("sending changed auto-magical sync values to all connections");
+                    //GONetLog.Debug("sending changed auto-magical sync values to all connections");
                     if (IsServer)
                     {
                         // if its the server, we have to consider who we are sending to and ensure we do not send then changes that initially came from them!
@@ -3668,7 +3668,7 @@ namespace GONet
                                 GONetConnection_ServerToClient gONetConnection_ServerToClient = _gonetServer.remoteClients[iConnection].ConnectionToClient;
                                 for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
                                 {
-                                    GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this. bytesUsedCount: " + bundleFragments.fragmentBytesUsedCount[iFragment]);  /////////////////////////// DREETS!
+                                    //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this. bytesUsedCount: " + bundleFragments.fragmentBytesUsedCount[iFragment]);  /////////////////////////// DREETS!
                                     if (_gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId).IsInitializedWithServer) // only send to client initialized with server!
                                     {
                                         SendBytesToRemoteConnection(gONetConnection_ServerToClient, bundleFragments.fragmentBytes[iFragment], bundleFragments.fragmentBytesUsedCount[iFragment], useThisChannelId);
@@ -3869,7 +3869,7 @@ namespace GONet
 
             int countTotal = changes.Count;
             int countFiltered = SerializeBody_ChangesBundle_PRE_OrderAndCountFiltered(changes, filterUsingOwnerAuthorityId);
-            GONetLog.Debug($"mikkyu magoo...countFilteres: {countFiltered}");
+            //GONetLog.Debug($"mikkyu magoo...countFilteres: {countFiltered}");
             int individualChangesCountRemaining = countFiltered;
             bundleFragments.fragmentCount = 0;
 
@@ -4014,7 +4014,7 @@ namespace GONet
         /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
         private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId, ref int lastIndexUsed)
         {
-            GONetLog.Debug("mikkyu magoo");
+            //GONetLog.Debug("mikkyu magoo");
 
             int countTotal = changes.Count;
             int changesInBundle = 0;
@@ -4051,7 +4051,7 @@ namespace GONet
                 }
 
                 { // have to write the gonetid first before each changed value
-                    GONetLog.Append(change.syncCompanion.gonetParticipant.GONetIdAtInstantiation + ", ");
+                    //GONetLog.Append(change.syncCompanion.gonetParticipant.GONetIdAtInstantiation + ", ");
                     uint gonetId = change.syncCompanion.gonetParticipant.GONetIdAtInstantiation;
 
                     long diffFromPrevious = gonetId - gonetId_previous;
@@ -4085,10 +4085,10 @@ namespace GONet
                 }
 
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
-                GONetLog.AppendLine($"serialize change index: {change.index}");
+                //GONetLog.AppendLine($"serialize change index: {change.index}");
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
             }
-            GONetLog.Append_FlushDebug();
+            //GONetLog.Append_FlushDebug();
 
             { // indicates end of bundle!  we write regardless of if changes added up top or not...no real harm
                 bitStream_headerAlreadyWritten.WriteBit(true);
