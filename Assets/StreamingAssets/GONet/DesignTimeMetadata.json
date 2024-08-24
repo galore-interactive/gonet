@@ -26,6 +26,26 @@
             "codeGenerationId": 1
         },
         {
+            "location": "scene://JustAnotherScene/GameObject (1)",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "scene://JustAnotherScene/GameObject (2)",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "scene://JustAnotherScene/GameObject (3)",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "scene://JustAnotherScene/GameObject (4)",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
             "location": "scene://JustAnotherScene/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1

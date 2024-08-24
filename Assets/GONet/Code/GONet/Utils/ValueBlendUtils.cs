@@ -31,14 +31,14 @@ namespace GONet.Utils
 
         internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
-            GONetLog.Debug($"grease");
+            //GONetLog.Debug($"grease");
             if (valueMonitoringSupport.TryGetBlendedValue(atElapsedTicks, out blendedValue, out didExtrapolate))
             {
-                GONetLog.Debug($"grease got first blendo");
+                //GONetLog.Debug($"grease got first blendo");
                 return true;
             }
 
-            GONetLog.Debug($"grease count: {valueMonitoringSupport.mostRecentChanges_usedSize}");
+            //GONetLog.Debug($"grease count: {valueMonitoringSupport.mostRecentChanges_usedSize}");
             // If the above does not yield good value blend, then the below will attmept to use the default implementations available.
             // NOTE: This would most likely be due to the valueMonitoringSupport profile/template not having identified an implementation of IGONetAutoMagicalSync_CustomValueBlending for the type of blendedValue.
             if (valueMonitoringSupport.mostRecentChanges_usedSize > 0)

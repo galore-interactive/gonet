@@ -249,7 +249,7 @@ namespace GONet
 
             if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
             {
-                GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
+                //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
 
                 GONetIdAtInstantiation = gonetId_new;
             }
@@ -419,7 +419,7 @@ namespace GONet
 
         private IEnumerator AwakeCoroutine()
         {
-            GONetLog.Debug($"dreetsi cikd wash");
+            //GONetLog.Debug($"dreetsi cikd wash");
             yield return GONetMain.OnAwake_ApplyDesignTimeMetadata(this);
 
             if (!IsInternallyConfigured)

@@ -658,20 +658,20 @@ namespace GONet.PluginAPI
                                         float remainingSectionPercentage = 1f - oneSectionPercentage;
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
                                         blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
-                                        GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
+                                        //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + extrapolated_ValueNew);
                                         didExtrapolate = true;
                                     }
                                 }
                                 else
                                 {
                                     blendedValue = newestValue;
-                                    GONetLog.Debug("VECTOR3 new new beast");
+                                    //GONetLog.Debug("VECTOR3 new new beast");
                                 }
                             }
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
                             {
                                 blendedValue = oldest.numericValue.UnityEngine_Vector3;
-                                GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(atElapsedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
+                                //GONetLog.Debug("VECTOR3 went old school on 'eem..... adjusted seconds: " + TimeSpan.FromTicks(atElapsedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
                             }
                             else // this is the normal case where we can apply interpolation if the settings call for it!
                             {
@@ -689,31 +689,31 @@ namespace GONet.PluginAPI
                                             older.numericValue.UnityEngine_Vector3,
                                             newer.numericValue.UnityEngine_Vector3,
                                             interpolationTime);
-                                        GONetLog.Debug($"we loip'd 'eem.  l: {older.numericValue}, r: {newer.numericValue}, t:{interpolationTime}");
+                                        //GONetLog.Debug($"we loip'd 'eem.  l: {older.numericValue}, r: {newer.numericValue}, t:{interpolationTime}");
                                         didWeLoip = true;
                                         break;
                                     }
                                 }
                                 if (!didWeLoip)
                                 {
-                                    GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                    //GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                 }
                             }
                         }
                         else
                         {
                             blendedValue = newestValue;
-                            GONetLog.Debug("not a vector3?");
+                            //GONetLog.Debug("not a vector3?");
                         }
                     }
                     else
                     {
-                        GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(GONetMain.Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
+                        //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(GONetMain.Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
                         return false; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
                     }
                 }
 
-                GONetLog.Debug("return blended: " + blendedValue);
+                //GONetLog.Debug("return blended: " + blendedValue);
                 return true;
             }
 
