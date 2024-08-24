@@ -59,6 +59,7 @@ namespace GONet.Editor
             EditorGUI.BeginChangeCheck();
             serializedObject.UpdateIfRequiredOrScript();
 
+            /* this stuff is no longer going to be accurate necessarilly at this moment, so don't show it in inspector
             {
                 EditorGUILayout.BeginHorizontal();
                 const string DESIGN = "Design Time Location";
@@ -75,6 +76,7 @@ namespace GONet.Editor
                 EditorGUILayout.TextField(value);
                 EditorGUILayout.EndHorizontal();
             }
+            */
 
             { // IsRigidBodyOwnerOnlyControlled
                 var pre = GUI.enabled;

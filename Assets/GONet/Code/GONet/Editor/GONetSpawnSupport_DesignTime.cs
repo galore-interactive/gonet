@@ -200,9 +200,19 @@ namespace GONet.Editor
                 Directory.CreateDirectory(directory);
             }
 
+            var invalidMofosWillNotPersist = newCompleteDesignTimeLocations
+                .Where(x => string.IsNullOrWhiteSpace(x.Location) || 
+                    x.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset);
+            foreach (var invalid in invalidMofosWillNotPersist)
+            {
+                GONetLog.Warning($"This little piggy is not going to the market!  He has some missing data that is not cool to persist!  Most likely, this is OK to overlook based on latest implementation preference and reliance on project over scene centricity.  As json: {JsonUtility.ToJson(invalid)}");
+            }
+
             DesignTimeMetadataLibrary designTimeMetadataLibrary = new DesignTimeMetadataLibrary()
             {
-                Entries = newCompleteDesignTimeLocations.Where(x => !string.IsNullOrWhiteSpace(x.Location)).OrderBy(x => x.Location).ToArray(),
+                Entries = newCompleteDesignTimeLocations
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Location) && 
+                        x.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset).OrderBy(x => x.Location).ToArray(),
             };
 
             string fullPath = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);

@@ -249,7 +249,7 @@ namespace GONet
 
             if (GONetIdAtInstantiation == GONetId_Unset && gonetId_raw_new != GONetIdRaw_Unset && ownerAuthorityId_new != GONetMain.OwnerAuthorityId_Unset)
             {
-                //GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
+                GONetLog.Debug("GONetIdAtInstantiation = " + gonetId_new);
 
                 GONetIdAtInstantiation = gonetId_new;
             }
@@ -288,7 +288,18 @@ namespace GONet
         }
 
         internal delegate void GNP_uint_Changed(GONetParticipant gonetParticipant);
-        internal event GNP_uint_Changed GONetIdAtInstantiationChanged;
+        private event GNP_uint_Changed gonetIdAtInstantiationChanged;
+
+        private bool anyUnhandledChanges_GONetIdAtInstantiationChanged;
+        internal void AddGONetIdAtInstantiationChangedHandler(GNP_uint_Changed handler)
+        {
+            gonetIdAtInstantiationChanged += handler;
+            if (anyUnhandledChanges_GONetIdAtInstantiationChanged)
+            {
+                anyUnhandledChanges_GONetIdAtInstantiationChanged = false;
+                handler(this);
+            }
+        }
 
         /// <summary>
         /// IMPORTANT: This is INTERNAL bud, so leave it alone!
@@ -300,7 +311,15 @@ namespace GONet
             private set
             { 
                 _GONetIdAtInstantiation = value; 
-                GONetIdAtInstantiationChanged?.Invoke(this);
+                
+                if (gonetIdAtInstantiationChanged == null)
+                {
+                    anyUnhandledChanges_GONetIdAtInstantiationChanged = true;
+                }
+                else
+                {
+                    gonetIdAtInstantiationChanged.Invoke(this);
+                }
             }
         }
 
@@ -332,7 +351,8 @@ namespace GONet
         /// <para>IMPORTANT: This will have a value of true for EVERYTHING up until GONet knows for sure if it was defined in a scene or not!  If you need to be informed the moment this value is known to be false instead, register to the event <see cref="TODO FIXME add it here once available"/>.</para>
         /// <para>REASONING: Returning true for things defined in scene.  Well, it will actually change to a value of false by the time the MonoBehaviour lifecycle method Start() is called.  This is due to the timing of Unity's SceneManager.sceneLoaded callback (see https://docs.unity3d.com/ScriptReference/SceneManagement.SceneManager-sceneLoaded.html).  It is called between OnEnable() and Start().  This callback is what GONet uses to keep track of what was defined in a scene (i.e., WasInstantiated = false) and what is in the game due to Object.Instantiate() having been called programmatically by code (i.e., WasInstantiated = true)</para>
         /// </summary>
-        public bool WasInstantiated => !GONetMain.WasDefinedInScene(this);
+        public bool WasInstantiated => wasInstantiatedForce || !GONetMain.WasDefinedInScene(this);
+        [SerializeField] internal bool wasInstantiatedForce;
 
         ulong endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = ulong.MaxValue;
         volatile bool isOKToStartAutoMagicalProcessing = false;
