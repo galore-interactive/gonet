@@ -46,7 +46,12 @@ namespace GONet.Generation
 
         public override bool Equals(object obj)
         {
-            return obj as DesignTimeMetadata == default ? false : ((DesignTimeMetadata)obj).Location == Location;
+            if (obj == null || !(obj is DesignTimeMetadata otherMetadata))
+            {
+                return false;
+            }
+
+            return string.Equals(Location ?? string.Empty, otherMetadata.Location ?? string.Empty, StringComparison.Ordinal);
         }
 
         public static implicit operator DesignTimeMetadata(string location)
