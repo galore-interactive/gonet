@@ -400,7 +400,7 @@ namespace GONet.Generation
                     SnapComparer snapComparer = SnapComparer.Instance;
                     //Create the allUniqueSnaps list in order to update codegen ids later
                     List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnaps = LoadAllSnapsFromPersistenceFile(GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
-                    foreach (var snapFromAssetFolder in newSnapsFromAssetFolders)
+                    foreach (var snapFromAssetFolder in newSnapsFromAssetFolders.OrderBy(x => x.SingleMemberCount))
                     {
                         bool found = false;
                         foreach (var uniqueSnap in allUniqueSnaps)
@@ -409,7 +409,7 @@ namespace GONet.Generation
                             {
                                 snapFromAssetFolder.codeGenerationId = uniqueSnap.codeGenerationId;
                                 //In order to not only save the new snap codegen id but also within its related GNP we need to perform this step too
-                                ApplyToGNPCodeGenerationId(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
+                                ApplyDesignTimeMetadataToGnp(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
                                 found = true;
                                 break;
                             }
@@ -419,7 +419,7 @@ namespace GONet.Generation
                         {
                             snapFromAssetFolder.codeGenerationId = GetNewCodeGenerationId(allUniqueSnaps);
                             //In order to not only save the new snap codegen id but also within its related GNP we need to perform this step too
-                            ApplyToGNPCodeGenerationId(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
+                            ApplyDesignTimeMetadataToGnp(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
                             allUniqueSnaps.Add(snapFromAssetFolder);
                         }
                     }
@@ -429,7 +429,7 @@ namespace GONet.Generation
                         // persist ALL....
                         foreach (var dtm in GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata() )
                         {
-                            GONetSpawnSupport_DesignTime.EnsureExistsInPersistence(dtm);
+                            GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
                         }
                         GONetLog.Debug($"[DREETS] howDeepIsYourSaveStack: {howDeepIsYourSaveStack}, DTM.Count: {GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Count()}, all locations: {string.Join("\n", GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Select(x => x.Location))}");
                     }
@@ -448,7 +448,7 @@ namespace GONet.Generation
         }
 
         /// <summary>
-        /// Returns the slowest available code generation id of a List of snaps. It there is a gap, it will return the gap id.
+        /// Returns the lowest available code generation id of a List of snaps. It there is a gap, it will return the gap id.
         /// </summary>
         /// <param name="allUniqueSnaps"></param>
         /// <returns></returns>
@@ -480,17 +480,22 @@ namespace GONet.Generation
         /// <summary>
         /// Apply changes to the code generation ID of a GNP. This needs to be call every time you set a snap's code generation id and you want it to be reflected in the attached GNPs aswell.
         /// </summary>
-        /// <param name="gnp"></param>
-        /// <param name="codeGenId"></param>
-        private static void ApplyToGNPCodeGenerationId(GONetParticipant gnp, byte codeGenId)
+        private static DesignTimeMetadata ApplyDesignTimeMetadataToGnp(GONetParticipant gnp, byte codeGenId, string updateLocation = default)
         {
-            if(gnp == null)
+            if ((object)gnp == null)
             {
                 GONetLog.Error("The GONetParticipant is null");
-                return;
+                return default;
             }
 
-            gnp.CodeGenerationId = codeGenId;
+            DesignTimeMetadata metadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gnp);
+
+            metadata.CodeGenerationId = codeGenId;
+            if (updateLocation != default)
+            {
+                metadata.Location = updateLocation;
+            }
+            return metadata;
         }
 
         /// <summary>
@@ -576,204 +581,175 @@ namespace GONet.Generation
                 return;
             }
 
-            //Save an empty file in order to force assets folder to update too
-            SaveUniqueSnapsToPersistenceFile(new List<GONetParticipant_ComponentsWithAutoSyncMembers>(), GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            Scene currentScene;
-            string currentScenePath = System.String.Empty;
-
-            {//Save the current scene's path for coming back to it at the end of this process. It would be weird if during this process you end up in another different scene.
-                currentScene = EditorSceneManager.GetActiveScene();
-
-                //Save current scene if neccesary to avoid loosing those changes
-                if (currentScene.isDirty)
-                {
-                    EditorSceneManager.SaveScene(currentScene);
-                }
-
-                currentScenePath = currentScene.path;
-            }
-
-            SnapComparer snapComparer = SnapComparer.Instance;
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> uniqueSnapsFromAssetsFolder;
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> uniqueSnapsFromScenes;
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnaps = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
-
-            {//Load all unique snaps (From both the in scenes file and the in assets folder file)
-                uniqueSnapsFromScenes = LoadAllSnapsFromPersistenceFile(GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
-
-                foreach (var uniqueSnapFromScene in uniqueSnapsFromScenes)
-                {
-                    if (!allUniqueSnaps.Contains(uniqueSnapFromScene, snapComparer))
-                    {
-                        //In case two different unique snaps have the same codegen id and it is different from 0, the last one gets an unset id in order to assing it later.
-                        foreach (var snaps in allUniqueSnaps)
-                        {
-                            if (snaps.codeGenerationId == uniqueSnapFromScene.codeGenerationId)
-                            {
-                                uniqueSnapFromScene.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
-                            }
-
-                            break;
-                        }
-                    }
-                }
-
-                uniqueSnapsFromAssetsFolder = LoadAllSnapsFromPersistenceFile(ASSET_FOLDER_SNAPS_FILE);
-                foreach (var uniqueSnapFromAssetsFolder in uniqueSnapsFromAssetsFolder)
-                {
-                    if (!allUniqueSnaps.Contains(uniqueSnapFromAssetsFolder, snapComparer))
-                    {
-                        //In case two different unique snaps have the same codegen id and it is different from 0, the last one gets an unset id in order to assing it later.
-                        foreach (var snaps in allUniqueSnaps)
-                        {
-                            if (snaps.codeGenerationId == uniqueSnapFromAssetsFolder.codeGenerationId)
-                            {
-                                uniqueSnapFromAssetsFolder.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
-                            }
-
-                            break;
-                        }
-
-                        allUniqueSnaps.Add(uniqueSnapFromAssetsFolder);
-                    }
-                }
-            }
-
-            //Get all the possible unique snaps that are within any scene inside the build.
-            List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleInSceneUniqueSnaps;
+            bool wasNewDtmForced = GONetSpawnSupport_Runtime.IsNewDtmForced;
+            try
             {
-                LoadAllPossibleUniqueSnapsFromLoopingBuildScenes(out possibleInSceneUniqueSnaps);
-            }
+                GONetSpawnSupport_Runtime.IsNewDtmForced = true;
 
-            {//Apply changes (Additions, deletes and/or modifications) to both the unique snaps list and to the corresponding in scene game objects
-                HashSet<GONetParticipant_ComponentsWithAutoSyncMembers> snapsToDelete = new HashSet<GONetParticipant_ComponentsWithAutoSyncMembers>();
-                foreach (var uniqueSnap in allUniqueSnaps)
-                {
-                    if (!possibleInSceneUniqueSnaps.Contains(uniqueSnap, snapComparer) && !uniqueSnapsFromAssetsFolder.Contains(uniqueSnap, snapComparer))
+
+
+                //Save an empty file in order to force assets folder to update too
+                SaveUniqueSnapsToPersistenceFile(new List<GONetParticipant_ComponentsWithAutoSyncMembers>(), GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                Scene currentScene;
+                string currentScenePath = System.String.Empty;
+
+                {//Save the current scene's path for coming back to it at the end of this process. It would be weird if during this process you end up in another different scene.
+                    currentScene = EditorSceneManager.GetActiveScene();
+
+                    //Save current scene if neccesary to avoid loosing those changes
+                    if (currentScene.isDirty)
                     {
-                        snapsToDelete.Add(uniqueSnap);
+                        EditorSceneManager.SaveScene(currentScene);
                     }
+
+                    currentScenePath = currentScene.path;
                 }
 
-                foreach (var snapToDelete in snapsToDelete)
-                {
-                    allUniqueSnaps.Remove(snapToDelete);
+                SnapComparer snapComparer = SnapComparer.Instance;
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> loadedSnapsFromAssetsFolder;
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> loadedSnapsFromScenes;
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> buildingAllSnapsMasterList = new();
 
-                    if (uniqueSnapsFromScenes.Contains(snapToDelete, snapComparer))
+                {//Load all unique snaps (From both the in scenes file and the in assets folder file) and clear out gen ids
+                    loadedSnapsFromScenes = LoadAllSnapsFromPersistenceFile(GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
+                    foreach (var loadedSnapFromScene in loadedSnapsFromScenes)
                     {
-                        uniqueSnapsFromScenes.Remove(snapToDelete);
-                    }
-                }
-
-                foreach (var possibleUniqueSnap in possibleInSceneUniqueSnaps)
-                {
-                    //If this snap is new, generate a new code gen id for it.
-                    if (!allUniqueSnaps.Contains(possibleUniqueSnap, snapComparer))
-                    {
-                        possibleUniqueSnap.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
-                        allUniqueSnaps.Add(possibleUniqueSnap);
-                        uniqueSnapsFromScenes.Add(possibleUniqueSnap);
-                    }
-                }
-
-                //Set all unset codegeneration id
-                foreach (var uniqueSnap in allUniqueSnaps)
-                {
-                    if (uniqueSnap.codeGenerationId == GONetParticipant.CodeGenerationId_Unset)
-                    {
-                        uniqueSnap.codeGenerationId = GetNewCodeGenerationId(allUniqueSnaps);
-                    }
-                }
-
-                //Apply changes not only to snaps but also to their corresponding GNPs
-                int scenesCount = EditorSceneManager.sceneCountInBuildSettings;
-                for (int i = 0; i < scenesCount; ++i)
-                {
-                    bool hasAnyMetadataUpdated = false;
-                    string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
-
-                    Scene openScene = EditorSceneManager.OpenScene(scenePath);
-                    EditorSceneManager.SetActiveScene(openScene);
-                    if (openScene.IsValid())
-                    {
-                        List<GONetParticipant> gnps;
-                        GetGNPsWithinScene(openScene, out gnps);
-                        GONetParticipant_ComponentsWithAutoSyncMembers snap;
-
-                        foreach (GONetParticipant gnp in gnps)
+                        if (!buildingAllSnapsMasterList.Contains(loadedSnapFromScene, snapComparer))
                         {
-                            snap = new GONetParticipant_ComponentsWithAutoSyncMembers(gnp);
-                            foreach (var uniqueSnap in allUniqueSnaps)
-                            {
-                                if (snapComparer.Equals(uniqueSnap, snap))
-                                {
-                                    if (gnp.CodeGenerationId != uniqueSnap.codeGenerationId)
-                                    {
-                                        ApplyToGNPCodeGenerationId(gnp, uniqueSnap.codeGenerationId);
-                                        hasAnyMetadataUpdated = true;
-                                    }
-                                }
-                            }
+                            loadedSnapFromScene.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
+                            buildingAllSnapsMasterList.Add(loadedSnapFromScene);
                         }
+                    }
 
-                        // TODO UNcomment: if (hasAnyMetadataUpdated)
+                    loadedSnapsFromAssetsFolder = LoadAllSnapsFromPersistenceFile(ASSET_FOLDER_SNAPS_FILE);
+                    foreach (var loadedSnapFromAssetsFolder in loadedSnapsFromAssetsFolder)
+                    {
+                        if (!buildingAllSnapsMasterList.Contains(loadedSnapFromAssetsFolder, snapComparer))
                         {
-                            // persist ALL.... 
-                            // TODO : If the count continues to go up and up across all scenes and not reset each scene,,,,then move this out of the scene for loop!
-                            foreach (var dtm in GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata())
-                            {
-                                GONetSpawnSupport_DesignTime.EnsureExistsInPersistence(dtm);
-                            }
-                            GONetLog.Debug($"[DREETS] processing scene: {scenePath}, DTM.Count: {GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Count()}, all locations: {string.Join("\n", GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Select(x => x.Location))}");
+                            loadedSnapFromAssetsFolder.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
+                            buildingAllSnapsMasterList.Add(loadedSnapFromAssetsFolder);
                         }
+                    }
+                }
+
+                //Get all the possible unique snaps that are within any scene inside the build.
+                CreateAllPossibleUniqueSnapsAndGNPsFromLoopingBuildScenes(
+                    out List<GONetParticipant_ComponentsWithAutoSyncMembers> createdInSceneUniqueSnaps,
+                    out List<SceneSnapGnpAssignment> createdInSceneUniqueAssignments);
+
+                {//Apply changes (Additions, deletes and/or modifications) to both the unique snaps list and to the corresponding in scene game objects
+                    HashSet<GONetParticipant_ComponentsWithAutoSyncMembers> snapsToDelete = new();
+                    foreach (var uniqueSnap in buildingAllSnapsMasterList)
+                    {
+                        if (!createdInSceneUniqueSnaps.Contains(uniqueSnap, snapComparer) &&
+                            !loadedSnapsFromAssetsFolder.Contains(uniqueSnap, snapComparer))
+                        {
+                            snapsToDelete.Add(uniqueSnap);
+                        }
+                    }
+
+                    foreach (var snapToDelete in snapsToDelete)
+                    {
+                        buildingAllSnapsMasterList.Remove(snapToDelete);
+
+                        if (loadedSnapsFromScenes.Contains(snapToDelete, snapComparer))
+                        {
+                            loadedSnapsFromScenes.Remove(snapToDelete);
+                        }
+                    }
+
+                    foreach (var possibleUniqueSnap in createdInSceneUniqueSnaps)
+                    {
+                        //If this snap is new, generate a new code gen id for it.
+                        if (!buildingAllSnapsMasterList.Contains(possibleUniqueSnap, snapComparer))
+                        {
+                            possibleUniqueSnap.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
+                            buildingAllSnapsMasterList.Add(possibleUniqueSnap);
+                            loadedSnapsFromScenes.Add(possibleUniqueSnap);
+                        }
+                    }
+
+                    //Set all unset codegeneration id
+                    foreach (var uniqueSnap in buildingAllSnapsMasterList.OrderBy(x => x.SingleMemberCount))
+                    {
+                        // with current state of code, this should always be unset and will get assigned new
+                        uniqueSnap.codeGenerationId = GetNewCodeGenerationId(buildingAllSnapsMasterList);
+
+                        foreach (var inSceneAssignmentMatch in
+                            createdInSceneUniqueAssignments.Where(x => snapComparer.Equals(x.assignedSnap, uniqueSnap)))
+                        {
+                            inSceneAssignmentMatch.assignedSnap.codeGenerationId = uniqueSnap.codeGenerationId;
+                        }
+                    }
+
+                    //Apply changes not only to snaps but also to their corresponding GNPs
+                    foreach (SceneSnapGnpAssignment inSceneSnapGnpAssignment in createdInSceneUniqueAssignments)
+                    {
+                        GONetParticipant_ComponentsWithAutoSyncMembers actualPersistedSnap = inSceneSnapGnpAssignment.assignedSnap;
+                        GONetParticipant inSceneGnp = inSceneSnapGnpAssignment.gnp;
+                        GONetLog.Debug($"uniqueSnap.hash: {actualPersistedSnap.GetHashCode()}, gnp.genId: {inSceneGnp.CodeGenerationId}, snap.genId: {actualPersistedSnap.codeGenerationId}");
+                        DesignTimeMetadata dtm =
+                            ApplyDesignTimeMetadataToGnp(inSceneGnp, actualPersistedSnap.codeGenerationId, inSceneSnapGnpAssignment.fullScenePath);
+                        GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
+                    }
+                }
+
+                {//Go back to the initial scene when this process started
+                    currentScene = EditorSceneManager.OpenScene(currentScenePath);
+                    if (currentScene.IsValid())
+                    {
+                        EditorSceneManager.SetActiveScene(currentScene);
                     }
                     else
                     {
-                        GONetLog.Warning("You are trying to open an invalid scene. Scene path: " + scenePath);
+                        GONetLog.Error("Not switching back to the scene that the user was in when this process started. The current scene is not valid.");
                     }
                 }
-            }
 
-            {//Go back to the initial scene when this process started
-                currentScene = EditorSceneManager.OpenScene(currentScenePath);
-                if (currentScene.IsValid())
+                GONetLog.Debug($"dreetsi enum");
+                GenerateSyncEventEnum(buildingAllSnapsMasterList);
+
+                //Save the updated unique snaps in their corresponding binary files
+                SaveUniqueSnapsToPersistenceFile(loadedSnapsFromScenes, GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
+                SaveUniqueSnapsToPersistenceFile(buildingAllSnapsMasterList, GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
+
+                if (File.Exists(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN))
                 {
-                    EditorSceneManager.SetActiveScene(currentScene);
+                    File.Delete(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
                 }
-                else
-                {
-                    GONetLog.Error("Not switching back to the scene that the user was in when this process started. The current scene is not valid.");
-                }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
             }
-
-            GONetLog.Debug($"dreetsi enum");
-            GenerateSyncEventEnum(allUniqueSnaps);
-
-            //Save the updated unique snaps in their corresponding binary files
-            SaveUniqueSnapsToPersistenceFile(uniqueSnapsFromScenes, GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
-            SaveUniqueSnapsToPersistenceFile(allUniqueSnaps, GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
-
-            if (File.Exists(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN))
+            finally
             {
-                File.Delete(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
+                GONetSpawnSupport_Runtime.IsNewDtmForced = wasNewDtmForced;
             }
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
         }
 
-        private static void LoadAllPossibleUniqueSnapsFromLoopingBuildScenes(out List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleUniqueSnaps)
+        class SceneSnapGnpAssignment
         {
-            possibleUniqueSnaps = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
+            public GONetParticipant gnp;
+            public string fullScenePath;
+            public GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap;
+        }
+
+        private static void CreateAllPossibleUniqueSnapsAndGNPsFromLoopingBuildScenes(
+            out List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleInSceneUniqueSnaps, 
+            out List<SceneSnapGnpAssignment> allSceneSnapGnpAssignments)
+        {
+            possibleInSceneUniqueSnaps = new();
+            allSceneSnapGnpAssignments = new();
 
             int scenesCount = EditorSceneManager.sceneCountInBuildSettings;
             for (int i = 0; i < scenesCount; ++i)
             {
                 string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
 
+                GONetLog.Debug($"*****************GONet Generation opening scene to process all GNPs.  Scene: {scenePath}");
                 Scene openScene = EditorSceneManager.OpenScene(scenePath);
                 EditorSceneManager.SetActiveScene(openScene);
                 if (openScene.IsValid())
@@ -782,7 +758,16 @@ namespace GONet.Generation
                     GetGNPsWithinScene(openScene, out gnps);
                     foreach (GONetParticipant gnp in gnps)
                     {
-                        possibleUniqueSnaps.Add(new GONetParticipant_ComponentsWithAutoSyncMembers(gnp));
+                        string gnpFullScenePath = DesignTimeMetadata.GetFullUniquePathInScene(gnp);
+                        GONetLog.Debug($"\tGONet Generation processing scene: {scenePath} - GNP full scene path: {gnpFullScenePath}");
+                        GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap = new(gnp);
+                        possibleInSceneUniqueSnaps.Add(assignedSnap);
+                        allSceneSnapGnpAssignments.Add(new()
+                        {
+                            fullScenePath = gnpFullScenePath,
+                            assignedSnap = assignedSnap,
+                            gnp = gnp,
+                        });
                     }
                 }
                 else
@@ -859,7 +844,7 @@ namespace GONet.Generation
                 Directory.CreateDirectory(GENERATION_FILE_PATH);
             }
 
-            allSnaps.ForEach(x => GONetLog.Debug("SAVING to persistence x.codeGenerationId: " + x.codeGenerationId + " x.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
+            //allSnaps.ForEach(x => GONetLog.Debug("SAVING to persistence gnp-(loc:" + x.gonetParticipant.DesignTimeLocation + ", genId:"+x.gonetParticipant.CodeGenerationId+"), snap.genId: " + x.codeGenerationId + " snap.ComponentMemberNames_By_ComponentTypeFullName.Length: " + x.ComponentMemberNames_By_ComponentTypeFullName.Length));
 
             int returnBytesUsedCount;
             byte[] snapsFileBytes = SerializationUtils.SerializeToBytes(allSnaps, out returnBytesUsedCount, out bool doesNeedToReturn);
@@ -1258,7 +1243,7 @@ namespace GONet.Generation
     public partial class GONetParticipant_ComponentsWithAutoSyncMembers
     {
         /// <summary>
-        /// Assigned once know to be a unique combo.
+        /// Assigned once known to be a unique combo.
         /// Relates directly to <see cref="GONetParticipant.CodeGenerationId"/>.
         /// IMPORTANT: MessagePack for C# is not supporting internal field.....so, this is now public...boo!
         /// </summary>
@@ -1268,6 +1253,23 @@ namespace GONet.Generation
         /// In deterministic order....with the one for <see cref="GONetParticipant.GONetId"/> first due to special case processing....also <see cref="GONetParticipant.ASSumed_GONetId_INDEX"/>
         /// </summary>
         public GONetParticipant_ComponentsWithAutoSyncMembers_Single[] ComponentMemberNames_By_ComponentTypeFullName;
+
+        public int SingleMemberCount
+        {
+            get
+            {
+                int count = 0;
+                try
+                {
+                    foreach (var a in ComponentMemberNames_By_ComponentTypeFullName)
+                    {
+                        count += a.autoSyncMembers.Length;
+                    }
+                }
+                catch { }
+                return count;
+            }
+        }
 
         /// <summary>
         /// This is ONLY populated when <see cref="GONetParticipant_ComponentsWithAutoSyncMembers.GONetParticipant_ComponentsWithAutoSyncMembers(GONetParticipant)"/> is used during 

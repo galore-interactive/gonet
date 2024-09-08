@@ -28,6 +28,8 @@ namespace GONet
 {
     public static class GONetSpawnSupport_Runtime
     {
+        public static bool IsNewDtmForced { get;set; }
+
         public const string GONET_STREAMING_ASSETS_FOLDER = "GONet";
         public static readonly string DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS = Path.Combine(GONET_STREAMING_ASSETS_FOLDER, "DesignTimeMetadata.json");
 
@@ -39,6 +41,11 @@ namespace GONet
 
         private static readonly Dictionary<DesignTimeMetadata, GONetParticipant> designTimeMetadataToProjectTemplate = new (100);
         private static readonly DesignTimeMetadataDictionary designTimeMetadataLookup = new();
+
+        static GONetSpawnSupport_Runtime()
+        {
+            GONetLog.Debug($"---------------------------------NEW GONetSpawnSupport_Runtime(), so, all lookup cleared out!!!!");
+        }
 
         public static IEnumerable<DesignTimeMetadata> LoadDesignTimeMetadataFromPersistence()
         {
@@ -306,13 +313,14 @@ namespace GONet
 
                 if (!designTimeMetadataLookup.TryGetValue(gONetParticipant, out DesignTimeMetadata value))
                 {
-                    DesignTimeMetadata metadata = Application.isPlaying
+                    bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
+                    DesignTimeMetadata metadata = shouldCreateNewDtm
                         ? new DesignTimeMetadata()
                         {
                             CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                         }
                         : defaultDTM_EditorNotPlayMode;
-                    //GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
+                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW? {shouldCreateNewDtm}"); // monitor how often new is created!!! do we need a pool ???
                     designTimeMetadataLookup.Set(gONetParticipant, metadata);
                     value = metadata;
                 }
@@ -382,13 +390,14 @@ namespace GONet
 
                 if (!designTimeMetadataLookup.TryGetValue(designTimeLocation, out DesignTimeMetadata value))
                 {
-                    DesignTimeMetadata metadata = Application.isPlaying
+                    bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
+                    DesignTimeMetadata metadata = shouldCreateNewDtm
                         ? new DesignTimeMetadata()
                         {
                             CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                         }
                         : defaultDTM_EditorNotPlayMode;
-                    //GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW  app.playing? {Application.isPlaying}"); // monitor how often new is created!!! do we need a pool ???
+                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW? {shouldCreateNewDtm}"); // monitor how often new is created!!! do we need a pool ???
                     designTimeMetadataLookup.Set(designTimeLocation, metadata);
                     value = metadata;
                 }

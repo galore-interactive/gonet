@@ -48,15 +48,23 @@ namespace GONet.Editor
 
         private static void OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly()
         {
-            RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX); // clear it now as it will be built back up below
+            EnsureDesignTimeLocationsCurrent_ProjectOnly();
+        }
 
-            Resources.LoadAll<GONetParticipant>(string.Empty); // IMPORTANT: have to load them all up for else the following call will not "find" them all and only the ones that happened to be loaded already would be found/processed
+        internal static void EnsureDesignTimeLocationsCurrent_ProjectOnly()
+        {
+            // clear it now as it will be built back up below
+            RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX);
+
+            // IMPORTANT: have to load them all up for else the following call will not "find" them all and only the ones that happened to be loaded already would be found/processed
+            Resources.LoadAll<GONetParticipant>(string.Empty);
             foreach (var gonetParticipant in Resources.FindObjectsOfTypeAll<GONetParticipant>())
             {
                 OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
             }
 
-            foreach (GONetParticipant gonetParticipant in GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GetGNPsAddedToPrefabThisFrame()) // IMPORTANT: have to do this because the above call to Resources.FindObjectsOfTypeAll<GONetParticipant>() does NOT identify a prefab that just had GNP added to it this frame!!!
+            // IMPORTANT: have to do this because the above call to Resources.FindObjectsOfTypeAll<GONetParticipant>() does NOT identify a prefab that just had GNP added to it this frame!!!
+            foreach (GONetParticipant gonetParticipant in GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GetGNPsAddedToPrefabThisFrame())
             {
                 OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
             }
@@ -80,12 +88,19 @@ namespace GONet.Editor
             }
             else if ((object)gonetParticipant != null && !string.IsNullOrWhiteSpace(gonetParticipant.DesignTimeLocation))
             {
-                EnsureExistsInPersistence(gonetParticipant.DesignTimeLocation);
+                EnsureExistsInPersistence_WithTheseValues(gonetParticipant.DesignTimeLocation);
             }
         }
 
         private static void OnHierarchyChanged_EnsureDesignTimeLocationsCurrent_SceneOnly()
         {
+            GONetLog.Debug($"FRAME: {Time.frameCount} .... OnHierarchyChanged_EnsureDesignTimeLocationsCurrent_SceneOnly");
+
+            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // SKIP code gen on first/oth frame due to this method being called when coming out of other GONet generation stuff (e.g., editor support: "Fix GONet Generated Code")
+            if (Time.frameCount == 0) return;
+            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             bool isHierarchyChangingDueToExitingPlayModeInEditor = 
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue && 
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode &&
@@ -115,7 +130,7 @@ namespace GONet.Editor
                             }
                             else
                             {
-                                EnsureExistsInPersistence(fullUniquePath); // although this is also called inside EnsureDesignTimeLocationCurrent, we need to call it here too in case the generated file this information goes into is manually deleted on the filesystem and the information was lost...this is a failsafe method to ensure it is populated!
+                                EnsureExistsInPersistence_WithTheseValues(fullUniquePath); // although this is also called inside EnsureDesignTimeLocationCurrent, we need to call it here too in case the generated file this information goes into is manually deleted on the filesystem and the information was lost...this is a failsafe method to ensure it is populated!
                             }
                         }
                     }
@@ -130,17 +145,41 @@ namespace GONet.Editor
             }
         }
 
-        internal static void EnsureExistsInPersistence(DesignTimeMetadata designTimeLocation)
+        internal static void EnsureExistsInPersistence_WithTheseValues(DesignTimeMetadata ensureExistsDtm)
         {
-            IEnumerable<DesignTimeMetadata> all = GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
+            IEnumerable<DesignTimeMetadata> persistedDtms = GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
 
-            if (!all.Any(x => x.Location == designTimeLocation.Location))
+            bool doesAlreadyExist = persistedDtms.Any(x => x.Location == ensureExistsDtm.Location);
+            if (doesAlreadyExist)
             {
-                var newAll = new List<DesignTimeMetadata>(all);
+                if (ensureExistsDtm.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset || 
+                    ensureExistsDtm.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)) // IMPORTANT: allow persisting "project://" when code gen 0 (in hopes this gets corrected later, but need it in there now!)
+                {
+                    int iMatch = 0;
+                    foreach (DesignTimeMetadata persistedDtm in persistedDtms.Where(x => x.Location == ensureExistsDtm.Location))
+                    {
+                        // update other info for those matching location
 
-                newAll.Add(designTimeLocation);
+                        if (ensureExistsDtm.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset)
+                        {
+                            persistedDtm.CodeGenerationId = ensureExistsDtm.CodeGenerationId;
+                        }
 
-                OverwritePersistenceWith(newAll);
+                        persistedDtm.UnityGuid = ensureExistsDtm.UnityGuid;
+                        
+                        if (++iMatch > 1)
+                        {
+                            Debug.LogWarning($"More than 1 match of location: {ensureExistsDtm.Location}, match# {iMatch}");
+                        }
+                    }
+                    OverwritePersistenceWith(persistedDtms);
+                }
+            }
+            else
+            {
+                var updatedListDtms = new List<DesignTimeMetadata>(persistedDtms);
+                updatedListDtms.Add(ensureExistsDtm);
+                OverwritePersistenceWith(updatedListDtms);
             }
         }
 
@@ -186,7 +225,7 @@ namespace GONet.Editor
                 serializedObject.ApplyModifiedProperties();
             }
 
-            EnsureExistsInPersistence(designTimeMetadata);
+            EnsureExistsInPersistence_WithTheseValues(designTimeMetadata);
         }
 
         /// <summary>
@@ -202,7 +241,8 @@ namespace GONet.Editor
 
             var invalidMofosWillNotPersist = newCompleteDesignTimeLocations
                 .Where(x => string.IsNullOrWhiteSpace(x.Location) || 
-                    x.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset);
+                    (x.Location.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX) 
+                        && x.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset));// IMPORTANT: allow persisting "project://" when code gen 0 (in hopes this gets corrected later, but need it in there now!)
             foreach (var invalid in invalidMofosWillNotPersist)
             {
                 GONetLog.Warning($"This little piggy is not going to the market!  He has some missing data that is not cool to persist!  Most likely, this is OK to overlook based on latest implementation preference and reliance on project over scene centricity.  As json: {JsonUtility.ToJson(invalid)}");
@@ -211,8 +251,7 @@ namespace GONet.Editor
             DesignTimeMetadataLibrary designTimeMetadataLibrary = new DesignTimeMetadataLibrary()
             {
                 Entries = newCompleteDesignTimeLocations
-                    .Where(x => !string.IsNullOrWhiteSpace(x.Location) && 
-                        x.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset).OrderBy(x => x.Location).ToArray(),
+                    .Where(x => !invalidMofosWillNotPersist.Contains(x)).OrderBy(x => x.Location).ToArray(),
             };
 
             string fullPath = Path.Combine(Application.streamingAssetsPath, GONetSpawnSupport_Runtime.DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS);

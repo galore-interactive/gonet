@@ -12,6 +12,9 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
 
     private float angle = 0f; // Current angle in radians
 
+    [GONetAutoMagicalSync]
+    public float NettyWorkedFloat { get; set; }
+
     public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
     {
         base.OnGONetClientVsServerStatusKnown(isClient, isServer, myAuthorityId);
@@ -37,6 +40,9 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
 
             // Rotate the object around its own axis
             transform.Rotate(Vector3.up, rotationSpeed * Time.deltaTime);
+
+            // just testing some network stuff
+            NettyWorkedFloat += Time.deltaTime;
         }
     }
 }

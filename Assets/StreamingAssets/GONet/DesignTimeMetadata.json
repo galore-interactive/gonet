@@ -16,34 +16,9 @@
             "codeGenerationId": 1
         },
         {
-            "location": "project://Assets/GONet/Sample/Projectile/Resources/CannonBall_NestedGNPs.prefab",
-            "unityGuid": "3ca87ecdc713ad64992714377edc8f8f",
-            "codeGenerationId": 1
-        },
-        {
             "location": "scene://JustAnotherScene/GameObject",
             "unityGuid": "",
-            "codeGenerationId": 1
-        },
-        {
-            "location": "scene://JustAnotherScene/GameObject (1)",
-            "unityGuid": "",
-            "codeGenerationId": 1
-        },
-        {
-            "location": "scene://JustAnotherScene/GameObject (2)",
-            "unityGuid": "",
-            "codeGenerationId": 1
-        },
-        {
-            "location": "scene://JustAnotherScene/GameObject (3)",
-            "unityGuid": "",
-            "codeGenerationId": 1
-        },
-        {
-            "location": "scene://JustAnotherScene/GameObject (4)",
-            "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 2
         },
         {
             "location": "scene://JustAnotherScene/GONet_GlobalContext",

@@ -2289,7 +2289,7 @@ namespace GONet
             isCurrentlyProcessingInstantiateGNPEvent = true;
             currentlyProcessingInstantiateGNPEvent = instantiateEvent;
 
-            //GONetLog.Debug($"dreetsi instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
+            GONetLog.Debug($"dreetsi instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
 
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeMetadata(instantiateEvent.DesignTimeLocation);
             template.wasInstantiatedForce = true; // the instantiated one will get this
