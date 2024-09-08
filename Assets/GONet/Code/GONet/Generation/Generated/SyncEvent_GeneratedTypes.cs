@@ -9,6 +9,7 @@ namespace GONet
 		SyncEvent_GONetParticipant_RemotelyControlledByAuthorityId = 4,
 		SyncEvent_Transform_rotation = 5,
 		SyncEvent_Transform_position = 6,
+		SyncEvent_CircularMotion_NettyWorkedFloat = 7,
 
 	}
 }

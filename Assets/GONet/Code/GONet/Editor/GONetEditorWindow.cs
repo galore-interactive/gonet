@@ -179,6 +179,9 @@ namespace GONet.Editor
 
         private void FixGONetGeneratedCode()
         {
+            GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (1)");
+
+
             if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH))
             {
                 File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
@@ -194,6 +197,7 @@ namespace GONet.Editor
                 File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ASSET_FOLDER_SNAPS_FILE);
             }
 
+            /* This causes all to recompile and I believe it is unnecessary and it certain takes a long time!
             const string UNITY_LIBRARY_SCRIPT_ASSEMBLIES = "Library/ScriptAssemblies";
             if (Directory.Exists(UNITY_LIBRARY_SCRIPT_ASSEMBLIES))
             {
@@ -202,6 +206,7 @@ namespace GONet.Editor
                     File.Delete(filePath);
                 }
             }
+            */
 
             if (Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
             {
@@ -211,10 +216,25 @@ namespace GONet.Editor
                 }
             }
 
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            bool wasNewDtmForced = GONetSpawnSupport_Runtime.IsNewDtmForced;
+            try
+            {
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (2)");
+                GONetSpawnSupport_Runtime.IsNewDtmForced = true;
 
-            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (3)");
+                GONetSpawnSupport_DesignTime.EnsureDesignTimeLocationsCurrent_ProjectOnly(); // TODO FIXME where does this belong to get all project:// to save to DTM.txt?!?!?!?
+
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+            }
+            finally
+            {
+                GONetSpawnSupport_Runtime.IsNewDtmForced = wasNewDtmForced;
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (4)");
+            }
         }
 
         internal static T CreateSyncSettingsProfileAsset<T>(string assetName) where T : ScriptableObject

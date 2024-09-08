@@ -18,6 +18,7 @@ namespace GONet.Generation
                 string previous = location;
                 location = value;
                 GONetSpawnSupport_Runtime.ChangeLocation(previous, value, this);
+                GONetLog.Debug($"assignment genId: {codeGenerationId}, *location: {value}");
             }
         }
 
@@ -35,7 +36,7 @@ namespace GONet.Generation
             set
             {
                 codeGenerationId = value;
-                //GONetLog.Debug($"codeGenerationId: {value}, location: {location}");
+                GONetLog.Debug($"assignment *genId: {value}, location: {location}");
             }
         }
 
