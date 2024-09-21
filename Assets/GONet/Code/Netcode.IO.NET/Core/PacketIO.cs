@@ -34,7 +34,7 @@ namespace NetcodeIO.NET.Internal
         /// </summary>
         public static int ReadPacketData(NetcodePacketHeader header, ByteArrayReaderWriter stream, int length, ulong protocolID, byte[] key, byte[] outputBuffer)
 		{
-			byte[] encryptedBuffer = BufferPool.GetBuffer(2048);
+			byte[] encryptedBuffer = Utils.BufferPool.GetBuffer(2048);
 			stream.ReadBytesIntoBuffer(encryptedBuffer, length);
 			
 			try
@@ -47,7 +47,7 @@ namespace NetcodeIO.NET.Internal
 			}
             finally
             {
-                BufferPool.ReturnBuffer(encryptedBuffer);
+                Utils.BufferPool.ReturnBuffer(encryptedBuffer);
             }
 		}
 
@@ -86,20 +86,20 @@ namespace NetcodeIO.NET.Internal
             UpdateRecordMacLength(_mac, len);
 
             int macSize = _mac.GetMacSize();
-            byte[] finalMac = BufferPool.GetBuffer(macSize);
+            byte[] finalMac = Utils.BufferPool.GetBuffer(macSize);
             MacUtilities.DoFinal(_mac, finalMac, macSize);
             int finalMacLength = finalMac.Length;
             Buffer.BlockCopy(finalMac, 0, outMac, 0, finalMacLength);
-            BufferPool.ReturnBuffer(finalMac);
+            Utils.BufferPool.ReturnBuffer(finalMac);
             return finalMacLength;
         }
 
         private static void UpdateRecordMacLength(IMac mac, int len)
         {
-            byte[] longLen = BufferPool.GetBuffer(8);
+            byte[] longLen = Utils.BufferPool.GetBuffer(8);
             Pack.UInt64_To_LE((ulong)len, longLen);
             mac.BlockUpdate(longLen, 0, longLen.Length);
-            BufferPool.ReturnBuffer(longLen);
+            Utils.BufferPool.ReturnBuffer(longLen);
         }
 
         private static void UpdateRecordMacText(IMac mac, byte[] buf, int off, int len)
@@ -123,7 +123,7 @@ namespace NetcodeIO.NET.Internal
 
         private static int ProcessEncryptionForPacketData(bool isEncrypting, NetcodePacketHeader header, ulong protocolID, byte[] packetData, int packetDataLen, byte[] key, byte[] outBuffer)
         {
-            byte[] additionalData = BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 1);
+            byte[] additionalData = Utils.BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 1);
             using (var writer = ByteArrayReaderWriter.Get(additionalData))
             {
                 writer.WriteASCII(Defines.NETCODE_VERSION_INFO_STR);
@@ -138,7 +138,7 @@ namespace NetcodeIO.NET.Internal
         {
             lock (encryptionMutex)
             {
-                byte[] nonce = BufferPool.GetBuffer(12);
+                byte[] nonce = Utils.BufferPool.GetBuffer(12);
                 using (var writer = ByteArrayReaderWriter.Get(nonce))
                 {
                     writer.Write((UInt32)0);
@@ -192,10 +192,10 @@ namespace NetcodeIO.NET.Internal
 
                 cipherEngine.Init(isEncrypting, _temp_Params);
 
-                byte[] firstBlock = BufferPool.GetBuffer(64);
+                byte[] firstBlock = Utils.BufferPool.GetBuffer(64);
                 KeyParameter macKey = GenerateRecordMacKey(cipherEngine, firstBlock);
 
-                byte[] mac = BufferPool.GetBuffer(16);
+                byte[] mac = Utils.BufferPool.GetBuffer(16);
                 byte[] receivedMac = null;
 
                 int lengthilSoup = packetDataLen;
@@ -217,7 +217,7 @@ namespace NetcodeIO.NET.Internal
 
                         int macSize = CalculateRecordMac(macKey, additionalData, packetData, 0, lengthilSoup, mac);
 
-                        receivedMac = BufferPool.GetBuffer(16);
+                        receivedMac = Utils.BufferPool.GetBuffer(16);
                         Array.Copy(packetData, lengthilSoup, receivedMac, 0, receivedMac.Length);
 
                         if (!Arrays.ConstantTimeAreEqual(mac, receivedMac))
@@ -236,13 +236,13 @@ namespace NetcodeIO.NET.Internal
                 }
                 finally
                 {
-                    BufferPool.ReturnBuffer(additionalData);
-                    BufferPool.ReturnBuffer(nonce);
-                    BufferPool.ReturnBuffer(mac);
-                    BufferPool.ReturnBuffer(firstBlock);
+                    Utils.BufferPool.ReturnBuffer(additionalData);
+                    Utils.BufferPool.ReturnBuffer(nonce);
+                    Utils.BufferPool.ReturnBuffer(mac);
+                    Utils.BufferPool.ReturnBuffer(firstBlock);
                     if (!isEncrypting)
                     {
-                        BufferPool.ReturnBuffer(receivedMac);
+                        Utils.BufferPool.ReturnBuffer(receivedMac);
                     }
                 }
             }
@@ -253,7 +253,7 @@ namespace NetcodeIO.NET.Internal
         /// </summary>
         public static int EncryptChallengeToken(ulong sequenceNum, byte[] packetData, byte[] key, byte[] outBuffer)
 		{
-			byte[] additionalData = BufferPool.GetBuffer(0);
+			byte[] additionalData = Utils.BufferPool.GetBuffer(0);
             return ProcessEncryptionForPacketData(true, sequenceNum, additionalData, packetData, 300 - Defines.MAC_SIZE, key, outBuffer);
 		}
 
@@ -262,7 +262,7 @@ namespace NetcodeIO.NET.Internal
 		/// </summary>
 		public static int DecryptChallengeToken(ulong sequenceNum, byte[] packetData, byte[] key, byte[] outBuffer)
 		{
-			byte[] additionalData = BufferPool.GetBuffer(0);
+			byte[] additionalData = Utils.BufferPool.GetBuffer(0);
             return ProcessEncryptionForPacketData(false, sequenceNum, additionalData, packetData, 300, key, outBuffer);
 		}
 
@@ -271,7 +271,7 @@ namespace NetcodeIO.NET.Internal
 		{
 			int len = privateConnectToken.Length;
 
-			byte[] additionalData = BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 8);
+			byte[] additionalData = Utils.BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 8);
 			using (var writer = ByteArrayReaderWriter.Get(additionalData))
 			{
 				writer.WriteASCII(Defines.NETCODE_VERSION_INFO_STR);
@@ -287,7 +287,7 @@ namespace NetcodeIO.NET.Internal
 		{
             int len = encryptedConnectToken.Length;
 
-            byte[] additionalData = BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 8);
+            byte[] additionalData = Utils.BufferPool.GetBuffer(Defines.NETCODE_VERSION_INFO_BYTES + 8 + 8);
             using (var writer = ByteArrayReaderWriter.Get(additionalData))
             {
                 writer.WriteASCII(Defines.NETCODE_VERSION_INFO_STR);
