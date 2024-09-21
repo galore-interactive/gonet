@@ -39,6 +39,13 @@ namespace GONet
             }
         }
 
+        private Subscription<GONetParticipantEnabledEvent> gonetSubscriptionEnabled;
+        private Subscription<GONetParticipantStartedEvent> gonetSubscriptionStarted;
+        private Subscription<GONetParticipantDisabledEvent> gonetSubscriptionDisabled;
+        private Subscription<GONetParticipantDeserializeInitAllCompletedEvent> gonetSubscriptionDeserializeInitAllCompleted;
+        private Subscription<SyncEvent_ValueChangeProcessed> gonetSubscriptionOwnerAuthorityId;
+        
+
         /// <summary>
         /// IMPORTANT: Keep in mind this is not going to be a good/final value until <see cref="OnGONetClientVsServerStatusKnown(bool, bool, ushort)"/> is called, which is also when <see cref="GONetMain.IsClientVsServerStatusKnown"/> turns true.
         /// </summary>
@@ -56,7 +63,11 @@ namespace GONet
 
         protected virtual void Awake()
         {
-            GONetMain.RegisterBehaviour(this);
+            gonetSubscriptionEnabled = GONetMain.EventBus.Subscribe<GONetParticipantEnabledEvent>(envelope => OnGONetParticipantEnabled(envelope.GONetParticipant));
+            gonetSubscriptionStarted = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(envelope => OnGONetParticipantStarted(envelope.GONetParticipant));
+            gonetSubscriptionDisabled = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(envelope => OnGONetParticipantDisabled(envelope.GONetParticipant));
+            gonetSubscriptionDeserializeInitAllCompleted = GONetMain.EventBus.Subscribe<GONetParticipantDeserializeInitAllCompletedEvent>(envelope => OnGONetParticipantDeserializeInitAllCompleted(envelope.GONetParticipant));
+            gonetSubscriptionOwnerAuthorityId = GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, envelope => OnGONetParticipant_OwnerAuthorityIdChanged(envelope.GONetParticipant, envelope.Event.GONetId, envelope.Event.ValuePrevious.System_UInt16, envelope.Event.ValueNew.System_UInt16));
         }
 
         protected virtual void OnEnable()
@@ -72,7 +83,7 @@ namespace GONet
             GONetMain.RemoveTickReceiver(this);
         }
 
-        internal void OnGONetParticipant_OwnerAuthorityIdChanged(GONetParticipant gonetParticipant, uint gonetId, ushort valuePrevious, ushort valueNew)
+        private void OnGONetParticipant_OwnerAuthorityIdChanged(GONetParticipant gonetParticipant, uint gonetId, ushort valuePrevious, ushort valueNew)
         {
             if ((object)gonetParticipant == null)
             {
@@ -103,7 +114,11 @@ namespace GONet
 
         protected virtual void OnDestroy()
         {
-            GONetMain.UnregisterBehaviour(this);
+            gonetSubscriptionEnabled.Unsubscribe();
+            gonetSubscriptionStarted.Unsubscribe();
+            gonetSubscriptionDisabled.Unsubscribe();
+            gonetSubscriptionDeserializeInitAllCompleted.Unsubscribe();
+            gonetSubscriptionOwnerAuthorityId.Unsubscribe();
         }
 
         /// <summary>
@@ -184,9 +199,9 @@ namespace GONet
         {
             base.Awake();
 
-            gonetParticipant = GetComponent<GONetParticipant>();
             Transform xform = transform;
-            while ((object)gonetParticipant == null && (object)xform != null)
+
+            while (gonetParticipant == null && xform != null)
             {
                 gonetParticipant = xform.gameObject.GetComponent<GONetParticipant>();
                 xform = xform.parent;

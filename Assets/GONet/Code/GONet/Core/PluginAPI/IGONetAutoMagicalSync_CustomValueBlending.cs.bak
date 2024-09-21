@@ -1808,29 +1808,5 @@ namespace GONet.PluginAPI
         }
     }
 
-    public class GONetValueBlending_Vector3_HighPerformance : IGONetAutoMagicalSync_CustomValueBlending
-    {
-        public static bool ShouldLog = false;
-
-        public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
-
-        public string Description => "High performance testing.";
-
-        public bool TryGetBlendedValue(
-            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
-        {
-            if (valueCount == 0)
-            {
-                blendedValue = Vector3.zero;
-                didExtrapolate = false;
-                return false;
-            }
-
-            blendedValue = valueBuffer[0].numericValue; // choose most recent value
-            didExtrapolate = false;
-            return true;
-        }
-    }
-
     #endregion
 }

@@ -198,7 +198,7 @@ namespace GONet.Utils
             {
                 // Swap out the two objects so the pool[] always has each object (available and checked out alike),
                 // so none are overwritten.  This is so the checks above for object borrowed from pool continue to work.
-                //PreObjectPositionSwap(currentPoolIndex, nextAvailableIndex);
+                PreObjectPositionSwap(currentPoolIndex, nextAvailableIndex);
                 T swappie = pool[currentPoolIndex] = pool[nextAvailableIndex]; // IMPORTANT_NOTE456: NOW, nextAvailableIndex actually represents what it says....you're welcome ;-)
                 // return the object to the pool, making it the next available object for borrowing
                 pool[nextAvailableIndex] = @object;
@@ -212,7 +212,7 @@ namespace GONet.Utils
             }
             ++totalReturned;
 
-            //ObjectReturned?.Invoke(this, @object);
+            ObjectReturned?.Invoke(this, @object);
         }
 
         /// <summary>
