@@ -60,7 +60,7 @@ namespace GONet
         private static readonly string configXml = @" <log4net>
  
    <appender name=""FileAppender"" type=""log4net.Appender.RollingFileAppender"">
-     <file value=""logs\gonet.log"" />
+     <file value=""____LOG_FILE_PATH____"" />
      <appendToFile value=""true"" />
      <rollingStyle value=""Once"" />
      <maxSizeRollBackups value=""10"" />
@@ -87,9 +87,13 @@ namespace GONet
  </log4net>
 ";
 
+        //const string logFilePlaceholder = "logs\\gonet.log";
+        const string logFilePlaceholder = "____LOG_FILE_PATH____";
+
         static GONetLog()
         {
             _fileLogger = LogManager.GetLogger(typeof(GONetLog));
+            string configXml_updated = configXml.Replace(logFilePlaceholder, Path.Combine(Application.persistentDataPath, "logs", "gonet.log"));
             using Stream configXmlStream = StringUtils.GenerateStreamFromString(configXml);
             log4net.Config.XmlConfigurator.Configure(configXmlStream);
         }

@@ -19,7 +19,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using GONet.Utils;
 using System.Collections.Concurrent;
-using Disruptor;
 
 namespace GONet
 {
@@ -647,29 +646,6 @@ namespace GONet
             disruptor.HandleEventsWith(new HandleWhich(newHandlerAndPredicate));
             */
             return subscription;
-        }
-
-        private class HandleWhich : IEventHandler<IGONetEvent>
-        {
-            readonly EventHandlerAndFilterer newHandlerAndPredicate;
-            public HandleWhich(EventHandlerAndFilterer newHandlerAndPredicate)
-            {
-                this.newHandlerAndPredicate = newHandlerAndPredicate;
-            }
-
-            void IEventHandler<IGONetEvent>.OnEvent(IGONetEvent @event, long sequence, bool endOfBatch)
-            {
-
-                /* WIP
-                    GONetEventEnvelope<IGONetEvent> genericEnvelope = genericEnvelopes_publishCallDepthIndex[genericEnvelope_publishCallDepth];
-                    genericEnvelope.Init(@event, sourceAuthorityId, targetClientAuthorityId, shouldPublishReliably);
-
-                    if (newHandlerAndPredicate.Filterer == null || newHandlerAndPredicate.Filterer(genericEnvelope))
-                    {
-                        newHandlerAndPredicate.Handler(genericEnvelope);
-                    }
-                */
-            }
         }
 
         /// <summary>
