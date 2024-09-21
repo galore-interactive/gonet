@@ -75,11 +75,13 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\RSASSAPSSparams.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\InvalidKeyException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\AuthEnvelopedDataParser.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IBatchSizeLimiter.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\TBSCertList.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DERSetParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsProtocolHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\DtlsServerProtocol.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSContentInfoParser.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\PhasedBackoffWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\extension\X509ExtensionUtil.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\SymmetricKeyEncSessionPacket.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\AbstractTlsPeer.cs" />
@@ -100,6 +102,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\Rfc6637Utilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsSrpIdentityManager.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\kdf\ConcatenationKdfGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\BlockingWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpSignatureList.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\paddings\BlockCipherPadding.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\Challenge.cs" />
@@ -135,6 +138,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\multiplier\DoubleAddMultiplier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\util\CipherKeyGeneratorFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\CMSAttributes.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ExceptionHandlerSetting.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP521R1Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crmf\AuthenticatorControl.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cmp\ProtectedPkiMessage.cs" />
@@ -185,6 +189,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\ECPublicBCPGKey.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\encoders\Base64Encoder.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\OtherRevocationInfoFormat.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ProducerType.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\OCSPException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\EncryptionScheme.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\OpenBsdBCrypt.cs" />
@@ -206,6 +211,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509CertPairParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\DigestRandomGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crmf\DefaultPKMacPrimitivesProvider.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueExceptionHandlerSetting.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\RevocationValues.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsClientContextImpl.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\PkixAttrCertPathValidator.cs" />
@@ -222,6 +228,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\SecretSubkeyPacket.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP160R1Curve.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ocsp\Signature.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\NaccacheSternKeyPairGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkcs\PrivateKeyInfoFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\CertificateID.cs" />
@@ -236,6 +243,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\endo\GlvEndomorphism.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsServer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\digests\GOST3411_2012_256Digest.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\AsyncSequenceBarrier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\encoders\BufferedDecoder.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\NetworkUtils.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\io\DigestStream.cs" />
@@ -280,12 +288,14 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509CertificateParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\jpake\JPakeRound3Payload.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\LockFreeQueue.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\AggressiveSpinWait.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\IMemoable.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\SM2KeyExchange.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\tsp\GenTimeAccuracy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\CompressionAlgorithmTags.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\DateTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\crmf\EncKeyWithID.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueExceptionHandlerWrapper.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerBMPString.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\X509ExtensionsGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\PKIConfirmContent.cs" />
@@ -296,6 +306,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSProcessableByteArray.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\misc\NetscapeRevocationURL.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsUtilities.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\AsyncWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\qualified\TypeOfBiometricData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\CmpObjectIdentifiers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\ECAlgorithms.cs" />
@@ -304,10 +315,12 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpPublicKeyEncryptedData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DERGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\BerOutputStream.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueDisruptor`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\CombinedHash.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsMac.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\BufferedBlockCipher.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\isismtt\x509\AdditionalInformationSyntax.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueEventHandlerGroup.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\FileUtils.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\digests\LongDigest.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\RsaKeyGenerationParameters.cs" />
@@ -335,6 +348,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Generation\DesignTimeMetadata.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\jpake\JPakeRound1Payload.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\ZOutputStream.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IWorkHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\tsp\Accuracy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\digests\RipeMD320Digest.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\crmf\CertReqMessages.cs" />
@@ -376,12 +390,15 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crmf\PkiArchiveControl.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\TargetInformation.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\SingleResp.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\EventBatch.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\smime\SMIMECapabilitiesAttribute.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\Rfc3280CertPathUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DERSequenceParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\ElGamalPublicBcpgKey.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\CompressedData.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SequenceBarrier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\ElGamalPublicKeyParameters.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\SecurityUtilityException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP128R1Point.cs" />
@@ -399,6 +416,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\RecipientInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\RFC3394WrapEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT113R2Curve.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IOnBatchStartEvaluator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpDataValidationException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x9\DHDomainParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\CertificationRequest.cs" />
@@ -406,10 +424,13 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\SessionParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsBlockCipher.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ClientCertificateType.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IValueEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\CrlAnnContent.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\CipherSuite.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\EventProcessorCreator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT409R1Curve.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\KDFDoublePipelineIterationParameters.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\WorkerPoolInfo.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\TokenFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\SignerLocation.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cryptopro\ECGOST3410ParamSetParameters.cs" />
@@ -424,6 +445,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\PBES2Parameters.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Utils\StringUtils.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\BasicTlsPskIdentity.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IValueExceptionHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT283Field.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT283K1Curve.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\endo\ScalarSplitParameters.cs" />
@@ -435,19 +457,23 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT193R2Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openssl\EncryptionException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\AgreementUtilities.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\RingBuffer`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\cert\CertificateNotYetValidException.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IDataProvider.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\AlertDescription.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\SigPolicyQualifierInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\RecipientId.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\Asn1Sequence.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\SecureRandom.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\ECLookupTable.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SingleProducerSequencer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ServerNameList.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\cert\CertificateParsingException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\qualified\BiometricData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\DHStandardGroups.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\ISAACEngine.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\EventProcessorFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cmp\CertificateStatus.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\CertBag.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsDheKeyExchange.cs" />
@@ -461,7 +487,10 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkcs\X509CertificateEntry.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerObjectIdentifier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\ModDetectionCodePacket.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ISequencer.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\ValueEventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSEnvelopedDataGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\SequencerFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\CertificateStatusRequest.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\KeyException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\qualified\ETSIQCObjectIdentifiers.cs" />
@@ -469,6 +498,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\RC532Engine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\KDFCounterParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\DHParametersHelper.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\UnmanagedDisruptor.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeReplayProtection.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\NaccacheSternKeyParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ocsp\CrlID.cs" />
@@ -533,6 +563,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\operators\DefaultSignatureCalculator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\PolicyQualifierId.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\store\IX509Selector.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueEventProcessorCreator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ocsp\OCSPResponseStatus.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IKeyUnwrapper.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ASN1TaggedObjectParser.cs" />
@@ -549,14 +580,17 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\nist\NISTObjectIdentifiers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ClientAuthenticationType.cs" />
     <Compile Include="Assets\Amazon\Scripts\GameLift.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\EventHandlerGroup.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\Dstu7624WrapEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ChangeCipherSpec.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Safe64.Dirty.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\PkixCertPathBuilderException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\JZlib.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\Req.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IExceptionHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\CompleteRevocationRefs.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\Dstu7624Engine.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ValueRingBuffer`1.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openssl\PEMException.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\DigitallySigned.cs" />
@@ -595,6 +629,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\ScaleYNegateXPointMap.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\DHParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerIA5String.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ISequenceReportingEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x9\ECNamedCurveTable.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat128.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\KEKRecipientInformation.cs" />
@@ -604,8 +639,10 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DERExternal.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\ZDeflaterOutputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsSrtpUtilities.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\UnmanagedRingBufferMemory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP224K1Field.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\Pkcs5S1ParametersGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Util\ThrowHelper.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openssl\MiscPemGenerator.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\Asn1OctetString.cs" />
@@ -617,6 +654,7 @@
     <Compile Include="Assets\GONet\Sample\Projectile\SmoothingValuesModifiersUI.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP160R2Curve.cs" />
     <Compile Include="Assets\3rdPerson+Fly\Scripts\LevelScripts\ThirdPersonOrbitCamBasic.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SpinWaitWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT131FieldElement.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\microsoft\MicrosoftObjectIdentifiers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\collections\EnumerableProxy.cs" />
@@ -637,6 +675,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x9\DHPublicKey.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\X509Extension.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\RC5Parameters.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IValueDataProvider.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\tsp\TimeStampRequestGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\collections\UnmodifiableListProxy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\eac\EACObjectIdentifiers.cs" />
@@ -659,7 +698,9 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\PkixCertPathValidator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\sig\SignatureExpirationTime.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\operators\Asn1CipherBuilder.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IAsyncBatchEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSException.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IValueRingBuffer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpSignatureSubpacketGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\isismtt\x509\Restriction.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ntt\NTTObjectIdentifiers.cs" />
@@ -764,6 +805,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\SubjectPublicKeyInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\macs\CbcBlockCipherMac.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\BasicOCSPRespGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\BusySpinWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\ThreadedSeedGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\io\FilterStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\encoders\BufferedEncoder.cs" />
@@ -782,7 +824,9 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpSecretKeyRingBundle.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\Primes.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\PopoDecKeyChallContent.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\HybridSpinWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\drbg\DrbgUtilities.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\TimeoutAsyncWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsSrpKeyExchange.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\RecipientInformation.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\store\X509CertStoreSelector.cs" />
@@ -821,17 +865,21 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP521R1Curve.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\BcpgObject.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\RevRepContentBuilder.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\EventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\encodings\OaepEncoding.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\NullEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\X448PrivateKeyParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\DefaultTlsServer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\qualified\Iso4217CurrencyCode.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\EventPoller.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\bzip2\src\CBZip2InputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\Ed448PublicKeyParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\ScaleYPointMap.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\CertPolicyId.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\IssuerAndSerialNumber.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\WorkerPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONet.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\UnmanagedRingBuffer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IDsaExt.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\InfTree.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\ElGamalPrivateKeyParameters.cs" />
@@ -971,6 +1019,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\DHAgreement.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\bzip2\src\CBZip2OutputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\io\pem\PemHeader.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\UnmanagedRingBuffer`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\RandomDsaKCalculator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\AesWrapEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT163K1Point.cs" />
@@ -1015,11 +1064,13 @@
     <Compile Include="Assets\GONet\Code\GONet\Utils\BitByBitByteArrayBuilder.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\HashAlgorithmTags.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\gm\SM2P256V1Point.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IAsyncEventProcessor`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\io\DigestSink.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\Ed25519PublicKeyParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerOctetString.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\TnepresEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\SignedData.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Util\InternalUtil.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\ECKeyGenerationParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\ECDsaSigner.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ExtensionType.cs" />
@@ -1059,9 +1110,11 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\MPInteger.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpMarker.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat256.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\IConsumerInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\GOST28147Engine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\LazyDERSequence.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\PssSigner.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ValueFatalExceptionHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\CrlValidatedID.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IWrapper.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\BulkCipherAlgorithm.cs" />
@@ -1078,6 +1131,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\digests\GOST3411Digest.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\ElGamalParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\endo\EndoUtilities.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Sequence.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\PKIMessages.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\KeyPurposeId.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat.cs" />
@@ -1123,9 +1177,11 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsServerContext.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\DigestUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\Poly1305KeyGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\BlockingSpinWaitWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\AttributeCertificateIssuer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\SM2KeyExchangePublicParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\RsaKeyPairGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ICursored.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\pkcs\SafeBag.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\SignaturePacket.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x9\X9ECPoint.cs" />
@@ -1148,6 +1204,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\modes\EAXBlockCipher.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IBlockResult.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\anssi\ANSSIObjectIdentifiers.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ConsumerRepository.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP192K1Curve.cs" />
     <Compile Include="Assets\3rdPerson+Fly\Scripts\PlayerScripts\BasicBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsServerContextImpl.cs" />
@@ -1155,7 +1212,9 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSSignedHelper.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat160.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsContext.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\AsyncBatchEventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\KEKIdentifier.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Util\StructProxy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\TEAEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openssl\IPasswordFinder.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ECPointFormat.cs" />
@@ -1163,6 +1222,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\CommitmentTypeIndication.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\sig\PrimaryUserId.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\CommitmentTypeQualifier.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ISequenced.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\date\DateTimeUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\AbstractTlsAgreementCredentials.cs" />
@@ -1181,7 +1241,9 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\crmf\CertReqMsg.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\field\IFiniteField.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\CAKeyUpdAnnContent.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IgnoreExceptionHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSUtils.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SequenceWaitResult.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\ExtendedKeyUsage.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerTaggedObject.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\djb\Curve25519FieldElement.cs" />
@@ -1232,6 +1294,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ocsp\ResponderID.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP256R1Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\PkixBuilderParameters.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\DependentSequenceGroup.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\multiplier\ZSignedDigitR2LMultiplier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cryptopro\CryptoProObjectIdentifiers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\DHBasicKeyPairGenerator.cs" />
@@ -1240,6 +1303,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\DSAParameter.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\SXprUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkix\TrustAnchor.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\IValueDisruptor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\AesFastEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ess\ContentIdentifier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\SignerInfoGenerator.cs" />
@@ -1268,6 +1332,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\pkcs\Pkcs12Store.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\X931Rng.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\PKIHeaderBuilder.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ValueEventPoller`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\BerSequence.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509Certificate.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\AttributeCertificate.cs" />
@@ -1276,6 +1341,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IDecryptorBuilderProvider.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\ICipherParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IRawAgreement.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\Disruptor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\UserAttributeSubpacketTags.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\tsp\TimeStampTokenInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\io\SignerSink.cs" />
@@ -1288,6 +1354,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\TimeStampedData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\X25519Agreement.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\ECKeyPairGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\EventProcessorInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSSignedDataStreamGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsCompression.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\RevReqContent.cs" />
@@ -1320,6 +1387,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PGPKeyRing.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\AbstractTlsSigner.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\IVerifierFactoryProvider.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\WorkProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\TwofishEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\HeartbeatMode.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpCompressedData.cs" />
@@ -1343,7 +1411,9 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\RijndaelEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSAuthenticatedDataGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\jpake\JPakePrimeOrderGroup.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\MultiProducerSequencer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\modes\CfbBlockCipher.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IEventProcessorSequenceAware.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP256K1Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT193R1Curve.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\BERTaggedObjectParser.cs" />
@@ -1374,6 +1444,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\CertificateList.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpSignature.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\ServerSrpParams.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\BatchEventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\OutputStreamPacket.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\agreement\srp\SRP6Utilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\MqvPrivateParameters.cs" />
@@ -1381,6 +1452,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\RsaPrivateCrtKeyParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsPskIdentityManager.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\S2k.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SequenceGroups.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\RSABlindedEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsDHKeyExchange.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\Ed448phSigner.cs" />
@@ -1404,9 +1476,11 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\Ed25519KeyGenerationParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\IRandomGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\abc\Tnaf.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IEventReleaseAware.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Server.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\OcspListID.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\isismtt\x509\MonetaryLimit.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\AsyncEventStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DefiniteLengthInputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\X509DefaultEntryConverter.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\icao\LDSVersionInfo.cs" />
@@ -1424,6 +1498,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\Asn1Encodable.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\PasswordRecipientInfo.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP384R1Curve.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\AggregateEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openssl\PEMWriter.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\bcpg\sig\RevocationReason.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\WrapperUtilities.cs" />
@@ -1448,6 +1523,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\macs\ISO9797Alg3Mac.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\RecipientKeyIdentifier.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\tsp\TimeStampTokenGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\TimeoutBlockingWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsKeyExchange.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\Ed25519Signer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerNumericString.cs" />
@@ -1456,6 +1532,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\SignatureAndHashAlgorithm.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\collections\CollectionUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\V2Form.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ValueDisruptor`2.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\prng\SP800SecureRandom.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\KeyAgreeRecipientInfoGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP384R1FieldElement.cs" />
@@ -1471,8 +1548,10 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT193R1Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\digests\SM3Digest.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x500\DirectoryString.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Util\Constants.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\ocsp\RespID.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\security\GeneralSecurityException.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\ProcessorRunStates.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\misc\CAST5CBCParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\EncryptedContentInfoParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat384.cs" />
@@ -1506,6 +1585,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSProcessableInputStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\HKDFBytesGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\modes\GOFBBlockCipher.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IBatchEventHandler.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\modes\SicBlockCipher.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\collections\HashSet.cs" />
@@ -1524,6 +1604,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat576.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\crmf\CertTemplate.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\io\pem\PemWriter.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IValueEventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\DisplayText.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerVideotexString.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\Ed25519PrivateKeyParameters.cs" />
@@ -1570,6 +1651,8 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\IAsn1String.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509CrlParser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509V1CertificateGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\YieldingWaitStrategy.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SequencerDispatcher.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cmp\PbmParameter.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\DeferredHash.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cryptopro\GOST3410ParamSetParameters.cs" />
@@ -1604,6 +1687,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\raw\Nat320.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerApplicationSpecific.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSAttributeTableGenerationException.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\ISequenceBarrierOptions.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsDHUtilities.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpPublicKey.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT233K1Point.cs" />
@@ -1614,11 +1698,15 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecT113R2Point.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\parameters\DSAParameterGenerationParameters.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\OtherRevVals.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\EventPoller`1.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\esf\CrlListID.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\TlsStream.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\zlib\Inflate.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSEnvelopedGenerator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Dsl\ExceptionHandlerWrapper.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\SleepingWaitStrategy.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IEventProcessor.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\isismtt\ocsp\CertHash.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\util\CipherFactory.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\x509\V2TBSCertListGenerator.cs" />
@@ -1655,6 +1743,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\Pkcs12ParametersGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\macs\CMac.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\ec\custom\sec\SecP192R1FieldElement.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\RingBuffer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\tls\DtlsEpoch.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\bc\LinkedCertificate.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpEncryptedData.cs" />
@@ -1704,6 +1793,7 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\MiscUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\GONetSessionContext.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\RsaEngine.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IEventReleaser.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\Cast5Engine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSAuthEnvelopedData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\modes\gcm\BasicGcmExponentiator.cs" />
@@ -1719,13 +1809,17 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\math\field\IExtensionField.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\HMacDsaKCalculator.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\Defines.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\EventProcessorExtensions.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\openpgp\PgpEncryptedDataList.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSCompressedDataParser.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\DisruptorUtil.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\signers\GOST3410Signer.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\CamelliaWrapEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\ocsp\ResponseData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\DerStringBase.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\cms\AuthenticatedDataParser.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\FatalExceptionHandler.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Processing\IEventProcessor`1.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\NoekeonEngine.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\generators\KDFFeedbackBytesGenerator.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509Utilities.cs" />
@@ -1767,6 +1861,7 @@
     <Compile Include="Assets\GONet\Code\BCCrypto\src\util\BigIntegers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\asn1\gnu\GNUObjectIdentifiers.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\BufferedAeadCipher.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\IAsyncWaitStrategy.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\x509\X509Crl.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\cms\CMSSignedData.cs" />
     <Compile Include="Assets\GONet\Code\BCCrypto\src\crypto\engines\ChaCha7539Engine.cs" />
@@ -1776,12 +1871,15 @@
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Overlay.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap.shader" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\InlineIL.xml" />
     <None Include="Assets\GONet\Code\Plugins\System.Runtime.CompilerServices.Unsafe.dll" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Mobile.cginc" />
     <None Include="Assets\StreamingAssets\GONet\Start_SERVER_BAT.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF SSD.shader" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\InlineIL.dll" />
     <None Include="Assets\StreamingAssets\GONet\log_config.xml" />
     <None Include="Assets\StreamingAssets\GONet\DesignTimeLocations.txt" />
+    <None Include="Assets\GONet\Code\Disruptor\FodyWeavers.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\Amazon\Plugins\Google.Protobuf.xml" />
     <None Include="Assets\Amazon\Plugins\AWSSDK.S3.xml" />
@@ -2082,6 +2180,9 @@
     </Reference>
     <Reference Include="Unity.Analytics.StandardEvents">
       <HintPath>Library\PackageCache\com.unity.analytics@3.8.1\AnalyticsStandardEvents\Unity.Analytics.StandardEvents.dll</HintPath>
+    </Reference>
+    <Reference Include="InlineIL">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\InlineIL.dll</HintPath>
     </Reference>
     <Reference Include="UnityEditor.iOS.Extensions.Xcode">
       <HintPath>C:\Program Files\Unity\Hub\Editor\2022.3.12f1\Editor\Data\PlaybackEngines\AppleTVSupport\UnityEditor.iOS.Extensions.Xcode.dll</HintPath>
