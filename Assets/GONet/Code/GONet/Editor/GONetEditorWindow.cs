@@ -145,6 +145,8 @@ namespace GONet.Editor
             if (GUILayout.Button("Refresh GONet code generation"))
             {
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
 
             EditorGUILayout.Separator();
@@ -165,15 +167,21 @@ namespace GONet.Editor
             if (GUILayout.Button("Fix GONet Generated Code"))
             {
                 FixGONetGeneratedCode();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
 
             if (GUILayout.Button("Generate Runtime only scripts"))
             {
                 GenerateRuntimeOnlyScripts();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
             if (GUILayout.Button("Delete Runtime only scripts"))
             {
                 DeleteRuntimeOnlyScripts();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
         }
 
