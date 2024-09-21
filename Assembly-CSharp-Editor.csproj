@@ -76,13 +76,22 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
+    <Compile Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\FodyAssemblyPostProcessor.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\FodyHelpers.dll" />
     <None Include="Assets\ConsoleE\Editor\ConsoleE.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\InlineIL.Fody.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Rocks.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\FodyWeavers.xml" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Mdb.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Pdb.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.dll" />
+    <None Include="Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\FodyHelpers.xml" />
     <None Include="Assets\AssetStoreTools\Editor\AssetStoreToolsExtra.dll" />
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.tt" />
   </ItemGroup>
@@ -398,6 +407,27 @@
     </Reference>
     <Reference Include="Unity.Analytics.StandardEvents">
       <HintPath>Library\PackageCache\com.unity.analytics@3.8.1\AnalyticsStandardEvents\Unity.Analytics.StandardEvents.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Pdb">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Pdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.dll</HintPath>
+    </Reference>
+    <Reference Include="InlineIL">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\InlineIL.dll</HintPath>
+    </Reference>
+    <Reference Include="FodyHelpers">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\FodyHelpers.dll</HintPath>
+    </Reference>
+    <Reference Include="InlineIL.Fody">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\InlineIL.Fody.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Rocks">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Rocks.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Mdb">
+      <HintPath>Assets\GONet\Code\Disruptor\Plugins\Editor\Fody\Mono.Cecil.Mdb.dll</HintPath>
     </Reference>
     <Reference Include="log4netPlastic">
       <HintPath>Library\PackageCache\com.unity.collab-proxy@2.2.0\Lib\Editor\PlasticSCM\log4netPlastic.dll</HintPath>
