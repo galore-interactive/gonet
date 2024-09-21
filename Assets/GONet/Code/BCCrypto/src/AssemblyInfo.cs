@@ -1,5 +1,7 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+
 //using System.Security.Permissions;
 
 #if PORTABLE
@@ -21,6 +23,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCopyright("Copyright (C) 2000-2020")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
+
+[assembly: InternalsVisibleTo("Netcode.IO.NET")]
+[assembly: InternalsVisibleTo("Assembly-CSharp")]
 
 //
 // Version information for an assembly consists of the following four values:

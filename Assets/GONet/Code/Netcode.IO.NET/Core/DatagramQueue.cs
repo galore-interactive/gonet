@@ -1,5 +1,4 @@
-﻿using GONet;
-using GONet.Utils;
+﻿using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -131,11 +130,11 @@ namespace NetcodeIO.NET.Utils
             }
             catch (ObjectDisposedException ode)
             {
-                GONetLog.Info($"Trying to end the BeginSendTo call.  This is most likely happening as a result of a normal shutdown procedure. Message: {ode.Message}");
+                //GONetLog.Info($"Trying to end the BeginSendTo call.  This is most likely happening as a result of a normal shutdown procedure. Message: {ode.Message}");
             }
             catch (Exception e)
             {
-                GONetLog.Error($"Ran into something possibly serious trying to wrap up this BeginSendTo call.  Exception Type: {e.GetType().FullName} Message: {e.Message}\nStacTrace: {e.StackTrace}");
+                //GONetLog.Error($"Ran into something possibly serious trying to wrap up this BeginSendTo call.  Exception Type: {e.GetType().FullName} Message: {e.Message}\nStacTrace: {e.StackTrace}");
             }
             finally
             {
