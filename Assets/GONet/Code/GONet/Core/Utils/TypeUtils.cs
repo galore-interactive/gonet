@@ -18,6 +18,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace GONet.Utils
@@ -149,6 +150,7 @@ namespace GONet.Utils
 
         static readonly ConcurrentDictionary<Thread, List<Type>> toCheckTypesByThread = new ConcurrentDictionary<Thread, List<Type>>();
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsTypeAInstanceOfTypeB(Type typeA, Type typeB)
         {
             if (typeA == null || typeB == null)

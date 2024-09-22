@@ -960,7 +960,7 @@ namespace GONet
                 //If we are a client we broadcast it to our connections (which are only the server)
                 if (IsClient)
                 {
-                    GONetLog.Debug($"Sending event to server.  type: {eventEnvelope.Event.GetType().Name}");
+                    //GONetLog.Debug($"Sending event to server.  type: {eventEnvelope.Event.GetType().Name}");
                     SendBytesToRemoteConnections(bytes, returnBytesUsedCount, channelId);
                 }
                 else
