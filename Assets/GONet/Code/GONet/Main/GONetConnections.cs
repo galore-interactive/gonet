@@ -232,11 +232,27 @@ namespace GONet
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
-            IPAddress currenetServerIP = IPAddress.Parse(serverIP);
-            bool isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
-            if (isChangingConnectInfo)
+            bool isChangingConnectInfo = default;
+            IPAddress currenetServerIP = default;
+            try
             {
-                mostRecentConnectInfo = new IPEndPoint(currenetServerIP, serverPort);
+                currenetServerIP = IPAddress.Parse(serverIP);
+                isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
+                if (isChangingConnectInfo)
+                {
+                    mostRecentConnectInfo = new IPEndPoint(currenetServerIP, serverPort);
+                }
+            }
+            catch
+            {
+                // ASSuME serverIP actually represents a hostname and needs to be processed differently than an IP address
+                IPEndPoint currentServerEndPoint = NetworkUtils.GetIPEndPointFromHostName(serverIP, serverPort);
+                currenetServerIP = currentServerEndPoint.Address;
+                isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
+                if (isChangingConnectInfo)
+                {
+                    mostRecentConnectInfo = currentServerEndPoint;
+                }
             }
 
             if (InitiatingClientConnectionUID == default || isChangingConnectInfo)

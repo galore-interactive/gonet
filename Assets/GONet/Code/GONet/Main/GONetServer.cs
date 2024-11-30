@@ -21,13 +21,14 @@ using GONet.Utils;
 using NetcodeIO.NET;
 
 using GONetChannelId = System.Byte;
-using NetcodeIO.NET.Utils;
 
 namespace GONet
 {
     public class GONetServer
     {
         public int MaxClientCount { get; private set; }
+
+        public bool IsRunning => server != default && server.IsRunning;
 
         Server server;
         public uint numConnections = 0;
