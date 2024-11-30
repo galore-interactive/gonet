@@ -205,6 +205,33 @@ namespace GONet.Utils
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsEditorOnlyAssembly(Assembly assembly)
+        {
+            const string unityEditorPrefix = "UnityEditor";
+            const string editorKeyword = "Editor";
+            const string assemblyCSharpEditor = "Assembly-CSharp-Editor";
+            const string assemblyCSharpEditorFirstpass = "Assembly-CSharp-Editor-firstpass";
+            const string assemblyCSharpEditorTestable = "Assembly-CSharp-Editor-testable";
+
+            string assemblyName = assembly.GetName().Name;
+            return assemblyName.StartsWith(unityEditorPrefix)
+                   || assemblyName.Contains(editorKeyword)
+                   || assemblyName == assemblyCSharpEditor
+                   || assemblyName == assemblyCSharpEditorFirstpass
+                   || assemblyName == assemblyCSharpEditorTestable;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsEditorOnlyType(Type type)
+        {
+            const string editorNamespaceKeyword = "Editor";
+
+            // Check if the type's assembly is editor-only
+            return IsEditorOnlyAssembly(type.Assembly)
+                   // Additional check to exclude any namespace conventions for editor types
+                   || type.Namespace != null && type.Namespace.Contains(editorNamespaceKeyword);
+        }
         public static bool IsTypeAInstanceOfAnyTypesB(Type typeA, Type[] typesB)
         {
             if (typesB != null)

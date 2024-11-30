@@ -28,7 +28,7 @@ namespace GONet
 {
     public static class GONetSpawnSupport_Runtime
     {
-        public static bool IsNewDtmForced { get;set; }
+        public static bool IsNewDtmForced { get; set; }
 
         public const string GONET_STREAMING_ASSETS_FOLDER = "GONet";
         public static readonly string DESIGN_TIME_METADATA_FILE_POST_STREAMING_ASSETS = Path.Combine(GONET_STREAMING_ASSETS_FOLDER, "DesignTimeMetadata.json");
@@ -39,8 +39,25 @@ namespace GONet
 
         private static readonly string[] ALL_END_OF_LINE_OPTIONS = new[] { "\r\n", "\r", "\n" };
 
-        private static readonly Dictionary<DesignTimeMetadata, GONetParticipant> designTimeMetadataToProjectTemplate = new (100);
+        private static readonly Dictionary<DesignTimeMetadata, GONetParticipant> designTimeMetadataToProjectTemplate = new(100, new DesignTimeMetadataLocationComparer());
         private static readonly DesignTimeMetadataDictionary designTimeMetadataLookup = new();
+        /// <summary>
+        /// For the dictionary <see cref="designTimeMetadataToProjectTemplate"/>, this special comparer that only considers location is preferred over the <see cref="DesignTimeMetadata"/> 
+        /// equals and gethashcode implementation details.
+        /// </summary>
+        class DesignTimeMetadataLocationComparer : IEqualityComparer<DesignTimeMetadata>
+        {
+            public bool Equals(DesignTimeMetadata x, DesignTimeMetadata y)
+            {
+                if (x == null || y == null || x.Location == null || y.Location == null) return false;
+                return x.Location == y.Location;
+            }
+
+            public int GetHashCode(DesignTimeMetadata obj)
+            {
+                return obj.Location.GetHashCode();
+            }
+        }
 
         static GONetSpawnSupport_Runtime()
         {
@@ -78,10 +95,10 @@ namespace GONet
         private static async Task<string> LoadFileFromWeb_Task(string uri)
         {
             using UnityWebRequest fileRequest = UnityWebRequest.Get(uri);
-            
+
             //fileRequest.SetRequestHeader("Content-Type", "text/plain");
             //var inFlight = fileRequest.SendWebRequest();
-            
+
             var inFlight = fileRequest.Send();
             while (!inFlight.isDone)
             {
@@ -300,6 +317,10 @@ namespace GONet
         };
 
         public static IEnumerable<DesignTimeMetadata> GetAllDesignTimeMetadata() => designTimeMetadataLookup;
+        public static void ClearAllDesignTimeMetadata()
+        {
+            designTimeMetadataLookup.Clear();
+        }
 
         private static int callDepth = 0;
         public static DesignTimeMetadata GetDesignTimeMetadata(GONetParticipant gONetParticipant)
@@ -436,6 +457,12 @@ namespace GONet
         private static readonly Dictionary<string, DesignTimeMetadata> designTimeMetadataByLocation = new(256);
 
         public int Count => designTimeMetadataByGNP.Count;
+
+        public void Clear()
+        {
+            designTimeMetadataByGNP.Clear();
+            designTimeMetadataByLocation.Clear();
+        }
 
         public void Set(GONetParticipant keyGNP, DesignTimeMetadata value)
         {

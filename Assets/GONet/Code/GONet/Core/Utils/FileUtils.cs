@@ -14,13 +14,14 @@
  */
 
 using Microsoft.Win32.SafeHandles;
+using System;
 using System.IO;
 
 namespace GONet.Utils
 {
     public static class FileUtils
     {
-        public static void Copy(string sourceDirectory, string targetDirectory)
+        public static void CopyDirectory(string sourceDirectory, string targetDirectory)
         {
             DirectoryInfo diSource = new DirectoryInfo(sourceDirectory);
             DirectoryInfo diTarget = new DirectoryInfo(targetDirectory);
@@ -63,6 +64,124 @@ namespace GONet.Utils
                     bufferedStream.Write(bytes, 0, bytesUsedCount);
                 }
             }
+        }
+
+        public static bool DoFilesHaveSameContents(string pathA, string pathB)
+        {
+            // Check if both files exist
+            if (!File.Exists(pathA) || !File.Exists(pathB))
+            {
+                return false;
+            }
+
+            // Check file sizes first
+            FileInfo fileInfoA = new FileInfo(pathA);
+            FileInfo fileInfoB = new FileInfo(pathB);
+
+            if (fileInfoA.Length != fileInfoB.Length)
+            {
+                return false; // Files have different sizes
+            }
+
+            // Compare file contents
+            using (FileStream streamA = File.OpenRead(pathA))
+            using (FileStream streamB = File.OpenRead(pathB))
+            {
+                const int bufferSize = 8192; // 8KB buffer
+                byte[] bufferA = new byte[bufferSize];
+                byte[] bufferB = new byte[bufferSize];
+
+                int bytesReadA;
+                int bytesReadB;
+
+                while ((bytesReadA = streamA.Read(bufferA, 0, bufferSize)) > 0 &&
+                       (bytesReadB = streamB.Read(bufferB, 0, bufferSize)) > 0)
+                {
+                    if (bytesReadA != bytesReadB || !bufferA.AsSpan(0, bytesReadA).SequenceEqual(bufferB.AsSpan(0, bytesReadB)))
+                    {
+                        return false; // Contents are different
+                    }
+                }
+            }
+
+            return true; // Files have the same contents
+        }
+
+        public static unsafe bool DoFilesHaveSameContentsFastest(string pathA, string pathB)
+        {
+            // Check if both files exist
+            if (!File.Exists(pathA) || !File.Exists(pathB))
+            {
+                return false;
+            }
+
+            // Check file sizes first
+            FileInfo fileInfoA = new FileInfo(pathA);
+            FileInfo fileInfoB = new FileInfo(pathB);
+
+            if (fileInfoA.Length != fileInfoB.Length)
+            {
+                return false; // Files have different sizes
+            }
+
+            // Compare file contents
+            using (FileStream streamA = File.OpenRead(pathA))
+            using (FileStream streamB = File.OpenRead(pathB))
+            {
+                const int bufferSize = 8192; // 8KB buffer
+                byte[] bufferA = new byte[bufferSize];
+                byte[] bufferB = new byte[bufferSize];
+
+                int bytesReadA;
+                int bytesReadB;
+
+                while ((bytesReadA = streamA.Read(bufferA, 0, bufferSize)) > 0 &&
+                       (bytesReadB = streamB.Read(bufferB, 0, bufferSize)) > 0)
+                {
+                    if (bytesReadA != bytesReadB || !BuffersAreEqualUnsafe(bufferA, bufferB, bytesReadA))
+                    {
+                        return false; // Contents are different
+                    }
+                }
+            }
+
+            return true; // Files have the same contents
+        }
+
+        private static unsafe bool BuffersAreEqualUnsafe(byte[] bufferA, byte[] bufferB, int count)
+        {
+            fixed (byte* ptrA = bufferA, ptrB = bufferB)
+            {
+                byte* a = ptrA;
+                byte* b = ptrB;
+
+                for (int i = 0; i < count; i++)
+                {
+                    if (*a != *b)
+                    {
+                        return false;
+                    }
+                    a++;
+                    b++;
+                }
+            }
+            return true;
+        }
+
+        public static void CopyFile(string fromFileAtPath, string overwriteToFileAtPath)
+        {
+            if (!File.Exists(fromFileAtPath))
+            {
+                throw new FileNotFoundException($"Source file not found: {fromFileAtPath}");
+            }
+
+            string destinationDirectory = Path.GetDirectoryName(overwriteToFileAtPath);
+            if (!string.IsNullOrEmpty(destinationDirectory) && !Directory.Exists(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            File.Copy(fromFileAtPath, overwriteToFileAtPath, overwrite: true);
         }
     }
 }

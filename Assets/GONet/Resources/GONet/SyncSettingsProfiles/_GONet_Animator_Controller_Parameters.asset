@@ -20,6 +20,7 @@ MonoBehaviour:
   QuantizeDownToBitCount: 0
   QuantizeLowerBound: -1.7014117e+38
   QuantizeUpperBound: 1.7014117e+38
+  QuantizationResultingPrecision: <full precision - no quantization will occur>
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   SyncValueTypeSerializerOverrides: []

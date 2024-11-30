@@ -417,7 +417,18 @@ namespace GONet
 
         #endregion
 
-        public GONetAutoMagicalSyncAttribute() { }
+        public GONetAutoMagicalSyncAttribute()
+        {
+            /* this was going to be an attempt at monitoring when new attributes are added to the project, but this is not how it would work at all...just keeping for reference.  Remove it when you like.
+            // Fetch the stack trace to identify the calling member
+            var stackTrace = new System.Diagnostics.StackTrace();
+            var callingFrame = stackTrace.GetFrame(1); // Get the frame that called the constructor
+            var method = callingFrame?.GetMethod();
+            var declaringType = method?.DeclaringType?.FullName ?? "Unknown";
+            var memberName = method?.Name ?? "Unknown";
+            Debug.Log($"GONetAutoMagicalSyncAttribute instance created. Declaring Type: {declaringType}.  Member Name: {memberName}");
+            */
+        }
 
         /// <param name="profileTemplateName">
         /// <para>This is the main way in which the runtime settings (represented by the placement of an instance of <see cref="GONetAutoMagicalSyncAttribute"/> on <see cref="MonoBehaviour"/> fields for syncing data) are derived/looked up.</para>

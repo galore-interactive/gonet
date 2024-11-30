@@ -13,34 +13,59 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Generation;
 using UnityEditor;
+using UnityEngine;
 
 namespace GONet.Editor
 {
     [CustomEditor(typeof(GONetGlobal))]
     public class GONetGlobalCustomInspector : GNPListCustomInspector
     {
-        GONetGlobal targetGNG;
+        private GONetGlobal targetGNG;
+        private SerializedProperty fieldToMonitor_valueBlendingBufferLeadTimeMilliseconds;
 
         private void OnEnable()
         {
             targetGNG = (GONetGlobal)target;
 
-            /* this will not work since it runs on a non-main unity thread...darn...will use RequiresConstantRepaint instead
-            var subscription = GONetMain.EventBus.Subscribe<GONetParticipantStartedEvent>(_ => Repaint());
-            subscription.SetSubscriptionPriority(short.MaxValue); // setting priority to run last so the GONetGlobal instance has a chance to add the new GNP to its list before we repaint here
-
-            var subscription2 = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(_ => Repaint());
-            subscription2.SetSubscriptionPriority(short.MaxValue); // setting priority to run last so the GONetGlobal instance has a chance to remove the GNP from its list before we repaint here
-            */
+            fieldToMonitor_valueBlendingBufferLeadTimeMilliseconds = serializedObject.FindProperty(nameof(GONetGlobal.valueBlendingBufferLeadTimeMilliseconds));
         }
 
         public override void OnInspectorGUI()
         {
+            bool guiEnabledPrevious = GUI.enabled;
+            GUI.enabled = !Application.isPlaying;
+
+            serializedObject.Update();
+
+            int previousValue = fieldToMonitor_valueBlendingBufferLeadTimeMilliseconds.intValue;
+
+            EditorGUI.BeginChangeCheck();
+
             DrawDefaultInspector();
+
+            // Apply changes and report as dirty if the monitored field is modified
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                int newValue = fieldToMonitor_valueBlendingBufferLeadTimeMilliseconds.intValue;
+
+                if (newValue != previousValue)
+                {
+                    GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason(
+                        $"{nameof(GONetGlobal)} at '{DesignTimeMetadata.GetFullPath(targetGNG.GetComponent<GONetParticipant>())}' has changed the monitored field '{fieldToMonitor_valueBlendingBufferLeadTimeMilliseconds.displayName}' in editor.  NOTE: The path to the GameObject that changed might incorrectly list it is in the project, when in fact it is in a scene.");
+
+                    EditorUtility.SetDirty(targetGNG);
+                }
+            }
 
             const string ALL = "ALL Enabled GONetParticipants:";
             DrawGNPList(targetGNG.EnabledGONetParticipants, ALL, false);
+
+            GUI.enabled = guiEnabledPrevious;
         }
     }
+
 }

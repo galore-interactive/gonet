@@ -71,6 +71,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GNPListCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetGlobalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Utils\AnimationEditorUtils.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSyncSettingsProfileCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\BitByBitByteArrayBuilderTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetParticipantCompanionBehaviourCustomInspector.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\ConsoleE\Editor\ConsoleE.dll" />

@@ -25,6 +25,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using Unity.Plastic.Newtonsoft.Json;
+using Unity.Plastic.Newtonsoft.Json.Serialization;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -39,21 +41,56 @@ namespace GONet.Generation
     {
         private static object _compilationContext;
         private static List<CompilerMessage> _compilationErrorMessages = new List<CompilerMessage>();
+        private static bool isBuilding;
+        public static bool IsBuilding => isBuilding;
         public int callbackOrder => 1;
 
         public void OnPreprocessBuild(BuildReport report)
         {
+            isBuilding = true;
+            GONetSpawnSupport_DesignTime.ClearAllDesignTimeMetadata();
             CompilationPipeline.compilationStarted += CompilationPipelineOnCompilationStarted;
             CompilationPipeline.assemblyCompilationFinished += CompilationPipelineOnAssemblyCompilationFinished;
             CompilationPipeline.compilationFinished += CompilationPipelineOnCompilationFinished;
 
+            GONetLog.Debug($"~~~~~~~~~~~~GEEPs start  BUILD did this!");
             GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
             GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GenerateFiles();
+            FileUtils.CopyFile(
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH, 
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH_LAST_BUILD);
         }
 
         public void OnPostprocessBuild(BuildReport report)
         {
             GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.DeleteGeneratedFiles();
+
+            if (report == null)
+            {
+                GONetLog.Error($"The build report is not available after build is reported as being completed.  GONet will not process things completely.");
+                return;
+            }
+
+            if (report.summary.result == BuildResult.Unknown)
+            {
+                // delay the call to process this in hopes that unity will have the report status ready to check at that time, which in testing it does!
+                EditorApplication.delayCall += () => OnPostprocessBuild_ProcessDirtyIfAppropriate(report);
+            }
+            else
+            {
+                OnPostprocessBuild_ProcessDirtyIfAppropriate(report);
+            }
+        }
+
+        private static void OnPostprocessBuild_ProcessDirtyIfAppropriate(BuildReport report)
+        {
+            GONetLog.Debug($"~~~~~~~~~~~~GEEPs end  BUILD did this!  report.summary.result: {report.summary.result}");
+            isBuilding = false;
+            if (report.summary.result == BuildResult.Succeeded)
+            {
+                GONetSpawnSupport_DesignTime.IndicateGONetDesignTimeNoLongerDirty();
+                GONetSpawnSupport_DesignTime.RecordScenesInSuccessfulBuild();
+            }
         }
 
         private static void CompilationPipelineOnCompilationStarted(object compilationContext)
@@ -125,6 +162,7 @@ namespace GONet.Generation
         private const string C_SHARP_FILE_SUFFIX = ".cs";
         internal const string BINARY_FILE_SUFFIX = "_MemoryPack.bin"; // NOTE: _MemoryPack suffix added to allow working well on older project upgraded from before GONet used MemoryPack (and used MessagePack instead...which formats do not match/jive)
         internal const string GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH = GENERATION_FILE_PATH + "All_Unique_Snaps" + BINARY_FILE_SUFFIX;
+        internal const string GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH_LAST_BUILD = GENERATION_FILE_PATH + "All_Unique_Snaps_LastBuild" + BINARY_FILE_SUFFIX;
         internal const string GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH = GENERATION_FILE_PATH + "In_Scene_Unique_Snaps" + BINARY_FILE_SUFFIX;
         internal const string ASSET_FOLDER_SNAPS_FILE = GENERATION_FILE_PATH + "Assets_Folder_Unique_Snaps" + BINARY_FILE_SUFFIX;
         private const string TEST_FILENAME_TO_FORCE_GEN = "Test" + BINARY_FILE_SUFFIX;
@@ -143,7 +181,6 @@ namespace GONet.Generation
 
         static GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator()
         {
-            EditorApplication.playModeStateChanged += OnEditorPlayModeStateChanged;
             GONetParticipant.ResetCalled += GONetParticipant_EditorOnlyReset;
             EditorApplication.quitting += OnEditorApplicationQuitting;
         }
@@ -174,6 +211,8 @@ namespace GONet.Generation
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+
+            GONetLog.Debug($"--------------  ddddddddddddddddeeeeee  zun zwallace.... tODO if this is after all the stuff on load, then _DesignTime can wait for this before on hierarchy change....add condition in if check");
         }
 
         static readonly Dictionary<int, List<GONetParticipant>> OnPostprocessAllAssets_By_frameCountMap = new Dictionary<int, List<GONetParticipant>>();
@@ -188,13 +227,125 @@ namespace GONet.Generation
             return gnpsAddedToPrefabsThisFrame;
         }
 
-        internal static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
+        internal static void OnPostprocessAllAssets_TakeNoteOfAnyGONetChanges(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
+        {
+            IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants =
+                GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
+            IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants.Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)).Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
+
+            if (importedAssets != null) foreach (string importedAsset in importedAssets)
+            {
+                //Debug.Log("Reimported Asset: " + importedAsset);
+                HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate(importedAsset);
+            }
+
+            if (deletedAssets != null) foreach (string deletedAsset in deletedAssets)
+            {
+                //Debug.Log("Deleted Asset: " + deletedAsset);
+                if (gnpPrefabAssetPaths.Contains(deletedAsset))
+                {
+                    GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"GNP prefab asset deleted: {deletedAsset}");
+                }
+                if (deletedAsset.EndsWith(".asset") &&
+                    deletedAsset.StartsWith(GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH))
+                {
+                    GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason(
+                        $"Likely {nameof(GONetAutoMagicalSyncSettings_ProfileTemplate)} deleted: {deletedAsset}");
+                }
+            }
+
+            // Official GONet paths
+            const string ResourcesFolder = "/Resources/";
+
+            if (movedAssets != null && movedFromAssetPaths != null) for (int i = 0; i < movedAssets.Length; i++)
+            {
+                string movedAsset = movedAssets[i];
+                string movedFrom = movedFromAssetPaths[i];
+
+                //Debug.Log("Moved Asset: " + movedAsset + " from: " + movedFrom);
+
+                // Check for GONetAutoMagicalSyncSettings_ProfileTemplate
+                if (movedAsset.EndsWith(".asset") &&
+                    AssetDatabase.LoadAssetAtPath<GONetAutoMagicalSyncSettings_ProfileTemplate>(movedAsset) != null &&
+                    !movedAsset.StartsWith(GONetEditorWindow.ASSETS_SYNC_SETTINGS_PROFILES_FOLDER_PATH))
+                {
+                    GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason(
+                        $"{nameof(GONetAutoMagicalSyncSettings_ProfileTemplate)} moved out of the official folder: {movedFrom} -> {movedAsset}");
+                }
+
+                // Check for GONetParticipant prefabs
+                if (movedAsset.EndsWith(".prefab") &&
+                    AssetDatabase.LoadAssetAtPath<GameObject>(movedAsset)?.GetComponent<GONetParticipant>() != null &&
+                    !movedAsset.Contains(ResourcesFolder))
+                {
+                    GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason(
+                        $"{nameof(GONetParticipant)} prefab moved out of a Resources folder: {movedFrom} -> {movedAsset}");
+                }
+            }
+        }
+
+        #region imported asset, on GNP prefab change:
+        static void HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate(string importedAssetPath)
+        {
+            // Ensure the modified path is within the Assets folder and has a valid prefab extension, and in/under Resources folder
+            if (!importedAssetPath.StartsWith("Assets/") || !importedAssetPath.EndsWith(".prefab") | !IsInResourcesFolder(importedAssetPath))
+            {
+                return;
+            }
+
+            // Load last build's design time metadata to get previously tracked GONetParticipant prefabs
+            IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
+                GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
+
+            HashSet<string> gnpPrefabAssetPaths_lastBuild =
+                designTimeLocations_gonetParticipants_lastBuild
+                    .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                    .Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length))
+                    .ToHashSet();
+
+            // Determine if the modified prefab path was in the last build's data
+            bool wasInLastBuild = gnpPrefabAssetPaths_lastBuild.Contains(importedAssetPath);
+            bool hasGONetParticipant = PrefabContainsGONetParticipant(importedAssetPath);
+
+            if (!wasInLastBuild && hasGONetParticipant)
+            {
+                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"killo GONetParticipant added to prefab: {importedAssetPath}");
+            }
+            else if (wasInLastBuild && !hasGONetParticipant)
+            {
+                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"killo GONetParticipant removed from prefab: {importedAssetPath}");
+            }
+        }
+
+        static bool PrefabContainsGONetParticipant(string prefabPath)
+        {
+            // Load the prefab asset at the specified path and check if it contains a GONetParticipant component
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                return false;
+            }
+
+            return prefab.GetComponentInChildren<GONetParticipant>() != null;
+        }
+
+        static bool IsInResourcesFolder(string path)
+        {
+            // Check if the path contains "/Resources/" (indicating it's in a Resources folder within the Assets hierarchy)
+            return path.Contains("/Resources/");
+        }
+        #endregion
+
+        /// <summary>
+        /// POST: All assets/project SNAPs updated!
+        /// </summary>
+        internal static void OnPostprocessAllAssets_UpdateAssetProjectSnaps(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
             HashSet<string> existingGONetParticipantAssetPaths = new HashSet<string>();
             IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants = 
                 GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
 
-            foreach (string importedAsset in importedAssets)
+            if (importedAssets != null) foreach (string importedAsset in importedAssets)
             {
                 //Debug.Log("Reimported Asset: " + importedAsset);
 
@@ -230,14 +381,14 @@ namespace GONet.Generation
                 }
             }
 
-            foreach (string deletedAsset in deletedAssets)
+            if (deletedAssets != null) foreach (string deletedAsset in deletedAssets)
             {
                 //Debug.Log("Deleted Asset: " + deletedAsset);
 
                 existingGONetParticipantAssetPaths.Remove(deletedAsset); // no matter what, if this was deleted....get this out of here
             }
 
-            for (int i = 0; i < movedAssets.Length; i++)
+            if (movedAssets != null && movedFromAssetPaths != null) for (int i = 0; i < movedAssets.Length; i++)
             {
                 //Debug.Log("Moved Asset: " + movedAssets[i] + " from: " + movedFromAssetPaths[i]);
 
@@ -275,10 +426,10 @@ namespace GONet.Generation
             }
         }
 
-        private static void OnEditorPlayModeStateChanged(PlayModeStateChange state)
+        internal static void OnEditorPlayModeStateChanged_BlockEnteringPlaymodeIfUniqueSnapsChanged(PlayModeStateChange state, out bool didPreventEnteringPlaymode)
         {
+            didPreventEnteringPlaymode = false;
             LastPlayModeStateChange = state;
-
 
             /* v1.3.1 TURN OFF automatic code generation related activities in preference for only doing it during a build to avoid excessive actions that are only really required to be done for builds
                 // TODO add comment about why are we doing this......   
@@ -291,6 +442,21 @@ namespace GONet.Generation
             // since the v1.3.1 days to reduce the operations and we should be in good shape....this has to stay!
             if (state == PlayModeStateChange.ExitingEditMode)
             {
+                // check for GONet changes since last build and warn about GONet not going to run and a build is needed!
+                if (File.Exists(GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH_LAST_BUILD))
+                {
+                    UpdateAllUniqueSnaps(shouldBypassChangePlaymodeCheck: true); // TODO FIXME this is terribly slow thing to do each time entering play mode...but right now, it is needed to updated the current unique SNAPS for comparison with same info but from last build
+                    if (!FileUtils.DoFilesHaveSameContents(GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH, GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH_LAST_BUILD))
+                    {
+                        string dirtyReason = $"GONet detected one or more changes in the unique configurations of 'components with auto sync members' in the project (i.e., known internally as 'SNAPs').  One likely reason for this is the addition/removal of [{nameof(GONetAutoMagicalSyncAttribute).Replace("Attribute", string.Empty)}] from fields/properties.";
+                        GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason(dirtyReason);
+                        EditorApplication.isPlaying = false; // Cancel entering Play Mode
+                        Debug.LogError(string.Concat("GONet prevented entering play mode for the following reason: ", dirtyReason));
+                        didPreventEnteringPlaymode = true;
+                        return;
+                    }
+                }
+
                 GenerateFiles();
             }
             else if (state == PlayModeStateChange.EnteredEditMode)
@@ -356,6 +522,7 @@ namespace GONet.Generation
         static void OnEditorApplicationQuitting()
         {
             gonetParticipantAssetsPaths_to_lastFrameCountProcessed.Clear(); // don't want the frameCount from this session carrying over to next session
+            GONetSpawnSupport_DesignTime.IsQuitting = true;
         }
 
         static int howDeepIsYourSaveStack = 0;
@@ -365,7 +532,7 @@ namespace GONet.Generation
         /// PRE: <paramref name="ensureToIncludeTheseGONetParticipantAssets_paths"/> is populated with asset path KNOWN to be <see cref="GONetParticipant"/> prefabs in the project!
         /// </summary>
         /// <param name="ensureToIncludeTheseGONetParticipantAssets_paths"></param>
-        internal static void UpdateAssetsSnaps(IEnumerable<string> ensureToIncludeTheseGONetParticipantAssets_paths)
+        internal static void UpdateAssetsSnaps(IEnumerable<string> ensureToIncludeTheseGONetParticipantAssets_paths = default)
         {
             CultureInfo previousCulture = Thread.CurrentThread.CurrentCulture;
             const string USE_US_CULTURE_TO_ENSURE_PERIOD_INSTEAD_OF_COMMA_FOR_FLOATING_POINT_ToString = "en-US";
@@ -386,7 +553,7 @@ namespace GONet.Generation
 
                     //Get the updated asset folder snaps
                     List<GONetParticipant_ComponentsWithAutoSyncMembers> newSnapsFromAssetFolders = new List<GONetParticipant_ComponentsWithAutoSyncMembers>();
-                    foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
+                    if (ensureToIncludeTheseGONetParticipantAssets_paths != null) foreach (string gonetParticipantAssetPath in ensureToIncludeTheseGONetParticipantAssets_paths)
                     {
                         GONetParticipant gonetParticipantPrefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(gonetParticipantAssetPath);
                         if (gonetParticipantPrefab != null) // it would be null during some GONet generation flows herein when moving locations...but eventually it will be A-OK...avoid/skip for now
@@ -431,7 +598,7 @@ namespace GONet.Generation
                         {
                             GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
                         }
-                        GONetLog.Debug($"[DREETS] howDeepIsYourSaveStack: {howDeepIsYourSaveStack}, DTM.Count: {GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Count()}, all locations: {string.Join("\n", GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Select(x => x.Location))}");
+                        GONetLog.Debug($"~~~~~~~~~~~~~~~~GEEPs PROJECT howDeepIsYourSaveStack: {howDeepIsYourSaveStack}, DTM.Count: {GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Count()}, all locations: {string.Join("\n", GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Select(x => x.Location))}");
                     }
 
                     SaveUniqueSnapsToPersistenceFile(newSnapsFromAssetFolders, ASSET_FOLDER_SNAPS_FILE);
@@ -480,7 +647,7 @@ namespace GONet.Generation
         /// <summary>
         /// Apply changes to the code generation ID of a GNP. This needs to be call every time you set a snap's code generation id and you want it to be reflected in the attached GNPs aswell.
         /// </summary>
-        private static DesignTimeMetadata ApplyDesignTimeMetadataToGnp(GONetParticipant gnp, byte codeGenId, string updateLocation = default)
+        private static DesignTimeMetadata ApplyDesignTimeMetadataToGnp(GONetParticipant gnp, byte codeGenId, string updateLocation = default, string updateGuid = default)
         {
             if ((object)gnp == null)
             {
@@ -495,6 +662,10 @@ namespace GONet.Generation
             {
                 metadata.Location = updateLocation;
             }
+            if (!string.IsNullOrWhiteSpace(updateGuid))
+            {
+                metadata.UnityGuid = updateGuid;
+            }
             return metadata;
         }
 
@@ -504,6 +675,8 @@ namespace GONet.Generation
         /// </summary>
         internal static void GenerateFiles()
         {
+            GONetParticipant.isGenerating = true;
+
             /*This method is one of the key tasks (out of three) of the GONet's code generation pipeline. The goal of this code generation task is to create all the necessary generated scripts for
             * GONet to work properly. It is executed in the following cases:
             * 1. Inmediately before Unity changes from EditorMode to PlayMode. UnityEditor.EditorApplication.playModeStateChanged.OnEditorPlayModeStateChanged(PlayModeStateChange state)
@@ -517,11 +690,29 @@ namespace GONet.Generation
             */
 
             List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnaps = LoadAllSnapsFromPersistenceFile(GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
+
             { //Generate one GONetParticipant_AutoMagicalSyncCompanion_Generated file per unique snap.
                 int count = allUniqueSnaps.Count;
                 for (int i = 0; i < count; ++i)
                 {
                     GONetParticipant_ComponentsWithAutoSyncMembers one = allUniqueSnaps[i];
+
+
+                    // Custom contract resolver to include private members
+                    var contractResolver = new DefaultContractResolver
+                    {
+                        DefaultMembersSearchFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                    };
+
+                    JsonSerializerSettings settings = new JsonSerializerSettings
+                    {
+                        ContractResolver = contractResolver,
+                        Formatting = Formatting.Indented
+                    };
+
+                    string json = JsonConvert.SerializeObject(one, settings);
+
+                    Debug.Log($"Generating files.  Considering snap:\n{json}");
                     one.ApplyProfileToAttributes_IfAppropriate(); // this needs to be done for everyone prior to generation!
 
                     //ASK SHAUN POSSIBLE REFACTOR: Since it is not possible to get into this catch condition should we make it generic (catch(Exception e))?
@@ -549,20 +740,27 @@ namespace GONet.Generation
 
             AssetDatabase.SaveAssets(); // since we are generating the class that is the real thing of value here, ensure we also save the asset to match current state
             AssetDatabase.Refresh(); // get the Unity editor to recognize any new code just added and recompile it
+
+            GONetParticipant.isGenerating = false;
         }
 
-        private static List<Type> GetAllConcreteIGONetEventTypes()
+        /// <summary>
+        /// NOTE: Excluded editor only classes.
+        /// </summary>
+        private static List<Type> GetAllConcreteIGONetEventTypes(bool excludeEditorOnlyTypes = true)
         {
             List<Type> structNames = new List<Type>();
-            foreach (var types in AppDomain.CurrentDomain.GetAssemblies()
-                                  .OrderBy(a => a.FullName).Select(a => a.GetLoadableTypes()
-                                  .Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract /* SHAUN excluded for MemoryPack not allowing interface unoins to be for structs!!! TODO consider another alternative than converting all to classes!!! && TypeUtils.IsStruct(t) */)
-                                  .OrderBy(t2 => t2.FullName)))
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().OrderBy(a => a.FullName))
             {
-                foreach (var type in types)
-                {
-                    structNames.Add(type);
-                }
+                if (excludeEditorOnlyTypes && TypeUtils.IsEditorOnlyAssembly(assembly)) continue;
+
+                var types = assembly.GetLoadableTypes()
+                    .Where(t => TypeUtils.IsTypeAInstanceOfTypeB(t, typeof(IGONetEvent)) && !t.IsAbstract /* SHAUN excluded for MemoryPack not allowing interface unoins to be for structs!!! TODO consider another alternative than converting all to classes!!! && TypeUtils.IsStruct(t) */
+                                && (!excludeEditorOnlyTypes || !TypeUtils.IsEditorOnlyType(t)))
+                    .OrderBy(t2 => t2.FullName);
+
+                structNames.AddRange(types);
             }
 
             return structNames;
@@ -572,46 +770,105 @@ namespace GONet.Generation
         /// Updates the code generation unique snaps preparing them for the generation process. This method only track snaps within any scene inside the build settings. Those scenes that are not 
         /// within this list will be ignored.
         /// </summary>
-        public static void UpdateAllUniqueSnaps()
+        public static void UpdateAllUniqueSnaps(bool shouldBypassChangePlaymodeCheck = false)
         {
             //You can not execute this if you are in play mode or you are about to enter.
-            if (EditorApplication.isPlayingOrWillChangePlaymode) // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
+            if (!shouldBypassChangePlaymodeCheck && 
+                EditorApplication.isPlayingOrWillChangePlaymode) // see http://wiki.unity3d.com/index.php/SaveOnPlay for the idea here!
             {
                 GONetLog.Warning("You can't execute this while Unity is in Play mode. Exit Play mode and try again. Aborting process...");
                 return;
             }
+
+            GONetLog.Debug($"~~~~~~~~~~~~GEEPs start");
 
             bool wasNewDtmForced = GONetSpawnSupport_Runtime.IsNewDtmForced;
             try
             {
                 GONetSpawnSupport_Runtime.IsNewDtmForced = true;
 
-
-
                 //Save an empty file in order to force assets folder to update too
-                SaveUniqueSnapsToPersistenceFile(new List<GONetParticipant_ComponentsWithAutoSyncMembers>(), GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
+                SaveUniqueSnapsToPersistenceFile(new(), GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
-                Scene currentScene;
-                string currentScenePath = System.String.Empty;
+                Scene initialActiveScene;
+                string initialActiveScenePath = System.String.Empty;
 
                 {//Save the current scene's path for coming back to it at the end of this process. It would be weird if during this process you end up in another different scene.
-                    currentScene = EditorSceneManager.GetActiveScene();
+                    initialActiveScene = EditorSceneManager.GetActiveScene();
 
                     //Save current scene if neccesary to avoid loosing those changes
-                    if (currentScene.isDirty)
+                    if (initialActiveScene.isDirty)
                     {
-                        EditorSceneManager.SaveScene(currentScene);
+                        EditorSceneManager.SaveScene(initialActiveScene);
                     }
 
-                    currentScenePath = currentScene.path;
+                    initialActiveScenePath = initialActiveScene.path;
                 }
 
                 SnapComparer snapComparer = SnapComparer.Instance;
                 List<GONetParticipant_ComponentsWithAutoSyncMembers> loadedSnapsFromAssetsFolder;
                 List<GONetParticipant_ComponentsWithAutoSyncMembers> loadedSnapsFromScenes;
+                List<GONetParticipant_ComponentsWithAutoSyncMembers> snapsFromProjectAssetResourcesFolders = new();
                 List<GONetParticipant_ComponentsWithAutoSyncMembers> buildingAllSnapsMasterList = new();
+                
+                List<GONetParticipant> gnpsInProjectResources = default;
+
+                { // the folling replaces this: UpdateAssetsSnaps();
+                    gnpsInProjectResources = GatherGONetParticipantsInAllResourcesFolders();
+
+                    //Get the updated asset folder snaps and ensure guids set on prefabs
+                    foreach (GONetParticipant gonetParticipantPrefab in gnpsInProjectResources)
+                    {
+                        if (gonetParticipantPrefab != null) // it would be null during some GONet generation flows herein when moving locations...but eventually it will be A-OK...avoid/skip for now
+                        {
+                            GONetParticipant_ComponentsWithAutoSyncMembers updatedSnapFromAssets = new(gonetParticipantPrefab);
+                            updatedSnapFromAssets.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
+                            snapsFromProjectAssetResourcesFolders.Add(updatedSnapFromAssets);
+                            EnsurePrefabGuidSet(gonetParticipantPrefab);
+                        }
+                    }
+
+                    //SnapComparer snapComparer = SnapComparer.Instance;
+                    //Create the allUniqueSnaps list in order to update codegen ids later
+                    List<GONetParticipant_ComponentsWithAutoSyncMembers> allUniqueSnaps = LoadAllSnapsFromPersistenceFile(GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
+                    foreach (var snapFromAssetFolder in snapsFromProjectAssetResourcesFolders.OrderBy(x => x.SingleMemberCount))
+                    {
+                        bool found = false;
+                        foreach (var uniqueSnap in allUniqueSnaps)
+                        {
+                            if (snapComparer.Equals(uniqueSnap, snapFromAssetFolder))
+                            {
+                                snapFromAssetFolder.codeGenerationId = uniqueSnap.codeGenerationId;
+                                //In order to not only save the new snap codegen id but also within its related GNP we need to perform this step too
+                                ApplyDesignTimeMetadataToGnp(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found)
+                        {
+                            snapFromAssetFolder.codeGenerationId = GetNewCodeGenerationId(allUniqueSnaps);
+                            //In order to not only save the new snap codegen id but also within its related GNP we need to perform this step too
+                            ApplyDesignTimeMetadataToGnp(snapFromAssetFolder.gonetParticipant, snapFromAssetFolder.codeGenerationId);
+                            allUniqueSnaps.Add(snapFromAssetFolder);
+                        }
+                    }
+
+                    //if (howDeepIsYourSaveStack <= 1) // gotta be careful we do not get into an endless cycle as the method we are in now is called when scene saved.
+                    {
+                        // persist ALL....
+                        foreach (var dtm in GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata())
+                        {
+                            GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
+                        }
+                        GONetLog.Debug($"~~~~~~~~~~~~~~~~GEEPs PROJECT howDeepIsYourSaveStack: {howDeepIsYourSaveStack}, DTM.Count: {GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Count()}, all locations: {string.Join("\n", GONetSpawnSupport_Runtime.GetAllDesignTimeMetadata().Select(x => x.Location))}");
+                    }
+
+                    SaveUniqueSnapsToPersistenceFile(snapsFromProjectAssetResourcesFolders, ASSET_FOLDER_SNAPS_FILE);
+                }
 
                 {//Load all unique snaps (From both the in scenes file and the in assets folder file) and clear out gen ids
                     loadedSnapsFromScenes = LoadAllSnapsFromPersistenceFile(GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
@@ -635,23 +892,27 @@ namespace GONet.Generation
                     }
                 }
 
+                CreateAllPossibleUniqueSnapsAndGNPsFromResources(
+                    gnpsInProjectResources,
+                    out List<SnapGnpAssignment> createdInProjectResourcesAssetsUniqueAssignments);
+
                 //Get all the possible unique snaps that are within any scene inside the build.
                 CreateAllPossibleUniqueSnapsAndGNPsFromLoopingBuildScenes(
                     out List<GONetParticipant_ComponentsWithAutoSyncMembers> createdInSceneUniqueSnaps,
-                    out List<SceneSnapGnpAssignment> createdInSceneUniqueAssignments);
+                    out List<SnapGnpAssignment> createdInSceneUniqueAssignments);
 
                 {//Apply changes (Additions, deletes and/or modifications) to both the unique snaps list and to the corresponding in scene game objects
-                    HashSet<GONetParticipant_ComponentsWithAutoSyncMembers> snapsToDelete = new();
+                    HashSet<GONetParticipant_ComponentsWithAutoSyncMembers> sceneSnapsToDelete = new();
                     foreach (var uniqueSnap in buildingAllSnapsMasterList)
                     {
                         if (!createdInSceneUniqueSnaps.Contains(uniqueSnap, snapComparer) &&
                             !loadedSnapsFromAssetsFolder.Contains(uniqueSnap, snapComparer))
                         {
-                            snapsToDelete.Add(uniqueSnap);
+                            sceneSnapsToDelete.Add(uniqueSnap);
                         }
                     }
 
-                    foreach (var snapToDelete in snapsToDelete)
+                    foreach (var snapToDelete in sceneSnapsToDelete)
                     {
                         buildingAllSnapsMasterList.Remove(snapToDelete);
 
@@ -662,6 +923,17 @@ namespace GONet.Generation
                     }
 
                     foreach (var possibleUniqueSnap in createdInSceneUniqueSnaps)
+                    {
+                        //If this snap is new, generate a new code gen id for it.
+                        if (!buildingAllSnapsMasterList.Contains(possibleUniqueSnap, snapComparer))
+                        {
+                            possibleUniqueSnap.codeGenerationId = GONetParticipant.CodeGenerationId_Unset;
+                            buildingAllSnapsMasterList.Add(possibleUniqueSnap);
+                            loadedSnapsFromScenes.Add(possibleUniqueSnap);
+                        }
+                    }
+
+                    foreach (var possibleUniqueSnap in snapsFromProjectAssetResourcesFolders)
                     {
                         //If this snap is new, generate a new code gen id for it.
                         if (!buildingAllSnapsMasterList.Contains(possibleUniqueSnap, snapComparer))
@@ -683,25 +955,43 @@ namespace GONet.Generation
                         {
                             inSceneAssignmentMatch.assignedSnap.codeGenerationId = uniqueSnap.codeGenerationId;
                         }
+                        foreach (var inProjectResourcesAssetsAssignmentMatch in
+                            createdInProjectResourcesAssetsUniqueAssignments.Where(x => snapComparer.Equals(x.assignedSnap, uniqueSnap)))
+                        {
+                            inProjectResourcesAssetsAssignmentMatch.assignedSnap.codeGenerationId = uniqueSnap.codeGenerationId;
+                        }
+                        
                     }
 
                     //Apply changes not only to snaps but also to their corresponding GNPs
-                    foreach (SceneSnapGnpAssignment inSceneSnapGnpAssignment in createdInSceneUniqueAssignments)
+                    foreach (SnapGnpAssignment inSceneSnapGnpAssignment in createdInSceneUniqueAssignments)
                     {
                         GONetParticipant_ComponentsWithAutoSyncMembers actualPersistedSnap = inSceneSnapGnpAssignment.assignedSnap;
                         GONetParticipant inSceneGnp = inSceneSnapGnpAssignment.gnp;
-                        GONetLog.Debug($"uniqueSnap.hash: {actualPersistedSnap.GetHashCode()}, gnp.genId: {inSceneGnp.CodeGenerationId}, snap.genId: {actualPersistedSnap.codeGenerationId}");
+                        GONetLog.Debug($"uniqueSnap.hash: {actualPersistedSnap.GetHashCode()}, SCENE gnp.genId: {inSceneGnp.CodeGenerationId}, snap.genId: {actualPersistedSnap.codeGenerationId}");
                         DesignTimeMetadata dtm =
-                            ApplyDesignTimeMetadataToGnp(inSceneGnp, actualPersistedSnap.codeGenerationId, inSceneSnapGnpAssignment.fullScenePath);
+                            ApplyDesignTimeMetadataToGnp(inSceneGnp, actualPersistedSnap.codeGenerationId, inSceneSnapGnpAssignment.fullProjectOrScenePath);
+                        GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
+                    }
+                    foreach (SnapGnpAssignment inProjectResourcesAssetsAssignmentMatch in createdInProjectResourcesAssetsUniqueAssignments)
+                    {
+                        GONetParticipant_ComponentsWithAutoSyncMembers actualPersistedSnap = inProjectResourcesAssetsAssignmentMatch.assignedSnap;
+                        GONetParticipant inProjectGnp = inProjectResourcesAssetsAssignmentMatch.gnp;
+                        GONetLog.Debug($"uniqueSnap.hash: {actualPersistedSnap.GetHashCode()}, PROJECT gnp.genId: {inProjectGnp.CodeGenerationId}, snap.genId: {actualPersistedSnap.codeGenerationId}");
+                        DesignTimeMetadata dtm =
+                            ApplyDesignTimeMetadataToGnp(
+                                inProjectGnp, 
+                                actualPersistedSnap.codeGenerationId, 
+                                inProjectResourcesAssetsAssignmentMatch.fullProjectOrScenePath,
+                                inProjectGnp.UnityGuid);
                         GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
                     }
                 }
 
                 {//Go back to the initial scene when this process started
-                    currentScene = EditorSceneManager.OpenScene(currentScenePath);
-                    if (currentScene.IsValid())
+                    if (initialActiveScene.IsValid())
                     {
-                        EditorSceneManager.SetActiveScene(currentScene);
+                        EditorSceneManager.SetActiveScene(initialActiveScene);
                     }
                     else
                     {
@@ -716,6 +1006,8 @@ namespace GONet.Generation
                 SaveUniqueSnapsToPersistenceFile(loadedSnapsFromScenes, GENERATED_IN_SCENE_UNIQUE_SNAPS_FILE_PATH);
                 SaveUniqueSnapsToPersistenceFile(buildingAllSnapsMasterList, GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
 
+                //UpdateAssetsSnaps(); // Doing this a second time to ensure all the assigned 
+
                 if (File.Exists(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN))
                 {
                     File.Delete(GENERATION_FILE_PATH + TEST_FILENAME_TO_FORCE_GEN);
@@ -728,43 +1020,179 @@ namespace GONet.Generation
             {
                 GONetSpawnSupport_Runtime.IsNewDtmForced = wasNewDtmForced;
             }
+            GONetLog.Debug($"~~~~~~~~~~~~GEEPs end ( no more updates to DTM.json! )");
         }
 
-        class SceneSnapGnpAssignment
+        /// <summary>
+        /// Do all proper unity serialization stuff or else a change will NOT stick/save/persist.
+        /// </summary>
+        private static void EnsurePrefabGuidSet(GONetParticipant gonetParticipantPrefab)
+        {
+            string goName = gonetParticipantPrefab.gameObject.name; // IMPORTANT: after a call to serializedObject.ApplyModifiedProperties(), gonetParticipant is unity "null" and this line MUst come before that!
+
+            /*
+            SerializedObject serializedObject = new SerializedObject(gonetParticipant); // use the damned unity serializtion stuff or be doomed to fail on saving stuff to scene as you hope/expect!!!
+            SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.DesignTimeLocation));
+            serializedObject.Update();
+            serializedProperty.stringValue = currentLocation; // set it this way or else it will NOT work with prefabs!
+            gonetParticipant.DesignTimeLocation = currentLocation; // doubly sure
+            serializedObject.ApplyModifiedProperties();
+            */
+
+            string unityGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(gonetParticipantPrefab));
+
+            {
+                SerializedObject serializedObject = new SerializedObject(gonetParticipantPrefab); // use the damned unity serializtion stuff or be doomed to fail on saving stuff to scene as you hope/expect!!!
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.UnityGuid));
+                serializedObject.Update();
+                serializedProperty.stringValue = unityGuid; // set it this way or else it will NOT work with prefabs!
+                gonetParticipantPrefab.UnityGuid = unityGuid;
+                serializedObject.ApplyModifiedProperties();
+            }
+        }
+
+        /// <summary>
+        /// Using brute force and loading all prefabs in Resources subfolders even if they don't have GNP.
+        /// 
+        /// Consider Using Asset Labels
+        ///If you prefer a more controlled approach, you can label prefabs containing GONetParticipant and search by label.
+        ///Steps to Implement Labeling
+        ///Label Existing Prefabs:
+        ///Run a script that iterates over all prefabs under Assets, checks for GONetParticipant, and adds a label.
+        ///Automatically Label New Prefabs:
+        ///Implement an AssetPostprocessor that labels prefabs when they are imported or modified.
+        ///Search by Label:
+        ///Modify your search query to use the label, e.g., l:GONetParticipant t:Prefab.
+        /// </summary>
+        /// <returns></returns>
+        internal static List<GONetParticipant> GatherGONetParticipantsInAllResourcesFolders()
+        {
+            // Find all 'Resources' folders under 'Assets'
+            string[] resourcesFolderGUIDs = AssetDatabase.FindAssets("Resources t:folder", new[] { "Assets" });
+
+            List<string> resourcesFolders = new List<string>();
+
+            foreach (string guid in resourcesFolderGUIDs)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                // Ensure the folder name is exactly 'Resources'
+                if (Path.GetFileName(path) == "Resources")
+                {
+                    resourcesFolders.Add(path);
+                }
+            }
+
+            List<GONetParticipant> gonetParticipantsInPrefabs = new List<GONetParticipant>();
+
+            foreach (string resourcesFolder in resourcesFolders)
+            {
+                // Find all prefab GUIDs under the Resources folder
+                string[] prefabGUIDs = AssetDatabase.FindAssets("t:Prefab", new[] { resourcesFolder });
+
+                foreach (string guid in prefabGUIDs)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+
+                    if (prefab != null)
+                    {
+                        // Get all GONetParticipant components in the prefab's hierarchy
+                        GONetParticipant[] gnps = prefab.GetComponentsInChildren<GONetParticipant>(includeInactive: true);
+
+                        if (gnps.Length > 0)
+                        {
+                            gonetParticipantsInPrefabs.AddRange(gnps);
+                            Debug.Log($"Found {gnps.Length} GONetParticipant(s) in prefab: {assetPath}");
+                        }
+                    }
+                }
+            }
+
+            return gonetParticipantsInPrefabs;
+        }
+
+        class SnapGnpAssignment
         {
             public GONetParticipant gnp;
-            public string fullScenePath;
+            public string fullProjectOrScenePath;
             public GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap;
+        }
+
+        private static void CreateAllPossibleUniqueSnapsAndGNPsFromResources(
+            List<GONetParticipant> gnpsInProjectResources, 
+            out List<SnapGnpAssignment> createdInProjectResourcesAssetsUniqueAssignments)
+        {
+            createdInProjectResourcesAssetsUniqueAssignments = new();
+
+            foreach (GONetParticipant gnp in gnpsInProjectResources)
+            {
+                string projectPath = AssetDatabase.GetAssetPath(gnp);
+                bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
+                if (isProjectAsset)
+                {
+                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap = new(gnp);
+                    // TODO? possibleInSceneUniqueSnaps.Add(assignedSnap);
+                    createdInProjectResourcesAssetsUniqueAssignments.Add(new()
+                    {
+                        fullProjectOrScenePath = currentLocation,
+                        assignedSnap = assignedSnap,
+                        gnp = gnp,
+                    });
+                }
+                else
+                {
+                    GONetLog.Error("gnp has no project path!?!? gnp.go.name: " + gnp.gameObject.name);
+                }
+            }
         }
 
         private static void CreateAllPossibleUniqueSnapsAndGNPsFromLoopingBuildScenes(
             out List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleInSceneUniqueSnaps, 
-            out List<SceneSnapGnpAssignment> allSceneSnapGnpAssignments)
+            out List<SnapGnpAssignment> allSceneSnapGnpAssignments)
         {
             possibleInSceneUniqueSnaps = new();
             allSceneSnapGnpAssignments = new();
 
             int scenesCount = EditorSceneManager.sceneCountInBuildSettings;
+
+            // Record the initially active scene
+            Scene initialActiveScene = EditorSceneManager.GetActiveScene();
+
             for (int i = 0; i < scenesCount; ++i)
             {
                 string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
+                Scene scene = EditorSceneManager.GetSceneByPath(scenePath);
 
-                GONetLog.Debug($"*****************GONet Generation opening scene to process all GNPs.  Scene: {scenePath}");
-                Scene openScene = EditorSceneManager.OpenScene(scenePath);
-                EditorSceneManager.SetActiveScene(openScene);
+                Scene openScene;
+
+                if (scene.isLoaded)
+                {
+                    // The scene is already open; use the existing scene
+                    openScene = scene;
+                }
+                else
+                {
+                    // Open the scene additively without unloading other scenes
+                    openScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+                }
+
                 if (openScene.IsValid())
                 {
-                    List<GONetParticipant> gnps;
+                    // Process GONetParticipants
+                    List<GONetParticipant> gnps = new List<GONetParticipant>();
                     GetGNPsWithinScene(openScene, out gnps);
+
                     foreach (GONetParticipant gnp in gnps)
                     {
+                        // Process each GNP
                         string gnpFullScenePath = DesignTimeMetadata.GetFullUniquePathInScene(gnp);
-                        GONetLog.Debug($"\tGONet Generation processing scene: {scenePath} - GNP full scene path: {gnpFullScenePath}");
                         GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap = new(gnp);
                         possibleInSceneUniqueSnaps.Add(assignedSnap);
                         allSceneSnapGnpAssignments.Add(new()
                         {
-                            fullScenePath = gnpFullScenePath,
+                            fullProjectOrScenePath = gnpFullScenePath,
                             assignedSnap = assignedSnap,
                             gnp = gnp,
                         });
@@ -772,9 +1200,18 @@ namespace GONet.Generation
                 }
                 else
                 {
-                    GONetLog.Warning("You are trying to open an invalid scene. Scene path: " + scenePath);
+                    GONetLog.Warning("Invalid scene: " + scenePath);
+                }
+
+                // Unload the scene to free up memory, unless it was already open or is the initial active scene
+                if (!scene.isLoaded && openScene != initialActiveScene)
+                {
+                    EditorSceneManager.CloseScene(openScene, true);
                 }
             }
+
+            // Ensure the initial scene is the active scene
+            EditorSceneManager.SetActiveScene(initialActiveScene);
         }
 
         private static void GetGNPsWithinScene(Scene scene, out List<GONetParticipant> gonetParticipantsInOpenScenes)
@@ -783,7 +1220,8 @@ namespace GONet.Generation
             GameObject[] rootGOs = scene.GetRootGameObjects();
             for (int iRootGO = 0; iRootGO < rootGOs.Length; ++iRootGO)
             {
-                GONetParticipant[] gonetParticipantsInOpenScene = rootGOs[iRootGO].GetComponentsInChildren<GONetParticipant>();
+                // NOTE: including inactive GNPs as well since they may be enabled at some point
+                GONetParticipant[] gonetParticipantsInOpenScene = rootGOs[iRootGO].GetComponentsInChildren<GONetParticipant>(includeInactive: true);
                 gonetParticipantsInOpenScenes.AddRange(gonetParticipantsInOpenScene);
             }
         }
@@ -1002,38 +1440,46 @@ namespace GONet.Generation
         /// </returns>
         internal bool PostDeserialize_InitAttribute(string memberOwner_componentTypeAssemblyQualifiedName)
         {
-            Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
-            MemberInfo[] syncMembers = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance);
-
-            if (syncMembers.Length == 0) //If length is 0 it means the member could not be found (It has been deleted)
+            try
             {
-                return false;
-            }
+                Type memberOwnerType = Type.GetType(memberOwner_componentTypeAssemblyQualifiedName);
+                MemberInfo[] syncMembers = memberOwnerType.GetMember(memberName, BindingFlags.Public | BindingFlags.Instance);
 
-            MemberInfo syncMember = syncMembers[0];
-            Type syncMemberType = syncMember.MemberType == MemberTypes.Property
-                                ? ((PropertyInfo)syncMember).PropertyType
-                                : ((FieldInfo)syncMember).FieldType;
-
-            { // get the attribute, either off the field itself or our intrinsic stuff we do
-                attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
-
-                bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
-                if (isSpecialCaseThatRequiresManualAttributeConstruction)
+                if (syncMembers.Length == 0) //If length is 0 it means the member could not be found (It has been deleted)
                 {
-                    if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, syncMemberType), out attribute))
+                    return false;
+                }
+
+                MemberInfo syncMember = syncMembers[0];
+                Type syncMemberType = syncMember.MemberType == MemberTypes.Property
+                                    ? ((PropertyInfo)syncMember).PropertyType
+                                    : ((FieldInfo)syncMember).FieldType;
+
+                { // get the attribute, either off the field itself or our intrinsic stuff we do
+                    attribute = (GONetAutoMagicalSyncAttribute)syncMember.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+
+                    bool isSpecialCaseThatRequiresManualAttributeConstruction = attribute == null;
+                    if (isSpecialCaseThatRequiresManualAttributeConstruction)
                     {
-                        const string TURD = "This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: ";
-                        const string MTFN = " memberType.FullName: ";
-                        const string EXPECT = "\nThis is expected to happen when removing [GONetAutoMagicalSync] from members  and no more exist on any members in that MB/class and then running generation is trying to access information to generate class for that old data ";
-                        string message = string.Concat(TURD, memberOwnerType.FullName, MTFN, syncMemberType.FullName, EXPECT);
-                        Debug.LogWarning(message);
-                        GONetLog.Warning(message);
+                        if (!GONetParticipant_ComponentsWithAutoSyncMembers.intrinsicAttributeByMemberTypeMap.TryGetValue(ValueTuple.Create(memberOwnerType, syncMemberType), out attribute))
+                        {
+                            const string TURD = "This is some bogus turdmeal.  Should be able to either deserialize the GONetAutoMagicalSyncAttribute or lookup one from intrinsic type, but nope!  memberOwnerType.FullName: ";
+                            const string MTFN = " memberType.FullName: ";
+                            const string EXPECT = "\nThis is expected to happen when removing [GONetAutoMagicalSync] from members  and no more exist on any members in that MB/class and then running generation is trying to access information to generate class for that old data ";
+                            string message = string.Concat(TURD, memberOwnerType.FullName, MTFN, syncMemberType.FullName, EXPECT);
+                            Debug.LogWarning(message);
+                            GONetLog.Warning(message);
+                        }
                     }
                 }
-            }
 
-            return true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Warning($"Exception processing '{memberOwner_componentTypeAssemblyQualifiedName}'.  It might be OK to ignore if this information in cache is outdated.  Message: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
@@ -1564,7 +2010,9 @@ namespace GONet.Generation
             //* v1.3.1 TURN OFF automatic code generation related activities in preference for only doing it during a build to avoid excessive actions that are only really required to be done for builds
             if (!Application.isPlaying)
             {
-                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.OnPostprocessAllAssets(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
+                // GONET 1.4 is going to stop doing this unless a build is going: GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.OnPostprocessAllAssets(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
+                
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.OnPostprocessAllAssets_TakeNoteOfAnyGONetChanges(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
             }
             //*/
         }

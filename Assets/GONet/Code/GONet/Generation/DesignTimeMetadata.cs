@@ -1,8 +1,12 @@
 ﻿using GONet.Utils;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using GONetCodeGenerationId = System.Byte;
+
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+using UnityEditor;
+#endif
 
 namespace GONet.Generation
 {
@@ -42,7 +46,12 @@ namespace GONet.Generation
 
         public override int GetHashCode()
         {
-            return Location == null ? base.GetHashCode() : Location.GetHashCode();
+            if (!string.IsNullOrEmpty(UnityGuid))
+            {
+                return UnityGuid.GetHashCode();
+            }
+
+            return string.IsNullOrEmpty(Location) ? base.GetHashCode() : Location.GetHashCode();
         }
 
         public override bool Equals(object obj)
@@ -52,6 +61,13 @@ namespace GONet.Generation
                 return false;
             }
 
+            // Compare based on UnityGuid if present
+            if (!string.IsNullOrEmpty(UnityGuid) && !string.IsNullOrEmpty(otherMetadata.UnityGuid))
+            {
+                return string.Equals(UnityGuid, otherMetadata.UnityGuid, StringComparison.Ordinal);
+            }
+
+            // Fallback to comparing based on Location if UnityGuid is not present
             return string.Equals(Location ?? string.Empty, otherMetadata.Location ?? string.Empty, StringComparison.Ordinal);
         }
 
@@ -69,6 +85,115 @@ namespace GONet.Generation
             return string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, HierarchyUtils.GetFullUniquePath(gnpInScene.gameObject));
 
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// returns false if <paramref name="gnpPresumablyInProject"/> is not in correct place in project / asset database as expected for prefabs!
+        /// </summary>
+        /* This worked on nov 3, just before new impl below
+        public static bool TryGetFullPathInProject(GONetParticipant gnpPresumablyInProject, out string fullPathInProject)
+        {
+            // Attempt to get the direct asset path
+            string projectPath = AssetDatabase.GetAssetPath(gnpPresumablyInProject);
+
+            // Check if it's directly an asset in the project
+            if (!string.IsNullOrWhiteSpace(projectPath))
+            {
+                fullPathInProject = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                return true;
+            }
+
+            // Check if we're in Prefab Mode and if the object is part of that prefab
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage != null && prefabStage.scene == gnpPresumablyInProject.gameObject.scene)
+            {
+                // We're in Prefab Mode, so get the path of the prefab being edited
+                projectPath = prefabStage.assetPath;
+                if (!string.IsNullOrWhiteSpace(projectPath))
+                {
+                    fullPathInProject = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    return true;
+                }
+            }
+
+            // If it's part of a prefab instance in a scene, return false
+            GameObject prefabRoot = PrefabUtility.GetNearestPrefabInstanceRoot(gnpPresumablyInProject.gameObject);
+            if (prefabRoot != null)
+            {
+                fullPathInProject = default;
+                return false;
+            }
+
+            // If none of the checks succeeded, it's not a valid project asset
+            fullPathInProject = default;
+            return false;
+        }
+        */
+        public static bool TryGetFullPathInProject(GONetParticipant gnpPresumablyInProject, out string fullPathInProject)
+        {
+            // 1. Direct Project Asset Check
+            string projectPath = AssetDatabase.GetAssetPath(gnpPresumablyInProject);
+            if (!string.IsNullOrWhiteSpace(projectPath))
+            {
+                fullPathInProject = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                return true;
+            }
+
+            // 2. Full Prefab Mode Check Using PrefabStageUtility
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage != null && prefabStage.scene == gnpPresumablyInProject.gameObject.scene)
+            {
+                // The prefab is in full Prefab Mode (separate scene context)
+                projectPath = prefabStage.assetPath;
+                if (!string.IsNullOrWhiteSpace(projectPath))
+                {
+                    fullPathInProject = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    return true;
+                }
+            }
+
+            // 3. Prefab Preview Mode Check (Edit in Context Mode)
+            GameObject prefabAsset = PrefabUtility.GetCorrespondingObjectFromSource(gnpPresumablyInProject.gameObject);
+            if (prefabAsset != null)
+            {
+                // We are in Prefab Preview Mode if `prefabAsset` has a valid project path and we aren't in a full Prefab Mode stage
+                projectPath = AssetDatabase.GetAssetPath(prefabAsset);
+                if (!string.IsNullOrWhiteSpace(projectPath))
+                {
+                    fullPathInProject = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    return true;
+                }
+            }
+
+            // 4. Prefab Instance in a Scene (returns false if in scene context)
+            GameObject prefabRoot = PrefabUtility.GetNearestPrefabInstanceRoot(gnpPresumablyInProject.gameObject);
+            if (prefabRoot != null)
+            {
+                fullPathInProject = default;
+                return false;
+            }
+
+            // If none of the above checks succeeded, it's not a valid project asset
+            fullPathInProject = default;
+            return false;
+        }
+        public static string GetFullPath(GONetParticipant gnpAnywhere)
+        {
+            try
+            {
+                if (TryGetFullPathInProject(gnpAnywhere, out string fullPathInProject))
+                {
+                    return fullPathInProject;
+                }
+                
+                return GetFullUniquePathInScene(gnpAnywhere);
+            }
+            catch
+            {
+                return gnpAnywhere.gameObject.name;
+            }
+        }
+#endif
     }
 
     [Serializable]

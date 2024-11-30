@@ -11,6 +11,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "project://Assets/GONet/Sample/Projectile/Resources/AddGNP.prefab",
+            "unityGuid": "ed6740930fa5ebc4bb35d7a43b4bbcf9",
+            "codeGenerationId": 2
+        },
+        {
             "location": "project://Assets/GONet/Sample/Projectile/Resources/CannonBall.prefab",
             "unityGuid": "296a736c5d07aac40bac772034430131",
             "codeGenerationId": 1
@@ -31,11 +36,6 @@
             "codeGenerationId": 2
         },
         {
-            "location": "scene://JustAnotherScene/GameObject (3)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
             "location": "scene://JustAnotherScene/GameObject (4)",
             "unityGuid": "",
             "codeGenerationId": 2
@@ -46,14 +46,14 @@
             "codeGenerationId": 2
         },
         {
-            "location": "scene://JustAnotherScene/GameObject (6)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
             "location": "scene://JustAnotherScene/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1
+        },
+        {
+            "location": "scene://JustAnotherScene/NADA/GameObject (3)",
+            "unityGuid": "",
+            "codeGenerationId": 2
         },
         {
             "location": "scene://ProjectileTest/GONet_GlobalContext",
