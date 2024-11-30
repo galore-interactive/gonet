@@ -425,6 +425,13 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                     }
                 }
 
+                if (serializedObject.hasModifiedProperties)
+                {
+                    if (!Application.isPlaying)
+                    {
+                        GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason("Important member data of a GONetParticipant has changed values in editor. Path:" + DesignTimeMetadata.GetFullPath(targetGONetParticipant));
+                    }
+                }
                 serializedObject.ApplyModifiedProperties();
 
                 if (EditorGUI.EndChangeCheck())

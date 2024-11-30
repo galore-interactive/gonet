@@ -24,6 +24,9 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
     public GONetSampleClientOrServer GONetClientPREFAB;
 
     public GONetParticipant authorityPrefab;
+    private GONetParticipant myAuthorityInstance;
+    public GONetParticipant MyAuthorityInstance => myAuthorityInstance;
+    public Transform[] spawnPoints;
 
     private bool hasServerSpawned;
     private bool hasClientSpawned;
@@ -106,6 +109,54 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
         }
     }
 
+    public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
+    {
+        base.OnGONetClientVsServerStatusKnown(isClient, isServer, myAuthorityId);
+
+        InstantiateAuthorityPrefabIfNotAlready();
+    }
+
+    public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
+    {
+        base.OnGONetParticipantEnabled(gonetParticipant);
+
+
+        if (!gonetParticipant.IsMine)
+        {
+            var characterController = gonetParticipant.GetComponentInChildren<CharacterController>();
+            if (characterController)
+            { 
+                TurnOffNonAuthorityStuff(gonetParticipant, characterController);
+            }
+        }
+    }
+
+    /// <summary>
+    /// PRE: <paramref name="gonetParticipant"/> IsMine is false.
+    /// </summary>
+    private void TurnOffNonAuthorityStuff(GONetParticipant gonetParticipant, CharacterController characterController)
+    {
+        characterController.enabled = false;
+        foreach (var turnOff in gonetParticipant.GetComponentsInChildren<Camera>())
+        {
+            turnOff.gameObject.SetActive(false);
+        }
+        /*
+        foreach (var turnOff in gonetParticipant.GetComponentsInChildren<CinemachineVirtualCamera>())
+        {
+            turnOff.gameObject.SetActive(false);
+        }
+        foreach (var turnOff in gonetParticipant.GetComponentsInChildren<ThirdPersonController>())
+        {
+            turnOff.enabled = false;
+        }
+        foreach (var turnOff in gonetParticipant.GetComponentsInChildren<PlayerInput>())
+        {
+            turnOff.enabled = false;
+        }
+        */
+    }
+
     void ProcessCmdLine()
     {
         string[] args = Environment.GetCommandLineArgs();
@@ -142,7 +193,22 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
 
         if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.LeftCommand)) && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
         {
-            Instantiate(authorityPrefab, transform.position, transform.rotation);
+            InstantiateAuthorityPrefabIfNotAlready();
+        }
+    }
+
+    private void InstantiateAuthorityPrefabIfNotAlready()
+    {
+        if (!myAuthorityInstance && authorityPrefab)
+        {
+            Transform spawnPoint = transform;
+            if (spawnPoints != null && spawnPoints.Length > 0)
+            {
+                int iRandom = UnityEngine.Random.Range(0, spawnPoints.Length);
+                spawnPoint = spawnPoints[iRandom];
+            }
+
+            myAuthorityInstance = Instantiate(authorityPrefab, spawnPoint.position, spawnPoint.rotation);
         }
     }
 

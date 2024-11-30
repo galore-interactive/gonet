@@ -22,6 +22,10 @@ using GONet.Serializables;
 using GONet.Utils;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+using UnityEditor;
+#endif
 using GONetCodeGenerationId = System.Byte;
 
 namespace GONet
@@ -394,6 +398,43 @@ namespace GONet
             DefaultConstructorCalled?.Invoke(this);
         }
 
+#if UNITY_EDITOR
+        private static bool isExitingPlayMode = false;
+        private static float timeSinceExitPlayMode = 0f;
+        private static float exitPlayModeDelay = 0.5f; // half-second delay after exiting play mode
+        public static bool isGenerating;
+
+        static GONetParticipant()
+        {
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            EditorApplication.update += UpdateExitPlayModeState;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange stateChange)
+        {
+            if (stateChange == PlayModeStateChange.ExitingPlayMode)
+            {
+                isExitingPlayMode = true;
+            }
+            else if (stateChange == PlayModeStateChange.EnteredEditMode)
+            {
+                timeSinceExitPlayMode = 0f; // reset the time counter
+            }
+        }
+
+        private static void UpdateExitPlayModeState()
+        {
+            if (isExitingPlayMode)
+            {
+                timeSinceExitPlayMode += Time.deltaTime;
+                if (timeSinceExitPlayMode > exitPlayModeDelay)
+                {
+                    isExitingPlayMode = false; // delay has passed, safe to reset the flag
+                }
+            }
+        }
+#endif
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool DoesGONetIdContainAllComponents()
         {
@@ -409,12 +450,93 @@ namespace GONet
             return gonetId_raw != GONetId_Unset && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset;
         }
 
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!EditorApplication.isPlaying && 
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                 !isExitingPlayMode &&
+                 !isGenerating)
+            {
+                // TODO maybe this should be used for property change identification!!!!!
+                //GONetLog.Debug($"GONetParticipant was added or changed on GameObject: {gameObject.name} (Design-time only).");
+
+                if (IsInPrefabPreviewMode())
+                {
+                    GONetLog.Debug($"GONetParticipant was validated on GameObject: {gameObject.name} (Design-time only).");
+                }
+            }
+
+
+            /* option used in editor namespace code only....here for reference
+                         bool isHappeningDueToExitingPlayModeInEditor =
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                    GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount || // IMPORTANT: this is how we know it "just" changed from play to edit mode...otherwise we could never run the logic we want after exiting the play mode and we start messing around with the hierarchy
+                    Time.frameCount == 0);
+
+            if (!EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToExitingPlayModeInEditor &&
+                !isGenerating)
+            {
+                //GONetLog.Debug($"GONetParticipant was added or changed on GameObject: {gameObject.name} (Design-time only).");
+            }
+*/
+        }
+
+        private bool IsInPrefabPreviewMode()
+        {
+            /* reference for troubleshooting
+            GameObject prefabSource = PrefabUtility.GetCorrespondingObjectFromSource(gameObject);
+            GameObject prefabRoot = PrefabUtility.GetNearestPrefabInstanceRoot(gameObject);
+            var magoo = PrefabUtility.GetOriginalSourceRootWhereGameObjectIsAdded(gameObject);
+            var slgo = PrefabUtility.GetOutermostPrefabInstanceRoot(gameObject);
+            var dickl = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+            var kk = PrefabUtility.GetPrefabAssetType(gameObject);
+            var jjjdfi = PrefabUtility.GetPrefabInstanceHandle(gameObject);
+            var iiiss = PrefabUtility.IsAnyPrefabInstanceRoot(gameObject);
+            var eee = PrefabUtility.IsOutermostPrefabInstanceRoot(gameObject);
+            var any = PrefabUtility.IsPartOfAnyPrefab(gameObject);
+            */
+
+            // Check if the object is part of any prefab
+            if (PrefabUtility.IsPartOfAnyPrefab(gameObject))
+            {
+                // Check if the object is in an unloaded or temporary scene (scene path is null or empty)
+                if (!gameObject.scene.isLoaded && string.IsNullOrEmpty(gameObject.scene.path))
+                {
+                    // Additional check: confirm that there's a valid asset path for the nearest instance root
+                    string assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        return true; // Confirmed to be in Prefab Preview Mode
+                    }
+                }
+            }
+
+            return false; // Not in Prefab Preview Mode
+        }
+
+        /// <summary>
+        /// NOTE: This will NOT be called when this was added to a GO on a prefab when in Prefab Preview (i.e., in-context editing) mode!
+        /// </summary>
+        public static event GNPDelegate OnAwakeEditor;
+#endif
+
         private void Awake()
         {
             if (Application.isPlaying)
             {
                 StartCoroutine(AwakeCoroutine());
             }
+#if UNITY_EDITOR
+            else
+            {
+                OnAwakeEditor?.Invoke(this);
+            }
+#endif
         }
 
         private IEnumerator AwakeCoroutine()
@@ -543,6 +665,7 @@ namespace GONet
         /// <summary>
         /// IMPORTANT: Do NOT use this.
         /// TODO: make the main dll internals visible to editor dll so this can be made internal again
+        /// NOTE: This will NOT be called when this was added to a GO on a prefab when in Prefab Preview (i.e., in-context editing) mode!
         /// </summary>
         public static event GNPDelegate OnDestroyCalled;
         private void OnDestroy()
