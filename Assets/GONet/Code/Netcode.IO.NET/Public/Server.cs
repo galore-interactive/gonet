@@ -170,6 +170,7 @@ namespace NetcodeIO.NET
 		private ISocketContext listenSocket;
 		private IPEndPoint listenEndpoint;
 
+		internal bool IsRunning => isRunning;
 		private bool isRunning = false;
 
 		private ulong protocolID;

@@ -13,7 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -64,6 +64,26 @@ namespace GONet.Utils
             }
 
             return false;
+        }
+
+        public static IPEndPoint GetIPEndPointFromHostName(string hostName, int port, bool throwIfMoreThanOneIP = false)
+        {
+            var addresses = System.Net.Dns.GetHostAddresses(hostName);
+            if (addresses.Length == 0)
+            {
+                throw new ArgumentException(
+                    "Unable to retrieve address from specified host name.",
+                    nameof(hostName)
+                );
+            }
+            else if (throwIfMoreThanOneIP && addresses.Length > 1)
+            {
+                throw new ArgumentException(
+                    "There is more that one IP address to the specified host.",
+                    nameof(hostName)
+                );
+            }
+            return new IPEndPoint(addresses[0], port); // Port gets validated here.
         }
     }
 }
