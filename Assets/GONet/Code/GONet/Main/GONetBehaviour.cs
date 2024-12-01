@@ -97,6 +97,23 @@ namespace GONet
             {
                 yield return null;
             }
+
+            if (GONetMain.IsServer)
+            {
+                while (GONetMain.gonetServer == null)
+                {
+                    yield return null;
+                }
+            }
+
+            if (GONetMain.IsClient)
+            {
+                while (GONetMain.GONetClient == null)
+                {
+                    yield return null;
+                }
+            }
+
             yield return new WaitForSecondsRealtime(0.1f); // TODO this magic number to wait is bogus and not sure fire....we need to wait only the exact amount of "time" required and no more/no less
             OnGONetClientVsServerStatusKnown(GONetMain.IsClient, GONetMain.IsServer, GONetMain.MyAuthorityId);
         }
@@ -111,8 +128,8 @@ namespace GONet
         /// <para>Futhermore, GONet has also assigned an authority id for this machine (i.e., <see cref="GONetMain.MyAuthorityId"/> is set) and that is important as well before doing certain things like instantiating/spawning prefabs with <see cref="GONetParticipant"/> attached.</para>
         /// <para>So, please after this is called, feel free to instantiate/spawn networked GameObjects (i.e., with <see cref="GONetParticipant"/>) into the scene.</para>
         /// </summary>
-        /// <param name="isClient">The value of <see cref="GONetMain.IsClient"/> at the time of calling this method.</param>
-        /// <param name="isServer">The value of <see cref="GONetMain.IsServer"/> at the time of calling this method.</param>
+        /// <param name="isClient">The value of <see cref="GONetMain.IsClient"/> at the time of calling this method. If true, it is also true that <see cref="GONetMain.GONetClient"/> is not null.</param>
+        /// <param name="isServer">The value of <see cref="GONetMain.IsServer"/> at the time of calling this method. If true, it is also true that <see cref="GONetMain.gonetServer"/> is not null.</param>
         /// <param name="myAuthorityId">The value of <see cref="GONetMain.MyAuthorityId"/> at the time of calling this method, which is guaranteed to be valid and not <see cref="GONetMain.OwnerAuthorityId_Unset"/></param>
         public virtual void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId) { }
 

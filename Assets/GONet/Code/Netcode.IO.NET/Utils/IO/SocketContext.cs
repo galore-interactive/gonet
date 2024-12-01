@@ -7,6 +7,8 @@ using System.Threading;
 using GONet.Utils;
 using System.Collections.Concurrent;
 using GONet;
+using Org.BouncyCastle.Bcpg;
+using UnityEditor;
 
 namespace NetcodeIO.NET.Utils.IO
 {
@@ -35,21 +37,31 @@ namespace NetcodeIO.NET.Utils.IO
 
 		private DatagramQueue datagramQueue;
 
-		public UDPSocketContext(AddressFamily addressFamily)
-		{
-			datagramQueue = new DatagramQueue();
-			
-			internalSocket = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
+        public UDPSocketContext(AddressFamily addressFamily)
+        {
+            datagramQueue = new DatagramQueue();
 
+            // Create socket based on address family
+            internalSocket = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
+
+			// allow dual-stack
 			{
-				// NOTE: @ 10 Hz GONet tick rate, 100 APR characters for 1 client ... server is sending 656 Kbps => 8,400 bytes/tick => 6 packets/tick
-				//const int SocketBufferSize = 1024 * 1024; // 1MB TODO make this user configurable
-				internalSocket.ReceiveBufferSize = 8400 * 2 * 2; // ~represents a client's incoming needs for 20 Hz server send rate and double that need for safety
-				internalSocket.SendBufferSize = 8400 * 2 * 100; // ~represents a server's outgoing needs for 100 clients and therefore 100 APR characters
+				//internalSocket.DualMode = true;
+				// the above causes this:
+				//NotSupportedException: This protocol version is not supported.
+				//System.Net.Sockets.Socket.set_DualMode(System.Boolean value) (at < 36d5d97f0e39429283d80156f1c7f1fc >:0)
 			}
-		}
+            internalSocket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
 
-		public void Bind(EndPoint endpoint)
+            {
+                // NOTE: @ 10 Hz GONet tick rate, 100 APR characters for 1 client ... server is sending 656 Kbps => 8,400 bytes/tick => 6 packets/tick
+                //const int SocketBufferSize = 1024 * 1024; // 1MB TODO make this user configurable
+                internalSocket.ReceiveBufferSize = 8400 * 2 * 2; // ~represents a client's incoming needs for 20 Hz server send rate and double that need for safety
+                internalSocket.SendBufferSize = 8400 * 2 * 100; // ~represents a server's outgoing needs for 100 clients and therefore 100 APR characters
+            }
+        }
+
+        public void Bind(EndPoint endpoint)
 		{
 			internalSocket.Bind(endpoint);
 
@@ -65,8 +77,8 @@ namespace NetcodeIO.NET.Utils.IO
 		/// </summary>
 		public void SendTo(byte[] data, EndPoint remoteEP)
 		{
+            GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 			internalSocket.SendTo(data, remoteEP);
-            //GONet.GONetLog.Debug("sending...length[]: " + data.Length);
         }
 
 		/// <summary>
@@ -74,8 +86,9 @@ namespace NetcodeIO.NET.Utils.IO
 		/// </summary>
 		public void SendTo(byte[] data, int length, EndPoint remoteEP)
 		{
+            GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
-		}
+        }
 
         #region Async send related stuff
 
@@ -137,7 +150,7 @@ namespace NetcodeIO.NET.Utils.IO
 
 			ReturnBorrowedSendStuffsCompleted(Thread.CurrentThread); // memory management like this is required due to array pools not being multithread capable and we send and endSend on different threads
 
-			//GONet.GONetLog.Debug("sending...length: " + length);
+			GONet.GONetLog.Debug("sending...length: " + length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 		}
 
 		private void ReturnBorrowedSendStuffsCompleted(Thread onlyProcessForThread)

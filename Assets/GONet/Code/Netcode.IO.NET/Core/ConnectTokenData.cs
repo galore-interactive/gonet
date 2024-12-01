@@ -23,14 +23,14 @@ namespace NetcodeIO.NET
 		public void ReadData(ByteArrayReaderWriter stream)
 		{
 			byte addressVal = stream.ReadByte();
-
-			// if address type is not 0 or 1, data is not valid
-			if (addressVal != 0 && addressVal != 1)
-				throw new FormatException();
-
 			this.AddressType = (NetcodeAddressType)addressVal;
 
-			IPAddress ip = null;
+            if (!Enum.IsDefined(typeof(NetcodeAddressType), AddressType))
+            {
+                throw new FormatException($"Invalid NetcodeAddressType value: {addressVal}");
+            }
+
+            IPAddress ip = null;
 
 			if (this.AddressType == NetcodeAddressType.IPv4)
 			{
