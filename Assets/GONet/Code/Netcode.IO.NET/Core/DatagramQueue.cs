@@ -107,7 +107,7 @@ namespace NetcodeIO.NET.Utils
                 {
                     Buffer.BlockCopy(receivePackaging.payload_transient, 0, receivePackaging.payload, 0, recv);
 
-                    GONet.GONetLog.Debug("receiving...length: " + recv + " from endpoint: " + NetworkUtils.GetEndpointDebugString(receivePackaging.sender));
+                    //GONet.GONetLog.Debug("receiving...length: " + recv + " from endpoint: " + NetworkUtils.GetEndpointDebugString(receivePackaging.sender));
                     Datagram packet = new Datagram();
                     packet.sender = receivePackaging.sender;
                     packet.payload = receivePackaging.payload;
@@ -148,7 +148,7 @@ namespace NetcodeIO.NET.Utils
             int recv = internalSocket.ReceiveFrom(receiveBuffer, ref sender);
             if (recv > 0)
             {
-                GONet.GONetLog.Debug($"Receiving from {((IPEndPoint)sender).Address}:{((IPEndPoint)sender).Port}, length: {recv}, from endpoint: {NetworkUtils.GetEndpointDebugString(sender)}");
+                //GONet.GONetLog.Debug($"Receiving from {((IPEndPoint)sender).Address}:{((IPEndPoint)sender).Port}, length: {recv}, from endpoint: {NetworkUtils.GetEndpointDebugString(sender)}");
 
                 Datagram packet = new Datagram();
                 packet.sender = sender;

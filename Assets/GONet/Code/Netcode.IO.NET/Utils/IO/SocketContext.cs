@@ -7,8 +7,6 @@ using System.Threading;
 using GONet.Utils;
 using System.Collections.Concurrent;
 using GONet;
-using Org.BouncyCastle.Bcpg;
-using UnityEditor;
 
 namespace NetcodeIO.NET.Utils.IO
 {
@@ -77,7 +75,7 @@ namespace NetcodeIO.NET.Utils.IO
 		/// </summary>
 		public void SendTo(byte[] data, EndPoint remoteEP)
 		{
-            GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
+            //GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 			internalSocket.SendTo(data, remoteEP);
         }
 
@@ -86,7 +84,7 @@ namespace NetcodeIO.NET.Utils.IO
 		/// </summary>
 		public void SendTo(byte[] data, int length, EndPoint remoteEP)
 		{
-            GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
+            //GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
         }
 
@@ -150,7 +148,7 @@ namespace NetcodeIO.NET.Utils.IO
 
 			ReturnBorrowedSendStuffsCompleted(Thread.CurrentThread); // memory management like this is required due to array pools not being multithread capable and we send and endSend on different threads
 
-			GONet.GONetLog.Debug("sending...length: " + length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
+			//GONet.GONetLog.Debug("sending...length: " + length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
 		}
 
 		private void ReturnBorrowedSendStuffsCompleted(Thread onlyProcessForThread)
