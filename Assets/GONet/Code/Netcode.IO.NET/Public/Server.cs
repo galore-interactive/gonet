@@ -7,8 +7,6 @@ using System.Linq;
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
-using GONet;
-using GONet.Utils;
 
 namespace NetcodeIO.NET
 {
@@ -1022,7 +1020,7 @@ namespace NetcodeIO.NET
 			}
 
 			// send packet
-			GONet.GONetLog.Debug("sending...packetLen: " + packetLen + ", to endpoint: " + NetworkUtils.GetEndpointDebugString(endpoint));
+			//GONet.GONetLog.Debug("sending...packetLen: " + packetLen + ", to endpoint: " + NetworkUtils.GetEndpointDebugString(endpoint));
             listenSocket.SendTo(packetBuffer, packetLen, endpoint);
 
 			BufferPool.ReturnBuffer(packetBuffer);
