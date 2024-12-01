@@ -22,20 +22,23 @@ namespace GONet.Utils
 {
     public static class NetworkUtils
     {
-        const string ANY_IP = "0.0.0.0"; // Now obsolete: IPAddress.Any.Address;
+        const string ANY_IP = "[::]"; // IPv6 any address, also works for IPv4 in dual-stack contexts
         const string LOOPBACK_IP = "127.0.0.1";
         const string LOCALHOST = "localhost";
+        const string LOOPBACK_IPV6 = "::1";
 
         public static bool IsIPAddressOnLocalMachine(string ipAddressToCheck)
         {
-            if (LOOPBACK_IP == ipAddressToCheck || LOCALHOST == ipAddressToCheck || ANY_IP == ipAddressToCheck)
+            if (LOOPBACK_IP == ipAddressToCheck || LOOPBACK_IPV6 == ipAddressToCheck || LOCALHOST == ipAddressToCheck || ANY_IP == ipAddressToCheck)
             {
                 return true;
             }
             else
             {
                 IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-                return host.AddressList.Any(ipAddress => ipAddress.AddressFamily == AddressFamily.InterNetwork && ipAddress.ToString() == ipAddressToCheck);
+                return host.AddressList.Any(ipAddress =>
+                    (ipAddress.AddressFamily == AddressFamily.InterNetwork || ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+                    && ipAddress.ToString() == ipAddressToCheck);
             }
         }
 
@@ -44,10 +47,13 @@ namespace GONet.Utils
         /// </summary>
         public static bool IsLocalPortListening(int port)
         {
-            var endpoint = new IPEndPoint(IPAddress.Any, port);
-            Socket socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            var endpoint = new IPEndPoint(IPAddress.IPv6Any, port);
+            Socket socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
             try
             {
+                // allow dual-stack
+                // TODO does this make sense in this contect? socket.DualMode = true;
+                socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
                 socket.Bind(endpoint);
             }
             catch (SocketException socketException)
@@ -71,19 +77,41 @@ namespace GONet.Utils
             var addresses = System.Net.Dns.GetHostAddresses(hostName);
             if (addresses.Length == 0)
             {
-                throw new ArgumentException(
-                    "Unable to retrieve address from specified host name.",
-                    nameof(hostName)
-                );
+                throw new ArgumentException("Unable to retrieve address from specified host name.", nameof(hostName));
             }
             else if (throwIfMoreThanOneIP && addresses.Length > 1)
             {
-                throw new ArgumentException(
-                    "There is more that one IP address to the specified host.",
-                    nameof(hostName)
-                );
+                throw new ArgumentException("There is more than one IP address for the specified host.", nameof(hostName));
             }
-            return new IPEndPoint(addresses[0], port); // Port gets validated here.
+
+            // Prefer IPv6 if available, otherwise use the first address
+            var preferredAddress = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6) ?? addresses[0];
+            return new IPEndPoint(preferredAddress, port);
+        }
+
+        public static string GetEndpointDebugString(EndPoint endpoint)
+        {
+            if (endpoint == null)
+                return "Endpoint is null";
+
+            if (endpoint is IPEndPoint ipEndPoint)
+            {
+                return $"Endpoint Details:\n" +
+                       $"  - Type: IPEndPoint\n" +
+                       $"  - Address: {ipEndPoint.Address}\n" +
+                       $"  - Port: {ipEndPoint.Port}\n" +
+                       $"  - Address Family: {ipEndPoint.AddressFamily}\n" +
+                       $"  - Is IPv4: {ipEndPoint.AddressFamily == AddressFamily.InterNetwork}\n" +
+                       $"  - Is IPv6: {ipEndPoint.AddressFamily == AddressFamily.InterNetworkV6}\n" +
+                       $"  - Is IPv4 Mapped to IPv6: {ipEndPoint.Address.IsIPv4MappedToIPv6}\n" +
+                       $"  - Full Address: {ipEndPoint}";
+            }
+            else
+            {
+                return $"Endpoint Details:\n" +
+                       $"  - Type: {endpoint.GetType().Name}\n" +
+                       $"  - Address: {endpoint}";
+            }
         }
     }
 }

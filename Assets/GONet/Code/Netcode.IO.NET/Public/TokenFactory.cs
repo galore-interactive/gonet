@@ -73,17 +73,19 @@ namespace NetcodeIO.NET
 
 			Buffer.BlockCopy(userData, 0, privateConnectToken.UserData, 0, userData.Length);
 
-			privateConnectToken.ConnectServers = new ConnectTokenServerEntry[addressList.Length];
-			for (int i = 0; i < privateConnectToken.ConnectServers.Length; i++)
-			{
-				privateConnectToken.ConnectServers[i] = new ConnectTokenServerEntry()
-				{
-					AddressType = addressList[i].AddressFamily == AddressFamily.InterNetwork ? NetcodeAddressType.IPv4 : NetcodeAddressType.IPv6,
-					Endpoint = addressList[i]
-				};
-			}
-
-			byte[] privateConnectTokenBytes = new byte[1024];
+            privateConnectToken.ConnectServers = new ConnectTokenServerEntry[addressList.Length];
+            for (int i = 0; i < privateConnectToken.ConnectServers.Length; i++)
+            {
+                privateConnectToken.ConnectServers[i] = new ConnectTokenServerEntry()
+                {
+                    // Handle dual-stack explicitly
+                    AddressType = addressList[i].AddressFamily == AddressFamily.InterNetwork ? NetcodeAddressType.IPv4 :
+                                  addressList[i].AddressFamily == AddressFamily.InterNetworkV6 ? NetcodeAddressType.IPv6 :
+                                  throw new ArgumentException("Unsupported address family."),
+                    Endpoint = addressList[i]
+                };
+            }
+            byte[] privateConnectTokenBytes = new byte[1024];
 			using (var writer = ByteArrayReaderWriter.Get(privateConnectTokenBytes))
 			{
 				privateConnectToken.Write(writer);

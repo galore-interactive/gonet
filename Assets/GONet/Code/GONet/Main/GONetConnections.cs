@@ -17,6 +17,7 @@ using GONet.Utils;
 using NetcodeIO.NET;
 using ReliableNetcode;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using GONetChannelId = System.Byte;
 
@@ -233,22 +234,28 @@ namespace GONet
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
             bool isChangingConnectInfo = default;
-            IPAddress currenetServerIP = default;
+            IPAddress currentServerIP = default;
+            IPEndPoint mostRecentConnectInfo = default;
+
             try
             {
-                currenetServerIP = IPAddress.Parse(serverIP);
-                isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
+                currentServerIP = IPAddress.Parse(serverIP);
+                isChangingConnectInfo = mostRecentConnectInfo == null ||
+                                        !IPAddress.Equals(mostRecentConnectInfo.Address, currentServerIP) ||
+                                        mostRecentConnectInfo.Port != serverPort;
                 if (isChangingConnectInfo)
                 {
-                    mostRecentConnectInfo = new IPEndPoint(currenetServerIP, serverPort);
+                    mostRecentConnectInfo = new IPEndPoint(currentServerIP, serverPort);
                 }
             }
             catch
             {
-                // ASSuME serverIP actually represents a hostname and needs to be processed differently than an IP address
+                // Assume serverIP actually represents a hostname and needs to be processed differently than an IP address
                 IPEndPoint currentServerEndPoint = NetworkUtils.GetIPEndPointFromHostName(serverIP, serverPort);
-                currenetServerIP = currentServerEndPoint.Address;
-                isChangingConnectInfo = mostRecentConnectInfo == null || !IPAddress.Equals(mostRecentConnectInfo.Address, currenetServerIP) || mostRecentConnectInfo.Port != serverPort;
+                currentServerIP = currentServerEndPoint.Address;
+                isChangingConnectInfo = mostRecentConnectInfo == null ||
+                                        !IPAddress.Equals(mostRecentConnectInfo.Address, currentServerIP) ||
+                                        mostRecentConnectInfo.Port != serverPort;
                 if (isChangingConnectInfo)
                 {
                     mostRecentConnectInfo = currentServerEndPoint;
@@ -260,7 +267,23 @@ namespace GONet
                 InitiatingClientConnectionUID = (ulong)GUID.Generate().AsInt64();
             }
 
-            byte[] connectToken = factory.GenerateConnectToken(new IPEndPoint[] { mostRecentConnectInfo },
+            // Here, we're creating an array of endpoints that includes both IPv4 and IPv6 loopback addresses if the serverIP is a loopback address.
+            List<IPEndPoint> endpoints = new List<IPEndPoint>();
+
+            if (NetworkUtils.IsIPAddressOnLocalMachine(serverIP))
+            {
+                // Add both loopback addresses to handle special case where server will compare various addresses for validation
+                endpoints.Add(new IPEndPoint(IPAddress.IPv6Loopback, serverPort)); // put the most likely one to be used/operational one first to prevent unnecessary delays waiting for timeouts
+                endpoints.Add(new IPEndPoint(IPAddress.Loopback, serverPort));
+            }
+            else
+            {
+                // If not a loopback, just add the parsed or resolved address
+                endpoints.Add(mostRecentConnectInfo);
+            }
+
+            byte[] connectToken = factory.GenerateConnectToken(
+                endpoints.ToArray(),
                 CONNECTION_TOKEN_TIMOUT_SECONDS,
                 timeoutSeconds,
                 1UL,

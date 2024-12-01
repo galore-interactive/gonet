@@ -67,6 +67,13 @@ namespace GONet
 
         public static bool AreAllServerConnectionInfoActualsSet => !string.IsNullOrWhiteSpace(serverIPAddress_Actual) && serverPort_Actual != -1;
 
+        [SerializeField]
+        [Tooltip("Server connection ip or hostname.  If not provided, GONetGlobal.ServerIPAddress_Default is used instead.")]
+        private string server;
+        [SerializeField]
+        [Tooltip("Server connection port.  If not provided, GONetGlobal.ServerPort_Default is used instead.")]
+        private int serverPort;
+
         /// <summary>
         /// DO NOT SET THIS OUTSIDE GONET INTERNAL CODE!
         /// </summary>
@@ -81,7 +88,7 @@ namespace GONet
         /// </summary>
         internal static int serverPort_Actual = -1;
         /// <summary>
-        /// IMPORTANT: This will be -1 when the actual serer ip address is not known!
+        /// IMPORTANT: This will be -1 when the actual server ip address is not known!
         /// </summary>
         public static int ServerPort_Actual { get => serverPort_Actual; internal set { serverPort_Actual = value; FireEventIfBothActualsSet(); } }
 
@@ -106,6 +113,17 @@ namespace GONet
          Application.Quit();
 #endif
             }
+
+            if (!string.IsNullOrWhiteSpace(server))
+            {
+                serverIPAddress_Actual = server;
+            }
+            if (serverPort != default && serverPort > 0)
+            {
+                serverPort_Actual = serverPort;
+            }
+            ServerIPAddress_Actual = string.IsNullOrWhiteSpace(serverIPAddress_Actual) ? ServerIPAddress_Default : serverIPAddress_Actual;
+            ServerPort_Actual = (serverPort_Actual == default || serverPort_Actual < 0) ? ServerPort_Default : serverPort_Actual;
 
             SceneManager.sceneLoaded += OnSceneLoaded;
 

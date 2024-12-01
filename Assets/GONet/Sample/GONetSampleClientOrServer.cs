@@ -60,9 +60,6 @@ public class GONetSampleClientOrServer : MonoBehaviour
         }
         else
         {
-            GONetGlobal.ServerIPAddress_Actual = GONetGlobal.ServerIPAddress_Default;
-            GONetGlobal.ServerPort_Actual = GONetGlobal.ServerPort_Default;
-
             OnReadyToStartGONet();
         }
     }
@@ -96,9 +93,6 @@ public class GONetSampleClientOrServer : MonoBehaviour
         }
         else
         {
-            GONetGlobal.ServerIPAddress_Actual = GONetGlobal.ServerIPAddress_Default;
-            GONetGlobal.ServerPort_Actual = GONetGlobal.ServerPort_Default;
-
             OnReadyToStartGONet();
         }
     }
