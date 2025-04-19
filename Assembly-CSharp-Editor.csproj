@@ -60,8 +60,11 @@
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusHolisticTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\DualStackConnectionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\MemoryPack\MemoryPackTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\NetworkUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
@@ -365,6 +368,9 @@
     <Reference Include="UnityEditor.LinuxStandalone.Extensions">
       <HintPath>C:\Program Files\Unity\Hub\Editor\2022.3.12f1\Editor\Data\PlaybackEngines\LinuxStandaloneSupport\UnityEditor.LinuxStandalone.Extensions.dll</HintPath>
     </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>Library\PackageCache\com.unity.ext.nunit@2.0.3\net40\unity-custom\nunit.framework.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Analytics.Tracker">
       <HintPath>Library\PackageCache\com.unity.analytics@3.8.1\Unity.Analytics.Tracker.dll</HintPath>
     </Reference>
@@ -403,9 +409,6 @@
     </Reference>
     <Reference Include="log4netPlastic">
       <HintPath>Library\PackageCache\com.unity.collab-proxy@2.2.0\Lib\Editor\PlasticSCM\log4netPlastic.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>Library\PackageCache\com.unity.ext.nunit@1.0.6\net35\unity-custom\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="UnityEditor.iOS.Extensions.Xcode">
       <HintPath>C:\Program Files\Unity\Hub\Editor\2022.3.12f1\Editor\Data\PlaybackEngines\AppleTVSupport\UnityEditor.iOS.Extensions.Xcode.dll</HintPath>

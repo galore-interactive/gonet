@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "dgSpecHash": "ci3YbPoQaZ4=",
+  "success": true,
+  "projectFilePath": "D:\\projects\\unity\\gonet-git\\GONet.Core.Tests\\GONet.Core.Tests.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\shash\\.nuget\\packages\\castle.core\\5.1.1\\castle.core.5.1.1.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\coverlet.collector\\6.0.0\\coverlet.collector.6.0.0.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\microsoft.codecoverage\\17.6.0\\microsoft.codecoverage.17.6.0.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\microsoft.net.test.sdk\\17.6.0\\microsoft.net.test.sdk.17.6.0.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\nsubstitute\\5.3.0\\nsubstitute.5.3.0.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\nunit\\3.13.3\\nunit.3.13.3.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\nunit.analyzers\\3.6.1\\nunit.analyzers.3.6.1.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\nunit3testadapter\\4.2.1\\nunit3testadapter.4.2.1.nupkg.sha512",
+    "C:\\Users\\shash\\.nuget\\packages\\system.threading.tasks.extensions\\4.3.0\\system.threading.tasks.extensions.4.3.0.nupkg.sha512"
+  ],
+  "logs": []
+}

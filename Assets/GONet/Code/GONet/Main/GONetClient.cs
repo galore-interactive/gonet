@@ -111,9 +111,9 @@ namespace GONet
 
         private readonly Client client;
 
-        public GONetClient(Client client)
+        public GONetClient()
         {
-            this.client = client;
+            this.client = new();
 
             connectionToServer = new GONetConnection_ClientToServer(client);
 

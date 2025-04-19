@@ -18,7 +18,9 @@ using NetcodeIO.NET;
 using ReliableNetcode;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using GONetChannelId = System.Byte;
 
 namespace GONet
@@ -229,7 +231,7 @@ namespace GONet
         /// 1) Prior to connection being established, this represents how many seconds the client will attempt to connect to the server before giving up and considering the connected timed out (i.e., <see cref="ClientState.ConnectionRequestTimedOut"/>).  NOTE: During this time period, the connection will be attempted 10 times per second.
         /// 2) After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.
         /// </param>
-        public void Connect(string serverIP, int serverPort, int timeoutSeconds)
+        public async void Connect(string serverIP, int serverPort, int timeoutSeconds)
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
@@ -268,8 +270,9 @@ namespace GONet
             }
 
             // Here, we're creating an array of endpoints that includes both IPv4 and IPv6 loopback addresses if the serverIP is a loopback address.
-            List<IPEndPoint> endpoints = new List<IPEndPoint>();
+            IEnumerable<IPEndPoint> endpoints = NetworkUtils.BuildDualStackEndpointList(serverIP, serverPort);
 
+            /*
             if (NetworkUtils.IsIPAddressOnLocalMachine(serverIP))
             {
                 // Add both loopback addresses to handle special case where server will compare various addresses for validation
@@ -281,6 +284,7 @@ namespace GONet
                 // If not a loopback, just add the parsed or resolved address
                 endpoints.Add(mostRecentConnectInfo);
             }
+            */
 
             byte[] connectToken = factory.GenerateConnectToken(
                 endpoints.ToArray(),

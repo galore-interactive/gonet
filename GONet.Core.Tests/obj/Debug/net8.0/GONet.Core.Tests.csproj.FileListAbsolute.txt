@@ -1,0 +1,6 @@
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.csproj.AssemblyReference.cache
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.GeneratedMSBuildEditorConfig.editorconfig
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.AssemblyInfoInputs.cache
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.AssemblyInfo.cs
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.csproj.CoreCompileInputs.cache
+D:\projects\unity\gonet-git\GONet.Core.Tests\obj\Debug\net8.0\GONet.Core.Tests.sourcelink.json

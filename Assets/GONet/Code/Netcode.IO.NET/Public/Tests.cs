@@ -377,7 +377,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -469,7 +469,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -546,7 +546,7 @@ namespace NetcodeIO.NET.Tests
 
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -695,7 +695,7 @@ namespace NetcodeIO.NET.Tests
 			});
 			client.totalSeconds = time;
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 32, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -867,7 +867,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -942,7 +942,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1004,7 +1004,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT);
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 256, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1068,7 +1068,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint clientEndpoint2 = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 101);
 
 			// server only has room for one player - second player should be denied
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1162,7 +1162,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
 			// server only has room for one player - second player should be denied
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1235,7 +1235,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
 			// server only has room for one player - second player should be denied
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1310,7 +1310,7 @@ namespace NetcodeIO.NET.Tests
 			IPEndPoint clientEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), TEST_SERVER_PORT + 100);
 
 			// server only has room for one player - second player should be denied
-			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, "127.0.0.1", TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
+			Server server = new Server(socketMgr.CreateContext(serverEndpoint), 1, TEST_SERVER_PORT, TEST_PROTOCOL_ID, _privateKey);
 			server.Start(false);
 			server.totalSeconds = time;
 
@@ -1427,7 +1427,7 @@ namespace NetcodeIO.NET.Tests
 				var socket = socketMgr.CreateContext(serverEndpoint);
 
 				int slots = rand.Next(0, NUM_CLIENTS) + 1;
-				var server = new Server(socket, slots, "127.0.0.1", BASE_SERVER_PORT + i, TEST_PROTOCOL_ID, _privateKey);
+				var server = new Server(socket, slots, BASE_SERVER_PORT + i, TEST_PROTOCOL_ID, _privateKey);
 				server.Start(false);
 				server.totalSeconds = time;
 

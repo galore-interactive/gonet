@@ -20,6 +20,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using UnityEngine;
 
 namespace GONet.Utils
 {
@@ -258,11 +259,24 @@ namespace GONet.Utils
 
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    foreach (var type in assembly.GetTypes())
+                    try
                     {
-                        if (IsTypeAInstanceOfTypeB(type, typeof(T)) && (!type.IsAbstract || !isConcreteClassRequired))
+                        foreach (var type in assembly.GetTypes())
                         {
-                            uniqueSyncEventTypes.Add(type);
+                            if (IsTypeAInstanceOfTypeB(type, typeof(T)) && (!type.IsAbstract || !isConcreteClassRequired))
+                            {
+                                uniqueSyncEventTypes.Add(type);
+                            }
+                        }
+                    }
+                    catch (ReflectionTypeLoadException ex)
+                    {
+                        foreach (var type in ex.Types) // ex.Types are the ones that successfully loaded
+                        {
+                            if (IsTypeAInstanceOfTypeB(type, typeof(T)) && (!type.IsAbstract || !isConcreteClassRequired))
+                            {
+                                uniqueSyncEventTypes.Add(type);
+                            }
                         }
                     }
                 }

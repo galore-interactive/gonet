@@ -244,7 +244,7 @@ namespace NetcodeIO.NET
 		/// </summary>
 		public void Connect(byte[] connectToken)
 		{
-			Connect(connectToken, true);
+			Connect(connectToken, autoTick: true);
 		}
 
 		internal void Connect(byte[] connectToken, bool autoTick)
@@ -446,7 +446,7 @@ namespace NetcodeIO.NET
 
 		private void processDatagram(Datagram datagram)
 		{
-			if (!MiscUtils.AreEndPointsEqual(datagram.sender, currentServerEndpoint))
+			if (!GONet.Utils.NetworkUtils.AreSameAddressFamilyOrMapped(datagram.sender, currentServerEndpoint))
 				return;
 
 			using (var reader = ByteArrayReaderWriter.Get(datagram.payload))
