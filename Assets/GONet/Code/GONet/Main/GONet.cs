@@ -439,7 +439,7 @@ namespace GONet
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="events_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
         /// </summary>
-        static readonly Dictionary<Thread, LockFreeRingBuffer<IGONetEvent>> events_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, LockFreeRingBuffer<IGONetEvent>>(12);
+        static readonly Dictionary<Thread, RingBuffer<IGONetEvent>> events_SendToOthersQueue_ByThreadMap = new Dictionary<Thread, RingBuffer<IGONetEvent>>(12);
 
         /// <summary>
         /// The keys are only added from main unity thread...the value queues are only added to on the other thread (i.e., transfer data from <see cref="events_AwaitingSendToOthersQueue_ByThreadMap"/> once the time is right) but also read from and dequeued from the main unity thread when time to publish the events!
@@ -1692,7 +1692,7 @@ namespace GONet
 
         private static void PublishEvents_SentToOthers()
         {
-            LockFreeRingBuffer<IGONetEvent> eventQueue = events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+            RingBuffer<IGONetEvent> eventQueue = events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
 
             IGONetEvent @event;
             while (eventQueue.TryRead(out @event))
@@ -3523,7 +3523,7 @@ namespace GONet
                     thread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
 
                     events_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
-                    events_SendToOthersQueue_ByThreadMap[thread] = new LockFreeRingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
+                    events_SendToOthersQueue_ByThreadMap[thread] = new RingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
 
                     isThreadRunning = true;
                     thread.Start();
@@ -3535,7 +3535,7 @@ namespace GONet
                     if (!events_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
                     {
                         events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
-                        events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new LockFreeRingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
+                        events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new RingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
                     }
                 }
 
@@ -3803,7 +3803,7 @@ namespace GONet
             private void PublishEvents_SyncValueChangesSentToOthers_ASAP()
             {
                 Queue<IGONetEvent> queueAwaiting = events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread];
-                LockFreeRingBuffer<IGONetEvent> queueSend = events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
+                RingBuffer<IGONetEvent> queueSend = events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread];
                 while (queueAwaiting.Count > 0)
                 {
                     var @event = queueAwaiting.Dequeue();

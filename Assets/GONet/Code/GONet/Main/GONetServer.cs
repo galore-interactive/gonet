@@ -51,11 +51,11 @@ namespace GONet
         /// </summary>
         public event ClientActionDelegate ClientDisconnected;
 
-        public GONetServer(int maxClientCount, string address, int port)
+        public GONetServer(int maxClientCount, int port)
         {
             MaxClientCount = maxClientCount;
 
-            server = new Server(maxClientCount, address, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
+            server = new Server(maxClientCount, port, GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
             remoteClients = new List<GONetRemoteClient>(maxClientCount);
 
@@ -66,16 +66,9 @@ namespace GONet
             server.OnClientMessageReceived += OnClientMessageReceived;
             server.TickBeginning += Server_TickBeginning_PossibleSeparateThread;
 
-            if (NetworkUtils.IsIPAddressOnLocalMachine(address))
+            if (NetworkUtils.IsLocalPortListening(port))
             {
-                if (NetworkUtils.IsLocalPortListening(port))
-                {
-                    GONetLog.Warning("Instantiated a server <instance> locally and the port is already occupied!!!  Calling the <instance>.Start() method will likely fail and return false.");
-                }
-            }
-            else
-            {
-                GONetLog.Warning("Instantiated a server <instance> locally and the address is not on this local machine!!!  Calling the <instance>.Start() method will likely fail and return false.");
+                GONetLog.Warning("Instantiated a server <instance> locally and the port is already occupied!!!  Calling the <instance>.Start() method will likely fail and return false.");
             }
         }
 

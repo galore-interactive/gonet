@@ -14,6 +14,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -112,6 +113,123 @@ namespace GONet.Utils
                        $"  - Type: {endpoint.GetType().Name}\n" +
                        $"  - Address: {endpoint}";
             }
+        }
+
+        public static bool AreSameAddressFamilyOrMapped(IPAddress a, IPAddress b) =>
+            a.Equals(b) ||
+                (a.AddressFamily != b.AddressFamily &&
+                    (a.MapToIPv4().Equals(b) || a.MapToIPv6().Equals(b)));
+
+        /// <summary>
+        /// Returns <c>true</c> when the two <see cref="EndPoint"/>s refer to the same
+        /// IP *and* both ports match, treating IPv4‑mapped IPv6 addresses
+        /// (<c>::ffff:x.x.x.x</c>) as equivalent to their raw‑IPv4 form.
+        /// <para/>
+        /// If either <see cref="EndPoint"/> is not an <see cref="IPEndPoint"/>,
+        /// the method returns <c>false</c>.
+        /// </summary>
+        public static bool AreSameAddressFamilyOrMapped(EndPoint aEP, EndPoint bEP)
+        {
+            // must be IPEndPoint instances
+            if (aEP is not IPEndPoint a || bEP is not IPEndPoint b)
+                return false;
+
+            // ports must match first
+            if (a.Port != b.Port)
+                return false;
+
+            // identical addresses → early‑out
+            if (a.Address.Equals(b.Address))
+                return true;
+
+            // cross‑family: treat v4‑mapped‑v6 as the same host
+            if (a.AddressFamily != b.AddressFamily)
+            {
+                if (a.AddressFamily == AddressFamily.InterNetworkV6 && a.Address.IsIPv4MappedToIPv6 &&
+                    a.Address.MapToIPv4().Equals(b.Address))
+                    return true;
+
+                if (b.AddressFamily == AddressFamily.InterNetworkV6 && b.Address.IsIPv4MappedToIPv6 &&
+                    b.Address.MapToIPv4().Equals(a.Address))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public static bool DoEndpointsMatch(IPEndPoint listen4, IPEndPoint listen6, IPEndPoint tokenEP)
+        {
+            // 1. Port must match exactly
+            if (tokenEP.Port != listen4.Port && tokenEP.Port != listen6.Port)
+            {
+                return false;
+            }
+
+            // 2. wildcard bind → accept any address
+            if (listen4.Address.Equals(IPAddress.Any) || listen4.Address.Equals(IPAddress.IPv6Any) ||
+                listen6.Address.Equals(IPAddress.Any) || listen6.Address.Equals(IPAddress.IPv6Any))
+            {
+                return true;   // port already matched above
+            }
+
+            // 3. Compare addresses with v4‑mapped equivalence
+            bool addrMatches =
+                AreSameAddressFamilyOrMapped(tokenEP.Address, listen4.Address) ||
+                AreSameAddressFamilyOrMapped(tokenEP.Address, listen6.Address);
+
+            return addrMatches;
+        }
+
+        public static bool AreSameIP(IPAddress a, IPAddress b)
+        {
+            if (a.Equals(b)) return true;
+
+            // treat v4‑mapped‑v6 as equal to raw v4
+            if (a.AddressFamily != b.AddressFamily)
+            {
+                if (a.IsIPv4MappedToIPv6 && a.MapToIPv4().Equals(b)) return true;
+                if (b.IsIPv4MappedToIPv6 && b.MapToIPv4().Equals(a)) return true;
+            }
+            return false;
+        }
+
+        public static IEnumerable<IPEndPoint> BuildDualStackEndpointList(string host, int port)
+        {
+            // 1. Resolve whatever the user typed.
+            IPAddress[] resolved;
+            if (!IPAddress.TryParse(host, out var literal))
+                resolved = Dns.GetHostAddresses(host);
+            else
+                resolved = new[] { literal };
+
+            bool hasV4 = resolved.Any(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+            bool hasV6 = resolved.Any(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
+
+            var list = new List<IPEndPoint>(
+                resolved.Select(ip => new IPEndPoint(ip, port)));
+
+            // 2a. If we only got IPv4 but we KNOW the server is dual‑stack,
+            //     inject the mapped‑v6 form *or* ::1 for loop‑back.
+            if (!hasV6)
+            {
+                if (IPAddress.IsLoopback(resolved[0]))
+                    list.Insert(0, new IPEndPoint(IPAddress.IPv6Loopback, port));
+                else
+                    list.Insert(0, new IPEndPoint(resolved[0].MapToIPv6(), port));
+            }
+
+            // 2b. If we only got IPv6, inject IPv4.
+            if (!hasV4)
+            {
+                if (resolved[0].IsIPv4MappedToIPv6)
+                    list.Add(new IPEndPoint(resolved[0].MapToIPv4(), port));
+                else if (IPAddress.IsLoopback(resolved[0]))
+                    list.Add(new IPEndPoint(IPAddress.Loopback, port));
+                // else: we can’t infer a public v4; leave list unchanged
+            }
+
+            /* Optional: put IPv6 first so the client tries it before v4 */
+            return list.OrderBy(ep => ep.AddressFamily == AddressFamily.InterNetworkV6 ? 0 : 1);
         }
     }
 }

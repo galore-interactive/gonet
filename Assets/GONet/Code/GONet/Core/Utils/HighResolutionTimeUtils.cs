@@ -20,109 +20,77 @@ using System.Runtime.CompilerServices;
 namespace GONet.Utils
 {
     /// <summary>
-    /// It is known the precision of <see cref="DateTime.Now"/> and <see cref="DateTime.UtcNow"/> is low (@ ~15ms), 
-    /// which is not acceptable in many cases (especially in games).
-    /// Use this class when high precision timing matters.
+    /// Provides high-resolution timing utilities with precision exceeding <see cref="DateTime"/> (~15ms).
     /// </summary>
     public static class HighResolutionTimeUtils
     {
-        private static bool hasResyncd = false;
-        private static DateTime lastResyncTime;
-        private static DateTime lastResyncTimeUtc;
-        private static Stopwatch highResolutionStopwatch;
-        private static long lastResyncDiffTicks;
+        private static readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        private static DateTime lastResyncTime = DateTime.Now;
+        private static DateTime lastResyncTimeUtc = DateTime.UtcNow;
+        private static long lastResyncDiffTicks = 0;
+        private static TimeSpan autoResyncInterval = TimeSpan.FromSeconds(10);
+        private static readonly object syncLock = new object();
+        private static int resyncCount = 0;
 
         /// <summary>
-        /// Since it appears that Stopwatch does get out of sync with the system time (by as much as half a second per hour),
-        /// it makes sense to reset the hybrid DateTime class based on the amount of time that passes between calls to check
-        /// the time (via a call to <see cref="Resync"/>).
+        /// Gets or sets the interval after which a resync with system time occurs.
         /// </summary>
-        private static readonly long AUTO_RESYNC_AFTER_TICKS = TimeSpan.FromSeconds(10).Ticks;
-        private static readonly float AUTO_RESYNC_AFTER_TICKS_FLOAT = (float)AUTO_RESYNC_AFTER_TICKS;
-
-        private static readonly object resync = new object();
-        private static volatile int resyncCounter = 0;
-
-        static HighResolutionTimeUtils()
+        /// <exception cref="ArgumentException">Thrown if set to a non-positive value.</exception>
+        public static TimeSpan AutoResyncInterval
         {
-            lastResyncDiffTicks = 0;
-            Resync();
+            get => autoResyncInterval;
+            set => autoResyncInterval = value > TimeSpan.Zero ? value : throw new ArgumentException("Interval must be positive.", nameof(value));
         }
 
-        public static DateTime UtcNow
+        /// <summary>
+        /// Gets the number of resyncs performed since initialization.
+        /// </summary>
+        public static int ResyncCount => resyncCount;
+
+        /// <summary>
+        /// Gets the last difference in ticks between resyncs, indicating drift.
+        /// </summary>
+        public static long LastResyncDiffTicks => lastResyncDiffTicks;
+
+        /// <summary>
+        /// Gets the current UTC time with high-resolution adjustments.
+        /// </summary>
+        public static DateTime UtcNow => GetTime(lastResyncTimeUtc);
+
+        /// <summary>
+        /// Gets the current local time with high-resolution adjustments.
+        /// </summary>
+        public static DateTime Now => GetTime(lastResyncTime);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static DateTime GetTime(DateTime baseTime)
         {
-            get
-            {
-                if (highResolutionStopwatch.Elapsed.Ticks > AUTO_RESYNC_AFTER_TICKS)
-                {
-                    Resync();
-                }
+            if (stopwatch.Elapsed > autoResyncInterval)
+                Resync();
 
-                long addTicks = GetHighResolutionTicksToAddToResyncBaseline();
-
-                return lastResyncTimeUtc.AddTicks(addTicks);
-            }
-        }
-
-        public static DateTime Now
-        {
-            get
-            {
-                if (highResolutionStopwatch.Elapsed.Ticks > AUTO_RESYNC_AFTER_TICKS)
-                {
-                    Resync();
-                }
-
-                long addTicks = GetHighResolutionTicksToAddToResyncBaseline();
-
-                return lastResyncTime.AddTicks(addTicks);
-            }
+            long ticksToAdd = AdjustTicks(stopwatch.Elapsed.Ticks);
+            return baseTime.AddTicks(ticksToAdd);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static long GetHighResolutionTicksToAddToResyncBaseline()
+        private static long AdjustTicks(long elapsedTicks)
         {
-            long addTicks = highResolutionStopwatch.Elapsed.Ticks;
-
-            if (lastResyncDiffTicks != 0)
-            { // IMPORTANT: This code eases the adjustment (i.e., diff) back to resync time over the entire period between resyncs to avoid a possibly dramatic jump in time just after a resync!
-                float inverseLerpBetweenResyncs = addTicks / AUTO_RESYNC_AFTER_TICKS_FLOAT;
-                if (inverseLerpBetweenResyncs < 1f) // if 1 or greater there will be nothing to add based on calculations
-                {
-                    addTicks -= (long)(lastResyncDiffTicks * (1f - inverseLerpBetweenResyncs));
-                }
-            }
-
-            return addTicks;
+            if (lastResyncDiffTicks == 0) return elapsedTicks;
+            float progress = elapsedTicks / (float)autoResyncInterval.Ticks;
+            return progress >= 1f ? elapsedTicks : elapsedTicks - (long)(lastResyncDiffTicks * (1f - progress));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Resync()
         {
-            int resyncCounter_PRE = resyncCounter;
-            lock (resync)
+            lock (syncLock)
             {
-                if (resyncCounter == resyncCounter_PRE) // this would be false is another thread was also trying to do this at the same time!
-                {
-                    ++resyncCounter;
-
-                    DateTime now = DateTime.Now;
-                    long nowTicksBeforeResync = hasResyncd ? lastResyncTime.Ticks + highResolutionStopwatch.Elapsed.Ticks : now.Ticks;
-
-                    ///////////////////////////////////////////////////////////////////////////////////////
-                    // RE-Sync:
-                    lastResyncTime = now;
-                    lastResyncTimeUtc = DateTime.UtcNow;
-                    highResolutionStopwatch = Stopwatch.StartNew();
-                    ///////////////////////////////////////////////////////////////////////////////////////
-
-                    long nowTicksAfterResync = lastResyncTime.Ticks;
-                    lastResyncDiffTicks = nowTicksAfterResync - nowTicksBeforeResync;
-
-                    //GONetLog.Debug("lastResyncDiffTicks (well, as ms): " + TimeSpan.FromTicks(lastResyncDiffTicks).TotalMilliseconds);
-
-                    hasResyncd = true;
-                }
+                DateTime now = DateTime.Now;
+                long ticksBefore = lastResyncTime.Ticks + stopwatch.Elapsed.Ticks;
+                lastResyncTime = now;
+                lastResyncTimeUtc = DateTime.UtcNow;
+                stopwatch.Restart();
+                lastResyncDiffTicks = lastResyncTime.Ticks - ticksBefore;
+                resyncCount++;
             }
         }
     }
