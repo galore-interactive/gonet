@@ -22,18 +22,20 @@ namespace GONet.Utils // Assuming the original namespace
 
         // Struct to hold the index and padding to ensure cache line separation
         // Cache lines are typically 64 bytes.
-        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        // Can't combine generic types with explicit memory layout because the runtime needs
+        // flexibility in how it arranges generic type data in memory.
+        [StructLayout(LayoutKind.Sequential)]
         private struct PaddedIndex
         {
-            [FieldOffset(0)]
             public volatile int Value;
+            private readonly int _p1, _p2, _p3, _p4, _p5, _p6, _p7, _p8;
+            private readonly int _p9, _p10, _p11, _p12, _p13, _p14, _p15;
         }
 
         // Indices are NOT readonly, allowing their .Value to be modified.
         // Padding is handled by the struct layout.
         private PaddedIndex _readIndex;
         private PaddedIndex _writeIndex;
-
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RingBuffer{T}"/> class.
