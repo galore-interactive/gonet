@@ -16,6 +16,7 @@
 using NetcodeIO.NET;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using GONetChannelId = System.Byte;
 
 namespace GONet
@@ -124,6 +125,14 @@ namespace GONet
             // provides a way to process (i.e., invoke public event) on the main thread since
             // GONet event bus subscriptions are processed on the main thread.
             GONetMain.EventBus.Subscribe<ClientStateChangedEvent>(OnStateChanged_BubbleEventUp_MainThread);
+        }
+
+        public void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            client.AddP2pEndPoint(p2pEndPoint);
+
+            // TODO consolidate this!!
+            GONetGlobal.ServerP2pEndPoint = p2pEndPoint;
         }
 
         private void Client_TickBeginning_PossibleSeparateThread()

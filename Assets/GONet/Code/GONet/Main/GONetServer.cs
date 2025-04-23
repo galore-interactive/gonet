@@ -21,6 +21,7 @@ using GONet.Utils;
 using NetcodeIO.NET;
 
 using GONetChannelId = System.Byte;
+using System.Net;
 
 namespace GONet
 {
@@ -111,8 +112,8 @@ namespace GONet
         {
             try
             {
-                server.Start(90); // NOTE: this starts a separate thread where the server's Tick method is called
                 GONetMain.isServerOverride = true; // wherever the server is running is automatically considered "the" server
+                server.Start(90); // NOTE: this starts a separate thread where the server's Tick method is called
             }
             catch (Exception e)
             { // one main reason why here is if a server is already started on this machine on port....so this process will turn into a client
@@ -280,6 +281,7 @@ namespace GONet
         public void Stop()
         {
             server.Stop();
+            GONetMain.isServerOverride = false; // wherever the server is running is automatically considered "the" server
         }
 
         public GONetRemoteClient GetRemoteClientByConnection(GONetConnection_ServerToClient connectionToClient)
@@ -295,6 +297,14 @@ namespace GONet
         public GONetRemoteClient GetRemoteClientByAuthorityId(ushort authorityId)
         {
             return remoteClientsByAuthorityId[authorityId];
+        }
+
+        public void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            server.AddP2pEndPoint(p2pEndPoint);
+            
+            // TODO consolidate this!!
+            GONetGlobal.ServerP2pEndPoint = p2pEndPoint;
         }
 
         internal void OnConnectionToClientAuthorityIdAssigned(GONetConnection_ServerToClient connectionToClient, ushort ownerAuthorityId)

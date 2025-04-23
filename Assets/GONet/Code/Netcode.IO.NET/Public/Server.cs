@@ -8,6 +8,7 @@ using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
 using GONet.Utils;
+using System.Collections.Generic;
 
 namespace NetcodeIO.NET
 {
@@ -170,6 +171,7 @@ namespace NetcodeIO.NET
 		private ISocketContext listenSocket;
 		private IPEndPoint listenEndpoint;
 		private IPEndPoint listenEndpointV6;
+
 
 		internal bool IsRunning => isRunning;
 		private bool isRunning = false;
@@ -730,10 +732,10 @@ namespace NetcodeIO.NET
 				return;
 			}
 
-            // TODO if not development, probably want to remove the loopback/local support for security reasons
             ConnectTokenServerEntry[] clientServerList = privateConnectToken.ConnectServers;
             bool doesClientServerListIncludeThis = clientServerList.Any(x =>
-				NetworkUtils.DoEndpointsMatch(listenEndpoint, listenEndpointV6, x.Endpoint));
+				NetworkUtils.DoEndpointsMatch(listenEndpoint, listenEndpointV6, x.Endpoint) ||
+                p2pEndPoints.Any(p2p => NetworkUtils.DoEndpointsMatch(p2p, x.Endpoint)));
 
             if (!doesClientServerListIncludeThis)
             {
@@ -805,12 +807,18 @@ namespace NetcodeIO.NET
             }
         }
 
-		#endregion
+		private readonly HashSet<IPEndPoint> p2pEndPoints = new();
+        internal void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            p2pEndPoints.Add(p2pEndPoint);
+        }
 
-		#region Send Packet Methods
+        #endregion
 
-		// disconnect all clients
-		private void disconnectAll()
+        #region Send Packet Methods
+
+        // disconnect all clients
+        private void disconnectAll()
 		{
 			for (int i = 0; i < clientSlots.Length; i++)
 			{
@@ -1159,6 +1167,6 @@ namespace NetcodeIO.NET
             }
         }
 
-		#endregion
-	}
+        #endregion
+    }
 }

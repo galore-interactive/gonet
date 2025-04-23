@@ -18,6 +18,7 @@ using GONet.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -91,6 +92,8 @@ namespace GONet
         /// IMPORTANT: This will be -1 when the actual server ip address is not known!
         /// </summary>
         public static int ServerPort_Actual { get => serverPort_Actual; internal set { serverPort_Actual = value; FireEventIfBothActualsSet(); } }
+
+        public static IPEndPoint ServerP2pEndPoint { get; internal set; }
 
         private static void FireEventIfBothActualsSet()
         {

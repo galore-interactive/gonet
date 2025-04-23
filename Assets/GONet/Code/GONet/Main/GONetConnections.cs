@@ -231,7 +231,7 @@ namespace GONet
         /// 1) Prior to connection being established, this represents how many seconds the client will attempt to connect to the server before giving up and considering the connected timed out (i.e., <see cref="ClientState.ConnectionRequestTimedOut"/>).  NOTE: During this time period, the connection will be attempted 10 times per second.
         /// 2) After connection is established, this represents how many seconds have to transpire with no communication for this connection to be considered timed out...then will be auto-disconnected.
         /// </param>
-        public async void Connect(string serverIP, int serverPort, int timeoutSeconds)
+        public void Connect(string serverIP, int serverPort, int timeoutSeconds)
         {
             TokenFactory factory = new TokenFactory(GONetMain.noIdeaWhatThisShouldBe_CopiedFromTheirUnitTest, GONetMain._privateKey);
 
@@ -270,7 +270,9 @@ namespace GONet
             }
 
             // Here, we're creating an array of endpoints that includes both IPv4 and IPv6 loopback addresses if the serverIP is a loopback address.
-            IEnumerable<IPEndPoint> endpoints = NetworkUtils.BuildDualStackEndpointList(serverIP, serverPort);
+            List<IPEndPoint> endpoints = NetworkUtils.BuildDualStackEndpointList(serverIP, serverPort);
+            endpoints.AddRange(client.P2pEndPoints);
+            foreach (var e in endpoints) GONetLog.Debug($"{GetType().Name}.{nameof(Connect)} called. TOKEN ENTRY: {e}");
 
             /*
             if (NetworkUtils.IsIPAddressOnLocalMachine(serverIP))
@@ -317,6 +319,8 @@ namespace GONet
         private readonly RemoteClient remoteClient;
 
         public bool IsConnectedToClient => remoteClient.Connected;
+
+        public EndPoint RemoteClientEndPoint => remoteClient.RemoteEndpoint;
 
         public GONetConnection_ServerToClient(RemoteClient remoteClient) : base()
         {

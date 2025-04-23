@@ -180,6 +180,23 @@ namespace GONet.Utils
             return addrMatches;
         }
 
+        public static bool DoEndpointsMatch(IPEndPoint listen, IPEndPoint tokenEP)
+        {
+            // 1. Port must match exactly
+            if (tokenEP.Port != listen.Port)
+            {
+                return false;
+            }
+
+            // 2. wildcard bind → accept any address
+            if (listen.Address.Equals(IPAddress.Any) || listen.Address.Equals(IPAddress.IPv6Any))
+            {
+                return true;   // port already matched above
+            }
+
+            return AreSameAddressFamilyOrMapped(tokenEP.Address, listen.Address);
+        }
+
         public static bool AreSameIP(IPAddress a, IPAddress b)
         {
             if (a.Equals(b)) return true;
@@ -193,7 +210,7 @@ namespace GONet.Utils
             return false;
         }
 
-        public static IEnumerable<IPEndPoint> BuildDualStackEndpointList(string host, int port)
+        public static List<IPEndPoint> BuildDualStackEndpointList(string host, int port)
         {
             // 1. Resolve whatever the user typed.
             IPAddress[] resolved;
@@ -229,7 +246,13 @@ namespace GONet.Utils
             }
 
             /* Optional: put IPv6 first so the client tries it before v4 */
-            return list.OrderBy(ep => ep.AddressFamily == AddressFamily.InterNetworkV6 ? 0 : 1);
+            list.Sort((a, b) =>
+            {
+                int aKey = a.AddressFamily == AddressFamily.InterNetworkV6 ? 0 : 1;
+                int bKey = b.AddressFamily == AddressFamily.InterNetworkV6 ? 0 : 1;
+                return aKey.CompareTo(bKey);
+            });
+            return list;
         }
     }
 }
