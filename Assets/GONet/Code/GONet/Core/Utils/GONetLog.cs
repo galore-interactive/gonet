@@ -57,34 +57,39 @@ namespace GONet
 
         private static ILog _fileLogger;
 
-        private static readonly string configXml = @" <log4net>
- 
-   <appender name=""FileAppender"" type=""log4net.Appender.RollingFileAppender"">
-     <file value=""____LOG_FILE_PATH____"" />
-     <appendToFile value=""true"" />
-     <rollingStyle value=""Once"" />
-     <maxSizeRollBackups value=""10"" />
-     <maximumFileSize value=""10MB"" />
-     <staticLogFileName value=""true"" />
-     <layout type=""log4net.Layout.PatternLayout"">
-       <!-- <conversionPattern value=""%date %-5level in [%thread] %logger%newline%message%newline"" /> -->
-	   <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
-     </layout>
-   </appender>
-   
-	<appender name=""ConsoleAppender"" type=""log4net.Appender.ConsoleAppender"">
-		<layout type=""log4net.Layout.PatternLayout"">
-			   <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
-		 </layout>
-	</appender>
- 
-   <root>
-     <level value=""ALL"" />
-     <appender-ref ref=""FileAppender"" />
-     <appender-ref ref=""ConsoleAppender"" />
-   </root>
-   
- </log4net>
+        private static readonly string configXml = @"
+<log4net internalDebug=""true"">
+  <!-- writes to gonet.log, then every midnight rolls gonet.log → gonet.log.yyyy‑MM‑dd -->
+  <appender name=""FileAppender"" type=""log4net.Appender.RollingFileAppender"">
+    <file value=""____LOG_FILE_PATH____"" />
+    <appendToFile value=""true"" />
+    <!-- free the file handle after each write -->
+    <lockingModel type=""log4net.Appender.FileAppender+MinimalLock"" />
+    <!-- roll once per day -->
+    <rollingStyle value=""Date"" />
+    <!-- suffix for rolled files -->
+    <datePattern value=""'.'yyyy-MM-dd"" />
+    <!-- keep the “.log” name for the active file -->
+    <staticLogFileName value=""true"" />
+    <!-- how many days to keep -->
+    <maxSizeRollBackups value=""5"" />
+    <layout type=""log4net.Layout.PatternLayout"">
+      <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
+    </layout>
+  </appender>
+
+  <appender name=""ConsoleAppender"" type=""log4net.Appender.ConsoleAppender"">
+    <layout type=""log4net.Layout.PatternLayout"">
+      <conversionPattern value=""[%-5level] (Thread:%t) %date{yyyy-MM-dd HH:mm:ss.fff} %message%newline"" />
+    </layout>
+  </appender>
+
+  <root>
+    <level value=""ALL"" />
+    <appender-ref ref=""FileAppender"" />
+    <appender-ref ref=""ConsoleAppender"" />
+  </root>
+</log4net>
 ";
 
         //const string logFilePlaceholder = "logs\\gonet.log";
@@ -92,11 +97,31 @@ namespace GONet
 
         static GONetLog()
         {
+            if (_initialized) return;                // domain reload safety
+            _initialized = true;
+
+            // 1) prepare log directory
+            string logDir = Path.Combine(Application.persistentDataPath, "logs");
+            Directory.CreateDirectory(logDir);
+
+            // 2) build final xml
+            string config = configXml.Replace(
+                logFilePlaceholder,
+                Path.Combine(logDir, "gonet.log"));
+
+            // 3) let log4net tell us if something goes wrong
+            log4net.Util.LogLog.InternalDebugging = true;
+
+            // 4) configure
+            using Stream xml = StringUtils.GenerateStreamFromString(config);
+            log4net.Config.XmlConfigurator.Configure(xml);
+
             _fileLogger = LogManager.GetLogger(typeof(GONetLog));
-            string configXml_updated = configXml.Replace(logFilePlaceholder, Path.Combine(Application.persistentDataPath, "logs", "gonet.log"));
-            using Stream configXmlStream = StringUtils.GenerateStreamFromString(configXml);
-            log4net.Config.XmlConfigurator.Configure(configXmlStream);
+            _fileLogger.Info("GONetLog initialized");
         }
+
+        private static bool _initialized;
+
 
         #region Append methods
 
@@ -257,7 +282,7 @@ namespace GONet
                 StackTrace trace = new StackTrace(1, true);
                 const string FRAME_PRE = "(frame:";
                 const string FRAME_POST = "s) ";
-                ProcessMessageViaLogger(string.Concat(FRAME_PRE, GONetMain.Time.ElapsedSeconds, FRAME_POST, keyXxx, SPACE, message), trace.ToString(), logType);
+                ProcessMessageViaLogger(string.Concat(FRAME_PRE, GONetMain.Time.FrameCount, '/', GONetMain.Time.ElapsedSeconds, FRAME_POST, keyXxx, SPACE, message), trace.ToString(), logType);
             }
         }
 
@@ -269,13 +294,13 @@ namespace GONet
 
         private static string FormatMessage(string level, string message)
         {
-            const string FORMAT = "[{0}]{5}{6} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{3}s) {4}";
+            const string FORMAT = "[{0}]{5}{6} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{7}/{3}s) {4}";
             const string CLIENT = "[Client]";
             const string SERVER = "[Server]";
             return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message,
                 GONetMain.IsServer ? SERVER : string.Empty,
-                GONetMain.IsClient ? CLIENT : string.Empty
-                );
+                GONetMain.IsClient ? CLIENT : string.Empty,
+                GONetMain.Time.FrameCount);
         }
 
         private static void ProcessMessageViaLogger(string logString, string stackTrace, LogType type)
@@ -331,6 +356,10 @@ namespace GONet
                     _fileLogger.Fatal(concattedMessage);
                 }
                 else if (logLine.Contains(KeyVerbose))
+                {
+                    _fileLogger.Info(concattedMessage);
+                }
+                else
                 {
                     _fileLogger.Info(concattedMessage);
                 }

@@ -250,6 +250,12 @@ namespace GONet
         public static bool IsClient => _gonetClient == null ? isClient_asIndicatedByCommandLineArgs : _gonetClient.ClientTypeFlags != ClientTypeFlags.None;
 
         /// <summary>
+        /// Is a client host in peer-to-peer or non-dedicated server setup?
+        /// <see cref="ClientTypeFlags.ServerHost"/>.
+        /// </summary>
+        public static bool IsHost => IsServer && IsClient /* TODO && _gonetClient.ClientTypeFlags == ClientTypeFlags.ServerHost */;
+
+        /// <summary>
         /// Since the value of <see cref="GONetParticipant.GONetId"/> can change (i.e., <see cref="Server_AssumeAuthorityOver(GONetParticipant)"/> called),
         /// this is the mechanism to find the original value at time of initial instantiation.  Not sure how this helps others, but internally to GONet it is useful.
         /// </summary>
@@ -784,9 +790,7 @@ namespace GONet
 
         private static void OnActualServerConnectionInfoSet_UpdateIsServerOverride(string serverIP, int serverPort)
         {
-            isServerOverride |=
-                NetworkUtils.IsIPAddressOnLocalMachine(GONetGlobal.ServerIPAddress_Actual) &&
-                !NetworkUtils.IsLocalPortListening(GONetGlobal.ServerPort_Actual);
+            GONetLog.Debug($"Server override set to: {isServerOverride}, args: [{serverIP}]:{serverPort}, ServerIPAddress_Actual: {GONetGlobal.ServerIPAddress_Actual}, ServerPort_Actual: {GONetGlobal.ServerPort_Actual}, p2p: {GONetGlobal.ServerP2pEndPoint}");
         }
 
         private static void InitEventSubscriptions()
@@ -2065,6 +2069,8 @@ namespace GONet
 
             internal volatile int updateCount = 0;
 
+            public int FrameCount { get; private set; }
+
             public SecretaryOfTemporalAffairs() { }
 
             public SecretaryOfTemporalAffairs(SecretaryOfTemporalAffairs initFromAuthority)
@@ -2126,6 +2132,8 @@ namespace GONet
                 if (IsUnityMainThread)
                 {
                     //GONetLog.Debug(string.Concat("gonet.seconds: ", ElapsedSeconds, " unity.seconds: ", UnityEngine.Time.time, " diff: ", (UnityEngine.Time.time - ElapsedSeconds), " gonet.hash: ", GetHashCode()));
+
+                    FrameCount = UnityEngine.Time.frameCount;
                 }
             }
 
@@ -2205,7 +2213,10 @@ namespace GONet
                         try
                         {
                             // IMPORTANT: This check must come first as it exits early if condition met!
-                            if (!IsChannelClientInitializationRelated(networkData.channelId) && IsClient && !_gonetClient.IsInitializedWithServer)
+                            bool shouldQueueForProcessingAfterInitialization = 
+                                !IsChannelClientInitializationRelated(networkData.channelId) && IsClient && !_gonetClient.IsInitializedWithServer;
+                            //GONetLog.Debug($"GONet networkData received. channel: {networkData.channelId}, size: {networkData.bytesUsedCount}, shouldQueueForProcessingAfterInitialization? {shouldQueueForProcessingAfterInitialization}");
+                            if (shouldQueueForProcessingAfterInitialization)
                             {
                                 GONetClient.incomingNetworkData_mustProcessAfterClientInitialized.Enqueue(networkData);
                                 continue;
@@ -2251,7 +2262,7 @@ namespace GONet
                         bitStream.ReadLong(out elapsedTicksAtSend);
                         ////////////////////////////////////////////////////////////////////////////
 
-                        //GONetLog.Debug("received something....networkData.bytesUsedCount: " + networkData.bytesUsedCount);
+                        //GONetLog.Debug($"received something....networkData.bytesUsedCount: {networkData.bytesUsedCount}, messageType: {messageType.Name}, IsServer? {IsServer} (isServerOverride: {isServerOverride}, MyAuthorityId: {MyAuthorityId}/Server: {OwnerAuthorityId_Server}), IsClient? {IsClient}");
                         
                         {  // body:
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
@@ -2397,11 +2408,15 @@ namespace GONet
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
         {
+            GONetLog.Debug($"About to send all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
+
             Server_AssignNewClientAuthorityId(connectionToClient);
             Server_AssignNewClientGONetIdRawBatch(connectionToClient);
             Server_SendClientPersistentEventsSinceStart(connectionToClient);
             Server_SendClientCurrentState_AllAutoMagicalSync(connectionToClient);
             Server_SendClientIndicationOfInitializationCompletion(connectionToClient); // NOTE: sending this will cause the client to instantiate its GONetLocal
+
+            GONetLog.Debug($"...should have finished sending all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
         }
 
         private static void Server_OnNewClientInstantiatedItsGONetLocal(GONetLocal newClientGONetLocal)
@@ -2414,7 +2429,7 @@ namespace GONet
         {
             if (persistentEventsThisSession.Count > 0)
             {
-                //GONetLog.Debug($"About to send this many persistent events to newly connected client: {persistentEventsThisSession.Count}");
+                GONetLog.Debug($"About to send this many persistent events to newly connected client: {persistentEventsThisSession.Count}");
                 PersistentEvents_Bundle bundle = new PersistentEvents_Bundle(Time.ElapsedTicks, persistentEventsThisSession);
                 int returnBytesUsedCount;
 

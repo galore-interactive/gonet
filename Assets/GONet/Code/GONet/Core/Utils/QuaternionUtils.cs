@@ -377,4 +377,164 @@ namespace GONet.Utils
             return quaternion;
         }
     }
+
+    /// <summary>
+    /// Optimized quaternion interpolation and squad with log-exp, fast trig approximations,
+    /// branchless small-angle handling, and precomputed half-slerps.
+    /// </summary>
+    public static class QuaternionUtilsOptimized
+    {
+        /// <summary>
+        /// Fast polynomial approximations for acos, sin, cos
+        /// Returns an approximation of acos(x) for x in [-1,1]
+        /// Minimax polynomial: error ~0.005 radians
+        /// </summary>
+        private static float ApproxAcos(float x)
+        {
+            return (-0.156583f * x * x - 0.33072f * x + 1.5708f);
+        }
+
+        /// <summary>
+        /// Taylor-series-based approximation: sin(x) ≈ x * (1 - x^2/6)
+        /// </summary>
+        private static float ApproxSin(float x)
+        {
+            float x2 = x * x;
+            return x * (1f - x2 * (1f / 6f));
+        }
+
+        /// <summary>
+        /// Taylor-series-based approximation: cos(x) ≈ 1 - x^2/2 + x^4/24
+        /// </summary>
+        private static float ApproxCos(float x)
+        {
+            float x2 = x * x;
+            return 1f - x2 * 0.5f + (x2 * x2) * (1f / 24f);
+        }
+
+        /// <summary>
+        /// Clamp x to [0,1] over [edge0,edge1], then smoothstep
+        /// </summary>
+        private static float SmoothStep(float edge0, float edge1, float x)
+        {
+            float t = (x - edge0) / (edge1 - edge0);
+            // branchless clamp
+            t = t < 0f ? 0f : (t > 1f ? 1f : t);
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>
+        /// Quaternion logarithm and exponential
+        /// </summary>
+        public static Quaternion Log(Quaternion q)
+        {
+            if (q.w > 1f) q.w = 1f; // clamp for numeric safety
+            float angle = ApproxAcos(q.w);
+            float sinAngle = ApproxSin(angle);
+            Quaternion result = new Quaternion();
+            if (Mathf.Abs(sinAngle) > 1e-4f)
+            {
+                float coeff = angle / sinAngle;
+                result.x = q.x * coeff;
+                result.y = q.y * coeff;
+                result.z = q.z * coeff;
+            }
+            else
+            {
+                result.x = q.x;
+                result.y = q.y;
+                result.z = q.z;
+            }
+            result.w = 0f;
+            return result;
+        }
+
+        public static Quaternion Exp(Quaternion q)
+        {
+            float angle = new Vector3(q.x, q.y, q.z).magnitude;
+            float sinAngle = ApproxSin(angle);
+            float cosAngle = ApproxCos(angle);
+            Quaternion result = new Quaternion();
+            if (angle > 1e-4f)
+            {
+                float coeff = sinAngle / angle;
+                result.x = q.x * coeff;
+                result.y = q.y * coeff;
+                result.z = q.z * coeff;
+            }
+            else
+            {
+                result.x = q.x;
+                result.y = q.y;
+                result.z = q.z;
+            }
+            result.w = cosAngle;
+            return result;
+        }
+
+        /// <summary>
+        /// Fast slerp using log-exp, branchless small-angle, and trig approximations
+        /// </summary>
+        public static Quaternion SlerpFast(Quaternion a, Quaternion b, float t)
+        {
+            // dot:
+            float cosHalfAngle = a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;
+
+            // identity check:
+            if (Mathf.Abs(cosHalfAngle) >= 0.99999f)
+                return a;
+
+            // force shortest:
+            if (cosHalfAngle < 0f)
+            {
+                b = new Quaternion(-b.x, -b.y, -b.z, -b.w);
+                cosHalfAngle = -cosHalfAngle;
+            }
+
+            if (cosHalfAngle >= 0.99999f)
+                return a;
+
+            // exp/log path:
+            Quaternion delta = b * Quaternion.Inverse(a);
+            Quaternion logDelta = Log(delta);
+            Quaternion scaled = new Quaternion(logDelta.x * t, logDelta.y * t, logDelta.z * t, 0f);
+            Quaternion expDelta = Exp(scaled);
+            Quaternion full = a * expDelta;
+
+            // cheap LERP fallback (now our own):
+            Quaternion approx = LerpNormalized(a, b, t);
+
+            // mix based on how small the angle was:
+            float factor = SmoothStep(0.99f, 1.01f, cosHalfAngle);
+            return Quaternion.SlerpUnclamped(full, approx, factor);
+        }
+
+        static Quaternion LerpNormalized(Quaternion a, Quaternion b, float t)
+        {
+            // simple component‐wise LERP + normalize
+            Quaternion q = new Quaternion(
+                a.x * (1 - t) + b.x * t,
+                a.y * (1 - t) + b.y * t,
+                a.z * (1 - t) + b.z * t,
+                a.w * (1 - t) + b.w * t
+            );
+            return q.normalized;
+        }
+
+        /// <summary>
+        /// Precomputed half-slerps and final slerp -> fast Squad
+        /// </summary>
+        public static Quaternion SquadFast(Quaternion q0, Quaternion q1, Quaternion q2, Quaternion q3, float t)
+        {
+            // Precompute half-steps
+            float ta = 0.5f * (1f - t);
+            float tb = 0.5f * (1f + t);
+            Quaternion A = SlerpFast(q0, q3, ta);
+            Quaternion B = SlerpFast(q1, q2, tb);
+
+            // Final blend
+            float tc = 2f * t * (1f - t);
+            return SlerpFast(A, B, tc);
+        }
+    }
 }

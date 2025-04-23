@@ -727,11 +727,18 @@ namespace NetcodeIO.NET
 			BufferPool.ReturnBuffer(packetBuffer);
 		}
 
-		#endregion
+        #endregion
 
-		#region Util methods
+		internal IEnumerable<IPEndPoint> P2pEndPoints => p2pEndPoints;
+        private readonly HashSet<IPEndPoint> p2pEndPoints = new();
+        internal void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            p2pEndPoints.Add(p2pEndPoint);
+        }
 
-		private void sendPacket(NetcodePacketHeader packetHeader, byte[] packetData, int packetDataLen, byte[] key)
+        #region Util methods
+
+        private void sendPacket(NetcodePacketHeader packetHeader, byte[] packetData, int packetDataLen, byte[] key)
 		{
 			// assign a sequence number to this packet
 			packetHeader.SequenceNumber = this.nextPacketSequence++;
@@ -785,6 +792,6 @@ namespace NetcodeIO.NET
 			return replayProtection.AlreadyReceived(packetHeader.SequenceNumber);
 		}
 
-		#endregion
-	}
+        #endregion
+    }
 }
