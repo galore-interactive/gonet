@@ -83,15 +83,15 @@ namespace GONet.Utils
             return f;
         }
 
-        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector3 averageAcceleration)
+        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCountFromStarting, out Vector3 averageAcceleration, int iStarting = 0)
         {
             averageAcceleration = new Vector3();
 
-            if (valueCount > 1)
+            if (valueCountFromStarting > 1)
             {
                 Vector3 totalVelocity = Vector3.zero;
                 float totalSeconds = 0;
-                for (int i = 0; i < valueCount - 1; ++i)
+                for (int i = iStarting; i < valueCountFromStarting - 1; ++i)
                 {
                     Vector3 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector3;
                     Vector3 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector3;
