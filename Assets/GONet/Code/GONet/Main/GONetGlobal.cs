@@ -140,7 +140,7 @@ namespace GONet
 
             if (shouldAttemptAutoStartAsClient)
             {
-                Editor_AttemptStartAsClientIfAppropriate();
+                Editor_AttemptStartAsClientIfAppropriate(ServerIPAddress_Actual, ServerPort_Actual);
             }
         }
 
@@ -209,14 +209,24 @@ namespace GONet
             enabledGONetParticipants.Remove(gonetParticipant); // regardless of whether or not it was present before this call, it will not be present afterward
         }
 
-        private void Editor_AttemptStartAsClientIfAppropriate()
+        private void Editor_AttemptStartAsClientIfAppropriate(string serverIP, int serverPort)
         {
+            if (!Application.isEditor) return;
+
+            if (!AreAllServerConnectionInfoActualsSet)
+            {
+                ActualServerConnectionInfoSet += Editor_AttemptStartAsClientIfAppropriate;
+                return;
+            }
+
+            ActualServerConnectionInfoSet -= Editor_AttemptStartAsClientIfAppropriate;
+
+            // just for editor, we can assume we only want to auto start client when server running locally already or server is remote
             bool isAppropriate = 
-                Application.isEditor &&
                 !GONetMain.IsClient && 
                 !GONetMain.IsServer && 
-                NetworkUtils.IsIPAddressOnLocalMachine(GONetGlobal.ServerIPAddress_Default) && // just for editor, we can assume we only want to auto start client when server running locally
-                NetworkUtils.IsLocalPortListening(GONetGlobal.ServerPort_Default); // just for editor, we can assume we only want to auto start client when server running locally
+                (!NetworkUtils.IsIPAddressOnLocalMachine(serverIP) ||
+                  NetworkUtils.IsLocalPortListening(serverPort));
             
             if (isAppropriate) // do not attempt to start a client when we already know this is the server...no matter what the shouldAttemptAutoStartAsClient set to true seems to indicate!
             {
