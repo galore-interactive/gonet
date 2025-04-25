@@ -16,6 +16,7 @@
 using GONet.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace GONet.PluginAPI
@@ -1581,7 +1582,7 @@ namespace GONet.PluginAPI
         public bool TryGetBlendedValue(
             NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
-            GONetLog.Debug($"[DREETS] valueCount: {valueCount}, atElapsedTicks: {TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds}");
+            //GONetLog.Debug($"[DREETS] valueCount: {valueCount}, atElapsedTicks: {TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds}");
 
             blendedValue = default;
             didExtrapolate = false;
@@ -1796,9 +1797,168 @@ namespace GONet.PluginAPI
         }
     }
 
+    public class GONetValueBlending_Vector3_GrokOut : IGONetAutoMagicalSync_CustomValueBlending
+    {
+        public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
+
+        public string Description => "What Grok 3 beta implemented for us to try.";
+
+        private readonly struct State
+        {
+            public readonly Vector3 PreviousPosition;
+            public readonly Vector3 PreviousVelocity;
+
+            public State(Vector3 previousPosition, Vector3 previousVelocity)
+            {
+                PreviousPosition = previousPosition;
+                PreviousVelocity = previousVelocity;
+            }
+        }
+
+        private readonly Dictionary<NumericValueChangeSnapshot[], State> stateCache = new Dictionary<NumericValueChangeSnapshot[], State>();
+        private readonly object lockObject = new object();
+
+        private const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
+        private const float MAX_EXTRAPOLATION_TIME = 0.2f; // Limit extrapolation to 200ms
+        private const float MIN_DELTA_TIME = 0.01f; // Prevent division by near-zero
+        private const float MAX_VELOCITY = 50f; // Cap velocity (adjust for game)
+        private const float POSITION_SMOOTH_FACTOR = 0.5f; // Lerp factor for position smoothing
+        private const float VELOCITY_SMOOTH_FACTOR = 0.3f; // Lerp factor for velocity smoothing
+        private const float MAX_POSITION_DELTA = 0.5f; // Max position change per frame (adjust for game)
+
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer,
+            int valueCount,
+            long atElapsedTicks,
+            out GONetSyncableValue blendedValue,
+            out bool didExtrapolate)
+        {
+            blendedValue = default;
+            didExtrapolate = IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH;
+
+            // Retrieve or initialize state using valueBuffer as key
+            State state;
+            lock (lockObject)
+            {
+                if (!stateCache.TryGetValue(valueBuffer, out state))
+                {
+                    state = new State(Vector3.zero, Vector3.zero);
+                    stateCache[valueBuffer] = state;
+                }
+            }
+
+            Vector3 previousPosition = state.PreviousPosition;
+            Vector3 previousVelocity = state.PreviousVelocity;
+
+            if (valueCount < 2)
+            {
+                if (valueCount == 1)
+                {
+                    Vector3 newPosition = valueBuffer[0].numericValue.UnityEngine_Vector3;
+                    newPosition = Vector3.Lerp(previousPosition, newPosition, POSITION_SMOOTH_FACTOR);
+                    blendedValue.UnityEngine_Vector3 = newPosition;
+
+                    lock (lockObject)
+                    {
+                        stateCache[valueBuffer] = new State(newPosition, Vector3.zero);
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            NumericValueChangeSnapshot latestSnapshot = valueBuffer[0];
+            NumericValueChangeSnapshot prevSnapshot = valueBuffer[1];
+
+            if (latestSnapshot.elapsedTicksAtChange == atElapsedTicks)
+            {
+                Vector3 newPosition = latestSnapshot.numericValue.UnityEngine_Vector3;
+                newPosition = Vector3.Lerp(previousPosition, newPosition, POSITION_SMOOTH_FACTOR);
+                blendedValue.UnityEngine_Vector3 = newPosition;
+
+                lock (lockObject)
+                {
+                    stateCache[valueBuffer] = new State(newPosition, Vector3.zero);
+                }
+                return true;
+            }
+
+            // Interpolation when allowed and possible
+            if (!IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH &&
+                atElapsedTicks > prevSnapshot.elapsedTicksAtChange &&
+                atElapsedTicks < latestSnapshot.elapsedTicksAtChange)
+            {
+                float t = (atElapsedTicks - prevSnapshot.elapsedTicksAtChange) /
+                          (float)(latestSnapshot.elapsedTicksAtChange - prevSnapshot.elapsedTicksAtChange);
+                Vector3 newPosition = Vector3.Lerp(
+                    prevSnapshot.numericValue.UnityEngine_Vector3,
+                    latestSnapshot.numericValue.UnityEngine_Vector3,
+                    t);
+                newPosition = Vector3.Lerp(previousPosition, newPosition, POSITION_SMOOTH_FACTOR);
+
+                Vector3 velocity = (latestSnapshot.numericValue.UnityEngine_Vector3 - prevSnapshot.numericValue.UnityEngine_Vector3) /
+                                  ((latestSnapshot.elapsedTicksAtChange - prevSnapshot.elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond);
+                velocity = Vector3.Lerp(previousVelocity, velocity, VELOCITY_SMOOTH_FACTOR);
+
+                blendedValue.UnityEngine_Vector3 = newPosition;
+                didExtrapolate = false;
+
+                lock (lockObject)
+                {
+                    stateCache[valueBuffer] = new State(newPosition, velocity);
+                }
+                return true;
+            }
+
+            // Extrapolation
+            float deltaTime = (latestSnapshot.elapsedTicksAtChange - prevSnapshot.elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond;
+            float extrapolateTime = (atElapsedTicks - latestSnapshot.elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond;
+
+            deltaTime = Mathf.Max(deltaTime, MIN_DELTA_TIME);
+            extrapolateTime = Mathf.Min(extrapolateTime, MAX_EXTRAPOLATION_TIME);
+
+            Vector3 rawVelocity = (latestSnapshot.numericValue.UnityEngine_Vector3 - prevSnapshot.numericValue.UnityEngine_Vector3) / deltaTime;
+            Vector3 smoothedVelocity = Vector3.Lerp(previousVelocity, rawVelocity, VELOCITY_SMOOTH_FACTOR);
+
+            float velocityMagnitude = smoothedVelocity.magnitude;
+            if (velocityMagnitude > MAX_VELOCITY)
+            {
+                smoothedVelocity = smoothedVelocity.normalized * MAX_VELOCITY;
+            }
+
+            Vector3 newPosition1 = latestSnapshot.numericValue.UnityEngine_Vector3 + smoothedVelocity * extrapolateTime;
+            newPosition1 = Vector3.Lerp(previousPosition, newPosition1, POSITION_SMOOTH_FACTOR);
+
+            Vector3 delta = newPosition1 - previousPosition;
+            float deltaMagnitude = delta.magnitude;
+            if (deltaMagnitude > MAX_POSITION_DELTA)
+            {
+                newPosition1 = previousPosition + delta.normalized * MAX_POSITION_DELTA;
+            }
+
+            blendedValue.UnityEngine_Vector3 = newPosition1;
+
+            lock (lockObject)
+            {
+                stateCache[valueBuffer] = new State(newPosition1, smoothedVelocity);
+            }
+
+            return true;
+        }
+
+        // Clean up state for a specific valueBuffer (e.g., when object is destroyed)
+        public void RemoveBufferState(NumericValueChangeSnapshot[] valueBuffer)
+        {
+            lock (lockObject)
+            {
+                stateCache.Remove(valueBuffer);
+            }
+        }
+    }
+
     public class GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter : IGONetAutoMagicalSync_CustomValueBlending
     {
-        public static bool ShouldLog = false;
+        public static bool ShouldLog = true;
 
         public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
 
@@ -1812,14 +1972,6 @@ namespace GONet.PluginAPI
 
             if (valueCount > 0)
             {
-                //{ // TODO FIXME remove this temp test!!!!!
-                    int newestBufferIndex_TEMP = 0;
-                    NumericValueChangeSnapshot newest_TEMP = valueBuffer[newestBufferIndex_TEMP];
-                    //blendedValue = newest_TEMP.numericValue;
-                    //didExtrapolate = false; // false?
-                    //return true;
-                //}
-
                 { // use buffer to determine the actual value that we think is most appropriate for this moment in time
                     int newestBufferIndex = 0;
                     NumericValueChangeSnapshot newest = valueBuffer[newestBufferIndex];
@@ -1832,49 +1984,61 @@ namespace GONet.PluginAPI
                         bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
                         if (shouldAttemptInterExtraPolation)
                         {
-                            if (ShouldLog) GONetLog.Debug("value count: " + valueCount);
+                            //if (ShouldLog) GONetLog.Debug("values: " + valueCount + ", atElapsedTicks: " + atElapsedTicks + ", bufferHas: " + valueBuffer.GetHashCode() + ' ' + string.Join('-', valueBuffer.Select(x => string.Concat('{', 't', ':', x.elapsedTicksAtChange , ',', x.numericValue.ToString(), '}'))));
 
                             const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
                             if (IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH || atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
                             {
-                                if (ShouldLog) GONetLog.Debug("\tif EXTRAPO");
-                                bool isEnoughInfoToExtrapolate = valueCount >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
+                                //float average, min, max;
+                                //DetermineTimeBetweenStats(valueBuffer, valueCount, out min, out average, out max);
+                                //GONetLog.Debug($"millis between snaps: min: {min} avg: {average} max: {max}");
+
+                                // 1) find the “base” snapshot to extrapolate from:
+                                //    - if target is at or after newest, baseIndex = newestIndex
+                                //    - else if it's between oldest and newest, pick the closest one <= atElapsedTicks
+                                int iBase = newestBufferIndex;
+                                if (atElapsedTicks < newest.elapsedTicksAtChange && atElapsedTicks > oldest.elapsedTicksAtChange)
+                                {
+                                    for (int i = newestBufferIndex; i <= oldestBufferIndex; ++i)
+                                    {
+                                        if (valueBuffer[i].elapsedTicksAtChange <= atElapsedTicks)
+                                        {
+                                            iBase = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                                NumericValueChangeSnapshot baseSnap = valueBuffer[iBase];
+                                Vector3 baseValue = baseSnap.numericValue.UnityEngine_Vector3;
+                                int valueCountUsable = valueCount - iBase;
+
+                                //if (ShouldLog) GONetLog.Debug("if EXTRAPO");
+                                bool isEnoughInfoToExtrapolate = valueCountUsable >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
-                                    //float average, min, max;
-                                    //DetermineTimeBetweenStats(valueBuffer, valueCount, out min, out average, out max);
-                                    //GONetLog.Debug($"millis between snaps: min: {min} avg: {average} max: {max}");
-
-                                    if (valueCount > 3)
+                                    if (valueCountUsable > 3)
                                     {
-                                        //Vector3 accerlation_current;
-                                        //blendedValue = GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out accerlation_current);
-
-
-
-                                        //blendedValue = GetVector3AvgAccelerationBasedExtrapolation(valueBuffer, valueCount, atElapsedTicks, newestBufferIndex, newest);
-
                                         Vector3 averageAcceleration;
-                                        if (ValueBlendUtils.TryDetermineAverageAccelerationPerSecond(valueBuffer, Math.Max(valueCount, 4), out averageAcceleration))
+                                        if (ValueBlendUtils.TryDetermineAverageAccelerationPerSecond(valueBuffer, Math.Max(valueCountUsable, 4), out averageAcceleration, iBase))
                                         {
-                                            //GONetLog.Debug($"\navg accel: {averageAcceleration}");
-                                            blendedValue = newest.numericValue.UnityEngine_Vector3 + averageAcceleration * (float)TimeSpan.FromTicks(atElapsedTicks - newest.elapsedTicksAtChange).TotalSeconds;
-                                        }
+                                            //GONetLog.Debug($"avg accel: {averageAcceleration}");
+                                            blendedValue = baseSnap.numericValue.UnityEngine_Vector3 + averageAcceleration * (float)TimeSpan.FromTicks(atElapsedTicks - baseSnap.elapsedTicksAtChange).TotalSeconds;
+                                        } else GONetLog.Debug($" never determined bru: {valueBuffer.GetHashCode()}");
 
-
+                                        /*
                                         { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
                                             long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....TODO FIXME: maybe average the time between elements instead to be dynamic!!!
-                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                            long atMinusNewest_ticks = atElapsedTicks - baseSnap.elapsedTicksAtChange;
                                             float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
                                             float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
 
-                                            var newest_last = valueBuffer[newestBufferIndex + 1];
+                                            var newest_last = valueBuffer[iBase + 1];
                                             Vector3 acceleration_previous;
                                             Vector3 newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
                                                 ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(
                                                     valueBuffer,
-                                                    newest.elapsedTicksAtChange,
-                                                    newestBufferIndex + 1,
+                                                    baseSnap.elapsedTicksAtChange,
+                                                    iBase + 1,
                                                     newest_last,
                                                     out acceleration_previous);
 
@@ -1885,12 +2049,12 @@ namespace GONet.PluginAPI
                                             if (shouldDoSmoothing)
                                             {
                                                 Vector3 identity = Vector3.zero;
-                                                Vector3 overExtrapolationNewest = newestAsExtrapolated - newest.numericValue.UnityEngine_Vector3;
+                                                Vector3 overExtrapolationNewest = newestAsExtrapolated - baseSnap.numericValue.UnityEngine_Vector3;
                                                 Vector3 overExtrapolationNewest_adjustmentToSmooth = overExtrapolationNewest * timePercentageRemainingBeforeNextSync;
-                                                /*Vector3.LerpUnclamped(
+                                                / *Vector3.LerpUnclamped(
                                                     identity,
                                                     overExtrapolationNewest,
-                                                    timePercentageRemainingBeforeNextSync);*/
+                                                    timePercentageRemainingBeforeNextSync);* /
 
                                                 //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
 
@@ -1898,26 +2062,30 @@ namespace GONet.PluginAPI
                                             }
 
                                         }
+                                        */
                                         didExtrapolate = true;
                                     }
-                                    else if (valueCount > 2)
+                                    else if (valueCountUsable > 2)
                                     {
+                                        GONetLog.Debug("valueCountUsable: " + valueCountUsable);
                                         Vector3 acceleration;
-                                        blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest, out acceleration);
+                                        blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, iBase, baseSnap, out acceleration);
                                         didExtrapolate = true;
                                     }
                                     else
                                     {
-                                        NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                        Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
-                                        Vector3 valueDiffBetweenLastTwo = newestValue - justBeforeNewest_numericValue;
-                                        long ticksBetweenLastTwo = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
+                                        GONetLog.Debug("valueCountUsable: " + valueCountUsable);
 
-                                        long atMinusNewestTicks = atElapsedTicks - newest.elapsedTicksAtChange;
+                                        NumericValueChangeSnapshot justBeforeNewest = valueBuffer[iBase + 1];
+                                        Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
+                                        Vector3 valueDiffBetweenLastTwo = baseValue - justBeforeNewest_numericValue;
+                                        long ticksBetweenLastTwo = baseSnap.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
+
+                                        long atMinusNewestTicks = atElapsedTicks - baseSnap.elapsedTicksAtChange;
                                         int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
                                         if (extrapolationSections < 0) extrapolationSections = -extrapolationSections;
-                                        long extrapolated_TicksAtChange = newest.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
-                                        Vector3 extrapolated_ValueNew = newestValue + (valueDiffBetweenLastTwo * extrapolationSections);
+                                        long extrapolated_TicksAtChange = baseSnap.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
+                                        Vector3 extrapolated_ValueNew = baseValue + (valueDiffBetweenLastTwo * extrapolationSections);
 
                                         /* the above 4 lines is preferred over what we would have done below here accumulating in a loop as somehow the loop would get infinite or at least stop the simulation
                                         do
@@ -1937,21 +2105,21 @@ namespace GONet.PluginAPI
                                         float oneSectionPercentage = (1 / (float)(extrapolationSections + 1));
                                         float remainingSectionPercentage = 1f - oneSectionPercentage;
                                         float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
-                                        blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, newestValue, extrapolated_ValueNew, bezierTime);
-                                        //GONetLog.Debug("extroip'd....p0: " + justBeforeNewest_numericValue + " p1: " + newestValue + " p2: " + extrapolated_ValueNew + " blended: " + blendedValue + " t: " + bezierTime);
+                                        blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, baseValue, extrapolated_ValueNew, bezierTime);
+                                        //GONetLog.Debug("extroip'd....p0: " + justBeforeNewest_numericValue + " p1: " + baseValue + " p2: " + extrapolated_ValueNew + " blended: " + blendedValue + " t: " + bezierTime);
                                         if (float.IsNaN(bezierTime) || float.IsNaN(blendedValue.UnityEngine_Vector3.x))
                                         {
                                             GONetLog.Warning($"extrapolationSections: {extrapolationSections}, denominator: {denominator}, atMinusNewestTicks: {atMinusNewestTicks}");
                                         }
                                     }
 
-                                    blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
+                                    //blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
                                     didExtrapolate = true;
                                 }
                                 else
                                 {
-                                    blendedValue = newestValue;
-                                    //GONetLog.Debug("VECTOR3 new new beast");
+                                    blendedValue = baseValue; // was: newestValue;
+                                    GONetLog.Debug("VECTOR3 new new beast");
                                 }
                             }
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
