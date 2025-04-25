@@ -233,12 +233,12 @@ namespace GONet.Editor
         }
         private static void EditorSceneManager_sceneOpened(Scene scene, OpenSceneMode mode)
         {
-            GONetLog.Debug($" %& %^$B& ^$%#YMB$^Y ^$%BMKBYL ^%MUYK ^MV&UKY&^ MVUKY ^MBV UKY^MBUKY^ BVMUK^");
+            //GONetLog.Debug($" %& %^$B& ^$%#YMB$^Y ^$%BMKBYL ^%MUYK ^MV&UKY&^ MVUKY ^MBV UKY^MBUKY^ BVMUK^");
         }
 
         private static void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
         {
-            GONetLog.Debug($" %& %^$B& ^$%#YMB$^Y ^$%BMKBYL ^%MUYK ^MV&UKY&^ MVUKY ^MBV UKY^MBUKY^ BVMUK^");
+            //GONetLog.Debug($" %& %^$B& ^$%#YMB$^Y ^$%BMKBYL ^%MUYK ^MV&UKY&^ MVUKY ^MBV UKY^MBUKY^ BVMUK^");
         }
 
         private static void ResetInitialEditorLoadFlag()
