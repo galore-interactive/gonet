@@ -14,13 +14,10 @@
  */
 
 using GONet.Generation;
-using GONet.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEditor.SceneManagement;
@@ -38,39 +35,39 @@ namespace GONet.Editor
         private static bool IsCompiling
         {
             get => EditorPrefs.GetBool(IsCompilingKey, false);
-            set { EditorPrefs.SetBool(IsCompilingKey, value); GONetLog.Debug($"Setting IsCompiling to: {value}"); }
+            set { EditorPrefs.SetBool(IsCompilingKey, value); /*GONetLog.Debug($"Setting IsCompiling to: {value}");*/ }
         }
 
         private static void OnCompilationStarted(object obj)
         {
             IsCompiling = true;
-            GONetLog.Debug("......................................................COMPILE start");
+            //GONetLog.Debug("......................................................COMPILE start");
         }
 
         private static void OnCompilationFinished(object obj)
         {
-            GONetLog.Debug("COMPILE end - setting up delay");
+            //GONetLog.Debug("COMPILE end - setting up delay");
 
             // Use delay call to ensure this runs after Unity settles post-compilation
             EditorApplication.delayCall += () =>
             {
-                GONetLog.Debug("......................................................COMPILE end (after delay)");
+                //GONetLog.Debug("......................................................COMPILE end (after delay)");
                 //IsCompiling = false;
             };
         }
         private static void OnBeforeAssemblyReload()
         {
-            GONetLog.Debug("Before assembly reload - still compiling...");
+            //GONetLog.Debug("Before assembly reload - still compiling...");
             IsCompiling = true;
         }
 
         private static void OnAfterAssemblyReload()
         {
-            GONetLog.Debug("After assembly reload - now it's safe to reset flags.");
+            //GONetLog.Debug("After assembly reload - now it's safe to reset flags.");
             // Use delay call to ensure this runs after Unity settles post-compilation
             EditorApplication.delayCall += () =>
             {
-                GONetLog.Debug("......................................................COMPILE end (after delay)");
+                //GONetLog.Debug("......................................................COMPILE end (after delay)");
                 IsCompiling = false;
             };
         }
@@ -81,7 +78,7 @@ namespace GONet.Editor
             // Handle actions post-reload (useful for checking compilation state)
             if (EditorPrefs.HasKey(IsCompilingKey) && EditorPrefs.GetBool(IsCompilingKey, false))
             {
-                GONetLog.Debug("Scripts reloaded while compiling; performing post-compilation cleanup.");
+                //GONetLog.Debug("Scripts reloaded while compiling; performing post-compilation cleanup.");
                 OnCompilationFinished(null); // Ensure post-compilation cleanup runs
             }
         }
@@ -475,7 +472,7 @@ namespace GONet.Editor
                     GONetLog.Debug($"GONetParticipant found in excluded scene (i.e., not in build, so GONet does not care now): {DesignTimeMetadata.GetFullPath(gonetParticipant)}");
                 }
 
-                GONetLog.Debug($"SLEEPS RESOURCES gnp:{DesignTimeMetadata.GetFullPath(gonetParticipant)}");
+                //GONetLog.Debug($"SLEEPS RESOURCES gnp:{DesignTimeMetadata.GetFullPath(gonetParticipant)}");
             }
         }
 

@@ -211,8 +211,6 @@ namespace GONet.Generation
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-
-            GONetLog.Debug($"--------------  ddddddddddddddddeeeeee  zun zwallace.... tODO if this is after all the stuff on load, then _DesignTime can wait for this before on hierarchy change....add condition in if check");
         }
 
         static readonly Dictionary<int, List<GONetParticipant>> OnPostprocessAllAssets_By_frameCountMap = new Dictionary<int, List<GONetParticipant>>();

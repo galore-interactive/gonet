@@ -463,7 +463,7 @@ namespace GONet
 
                 if (IsInPrefabPreviewMode())
                 {
-                    GONetLog.Debug($"GONetParticipant was validated on GameObject: {gameObject.name} (Design-time only).");
+                    //GONetLog.Debug($"GONetParticipant was validated on GameObject: {gameObject.name} (Design-time only).");
                 }
             }
 

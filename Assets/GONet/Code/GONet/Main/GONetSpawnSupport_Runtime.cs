@@ -61,7 +61,7 @@ namespace GONet
 
         static GONetSpawnSupport_Runtime()
         {
-            GONetLog.Debug($"---------------------------------NEW GONetSpawnSupport_Runtime(), so, all lookup cleared out!!!!");
+            //GONetLog.Debug($"---------------------------------NEW GONetSpawnSupport_Runtime(), so, all lookup cleared out!!!!");
         }
 
         public static IEnumerable<DesignTimeMetadata> LoadDesignTimeMetadataFromPersistence()
@@ -80,7 +80,7 @@ namespace GONet
                 return library.Entries;
             }
 #else
-            Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
+            //Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
             {
                 string fileContentsJson = File.ReadAllText(fullPath);
@@ -418,7 +418,7 @@ namespace GONet
                             CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                         }
                         : defaultDTM_EditorNotPlayMode;
-                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW? {shouldCreateNewDtm}"); // monitor how often new is created!!! do we need a pool ???
+
                     designTimeMetadataLookup.Set(designTimeLocation, metadata);
                     value = metadata;
                 }

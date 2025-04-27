@@ -272,21 +272,7 @@ namespace GONet
             // Here, we're creating an array of endpoints that includes both IPv4 and IPv6 loopback addresses if the serverIP is a loopback address.
             List<IPEndPoint> endpoints = NetworkUtils.BuildDualStackEndpointList(serverIP, serverPort);
             endpoints.AddRange(client.P2pEndPoints);
-            foreach (var e in endpoints) GONetLog.Debug($"{GetType().Name}.{nameof(Connect)} called. TOKEN ENTRY: {e}");
-
-            /*
-            if (NetworkUtils.IsIPAddressOnLocalMachine(serverIP))
-            {
-                // Add both loopback addresses to handle special case where server will compare various addresses for validation
-                endpoints.Add(new IPEndPoint(IPAddress.IPv6Loopback, serverPort)); // put the most likely one to be used/operational one first to prevent unnecessary delays waiting for timeouts
-                endpoints.Add(new IPEndPoint(IPAddress.Loopback, serverPort));
-            }
-            else
-            {
-                // If not a loopback, just add the parsed or resolved address
-                endpoints.Add(mostRecentConnectInfo);
-            }
-            */
+            //foreach (var e in endpoints) GONetLog.Debug($"{GetType().Name}.{nameof(Connect)} called. TOKEN ENTRY: {e}");
 
             byte[] connectToken = factory.GenerateConnectToken(
                 endpoints.ToArray(),

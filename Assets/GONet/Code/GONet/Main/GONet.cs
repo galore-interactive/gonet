@@ -2373,7 +2373,7 @@ namespace GONet
             isCurrentlyProcessingInstantiateGNPEvent = true;
             currentlyProcessingInstantiateGNPEvent = instantiateEvent;
 
-            GONetLog.Debug($"dreetsi instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
+            //GONetLog.Debug($"instantiation.location: {instantiateEvent.DesignTimeLocation}, parent.fullPath: {instantiateEvent.ParentFullUniquePath}");
 
             GONetParticipant template = GONetSpawnSupport_Runtime.LookupTemplateFromDesignTimeMetadata(instantiateEvent.DesignTimeLocation);
             template.wasInstantiatedForce = true; // the instantiated one will get this
@@ -2408,7 +2408,7 @@ namespace GONet
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
         {
-            GONetLog.Debug($"About to send all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
+            //GONetLog.Debug($"About to send all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
 
             Server_AssignNewClientAuthorityId(connectionToClient);
             Server_AssignNewClientGONetIdRawBatch(connectionToClient);
@@ -2416,7 +2416,7 @@ namespace GONet
             Server_SendClientCurrentState_AllAutoMagicalSync(connectionToClient);
             Server_SendClientIndicationOfInitializationCompletion(connectionToClient); // NOTE: sending this will cause the client to instantiate its GONetLocal
 
-            GONetLog.Debug($"...should have finished sending all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
+            //GONetLog.Debug($"...should have finished sending all current state to newly connected client.cxnUID: {connectionToClient.InitiatingClientConnectionUID}");
         }
 
         private static void Server_OnNewClientInstantiatedItsGONetLocal(GONetLocal newClientGONetLocal)
