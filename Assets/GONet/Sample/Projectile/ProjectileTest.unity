@@ -2348,12 +2348,22 @@ PrefabInstance:
     - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: server
-      value: 2600:1f18:7b06:3783:f8a7:4ad1:cc22:9de2
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: serverPort
-      value: 41000
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: isTickReceiver
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: valueBlendingBufferLeadTimeMilliseconds
+      value: 85
       objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904700, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}

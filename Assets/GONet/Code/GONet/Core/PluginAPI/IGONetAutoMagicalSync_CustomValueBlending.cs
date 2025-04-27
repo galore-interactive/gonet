@@ -1958,7 +1958,7 @@ namespace GONet.PluginAPI
 
     public class GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter : IGONetAutoMagicalSync_CustomValueBlending
     {
-        public static bool ShouldLog = true;
+        public static bool ShouldLog = false;
 
         public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
 
@@ -2023,7 +2023,7 @@ namespace GONet.PluginAPI
                                         {
                                             //GONetLog.Debug($"avg accel: {averageAcceleration}");
                                             blendedValue = baseSnap.numericValue.UnityEngine_Vector3 + averageAcceleration * (float)TimeSpan.FromTicks(atElapsedTicks - baseSnap.elapsedTicksAtChange).TotalSeconds;
-                                        } else GONetLog.Debug($" never determined bru: {valueBuffer.GetHashCode()}");
+                                        }
 
                                         /*
                                         { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
@@ -2067,15 +2067,12 @@ namespace GONet.PluginAPI
                                     }
                                     else if (valueCountUsable > 2)
                                     {
-                                        GONetLog.Debug("valueCountUsable: " + valueCountUsable);
                                         Vector3 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, iBase, baseSnap, out acceleration);
                                         didExtrapolate = true;
                                     }
                                     else
                                     {
-                                        GONetLog.Debug("valueCountUsable: " + valueCountUsable);
-
                                         NumericValueChangeSnapshot justBeforeNewest = valueBuffer[iBase + 1];
                                         Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
                                         Vector3 valueDiffBetweenLastTwo = baseValue - justBeforeNewest_numericValue;
@@ -2109,7 +2106,7 @@ namespace GONet.PluginAPI
                                         //GONetLog.Debug("extroip'd....p0: " + justBeforeNewest_numericValue + " p1: " + baseValue + " p2: " + extrapolated_ValueNew + " blended: " + blendedValue + " t: " + bezierTime);
                                         if (float.IsNaN(bezierTime) || float.IsNaN(blendedValue.UnityEngine_Vector3.x))
                                         {
-                                            GONetLog.Warning($"extrapolationSections: {extrapolationSections}, denominator: {denominator}, atMinusNewestTicks: {atMinusNewestTicks}");
+                                            if (ShouldLog) GONetLog.Warning($"extrapolationSections: {extrapolationSections}, denominator: {denominator}, atMinusNewestTicks: {atMinusNewestTicks}");
                                         }
                                     }
 
@@ -2119,7 +2116,7 @@ namespace GONet.PluginAPI
                                 else
                                 {
                                     blendedValue = baseValue; // was: newestValue;
-                                    GONetLog.Debug("VECTOR3 new new beast");
+                                    if (ShouldLog) GONetLog.Debug("VECTOR3 new new beast");
                                 }
                             }
                             else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
