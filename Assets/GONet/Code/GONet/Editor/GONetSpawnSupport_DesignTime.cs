@@ -114,7 +114,7 @@ namespace GONet.Editor
             EditorApplication.projectWindowChanged += OnProjectChanged;
 #endif
             */
-            
+
             // Instead, in v1.4+, we just monitor GONet related changes and take note that there are changes from last build to warn users later
             EditorApplication.hierarchyChanged += OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly;
             EditorApplication.projectChanged += OnProjectChanged_TakeNoteOfAnyGONetChanges_ProjectOnly;
@@ -124,10 +124,10 @@ namespace GONet.Editor
 
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
-            
+
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
-            
+
             // Recover the IsCompiling state from EditorPrefs (in case of domain reload)
             if (EditorPrefs.HasKey(IsCompilingKey) && EditorPrefs.GetBool(IsCompilingKey, false))
             {
@@ -162,10 +162,9 @@ namespace GONet.Editor
                     string fileContents = GetLimitedFilePreview(filePath, 10);
 
                     // Show a warning to the user
-                    ShowGONetWarning(fileContents);
+                    didPreventEnteringPlaymode = ShowGONetWarning_ShouldPreventEnteringPlaymode(fileContents);
 
-                    EditorApplication.isPlaying = false;
-                    didPreventEnteringPlaymode = true;
+                    EditorApplication.isPlaying = !didPreventEnteringPlaymode;
                 }
 
                 if (!didPreventEnteringPlaymode)
@@ -218,7 +217,8 @@ namespace GONet.Editor
             // Return only the first few lines with an indication of truncation
             return string.Join("\n", lines, 0, maxLines) + $"\n\n...and {lines.Length - maxLines} more lines.";
         }
-        private static void ShowGONetWarning(string fileContents)
+
+        private static bool ShowGONetWarning_ShouldPreventEnteringPlaymode(string fileContents)
         {
             // Create the warning message
             string warningMessage = "WARNING: GONet will not function properly until you create another build, because the server and all clients are required to have the same information as it pertains to all the things that are going to be networked.\n\n" +
@@ -226,8 +226,16 @@ namespace GONet.Editor
                                     fileContents;
 
             // Show a dialog with the warning and file contents
-            EditorUtility.DisplayDialog("GONet Warning", warningMessage, "OK");
+            bool didProceedAnyway =
+                EditorUtility.DisplayDialog(
+                    "GONet Warning", warningMessage,
+                    "Proceed Anyway (*NOT* Recommended)",
+                    "Cancel, I'll Rebuild First (Please and Thank You!)",
+                    DialogOptOutDecisionType.ForThisSession, "GONet Enter Playe Mode Build Warning");
+
+            return !didProceedAnyway;
         }
+
         private static void EditorSceneManager_sceneOpened(Scene scene, OpenSceneMode mode)
         {
             //GONetLog.Debug($" %& %^$B& ^$%#YMB$^Y ^$%BMKBYL ^%MUYK ^MV&UKY&^ MVUKY ^MBV UKY^MBUKY^ BVMUK^");
@@ -415,7 +423,7 @@ namespace GONet.Editor
                 !EditorApplication.isUpdating && // handle scene loading or editor updates
                 !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
                 !IsQuitting;
-            if (isTargetedDesignTimeOnlyAction && 
+            if (isTargetedDesignTimeOnlyAction &&
                 (IsInSceneIncludedInBuild(gonetParticipant) || DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject)))
             {
                 // if in here, we know this is a new GNP being added into scene in editor edit mode (i.e., design time add)
@@ -451,7 +459,7 @@ namespace GONet.Editor
                     allPathsToGnpsInProject.Add(fullPath);
                 }
             }
-            
+
             GONetLog.Debug($"Here are all {allPathsToGnpsInProject.Count} GNPs in project:\n{string.Join("\n", allPathsToGnpsInProject)}");
             ProcessAnyDesignTimeDirty_IfAppropriate(allPathsToGnpsInProject);
 
@@ -536,7 +544,7 @@ namespace GONet.Editor
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode &&
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount; // IMPORTANT: this is how we know it "just" changed from play to edit mode...otherwise we could never run the logic we want after exiting the play mode and we start messing around with the hierarchy
 
-            if (!Application.isPlaying && 
+            if (!Application.isPlaying &&
                 !isHierarchyChangingDueToExitingPlayModeInEditor && // it would not be design time if we are playing (in editor) now would it?
                 !IsCompiling &&
                 !IsInitialEditorLoad)
@@ -571,17 +579,17 @@ namespace GONet.Editor
             {
                 IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
                     GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
-                
-                IEnumerable<string> gnpPrefabAssetPaths_lastBuild = 
+
+                IEnumerable<string> gnpPrefabAssetPaths_lastBuild =
                     designTimeLocations_gonetParticipants_lastBuild
                         .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
                         .Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
 
                 // TODO FIXME doing this every time the hiearchy changes is crazy....mainy due to high processing time....need to attempt to move this entire method logic to be called in the other option: AssetPostprocessor.OnPostprocessAllAssets, where we hope we can more narrowly focus in on the specific data that is changing instead of searching the entire project essentially!
                 //   --- UPDATE to above TODO FIXME: there is an implementation of this inside AssetPostprocessor/Magoo.OnPostprocessAllAssets (find OnPostprocessAllAssets_TakeNoteOfAnyGONetChanges), so this here can/should probably be removed as redundant and this is less performant for sure.
-                List<GONetParticipant> gnpsInProjectResources = 
+                List<GONetParticipant> gnpsInProjectResources =
                     GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GatherGONetParticipantsInAllResourcesFolders();
-                
+
                 HashSet<string> gnpsInProjectResources_paths = new(gnpsInProjectResources.Select(g => AssetDatabase.GetAssetPath(g)));
 
                 {// Check for GNP deletes: was previously in gnpPrefabAssetPaths_lastBuild, but NOT in the updated list of gnp prefabs
@@ -663,8 +671,8 @@ namespace GONet.Editor
             if (Time.frameCount == 0) return;
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            bool isHierarchyChangingDueToExitingPlayModeInEditor = 
-                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue && 
+            bool isHierarchyChangingDueToExitingPlayModeInEditor =
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue &&
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode &&
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount; // IMPORTANT: this is how we know it "just" changed from play to edit mode...otherwise we could never run the logic we want after exiting the play mode and we start messing around with the hierarchy
 
@@ -714,7 +722,7 @@ namespace GONet.Editor
             bool doesAlreadyExist = persistedDtms.Any(x => x.Location == ensureExistsDtm.Location);
             if (doesAlreadyExist)
             {
-                if (ensureExistsDtm.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset || 
+                if (ensureExistsDtm.CodeGenerationId != GONetParticipant.CodeGenerationId_Unset ||
                     ensureExistsDtm.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)) // IMPORTANT: allow persisting "project://" when code gen 0 (in hopes this gets corrected later, but need it in there now!)
                 {
                     int iMatch = 0;
@@ -728,7 +736,7 @@ namespace GONet.Editor
                         }
 
                         persistedDtm.UnityGuid = ensureExistsDtm.UnityGuid;
-                        
+
                         if (++iMatch > 1)
                         {
                             Debug.LogWarning($"More than 1 match of location: {ensureExistsDtm.Location}, match# {iMatch}");
@@ -774,7 +782,7 @@ namespace GONet.Editor
 
             DesignTimeMetadata designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
             designTimeMetadata.Location = currentLocation;
-            
+
             string unityGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(gonetParticipant));
             designTimeMetadata.UnityGuid = unityGuid;
 
@@ -814,8 +822,8 @@ namespace GONet.Editor
             }
 
             var invalidMofosWillNotPersist = newCompleteDesignTimeLocations
-                .Where(x => string.IsNullOrWhiteSpace(x.Location) || 
-                    (x.Location.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX) 
+                .Where(x => string.IsNullOrWhiteSpace(x.Location) ||
+                    (x.Location.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)
                         && x.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset));// IMPORTANT: allow persisting "project://" when code gen 0 (in hopes this gets corrected later, but need it in there now!)
             foreach (var invalid in invalidMofosWillNotPersist)
             {
