@@ -1,9 +1,7 @@
 {
     "name": "BCCrypto",
     "rootNamespace": "",
-    "references": [
-        "GUID:c32c331b790b47248b3cca2dfd448253"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,
