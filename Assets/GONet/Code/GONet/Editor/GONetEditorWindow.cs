@@ -145,6 +145,8 @@ namespace GONet.Editor
             if (GUILayout.Button("Refresh GONet code generation"))
             {
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
 
             EditorGUILayout.Separator();
@@ -165,20 +167,29 @@ namespace GONet.Editor
             if (GUILayout.Button("Fix GONet Generated Code"))
             {
                 FixGONetGeneratedCode();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
 
             if (GUILayout.Button("Generate Runtime only scripts"))
             {
                 GenerateRuntimeOnlyScripts();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
             if (GUILayout.Button("Delete Runtime only scripts"))
             {
                 DeleteRuntimeOnlyScripts();
+                Close(); // close now to avoid static reload stuff causing null references when rendering after above call
+                return;
             }
         }
 
         private void FixGONetGeneratedCode()
         {
+            GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (1)");
+
+
             if (File.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH))
             {
                 File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_ALL_UNIQUE_SNAPS_FILE_PATH);
@@ -194,6 +205,7 @@ namespace GONet.Editor
                 File.Delete(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ASSET_FOLDER_SNAPS_FILE);
             }
 
+            /* This causes all to recompile and I believe it is unnecessary and it certain takes a long time!
             const string UNITY_LIBRARY_SCRIPT_ASSEMBLIES = "Library/ScriptAssemblies";
             if (Directory.Exists(UNITY_LIBRARY_SCRIPT_ASSEMBLIES))
             {
@@ -202,6 +214,7 @@ namespace GONet.Editor
                     File.Delete(filePath);
                 }
             }
+            */
 
             if (Directory.Exists(GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GENERATED_FILE_PATH))
             {
@@ -211,10 +224,25 @@ namespace GONet.Editor
                 }
             }
 
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            bool wasNewDtmForced = GONetSpawnSupport_Runtime.IsNewDtmForced;
+            try
+            {
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (2)");
+                GONetSpawnSupport_Runtime.IsNewDtmForced = true;
 
-            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (3)");
+                GONetSpawnSupport_DesignTime.EnsureDesignTimeLocationsCurrent_ProjectOnly(); // TODO FIXME where does this belong to get all project:// to save to DTM.txt?!?!?!?
+
+                GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
+            }
+            finally
+            {
+                GONetSpawnSupport_Runtime.IsNewDtmForced = wasNewDtmForced;
+                GONetLog.Debug($"FRAME: {Time.frameCount} .... FixGONetGeneratedCode (4)");
+            }
         }
 
         internal static T CreateSyncSettingsProfileAsset<T>(string assetName) where T : ScriptableObject

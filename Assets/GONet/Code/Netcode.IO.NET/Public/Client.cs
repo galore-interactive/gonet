@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
+using GONet;
 
 namespace NetcodeIO.NET
 {
@@ -189,27 +190,35 @@ namespace NetcodeIO.NET
 
 		private Func<EndPoint, ISocketContext> socketFactory;
 
-		#endregion
+        #endregion
 
-		public Client()
-		{
-			state = ClientState.Disconnected;
-			pendingDisconnectState = ClientState.Disconnected;
+        public Client()
+        {
+            state = ClientState.Disconnected;
+            pendingDisconnectState = ClientState.Disconnected;
 
-			replayProtection = new NetcodeReplayProtection();
-			replayProtection.Reset();
+            replayProtection = new NetcodeReplayProtection();
+            replayProtection.Reset();
 
-			socketFactory = (endpoint) =>
-			{
-				var socket = new UDPSocketContext(endpoint.AddressFamily);
-				var socketEndpoint = new IPEndPoint(endpoint.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any, 0);
-				socket.Bind(socketEndpoint);
+            socketFactory = (endpoint) =>
+            {
+                // Create a dual-stack socket if endpoint is IPv6
+                var socket = new UDPSocketContext(endpoint.AddressFamily);
 
-				return socket;
-			};
-		}
+                // Bind to an appropriate endpoint that allows for dual-stack if necessary
+                var socketEndpoint = new IPEndPoint(
+                    endpoint.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any :
+                    endpoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any :
+                    throw new ArgumentException("Unsupported address family.", nameof(endpoint.AddressFamily)),
+                    0); // Port 0 means OS will assign any available port
 
-		internal Client(Func<EndPoint, ISocketContext> socketFactory)
+                socket.Bind(socketEndpoint);
+
+                return socket;
+            };
+        }
+
+        internal Client(Func<EndPoint, ISocketContext> socketFactory)
 		{
 			state = ClientState.Disconnected;
 			pendingDisconnectState = ClientState.Disconnected;
@@ -235,7 +244,7 @@ namespace NetcodeIO.NET
 		/// </summary>
 		public void Connect(byte[] connectToken)
 		{
-			Connect(connectToken, true);
+			Connect(connectToken, autoTick: true);
 		}
 
 		internal void Connect(byte[] connectToken, bool autoTick)
@@ -437,7 +446,7 @@ namespace NetcodeIO.NET
 
 		private void processDatagram(Datagram datagram)
 		{
-			if (!MiscUtils.AreEndPointsEqual(datagram.sender, currentServerEndpoint))
+			if (!GONet.Utils.NetworkUtils.AreSameAddressFamilyOrMapped(datagram.sender, currentServerEndpoint))
 				return;
 
 			using (var reader = ByteArrayReaderWriter.Get(datagram.payload))
@@ -655,6 +664,8 @@ namespace NetcodeIO.NET
 
 		private void connectionMoveNextEndpoint()
 		{
+			GONetLog.Debug($"Moving to next endpoint.  Perhaps due to timeout on attempts using previous endpoint.");
+
 			timer = 0.0;
 			connectionTimer = 0.0;
 
@@ -716,11 +727,18 @@ namespace NetcodeIO.NET
 			BufferPool.ReturnBuffer(packetBuffer);
 		}
 
-		#endregion
+        #endregion
 
-		#region Util methods
+		internal IEnumerable<IPEndPoint> P2pEndPoints => p2pEndPoints;
+        private readonly HashSet<IPEndPoint> p2pEndPoints = new();
+        internal void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            p2pEndPoints.Add(p2pEndPoint);
+        }
 
-		private void sendPacket(NetcodePacketHeader packetHeader, byte[] packetData, int packetDataLen, byte[] key)
+        #region Util methods
+
+        private void sendPacket(NetcodePacketHeader packetHeader, byte[] packetData, int packetDataLen, byte[] key)
 		{
 			// assign a sequence number to this packet
 			packetHeader.SequenceNumber = this.nextPacketSequence++;
@@ -746,7 +764,10 @@ namespace NetcodeIO.NET
 			{
                 socket.SendTo(packetBuffer, packetLen, currentServerEndpoint);
             }
-            catch { }
+            catch (Exception e)
+			{
+				GONetLog.Error(e.ToString());
+			}
 
             BufferPool.ReturnBuffer(packetBuffer);
 			BufferPool.ReturnBuffer(encryptedPacketBuffer);
@@ -771,6 +792,6 @@ namespace NetcodeIO.NET
 			return replayProtection.AlreadyReceived(packetHeader.SequenceNumber);
 		}
 
-		#endregion
-	}
+        #endregion
+    }
 }

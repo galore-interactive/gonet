@@ -1,15 +1,9 @@
-﻿using GONet;
-using GONet.Utils;
+﻿using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 
 namespace NetcodeIO.NET.Utils
@@ -59,23 +53,25 @@ namespace NetcodeIO.NET.Utils
 
         public void BeginReceiving(Socket socket, int activeReceiveThreads)
         {
-            EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+            // Use IPv6Any for dual-stack support
+            EndPoint sender = new IPEndPoint(IPAddress.IPv6Any, 0);
 
             for (int i = 0; i < activeReceiveThreads; ++i)
             {
-                const int LENGTH = 1024 * 2;
+                const int LENGTH = 1024 * 2; // Adjust this size based on your largest expected packet
                 byte[] payload = BufferPool.GetBuffer(LENGTH);
                 byte[] payload_transient = asyncReceivePool.Borrow(LENGTH);
 
                 var receivePackaging = new AsyncReceivePackaging()
-                { 
-                    payload = payload, 
+                {
+                    payload = payload,
                     payload_transient = payload_transient,
                     payloadBorrowedFromPool = asyncReceivePool,
                     socket = socket,
-                    sender = sender
+                    sender = sender // This will now handle both IPv4 and IPv6
                 };
 
+                // Begin asynchronous receive operation
                 socket.BeginReceiveFrom(receivePackaging.payload_transient, 0, receivePackaging.payload_transient.Length, SocketFlags.None, ref sender, OnBeginReceiveFromComplete, receivePackaging);
             }
         }
@@ -111,7 +107,7 @@ namespace NetcodeIO.NET.Utils
                 {
                     Buffer.BlockCopy(receivePackaging.payload_transient, 0, receivePackaging.payload, 0, recv);
 
-                    //GONet.GONetLog.Debug("receiving...length: " + recv);
+                    //GONet.GONetLog.Debug("receiving...length: " + recv + " from endpoint: " + NetworkUtils.GetEndpointDebugString(receivePackaging.sender));
                     Datagram packet = new Datagram();
                     packet.sender = receivePackaging.sender;
                     packet.payload = receivePackaging.payload;
@@ -131,11 +127,11 @@ namespace NetcodeIO.NET.Utils
             }
             catch (ObjectDisposedException ode)
             {
-                GONetLog.Info($"Trying to end the BeginSendTo call.  This is most likely happening as a result of a normal shutdown procedure. Message: {ode.Message}");
+                //GONetLog.Info($"Trying to end the BeginSendTo call.  This is most likely happening as a result of a normal shutdown procedure. Message: {ode.Message}");
             }
             catch (Exception e)
             {
-                GONetLog.Error($"Ran into something possibly serious trying to wrap up this BeginSendTo call.  Exception Type: {e.GetType().FullName} Message: {e.Message}\nStacTrace: {e.StackTrace}");
+                //GONetLog.Error($"Ran into something possibly serious trying to wrap up this BeginSendTo call.  Exception Type: {e.GetType().FullName} Message: {e.Message}\nStacTrace: {e.StackTrace}");
             }
             finally
             {
@@ -145,12 +141,15 @@ namespace NetcodeIO.NET.Utils
 
         internal void ReadFrom(Socket internalSocket)
         {
-            EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-            byte[] receiveBuffer = BufferPool.GetBuffer(2048);
+            // Use IPv6Any for dual-stack support
+            EndPoint sender = new IPEndPoint(IPAddress.IPv6Any, 0);
+            byte[] receiveBuffer = BufferPool.GetBuffer(2048); // Ensure this size is adequate for your needs
+
             int recv = internalSocket.ReceiveFrom(receiveBuffer, ref sender);
             if (recv > 0)
             {
-                //GONet.GONetLog.Debug("receiving...length: " + recv);
+                //GONet.GONetLog.Debug($"Receiving from {((IPEndPoint)sender).Address}:{((IPEndPoint)sender).Port}, length: {recv}, from endpoint: {NetworkUtils.GetEndpointDebugString(sender)}");
+
                 Datagram packet = new Datagram();
                 packet.sender = sender;
                 packet.payload = receiveBuffer;
@@ -170,7 +169,7 @@ namespace NetcodeIO.NET.Utils
 				if (endpointPool.Count > 0)
 					sender = endpointPool.Dequeue();
 				else
-					sender = new IPEndPoint(IPAddress.Any, 0);
+					sender = new IPEndPoint(IPAddress.IPv6Any, 0);
 			}
 
 			byte[] receiveBuffer = BufferPool.GetBuffer(2048);

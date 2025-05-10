@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -383,6 +384,27 @@ namespace GONet
             Assert.AreEqual(1, handlerOrder[2]);
         }
 
+        [Test]
+        public void CopyFieldsVersusCopyMemorySpeedTest()
+        {
+            var benchmark = new Benchmark(10_000_000);
+            var stopwatch = new System.Diagnostics.Stopwatch();
+
+            // Measure field-by-field copying
+            stopwatch.Start();
+            benchmark.CopyFields();
+            stopwatch.Stop();
+            long fieldMS = stopwatch.ElapsedMilliseconds;
+
+            // Measure memory copy
+            stopwatch.Restart();
+            benchmark.MemoryCopy();
+            stopwatch.Stop();
+            long memoryMS = stopwatch.ElapsedMilliseconds;
+
+            UnityEngine.Debug.Log($"Field-by-field Copying: {fieldMS} ms, Memory Copy: {memoryMS} ms");
+        }
+
         private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
         {
             Assert.AreEqual(0, GONetMain.EventBus.Publish(new GONetParticipantDisabledEvent()));
@@ -435,4 +457,82 @@ namespace GONet
             orderedSubscriptions.AddLast(nameof(OnIGONetEvent));
         }
     }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct SyncEventData
+    {
+        public SyncEvent_ValueChangeProcessedExplanation Explanation;
+        public long OccurredAtElapsedTicks;
+        public ushort RelatedOwnerAuthorityId;
+        public uint GONetId;
+        public byte CodeGenerationId;
+        public byte SyncMemberIndex;
+        public uint ValuePrevious;
+        public uint ValueNew;
+    }
+
+    public class Benchmark
+    {
+        public SyncEventData[] data;
+        public SyncEventData[] events;
+
+        private int iterations;
+
+        public Benchmark(int iterations)
+        {
+            this.iterations = iterations;
+            data = new SyncEventData[iterations];
+            events = new SyncEventData[iterations];
+
+            for (int i = 0; i < iterations; i++)
+            {
+                data[i] = new SyncEventData
+                {
+                    Explanation = new SyncEvent_ValueChangeProcessedExplanation(),
+                    OccurredAtElapsedTicks = i,
+                    RelatedOwnerAuthorityId = (ushort)i,
+                    GONetId = (uint)i,
+                    CodeGenerationId = (byte)i,
+                    SyncMemberIndex = (byte)i,
+                    ValuePrevious = (uint)i,
+                    ValueNew = (uint)(i + 1)
+                };
+                events[i] = new SyncEventData();
+            }
+        }
+
+        public void CopyFields()
+        {
+            for (int i = 0; i < iterations; i++)
+            {
+                SyncEventData eventsI = events[i];
+                SyncEventData dataI = data[i];
+
+                eventsI.Explanation = dataI.Explanation;
+                eventsI.OccurredAtElapsedTicks = dataI.OccurredAtElapsedTicks;
+                eventsI.RelatedOwnerAuthorityId = dataI.RelatedOwnerAuthorityId;
+                eventsI.GONetId = dataI.GONetId;
+                eventsI.CodeGenerationId = dataI.CodeGenerationId;
+                eventsI.SyncMemberIndex = dataI.SyncMemberIndex;
+                eventsI.ValuePrevious = dataI.ValuePrevious;
+                eventsI.ValueNew = dataI.ValueNew;
+            }
+        }
+
+        public void MemoryCopy()
+        {
+            unsafe
+            {
+                for (int i = 0; i < iterations; i++)
+                {
+                    fixed (SyncEventData* sourcePtr = &data[i])
+                    fixed (SyncEventData* destPtr = &events[i])
+                    {
+                        Buffer.MemoryCopy(sourcePtr, destPtr, sizeof(SyncEventData), sizeof(SyncEventData));
+                    }
+                }
+            }
+        }
+    }
+
 }

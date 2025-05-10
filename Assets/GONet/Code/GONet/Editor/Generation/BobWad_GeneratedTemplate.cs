@@ -66,9 +66,11 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                 foreach (var memberKVP in typeKVP.Value)
                 {
                     { // FIY, this block is mostly coppi pasta from below:!!:
-                        const string UNDIE = "_";
-                        const string PER = ".";
+                        const string GONET_NAMESPACE_PREFIX = "GONet.";
                         const string SYNC_EV = "SyncEvent_";
+                        const string PER = ".";
+                        const string UNDIE = "_";
+
                         ValueTuple<string, AnimatorControllerParameterGenerationInfo> memberTuple = memberKVP.Value;
                         string shortComponentType = typeKVP.Key.Contains(PER) ? typeKVP.Key.Substring(typeKVP.Key.LastIndexOf(PER) + 1) : typeKVP.Key;
                         string className = string.Concat(shortComponentType, UNDIE, memberKVP.Key);
@@ -81,7 +83,7 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
                             className = string.Concat(typeKVP.Key.Replace(PER, UNDIE), UNDIE, memberKVP.Key);
                         }
 
-                        syncEventTypeFullNames.Add(string.Concat("GONet.", SYNC_EV, className)); // except this, this is not coppi pasta
+                        syncEventTypeFullNames.Add(string.Concat(GONET_NAMESPACE_PREFIX, SYNC_EV, className)); // except this, this is not coppi pasta
                     }
                 }
             }
@@ -635,7 +637,7 @@ namespace GONet.Generation
 #line hidden
             this.Write("\t\t\treturn settings;\r\n\t\t}\r\n\r\n\t\tstatic internal GONetParticipant_AutoMagicalSyncCom" +
                     "panion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)\r\n" +
-                    "\t\t{\r\n\t\t\tswitch (gonetParticipant.codeGenerationId)\r\n\t\t\t{\r\n");
+                    "\t\t{\r\n\t\t\tswitch (gonetParticipant.CodeGenerationId)\r\n\t\t\t{\r\n");
 
 #line 287 "C:\projects\unity\gonet_ext\gonet-stress-test\Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt"
             for (int i = 0; i < usedCodegenIds.Length; ++i)
@@ -672,7 +674,7 @@ namespace GONet.Generation
 
 		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, ushort filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
-            switch (syncCompanion.gonetParticipant.codeGenerationId)
+            switch (syncCompanion.gonetParticipant.CodeGenerationId)
             {
 ");
 

@@ -34,6 +34,7 @@ namespace GONet.Editor
 
         const string SCR = " (Script)";
 
+        private const string PREFAB_FILE_EXTENSION = ".prefab";
         private void OnEnable()
         {
             targetGONetParticipant = (GONetParticipant)target;
@@ -58,6 +59,7 @@ namespace GONet.Editor
             EditorGUI.BeginChangeCheck();
             serializedObject.UpdateIfRequiredOrScript();
 
+            /* this stuff is no longer going to be accurate necessarilly at this moment, so don't show it in inspector
             {
                 EditorGUILayout.BeginHorizontal();
                 const string DESIGN = "Design Time Location";
@@ -70,10 +72,11 @@ namespace GONet.Editor
                 EditorGUILayout.BeginHorizontal();
                 const string CODE_GEN_ID = "Code Generation Id";
                 EditorGUILayout.LabelField(CODE_GEN_ID);
-                string value = targetGONetParticipant.codeGenerationId == GONetParticipant.CodeGenerationId_Unset ? NOT_SET : targetGONetParticipant.codeGenerationId.ToString();
+                string value = targetGONetParticipant.CodeGenerationId == GONetParticipant.CodeGenerationId_Unset ? NOT_SET : targetGONetParticipant.CodeGenerationId.ToString();
                 EditorGUILayout.TextField(value);
                 EditorGUILayout.EndHorizontal();
             }
+            */
 
             { // IsRigidBodyOwnerOnlyControlled
                 var pre = GUI.enabled;
@@ -422,6 +425,13 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                     }
                 }
 
+                if (serializedObject.hasModifiedProperties)
+                {
+                    if (!Application.isPlaying)
+                    {
+                        GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason("Important member data of a GONetParticipant has changed values in editor. Path:" + DesignTimeMetadata.GetFullPath(targetGONetParticipant));
+                    }
+                }
                 serializedObject.ApplyModifiedProperties();
 
                 if (EditorGUI.EndChangeCheck())
@@ -431,7 +441,7 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                         EditorUtility.SetDirty(targetGONetParticipant);
                         EditorUtility.SetDirty(targetGONetParticipant.gameObject);
 
-                        bool isPrefab = targetGONetParticipant.designTimeLocation.EndsWith(".prefab"); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
+                        bool isPrefab = targetGONetParticipant.DesignTimeLocation.EndsWith(PREFAB_FILE_EXTENSION); // TODO ensure we can count on this....or just use a sure fire way for unity to tell us the answer
                         if (!isPrefab)
                         {
                             EditorUtility.SetDirty(targetGONetParticipant);

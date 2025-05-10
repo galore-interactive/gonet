@@ -7,7 +7,8 @@ using System.Linq;
 using NetcodeIO.NET.Utils;
 using NetcodeIO.NET.Utils.IO;
 using NetcodeIO.NET.Internal;
-using GONet;
+using GONet.Utils;
+using System.Collections.Generic;
 
 namespace NetcodeIO.NET
 {
@@ -169,7 +170,10 @@ namespace NetcodeIO.NET
 
 		private ISocketContext listenSocket;
 		private IPEndPoint listenEndpoint;
+		private IPEndPoint listenEndpointV6;
 
+
+		internal bool IsRunning => isRunning;
 		private bool isRunning = false;
 
 		private ulong protocolID;
@@ -193,9 +197,39 @@ namespace NetcodeIO.NET
 
         private bool disposed = false;
 
-		#endregion
+        #endregion
 
-		public Server(int maxSlots, string address, int port, ulong protocolID, byte[] privateKey)
+        public Server(int maxSlots, int port, ulong protocolID, byte[] privateKey)
+        {
+            this.tickrate = 60;
+
+            this.maxSlots = maxSlots;
+            this.maxConnectTokenEntries = this.maxSlots * 8;
+            this.connectTokenHistory = new usedConnectToken[this.maxConnectTokenEntries];
+            initConnectTokenHistory();
+
+            this.clientSlots = new RemoteClient[maxSlots];
+            this.encryptionManager = new EncryptionManager(maxSlots);
+
+            this.listenEndpoint = new IPEndPoint(IPAddress.Any, port);
+            // Use IPv6Any to allow binding to both IPv4 and IPv6 if possible
+            this.listenEndpointV6 = new IPEndPoint(IPAddress.IPv6Any, port);
+
+            AddressFamily addressFamily = AddressFamily.InterNetworkV6; // Default to IPv6 for dual-stack
+
+            // Create UDPSocketContext with dual-stack support
+            this.listenSocket = new UDPSocketContext(addressFamily);
+
+            this.protocolID = protocolID;
+
+            this.privateKey = privateKey;
+
+            // Generate a random challenge key
+            this.challengeKey = new byte[32];
+            KeyUtils.GenerateKey(this.challengeKey);
+        }
+
+        internal Server(ISocketContext socketContext, int maxSlots, int port, ulong protocolID, byte[] privateKey)
 		{
 			this.tickrate = 60;
 
@@ -207,37 +241,10 @@ namespace NetcodeIO.NET
 			this.clientSlots = new RemoteClient[maxSlots];
 			this.encryptionManager = new EncryptionManager(maxSlots);
 
-			this.listenEndpoint = new IPEndPoint(IPAddress.Parse(address), port);
+			this.listenEndpoint = new IPEndPoint(IPAddress.Any, port);
+            this.listenEndpointV6 = new IPEndPoint(IPAddress.IPv6Any, port);
 
-			if (this.listenEndpoint.AddressFamily == AddressFamily.InterNetwork)
-				this.listenSocket = new UDPSocketContext(AddressFamily.InterNetwork);
-			else
-				this.listenSocket = new UDPSocketContext(AddressFamily.InterNetworkV6);
-
-			this.protocolID = protocolID;
-
-			this.privateKey = privateKey;
-
-			// generate a random challenge key
-			this.challengeKey = new byte[32];
-			KeyUtils.GenerateKey(this.challengeKey);
-		}
-
-		internal Server(ISocketContext socketContext, int maxSlots, string address, int port, ulong protocolID, byte[] privateKey)
-		{
-			this.tickrate = 60;
-
-			this.maxSlots = maxSlots;
-			this.maxConnectTokenEntries = this.maxSlots * 8;
-			this.connectTokenHistory = new usedConnectToken[this.maxConnectTokenEntries];
-			initConnectTokenHistory();
-
-			this.clientSlots = new RemoteClient[maxSlots];
-			this.encryptionManager = new EncryptionManager(maxSlots);
-
-			this.listenEndpoint = new IPEndPoint(IPAddress.Parse(address), port);
-
-			this.listenSocket = socketContext;
+            this.listenSocket = socketContext;
 
 			this.protocolID = protocolID;
 
@@ -256,35 +263,36 @@ namespace NetcodeIO.NET
 		public void Start(int tickHertz)
 		{
             Tickrate = tickHertz;
-			Start(true);
+			Start(autoTick: true);
 		}
 
-		internal void Start(bool autoTick)
-		{
-			if (disposed) throw new InvalidOperationException("Can't restart disposed server, please create a new server");
+        internal void Start(bool autoTick)
+        {
+            if (disposed) throw new InvalidOperationException("Can't restart disposed server, please create a new server");
 
-			resetConnectTokenHistory();
+            resetConnectTokenHistory();
 
-			IPEndPoint any = new IPEndPoint(IPAddress.Any, this.listenEndpoint.Port);
-			this.listenSocket.Bind(any);
-			isRunning = true;
+            // Bind to IPv6Any for dual-stack support
+            IPEndPoint any = new IPEndPoint(IPAddress.IPv6Any, this.listenEndpoint.Port);
+            this.listenSocket.Bind(any);
+            isRunning = true;
 
-			if (autoTick)
-			{
-				this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
+            if (autoTick)
+            {
+                this.totalSeconds = DateTime.UtcNow.GetTotalSeconds();
 
-				Thread tickThread = new Thread(serverTick_SeparateThread);
-				tickThread.Name = "GONet Server Tick";
-				tickThread.Priority = ThreadPriority.AboveNormal;
-				tickThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
-				tickThread.Start();
-			}
-		}
+                Thread tickThread = new Thread(serverTick_SeparateThread);
+                tickThread.Name = "GONet Server Tick";
+                tickThread.Priority = ThreadPriority.AboveNormal;
+                tickThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
+                tickThread.Start();
+            }
+        }
 
-		/// <summary>
-		/// Stop the server and disconnect any clients
-		/// </summary>
-		public void Stop()
+        /// <summary>
+        /// Stop the server and disconnect any clients
+        /// </summary>
+        public void Stop()
 		{
 			disposed = true;
 
@@ -724,85 +732,93 @@ namespace NetcodeIO.NET
 				return;
 			}
 
-			// if this server's public IP is not in the list of endpoints, packet is not valid
-			bool serverAddressInEndpoints = privateConnectToken.ConnectServers.Any(x => x.Endpoint.CompareEndpoint(this.listenEndpoint, this.Port));
-			if (!serverAddressInEndpoints)
-			{
-				log($"Server address not listen in token.  this.listenEndpoint: {this.listenEndpoint}", NetcodeLogLevel.Debug);
+            ConnectTokenServerEntry[] clientServerList = privateConnectToken.ConnectServers;
+            bool doesClientServerListIncludeThis = clientServerList.Any(x =>
+				NetworkUtils.DoEndpointsMatch(listenEndpoint, listenEndpointV6, x.Endpoint) ||
+                p2pEndPoints.Any(p2p => NetworkUtils.DoEndpointsMatch(p2p, x.Endpoint)));
 
-				{
-					// SHAUN TODO: when server is listening on ANY or LOOPBACK, it will not show up in token from client
-					//return; put me in coach!
+            if (!doesClientServerListIncludeThis)
+            {
+                log($"Server address not in token. this.listenEndpoint: {this.listenEndpoint}", NetcodeLogLevel.Debug);
 
-					privateConnectToken.ConnectServers.ToList().ForEach(x => log($"\tprivateConnectionToken.ConnectServers[i].Endpoint: {x.Endpoint}", NetcodeLogLevel.Debug));
-				}
+                // Log for debugging
+                privateConnectToken.ConnectServers.ToList().ForEach(x => log($"\tprivateConnectionToken.ConnectServers[i].Endpoint: {x.Endpoint}", NetcodeLogLevel.Debug));
             }
+            else
+            {
+                // If server address is in endpoints, proceed with connection logic
+                // if a client from packet source IP / port is already connected, ignore the packet
+                if (clientSlots.Any(x => x != null && x.RemoteEndpoint.Equals(sender)))
+                {
+                    log("Client {0} already connected", NetcodeLogLevel.Debug, sender.ToString());
+                    return;
+                }
 
-			// if a client from packet source IP / port is already connected, ignore the packet
-			if (clientSlots.Any(x => x != null && x.RemoteEndpoint.Equals(sender)))
-			{
-				log("Client {0} already connected", NetcodeLogLevel.Debug, sender.ToString());
-				return;
-			}
+                // if a client with the same id as the connect token is already connected, ignore the packet
+                if (clientSlots.Any(x => x != null && x.ClientID == privateConnectToken.ClientID))
+                {
+                    log("Client ID {0} already connected", NetcodeLogLevel.Debug, privateConnectToken.ClientID);
+                    return;
+                }
 
-			// if a client with the same id as the connect token is already connected, ignore the packet
-			if (clientSlots.Any(x => x != null && x.ClientID == privateConnectToken.ClientID))
-			{
-				log("Client ID {0} already connected", NetcodeLogLevel.Debug, privateConnectToken.ClientID);
-				return;
-			}
+                // if the connect token has already been used by a different endpoint, ignore the packet
+                // otherwise, add the token hmac and endpoint to the used token history
+                // compares the last 16 bytes (token mac)
+                byte[] token_mac = BufferPool.GetBuffer(Defines.MAC_SIZE);
+                System.Array.Copy(connectionRequestPacket.ConnectTokenBytes, Defines.NETCODE_CONNECT_TOKEN_PRIVATE_BYTES - Defines.MAC_SIZE, token_mac, 0, Defines.MAC_SIZE);
+                if (!findOrAddConnectToken(sender, token_mac, totalSeconds))
+                {
+                    log("Token already used for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
+                    BufferPool.ReturnBuffer(token_mac);
+                    return;
+                }
 
-			// if the connect token has already been used by a different endpoint, ignore the packet
-			// otherwise, add the token hmac and endpoint to the used token history
-			// compares the last 16 bytes (token mac)
-			byte[] token_mac = BufferPool.GetBuffer(Defines.MAC_SIZE);
-			System.Array.Copy(connectionRequestPacket.ConnectTokenBytes, Defines.NETCODE_CONNECT_TOKEN_PRIVATE_BYTES - Defines.MAC_SIZE, token_mac, 0, Defines.MAC_SIZE);
-			if (!findOrAddConnectToken(sender, token_mac, totalSeconds))
-			{
-				log("Token already used for sender: {0}", NetcodeLogLevel.Debug, sender.ToString());
-				BufferPool.ReturnBuffer(token_mac);
-				return;
-			}
+                BufferPool.ReturnBuffer(token_mac);
 
-			BufferPool.ReturnBuffer(token_mac);
+                // if we have no slots, we need to respond with a connection denied packet
+                var nextSlot = getFreeClientSlot();
+                if (nextSlot == -1)
+                {
+                    denyConnection(sender, privateConnectToken.ServerToClientKey);
+                    log("Server is full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
+                    return;
+                }
 
-			// if we have no slots, we need to respond with a connection denied packet
-			var nextSlot = getFreeClientSlot();
-			if (nextSlot == -1)
-			{
-				denyConnection(sender, privateConnectToken.ServerToClientKey);
-				log("Server is full, denying connection for sender: {0}", NetcodeLogLevel.Info, sender.ToString());
-				return;
-			}
+                // add encryption mapping for this endpoint as well as timeout
+                // packets received from this endpoint are to be decrypted with the client-to-server key
+                // packets sent to this endpoint are to be encrypted with the server-to-client key
+                // if no messages are received within timeout from this endpoint, it is disconnected (unless timeout is negative)
+                if (!encryptionManager.
+                    AddEncryptionMapping(
+                        sender,
+                        privateConnectToken.ServerToClientKey,
+                        privateConnectToken.ClientToServerKey,
+                        totalSeconds,
+                        totalSeconds + 30,
+                        privateConnectToken.TimeoutAfterSeconds,
+                        0))
+                {
+                    log("Failed to add encryption mapping for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
+                    return;
+                }
 
-			// add encryption mapping for this endpoint as well as timeout
-			// packets received from this endpoint are to be decrypted with the client-to-server key
-			// packets sent to this endpoint are to be encrypted with the server-to-client key
-			// if no messages are received within timeout from this endpoint, it is disconnected (unless timeout is negative)
-			if (!encryptionManager.
-                AddEncryptionMapping(
-                    sender,
-				    privateConnectToken.ServerToClientKey,
-				    privateConnectToken.ClientToServerKey,
-				    totalSeconds,
-				    totalSeconds + 30,
-				    privateConnectToken.TimeoutAfterSeconds,
-				    0))
-			{
-				log("Failed to add encryption mapping for sender: {0}", NetcodeLogLevel.Error, sender.ToString());
-				return;
-			}
+                // finally, send a connection challenge packet
+                sendConnectionChallenge(privateConnectToken, sender);
+            }
+        }
 
-			// finally, send a connection challenge packet
-			sendConnectionChallenge(privateConnectToken, sender);
-		}
+		private readonly HashSet<IPEndPoint> p2pEndPoints = new();
+        internal void AddP2pEndPoint(IPEndPoint p2pEndPoint)
+        {
+            p2pEndPoints.Add(p2pEndPoint);
+        }
 
-		#endregion
+        #endregion
 
-		#region Send Packet Methods
+        #region Send Packet Methods
 
-		// disconnect all clients
-		private void disconnectAll()
+        // disconnect all clients
+        private void disconnectAll()
 		{
 			for (int i = 0; i < clientSlots.Length; i++)
 			{
@@ -974,8 +990,8 @@ namespace NetcodeIO.NET
 				packetLen = (int)packetWriter.WritePosition;
 			}
 
-            // send packet
-            //GONet.GONetLog.Debug("sending...packetLen: " + packetLen);
+			// send packet
+			//GONet.GONetLog.Debug("sending...packetLen: " + packetLen + ", to endpoint: " + NetworkUtils.GetEndpointDebugString(endpoint));
             listenSocket.SendTo(packetBuffer, packetLen, endpoint);
 
 			BufferPool.ReturnBuffer(packetBuffer);
@@ -996,49 +1012,89 @@ namespace NetcodeIO.NET
 			BufferPool.ReturnBuffer(tempPacket);
 		}
 
-		#endregion
+        #endregion
 
-		#region Misc Util Methods
+        #region Misc Util Methods
 
-		// find or add a connect token entry
-		// intentional constant time worst case search
-		private bool findOrAddConnectToken(EndPoint address, byte[] mac, double time)
-		{
-			int matchingTokenIndex = -1;
-			int oldestTokenIndex = -1;
-			double oldestTokenTime = 0.0;
+        // find or add a connect token entry
+        // intentional constant time worst case search
+        private bool findOrAddConnectToken(EndPoint address, byte[] mac, double time)
+        {
+            int matchingTokenIndex = -1;
+            int oldestTokenIndex = -1;
+            double oldestTokenTime = 0.0;
 
-			for (int i = 0; i < connectTokenHistory.Length; i++)
-			{
-				var token = connectTokenHistory[i];
-				if (MiscUtils.CompareHMACConstantTime(token.mac, mac))
-					matchingTokenIndex = i;
+            for (int i = 0; i < connectTokenHistory.Length; i++)
+            {
+                var token = connectTokenHistory[i];
+                if (MiscUtils.CompareHMACConstantTime(token.mac, mac))
+                    matchingTokenIndex = i;
 
-				if (oldestTokenIndex == -1 || token.time < oldestTokenTime)
-				{
-					oldestTokenTime = token.time;
-					oldestTokenIndex = i;
-				}
-			}
+                if (oldestTokenIndex == -1 || token.time < oldestTokenTime)
+                {
+                    oldestTokenTime = token.time;
+                    oldestTokenIndex = i;
+                }
+            }
 
-			// if no entry is found with the mac, this is a new connect token. replace the oldest token entry.
-			if (matchingTokenIndex == -1)
-			{
-				connectTokenHistory[oldestTokenIndex].time = time;
-				connectTokenHistory[oldestTokenIndex].endpoint = address;
-				Buffer.BlockCopy(mac, 0, connectTokenHistory[oldestTokenIndex].mac, 0, mac.Length);
-				return true;
-			}
+            // If no entry is found with the mac, this is a new connect token. Replace the oldest token entry.
+            if (matchingTokenIndex == -1)
+            {
+                connectTokenHistory[oldestTokenIndex].time = time;
+                connectTokenHistory[oldestTokenIndex].endpoint = address;
+                Buffer.BlockCopy(mac, 0, connectTokenHistory[oldestTokenIndex].mac, 0, mac.Length);
+                return true;
+            }
 
-			// allow connect tokens we have already seen from the same address
-			if (connectTokenHistory[matchingTokenIndex].endpoint.Equals(address))
-				return true;
+            // allow connect tokens we have already seen from the same address
+            if (connectTokenHistory[matchingTokenIndex].endpoint.Equals(address))
+                return true;
 
-			return false;
-		}
+            // Custom comparison for loopback addresses
+            if (IsEquivalentLoopbackAddress(connectTokenHistory[matchingTokenIndex].endpoint, address))
+                return true;
 
-		// reset connect token history
-		private void resetConnectTokenHistory()
+            return false;
+        }
+
+        private bool IsEquivalentLoopbackAddress(EndPoint endpoint1, EndPoint endpoint2)
+        {
+            if (endpoint1 == null || endpoint2 == null) return false;
+
+            var ip1 = ((IPEndPoint)endpoint1).Address;
+            var ip2 = ((IPEndPoint)endpoint2).Address;
+
+            // Direct comparison for IPv6 loopback
+            if (ip1.Equals(IPAddress.IPv6Loopback) && ip2.Equals(IPAddress.IPv6Loopback))
+                return true;
+
+            // Direct comparison for IPv4 loopback
+            if (ip1.Equals(IPAddress.Loopback) && ip2.Equals(IPAddress.Loopback))
+                return true;
+
+            // Check if one is IPv4 mapped to IPv6 and the other is IPv4 loopback
+            if (ip1.IsIPv4MappedToIPv6 && ip1.MapToIPv4().Equals(IPAddress.Loopback) && ip2.Equals(IPAddress.Loopback))
+                return true;
+            if (ip2.IsIPv4MappedToIPv6 && ip2.MapToIPv4().Equals(IPAddress.Loopback) && ip1.Equals(IPAddress.Loopback))
+                return true;
+
+            // Check if one is IPv4 mapped to IPv6 and the other is IPv6 loopback
+            if (ip1.IsIPv4MappedToIPv6 && ip1.MapToIPv4().Equals(IPAddress.Loopback) && ip2.Equals(IPAddress.IPv6Loopback))
+                return true;
+            if (ip2.IsIPv4MappedToIPv6 && ip2.MapToIPv4().Equals(IPAddress.Loopback) && ip1.Equals(IPAddress.IPv6Loopback))
+                return true;
+
+            // Check if one is IPv6 loopback and the other is IPv4 loopback
+            if (ip1.Equals(IPAddress.IPv6Loopback) && ip2.Equals(IPAddress.Loopback))
+                return true;
+            if (ip2.Equals(IPAddress.IPv6Loopback) && ip1.Equals(IPAddress.Loopback))
+                return true;
+
+            return false;
+        }
+
+        // reset connect token history
+        private void resetConnectTokenHistory()
 		{
 			for (int i = 0; i < connectTokenHistory.Length; i++)
 			{
@@ -1111,6 +1167,6 @@ namespace NetcodeIO.NET
             }
         }
 
-		#endregion
-	}
+        #endregion
+    }
 }

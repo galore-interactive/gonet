@@ -332,7 +332,7 @@ namespace GONet.Generation
 
 		static internal GONetParticipant_AutoMagicalSyncCompanion_Generated hahaThisIsTrulyTheRealness(GONetParticipant gonetParticipant)
 		{
-			switch (gonetParticipant.codeGenerationId)
+			switch (gonetParticipant.CodeGenerationId)
 			{
 <#
 	for (int i = 0; i < usedCodegenIds.Length; ++i)
@@ -349,7 +349,7 @@ namespace GONet.Generation
 
 		internal static SyncEvent_ValueChangeProcessed hahaThisIsTrulyTheRealness_Events(SyncEvent_ValueChangeProcessedExplanation explanation, long elapsedTicks, ushort filterUsingOwnerAuthorityId, GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion, byte syncMemberIndex)
         {
-            switch (syncCompanion.gonetParticipant.codeGenerationId)
+            switch (syncCompanion.gonetParticipant.CodeGenerationId)
             {
 <#
 	for (int i = 0; i < usedCodegenIds.Length; ++i)

@@ -60,9 +60,6 @@ public class GONetSampleClientOrServer : MonoBehaviour
         }
         else
         {
-            GONetGlobal.ServerIPAddress_Actual = GONetGlobal.ServerIPAddress_Default;
-            GONetGlobal.ServerPort_Actual = GONetGlobal.ServerPort_Default;
-
             OnReadyToStartGONet();
         }
     }
@@ -96,9 +93,6 @@ public class GONetSampleClientOrServer : MonoBehaviour
         }
         else
         {
-            GONetGlobal.ServerIPAddress_Actual = GONetGlobal.ServerIPAddress_Default;
-            GONetGlobal.ServerPort_Actual = GONetGlobal.ServerPort_Default;
-
             OnReadyToStartGONet();
         }
     }
@@ -204,12 +198,12 @@ public class GONetSampleClientOrServer : MonoBehaviour
     {
         if (isServer)
         {
-            GONetMain.gonetServer = new GONetServer(100, GONetGlobal.ServerIPAddress_Actual, GONetGlobal.ServerPort_Actual);
+            GONetMain.gonetServer = new GONetServer(100, GONetGlobal.ServerPort_Actual);
             GONetMain.gonetServer.Start();
         }
         else
         {
-            GONetMain.GONetClient = new GONetClient(new Client());
+            GONetMain.GONetClient = new GONetClient();
             GONetMain.GONetClient.ConnectToServer(GONetGlobal.ServerIPAddress_Actual, GONetGlobal.ServerPort_Actual, 30);
         }
     }
