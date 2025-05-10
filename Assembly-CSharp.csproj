@@ -187,7 +187,6 @@
     <None Include="Assets\GONet\Plugins\log4net\log4net.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Surface.cginc" />
     <None Include="Assets\Amazon\Plugins\Newtonsoft.Json.xml" />
-    <None Include="Assets\GONet\Plugins\log4net\Common.Logging.dll" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\StreamingAssets\GONet\Start_README.txt" />
     <None Include="Assets\GONet\Plugins\log4net\log4net.dll" />
@@ -546,10 +545,6 @@
     </Reference>
     <Reference Include="log4net">
       <HintPath>Assets\GONet\Plugins\log4net\log4net.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Common.Logging">
-      <HintPath>Assets\GONet\Plugins\log4net\Common.Logging.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
