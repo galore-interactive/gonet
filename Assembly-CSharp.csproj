@@ -184,12 +184,10 @@
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Properties.cginc" />
     <None Include="Assets\Amazon\Plugins\System.Buffers.xml" />
-    <None Include="Assets\GONet\Plugins\log4net\log4net.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Surface.cginc" />
     <None Include="Assets\Amazon\Plugins\Newtonsoft.Json.xml" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\StreamingAssets\GONet\Start_README.txt" />
-    <None Include="Assets\GONet\Plugins\log4net\log4net.dll" />
     <None Include="Assets\Amazon\Plugins\System.Runtime.CompilerServices.Unsafe.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Masking.shader" />
     <None Include="Assets\StreamingAssets\GONet\Start_CLIENT_BAT.txt" />
@@ -541,10 +539,6 @@
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe">
       <HintPath>Assets\GONet\Code\Plugins\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>Assets\GONet\Plugins\log4net\log4net.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
