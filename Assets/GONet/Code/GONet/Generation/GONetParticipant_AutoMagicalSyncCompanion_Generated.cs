@@ -438,16 +438,16 @@ namespace GONet.Generation
             int valueCount, 
             long atElapsedTicks, 
             out GONetSyncableValue blendedValue,
-            out bool didExtrapolate)
+            out bool didExtrapolatePastMostRecentChanges)
         {
             IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
             //GONetLog.Debug($"grease null blender? {(customValueBlending == null)} @ index: {index}");
             if (customValueBlending != null)
             {
-                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolate);
+                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges);
             }
 
-            didExtrapolate = false;
+            didExtrapolatePastMostRecentChanges = false;
             blendedValue = default;
             return false;
         }

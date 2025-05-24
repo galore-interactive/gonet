@@ -2764,13 +2764,12 @@ namespace GONet
                     useBufferLeadTicks = 0;
                 }
 
-                //GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter.ShouldLog = syncCompanion.gonetParticipant.GetComponent<PlayerController>();
                 GONetSyncableValue blendedValue;
-                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue, out bool didExtrapolate))
+                if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue, out bool didExtrapolatePastMostRecentChanges))
                 {
-                    // we do not want to apply extrapolated values if an at rest command is awaiting processing since it is likely that 
-                    // the extrapolation occurred due to lack of information coming from owner since it is at rest.
-                    if (!hasAwaitingAtRest || !didExtrapolate)
+                    // We do not want to apply TRULY extrapolated (past end of most recent values) values if an at rest command is awaiting
+                    // processing since it is likely that the extrapolation occurred due to lack of information coming from owner since it is at rest.
+                    if (!hasAwaitingAtRest || !didExtrapolatePastMostRecentChanges)
                     {
                         //UnityEngine.Debug.Log($"[DREETS] set index: {index}");
                         syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
@@ -2795,7 +2794,6 @@ namespace GONet
                     //}
                 }
                 //if (Input.GetKeyDown(KeyCode.L)) GONetLog.Append_FlushDebug("**************************************************   something strange happened \n");
-                //GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter.ShouldLog = false;
             }
 
             /// <summary>
@@ -2818,9 +2816,9 @@ namespace GONet
                 return sb.ToString();
             }
 
-            internal bool TryGetBlendedValue(long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+            internal bool TryGetBlendedValue(long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges)
             {
-                return syncCompanion.TryGetBlendedValue(index, mostRecentChanges, mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolate);
+                return syncCompanion.TryGetBlendedValue(index, mostRecentChanges, mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges);
             }
         }
 
