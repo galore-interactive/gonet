@@ -1964,19 +1964,48 @@ namespace GONet.PluginAPI
 
         public string Description => "Provides a good blending solution for Vector3s with component values that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
 
+        public static void LogValueBufferEntries(NumericValueChangeSnapshot[] valueBuffer, int valueCount)
+        {
+            if (ShouldLog)
+            {
+                string logMessage = $"ValueBuffer Contents (count: {valueCount}):\n";
+                for (int i = 0; i < valueCount; ++i)
+                {
+                    NumericValueChangeSnapshot snapshot = valueBuffer[i];
+                    logMessage += $"[{i}] ticks: {snapshot.elapsedTicksAtChange} (ms: {TimeSpan.FromTicks(snapshot.elapsedTicksAtChange).TotalMilliseconds:F2}), value: {snapshot.numericValue.UnityEngine_Vector3}\n";
+                }
+                GONetLog.Debug(logMessage);
+            }
+        }
+
         public bool TryGetBlendedValue(
             NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
         {
             blendedValue = default;
             didExtrapolate = false;
 
+            if (ShouldLog)
+            {
+                GONetLog.Debug($"VECTOR3 buffer value caount: {valueCount}, atElapsedTicks (as ms): {TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds}, game time elapsed seconds: {GONetMain.Time.ElapsedSeconds}, game time elapsed seconds (client sim): {GONetMain.Time.ElapsedSeconds_ClientSimulation}");
+                LogValueBufferEntries(valueBuffer, valueCount);
+            }
             if (valueCount > 0)
             {
                 { // use buffer to determine the actual value that we think is most appropriate for this moment in time
                     int newestBufferIndex = 0;
                     NumericValueChangeSnapshot newest = valueBuffer[newestBufferIndex];
+
+                    if (float.IsNaN(newest.numericValue.UnityEngine_Vector3.x) ||
+                        float.IsNaN(newest.numericValue.UnityEngine_Vector3.y) ||
+                        float.IsNaN(newest.numericValue.UnityEngine_Vector3.z))
+                    {
+                        if (ShouldLog) GONetLog.Warning("Input data contains NaN value(s) for newest value in buffer.");
+                        return false;
+                    }
+
                     int oldestBufferIndex = valueCount - 1;
                     NumericValueChangeSnapshot oldest = valueBuffer[oldestBufferIndex];
+
                     bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) < GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
                     if (isNewestRecentEnoughToProcess)
                     {
@@ -2010,59 +2039,32 @@ namespace GONet.PluginAPI
                                 }
                                 NumericValueChangeSnapshot baseSnap = valueBuffer[iBase];
                                 Vector3 baseValue = baseSnap.numericValue.UnityEngine_Vector3;
-                                int valueCountUsable = valueCount - iBase;
+                                int valueCountUsable;
+                                // If iBase is still at newestBufferIndex and the newest is newer than target,
+                                // then no entries are usable
+                                if (iBase == newestBufferIndex && valueBuffer[newestBufferIndex].elapsedTicksAtChange > atElapsedTicks)
+                                {
+                                    valueCountUsable = 0;
+                                }
+                                else
+                                {
+                                    valueCountUsable = oldestBufferIndex - iBase + 1;
+                                }
 
-                                //if (ShouldLog) GONetLog.Debug("if EXTRAPO");
+                                if (ShouldLog) GONetLog.Debug("if EXTRAPO, value count usable: " + valueCountUsable);
                                 bool isEnoughInfoToExtrapolate = valueCountUsable >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
                                 if (isEnoughInfoToExtrapolate)
                                 {
                                     if (valueCountUsable > 3)
                                     {
                                         Vector3 averageAcceleration;
-                                        if (ValueBlendUtils.TryDetermineAverageAccelerationPerSecond(valueBuffer, Math.Max(valueCountUsable, 4), out averageAcceleration, iBase))
+                                        int countToUse = valueCountUsable < 4 ? valueCountUsable : 4;
+                                        if (ValueBlendUtils.TryDetermineAverageAccelerationPerSecond(valueBuffer, countToUse, out averageAcceleration, iBase))
                                         {
                                             //GONetLog.Debug($"avg accel: {averageAcceleration}");
                                             blendedValue = baseSnap.numericValue.UnityEngine_Vector3 + averageAcceleration * (float)TimeSpan.FromTicks(atElapsedTicks - baseSnap.elapsedTicksAtChange).TotalSeconds;
                                         }
 
-                                        /*
-                                        { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
-                                            long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....TODO FIXME: maybe average the time between elements instead to be dynamic!!!
-                                            long atMinusNewest_ticks = atElapsedTicks - baseSnap.elapsedTicksAtChange;
-                                            float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
-                                            float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
-
-                                            var newest_last = valueBuffer[iBase + 1];
-                                            Vector3 acceleration_previous;
-                                            Vector3 newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
-                                                ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(
-                                                    valueBuffer,
-                                                    baseSnap.elapsedTicksAtChange,
-                                                    iBase + 1,
-                                                    newest_last,
-                                                    out acceleration_previous);
-
-                                            //Vector3 acceleration_average = (accerlation_current + acceleration_previous) / 2f;
-                                            //GONetLog.Debug($"\naccel_prv: (x:{acceleration_previous.x}, y:{acceleration_previous.y}, z:{acceleration_previous.z}), \naccel_cur: (x:{accerlation_current.x}, y:{accerlation_current.y}, z:{accerlation_current.z}), \naccel_avg: (x:{acceleration_average.x}, y:{acceleration_average.y}, z:{acceleration_average.z})");
-
-                                            bool shouldDoSmoothing = false; //  timePercentageCompleteBeforeNextSync < 1;
-                                            if (shouldDoSmoothing)
-                                            {
-                                                Vector3 identity = Vector3.zero;
-                                                Vector3 overExtrapolationNewest = newestAsExtrapolated - baseSnap.numericValue.UnityEngine_Vector3;
-                                                Vector3 overExtrapolationNewest_adjustmentToSmooth = overExtrapolationNewest * timePercentageRemainingBeforeNextSync;
-                                                / *Vector3.LerpUnclamped(
-                                                    identity,
-                                                    overExtrapolationNewest,
-                                                    timePercentageRemainingBeforeNextSync);* /
-
-                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
-
-                                                blendedValue = blendedValue.UnityEngine_Vector3 + overExtrapolationNewest_adjustmentToSmooth;
-                                            }
-
-                                        }
-                                        */
                                         didExtrapolate = true;
                                     }
                                     else if (valueCountUsable > 2)
@@ -2073,41 +2075,105 @@ namespace GONet.PluginAPI
                                     }
                                     else
                                     {
-                                        NumericValueChangeSnapshot justBeforeNewest = valueBuffer[iBase + 1];
-                                        Vector3 justBeforeNewest_numericValue = justBeforeNewest.numericValue.UnityEngine_Vector3;
-                                        Vector3 valueDiffBetweenLastTwo = baseValue - justBeforeNewest_numericValue;
-                                        long ticksBetweenLastTwo = baseSnap.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-
-                                        long atMinusNewestTicks = atElapsedTicks - baseSnap.elapsedTicksAtChange;
-                                        int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
-                                        if (extrapolationSections < 0) extrapolationSections = -extrapolationSections;
-                                        long extrapolated_TicksAtChange = baseSnap.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
-                                        Vector3 extrapolated_ValueNew = baseValue + (valueDiffBetweenLastTwo * extrapolationSections);
-
-                                        /* the above 4 lines is preferred over what we would have done below here accumulating in a loop as somehow the loop would get infinite or at least stop the simulation
-                                        do
+                                        // Get direct pointer access to Vector3 components - no struct copies
+                                        unsafe
                                         {
-                                            extrapolated_TicksAtChange += ticksBetweenLastTwo;
-                                            extrapolated_ValueNew += valueDiffBetweenLastTwo;
-                                            ++extrapolationSections;
-                                        } while (extrapolated_TicksAtChange < atElapsedTicks);
-                                        */
+                                            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                                            {
+                                                // Direct pointer to justBeforeNewest Vector3 components
+                                                float* justBefore_components = (float*)((byte*)&bufferPtr[iBase + 1].numericValue + 1);
+                                                float* base_components = (float*)((byte*)&baseSnap.numericValue + 1);
 
-                                        long denominator = extrapolated_TicksAtChange - newest.elapsedTicksAtChange;
-                                        if (denominator == 0)
-                                        {
-                                            denominator = 1;
+                                                // Direct component access - no Vector3 struct operations
+                                                float justBefore_x = justBefore_components[0];
+                                                float justBefore_y = justBefore_components[1];
+                                                float justBefore_z = justBefore_components[2];
+
+                                                float base_x = base_components[0];
+                                                float base_y = base_components[1];
+                                                float base_z = base_components[2];
+
+                                                // Component-wise difference calculation
+                                                float diff_x = base_x - justBefore_x;
+                                                float diff_y = base_y - justBefore_y;
+                                                float diff_z = base_z - justBefore_z;
+
+                                                // Direct tick access
+                                                long ticksBetweenLastTwo = baseSnap.elapsedTicksAtChange - bufferPtr[iBase + 1].elapsedTicksAtChange;
+                                                long atMinusNewestTicks = atElapsedTicks - baseSnap.elapsedTicksAtChange;
+
+                                                // Guard against zero/negative time differences
+                                                if (ticksBetweenLastTwo <= 0)
+                                                {
+                                                    blendedValue = new Vector3(base_x, base_y, base_z);
+                                                    if (ShouldLog) GONetLog.Debug("Zero/negative time diff, using base value");
+                                                }
+                                                else
+                                                {
+                                                    // Optimized extrapolation calculation
+                                                    int extrapolationSections = (int)Math.Ceiling(atMinusNewestTicks / (float)ticksBetweenLastTwo);
+                                                    if (extrapolationSections < 0) extrapolationSections = -extrapolationSections;
+
+                                                    if (extrapolationSections == 0)
+                                                    {
+                                                        blendedValue = new Vector3(base_x, base_y, base_z);
+                                                        if (ShouldLog) GONetLog.Debug("Zero extrapolation sections, using base value");
+                                                    }
+                                                    else
+                                                    {
+                                                        long extrapolated_TicksAtChange = baseSnap.elapsedTicksAtChange + (ticksBetweenLastTwo * extrapolationSections);
+
+                                                        // Component-wise extrapolated value calculation (no Vector3 operators)
+                                                        float extrapolated_x = base_x + (diff_x * extrapolationSections);
+                                                        float extrapolated_y = base_y + (diff_y * extrapolationSections);
+                                                        float extrapolated_z = base_z + (diff_z * extrapolationSections);
+
+                                                        long denominator = extrapolated_TicksAtChange - baseSnap.elapsedTicksAtChange;
+                                                        if (denominator <= 0)
+                                                        {
+                                                            blendedValue = new Vector3(base_x, base_y, base_z);
+                                                            if (ShouldLog) GONetLog.Debug("Invalid denominator, using base value");
+                                                        }
+                                                        else
+                                                        {
+                                                            float interpolationTime = atMinusNewestTicks / (float)denominator;
+                                                            float oneSectionPercentage = 1f / (extrapolationSections + 1);
+                                                            float remainingSectionPercentage = 1f - oneSectionPercentage;
+                                                            float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
+
+                                                            // Final NaN check before bezier calculation
+                                                            if (float.IsNaN(bezierTime) || float.IsInfinity(bezierTime))
+                                                            {
+                                                                blendedValue = new Vector3(base_x, base_y, base_z);
+                                                                if (ShouldLog) GONetLog.Warning($"Invalid bezierTime: {bezierTime}, using base value");
+                                                            }
+                                                            else
+                                                            {
+                                                                // Create Vector3 structs only for the bezier call (unavoidable)
+                                                                Vector3 justBeforeVec = new Vector3(justBefore_x, justBefore_y, justBefore_z);
+                                                                Vector3 baseVec = new Vector3(base_x, base_y, base_z);
+                                                                Vector3 extrapolatedVec = new Vector3(extrapolated_x, extrapolated_y, extrapolated_z);
+
+                                                                blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeVec, baseVec, extrapolatedVec, bezierTime);
+
+                                                                // Check result for NaN (direct component access)
+                                                                Vector3 result = blendedValue.UnityEngine_Vector3;
+                                                                if (float.IsNaN(result.x) || float.IsNaN(result.y) || float.IsNaN(result.z))
+                                                                {
+                                                                    blendedValue = new Vector3(base_x, base_y, base_z);
+                                                                    if (ShouldLog) GONetLog.Warning("Bezier result contained NaN, using base value");
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (ShouldLog) GONetLog.Debug("extroip'd....p0: " + justBeforeVec + " p1: " + baseVec + " p2: " + extrapolatedVec + " blended: " + result + " t: " + bezierTime);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
-                                        float interpolationTime = atMinusNewestTicks / (float)denominator;
-                                        float oneSectionPercentage = (1 / (float)(extrapolationSections + 1));
-                                        float remainingSectionPercentage = 1f - oneSectionPercentage;
-                                        float bezierTime = oneSectionPercentage + (interpolationTime * remainingSectionPercentage);
-                                        blendedValue = ValueBlendUtils.GetQuadraticBezierValue(justBeforeNewest_numericValue, baseValue, extrapolated_ValueNew, bezierTime);
-                                        //GONetLog.Debug("extroip'd....p0: " + justBeforeNewest_numericValue + " p1: " + baseValue + " p2: " + extrapolated_ValueNew + " blended: " + blendedValue + " t: " + bezierTime);
-                                        if (float.IsNaN(bezierTime) || float.IsNaN(blendedValue.UnityEngine_Vector3.x))
-                                        {
-                                            if (ShouldLog) GONetLog.Warning($"extrapolationSections: {extrapolationSections}, denominator: {denominator}, atMinusNewestTicks: {atMinusNewestTicks}");
-                                        }
+                                        didExtrapolate = true;
                                     }
 
                                     //blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
