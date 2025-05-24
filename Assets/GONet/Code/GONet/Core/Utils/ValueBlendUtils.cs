@@ -38,7 +38,7 @@ namespace GONet.Utils
                 return true;
             }
 
-            //GONetLog.Debug($"grease count: {valueMonitoringSupport.mostRecentChanges_usedSize}");
+            //if (valueMonitoringSupport.mostRecentChanges_usedSize > 0) GONetLog.Debug($"grease count: {valueMonitoringSupport.mostRecentChanges_usedSize}, gross capacity: {valueMonitoringSupport.mostRecentChanges_capacitySize}");
             // If the above does not yield good value blend, then the below will attmept to use the default implementations available.
             // NOTE: This would most likely be due to the valueMonitoringSupport profile/template not having identified an implementation of IGONetAutoMagicalSync_CustomValueBlending for the type of blendedValue.
             if (valueMonitoringSupport.mostRecentChanges_usedSize > 0)
@@ -83,278 +83,514 @@ namespace GONet.Utils
             return f;
         }
 
-        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCountFromStarting, out Vector3 averageAcceleration, int iStarting = 0)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCountFromStarting, out Vector3 averageAcceleration, int iStarting = 0)
         {
-            averageAcceleration = new Vector3();
-
-            if (valueCountFromStarting > 1)
+            if (valueCountFromStarting <= 1)
             {
-                Vector3 totalVelocity = Vector3.zero;
-                float totalSeconds = 0;
-                for (int i = iStarting; i < valueCountFromStarting - 1; ++i)
+                averageAcceleration = Vector3.zero;
+                return false;
+            }
+
+            // Pin array once for maximum performance
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Component accumulators - no Vector3 struct operations
+                float totalVelocity_x = 0f;
+                float totalVelocity_y = 0f;
+                float totalVelocity_z = 0f;
+                float totalSeconds = 0f;
+
+                int endIndex = iStarting + valueCountFromStarting - 1;
+
+                // Optimized loop with direct pointer access
+                for (int i = iStarting; i < endIndex; ++i)
                 {
-                    Vector3 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector3;
-                    Vector3 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector3;
-                    Vector3 velocity = val_1 - val_2;
-                    totalVelocity += velocity;
-                    totalSeconds += (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange - valueBuffer[i + 1].elapsedTicksAtChange).TotalSeconds;
+                    // Direct pointers to Vector3 components (offset 1 byte for GONetSyncType)
+                    float* snap1_components = (float*)((byte*)&bufferPtr[i].numericValue + 1);
+                    float* snap2_components = (float*)((byte*)&bufferPtr[i + 1].numericValue + 1);
+
+                    // Direct component access - no property calls or struct copies
+                    float snap1_x = snap1_components[0];
+                    float snap1_y = snap1_components[1];
+                    float snap1_z = snap1_components[2];
+
+                    float snap2_x = snap2_components[0];
+                    float snap2_y = snap2_components[1];
+                    float snap2_z = snap2_components[2];
+
+                    // Accumulate velocity components directly
+                    totalVelocity_x += snap1_x - snap2_x;
+                    totalVelocity_y += snap1_y - snap2_y;
+                    totalVelocity_z += snap1_z - snap2_z;
+
+                    // Direct tick access and optimized conversion
+                    totalSeconds += (bufferPtr[i].elapsedTicksAtChange - bufferPtr[i + 1].elapsedTicksAtChange) * 1e-7f;
                 }
 
-                averageAcceleration = totalVelocity / totalSeconds;
+                // Early exit check
+                if (totalSeconds <= 0f)
+                {
+                    averageAcceleration = Vector3.zero;
+                    return false;
+                }
+
+                // Single division with reciprocal multiplication
+                float invTotalSeconds = 1f / totalSeconds;
+
+                // Component-wise final calculation
+                averageAcceleration = new Vector3(
+                    totalVelocity_x * invTotalSeconds,
+                    totalVelocity_y * invTotalSeconds,
+                    totalVelocity_z * invTotalSeconds
+                );
 
                 return true;
             }
-
-            return false;
         }
 
-        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector2 averageAcceleration)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector2 averageAcceleration)
         {
-            averageAcceleration = new Vector2();
-
-            if (valueCount > 1)
+            if (valueCount <= 1)
             {
-                Vector2 totalVelocity = Vector2.zero;
-                float totalSeconds = 0;
+                averageAcceleration = Vector2.zero;
+                return false;
+            }
+
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Component accumulators - no Vector2 struct operations
+                float totalVelocity_x = 0f;
+                float totalVelocity_y = 0f;
+                float totalSeconds = 0f;
+
                 for (int i = 0; i < valueCount - 1; ++i)
                 {
-                    Vector2 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector2;
-                    Vector2 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector2;
-                    Vector2 velocity = val_1 - val_2;
-                    totalVelocity += velocity;
-                    totalSeconds += (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange - valueBuffer[i + 1].elapsedTicksAtChange).TotalSeconds;
+                    // Direct pointers to Vector2 components (offset 1 byte for GONetSyncType)
+                    float* val1_components = (float*)((byte*)&bufferPtr[i].numericValue + 1);
+                    float* val2_components = (float*)((byte*)&bufferPtr[i + 1].numericValue + 1);
+
+                    // Direct component access
+                    float val1_x = val1_components[0];
+                    float val1_y = val1_components[1];
+                    float val2_x = val2_components[0];
+                    float val2_y = val2_components[1];
+
+                    // Accumulate velocity components
+                    totalVelocity_x += val1_x - val2_x;
+                    totalVelocity_y += val1_y - val2_y;
+
+                    // Direct tick access and optimized conversion
+                    totalSeconds += (bufferPtr[i].elapsedTicksAtChange - bufferPtr[i + 1].elapsedTicksAtChange) * 1e-7f;
                 }
 
-                averageAcceleration = totalVelocity / totalSeconds;
+                if (totalSeconds <= 0f)
+                {
+                    averageAcceleration = Vector2.zero;
+                    return false;
+                }
+
+                // Single division with reciprocal
+                float invTotalSeconds = 1f / totalSeconds;
+                averageAcceleration = new Vector2(
+                    totalVelocity_x * invTotalSeconds,
+                    totalVelocity_y * invTotalSeconds
+                );
 
                 return true;
             }
-
-            return false;
         }
 
-        internal static bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector4 averageAcceleration)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe bool TryDetermineAverageAccelerationPerSecond(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out Vector4 averageAcceleration)
         {
-            averageAcceleration = new Vector4();
-
-            if (valueCount > 1)
+            if (valueCount <= 1)
             {
-                Vector4 totalVelocity = Vector4.zero;
-                float totalSeconds = 0;
+                averageAcceleration = Vector4.zero;
+                return false;
+            }
+
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Component accumulators - no Vector4 struct operations
+                float totalVelocity_x = 0f;
+                float totalVelocity_y = 0f;
+                float totalVelocity_z = 0f;
+                float totalVelocity_w = 0f;
+                float totalSeconds = 0f;
+
                 for (int i = 0; i < valueCount - 1; ++i)
                 {
-                    Vector4 val_1 = valueBuffer[i].numericValue.UnityEngine_Vector3;
-                    Vector4 val_2 = valueBuffer[i + 1].numericValue.UnityEngine_Vector3;
-                    Vector4 velocity = val_1 - val_2;
-                    totalVelocity += velocity;
-                    totalSeconds += (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange - valueBuffer[i + 1].elapsedTicksAtChange).TotalSeconds;
+                    // Direct pointers to Vector4 components (offset 1 byte for GONetSyncType)
+                    float* val1_components = (float*)((byte*)&bufferPtr[i].numericValue + 1);
+                    float* val2_components = (float*)((byte*)&bufferPtr[i + 1].numericValue + 1);
+
+                    // Direct component access
+                    float val1_x = val1_components[0];
+                    float val1_y = val1_components[1];
+                    float val1_z = val1_components[2];
+                    float val1_w = val1_components[3];
+                    float val2_x = val2_components[0];
+                    float val2_y = val2_components[1];
+                    float val2_z = val2_components[2];
+                    float val2_w = val2_components[3];
+
+                    // Accumulate velocity components
+                    totalVelocity_x += val1_x - val2_x;
+                    totalVelocity_y += val1_y - val2_y;
+                    totalVelocity_z += val1_z - val2_z;
+                    totalVelocity_w += val1_w - val2_w;
+
+                    // Direct tick access and optimized conversion
+                    totalSeconds += (bufferPtr[i].elapsedTicksAtChange - bufferPtr[i + 1].elapsedTicksAtChange) * 1e-7f;
                 }
 
-                averageAcceleration = totalVelocity / totalSeconds;
+                if (totalSeconds <= 0f)
+                {
+                    averageAcceleration = Vector4.zero;
+                    return false;
+                }
+
+                // Single division with reciprocal
+                float invTotalSeconds = 1f / totalSeconds;
+                averageAcceleration = new Vector4(
+                    totalVelocity_x * invTotalSeconds,
+                    totalVelocity_y * invTotalSeconds,
+                    totalVelocity_z * invTotalSeconds,
+                    totalVelocity_w * invTotalSeconds
+                );
 
                 return true;
             }
-
-            return false;
         }
 
-        internal static bool DetermineTimeBetweenStats(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out float min, out float average, out float max)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe bool DetermineTimeBetweenStats(NumericValueChangeSnapshot[] valueBuffer, int valueCount, out float min, out float average, out float max)
         {
-            min = float.MaxValue;
-            max = float.MinValue;
-            average = -1;
-
-            if (valueCount > 1)
+            if (valueCount <= 1)
             {
-                float total = 0;
+                min = float.MaxValue;
+                max = float.MinValue;
+                average = -1;
+                return false;
+            }
+
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                min = float.MaxValue;
+                max = float.MinValue;
+                float total = 0f;
+
+                // Optimized tick to milliseconds conversion constant
+                const float TICKS_TO_MILLIS = 1e-4f; // 1e-7 * 1000
+
                 for (int i = 0; i < valueCount - 1; ++i)
                 {
-                    float millis_1 = (float)TimeSpan.FromTicks(valueBuffer[i].elapsedTicksAtChange).TotalMilliseconds;
-                    float millis_2 = (float)TimeSpan.FromTicks(valueBuffer[i + 1].elapsedTicksAtChange).TotalMilliseconds;
+                    // Direct tick access and optimized conversion
+                    float millis_1 = bufferPtr[i].elapsedTicksAtChange * TICKS_TO_MILLIS;
+                    float millis_2 = bufferPtr[i + 1].elapsedTicksAtChange * TICKS_TO_MILLIS;
                     float diffMillis = millis_1 - millis_2;
+
                     total += diffMillis;
                     if (diffMillis < min) min = diffMillis;
                     if (diffMillis > max) max = diffMillis;
                 }
 
                 average = total / (valueCount - 1);
-
                 return true;
             }
-
-            return false;
-        }
-
-        internal static Vector3 GetVector3AvgAccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest)
-        {
-            Vector3 averageAcceleration;
-            if (TryDetermineAverageAccelerationPerSecond(valueBuffer, valueCount, out averageAcceleration))
-            {
-                NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-                Vector3 q1 = q1_snap.numericValue.UnityEngine_Vector3;
-
-                NumericValueChangeSnapshot q2_snap = newest;
-                Vector3 q2 = newest.numericValue.UnityEngine_Vector3;
-
-                Vector3 diff_q2_q1 = q2 - q1;
-                float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
-                Vector3 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
-
-                float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
-
-                // s = 	s0 + v0t + ½at^2
-                var s0 = q2;
-                var v0 = velocity_q2_q1;
-                var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * averageAcceleration * atMinusNewest_seconds * atMinusNewest_seconds);
-                Vector3 extrapolatedViaAcceleration = s;
-
-                //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
-
-                //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
-
-                return extrapolatedViaAcceleration;
-            }
-
-            throw new Exception("booboo");
-
-        }
-
-        internal static Vector3 GetVector3AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector3 acceleration)
-        {
-            NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
-            Vector3 q0 = q0_snap.numericValue.UnityEngine_Vector3;
-
-            NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-            Vector3 q1 = q1_snap.numericValue.UnityEngine_Vector3;
-
-            NumericValueChangeSnapshot q2_snap = newest;
-            Vector3 q2 = newest.numericValue.UnityEngine_Vector3;
-
-            Vector3 diff_q2_q1 = q2 - q1;
-            float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector3 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
-
-            Vector3 diff_q1_q0 = q1 - q0;
-            float diff_q1_q0_seconds = (float)TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector3 velocity_q1_q0 = diff_q1_q0 / diff_q1_q0_seconds;
-
-            acceleration = (velocity_q2_q1 - velocity_q1_q0);
-
-            float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector3 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
-
-            // s = 	s0 + v0t + ½at^2
-            Vector3 s0 = q2;
-            Vector3 v0 = velocity_q2_q1;
-            Vector3 s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
-            Vector3 extrapolatedViaAcceleration = s;
-
-            //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
-
-            //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
-
-            return extrapolatedViaAcceleration;
-        }
-
-        internal static Vector2 GetVector2AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector2 acceleration)
-        {
-            NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
-            Vector2 q0 = q0_snap.numericValue.UnityEngine_Vector2;
-
-            NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-            Vector2 q1 = q1_snap.numericValue.UnityEngine_Vector2;
-
-            NumericValueChangeSnapshot q2_snap = newest;
-            Vector2 q2 = newest.numericValue.UnityEngine_Vector2;
-
-            Vector2 diff_q2_q1 = q2 - q1;
-            float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector2 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
-
-            Vector2 diff_q1_q0 = q1 - q0;
-            float diff_q1_q0_seconds = (float)TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector2 velocity_q1_q0 = diff_q1_q0 / diff_q1_q0_seconds;
-
-            acceleration = (velocity_q2_q1 - velocity_q1_q0);
-
-            float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector2 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
-
-            // s = 	s0 + v0t + ½at^2
-            var s0 = q2;
-            var v0 = velocity_q2_q1;
-            var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
-            Vector2 extrapolatedViaAcceleration = s;
-
-            //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
-
-            //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
-
-            return extrapolatedViaAcceleration;
-        }
-
-        internal static Vector4 GetVector4AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector4 acceleration)
-        {
-            NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
-            Vector4 q0 = q0_snap.numericValue.UnityEngine_Vector4;
-
-            NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-            Vector4 q1 = q1_snap.numericValue.UnityEngine_Vector4;
-
-            NumericValueChangeSnapshot q2_snap = newest;
-            Vector4 q2 = newest.numericValue.UnityEngine_Vector4;
-
-            Vector4 diff_q2_q1 = q2 - q1;
-            float diff_q2_q1_seconds = (float)TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector4 velocity_q2_q1 = diff_q2_q1 / diff_q2_q1_seconds;
-
-            Vector4 diff_q1_q0 = q1 - q0;
-            float diff_q1_q0_seconds = (float)TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector4 velocity_q1_q0 = diff_q1_q0 / diff_q1_q0_seconds;
-
-            acceleration = (velocity_q2_q1 - velocity_q1_q0);
-
-            float atMinusNewest_seconds = (float)TimeSpan.FromTicks(atElapsedTicks - q2_snap.elapsedTicksAtChange).TotalSeconds;
-            Vector4 finalVelocity = velocity_q2_q1 + acceleration * atMinusNewest_seconds;
-
-            // s = 	s0 + v0t + ½at^2
-            var s0 = q2;
-            var v0 = velocity_q2_q1;
-            var s = s0 + (v0 * atMinusNewest_seconds) + (0.5f * acceleration * atMinusNewest_seconds * atMinusNewest_seconds);
-            Vector4 extrapolatedViaAcceleration = s;
-
-            //GONetLog.Debug($"\nvelocity_q1_q0: (x:{velocity_q1_q0.x}, y:{velocity_q1_q0.y}, z:{velocity_q1_q0.z})\nvelocity_q2_q1: (x:{velocity_q2_q1.x}, y:{velocity_q2_q1.y}, z:{velocity_q2_q1.z})");
-
-            //Vector3 extrapolatedViaAcceleration = q2 + finalVelocity;
-
-            return extrapolatedViaAcceleration;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe Vector3 GetVector3AvgAccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest)
+        {
+            Vector3 averageAcceleration;
+            if (TryDetermineAverageAccelerationPerSecond(valueBuffer, valueCount, out averageAcceleration, 0))
+            {
+                fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                {
+                    // Direct pointer access to Vector3 components
+                    float* q1_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 1].numericValue + 1);
+                    float* q2_components = (float*)((byte*)&newest.numericValue + 1);
+
+                    // Direct component access
+                    float q1_x = q1_components[0], q1_y = q1_components[1], q1_z = q1_components[2];
+                    float q2_x = q2_components[0], q2_y = q2_components[1], q2_z = q2_components[2];
+
+                    // Component-wise difference
+                    float diff_x = q2_x - q1_x;
+                    float diff_y = q2_y - q1_y;
+                    float diff_z = q2_z - q1_z;
+
+                    // Direct tick access and optimized conversion
+                    float diff_q2_q1_seconds = (newest.elapsedTicksAtChange - bufferPtr[newestBufferIndex + 1].elapsedTicksAtChange) * 1e-7f;
+                    float atMinusNewest_seconds = (atElapsedTicks - newest.elapsedTicksAtChange) * 1e-7f;
+
+                    // Guard against division by zero
+                    if (diff_q2_q1_seconds <= 0f)
+                    {
+                        return new Vector3(q2_x, q2_y, q2_z);
+                    }
+
+                    // Component-wise velocity calculation
+                    float inv_diff_seconds = 1f / diff_q2_q1_seconds;
+                    float vel_x = diff_x * inv_diff_seconds;
+                    float vel_y = diff_y * inv_diff_seconds;
+                    float vel_z = diff_z * inv_diff_seconds;
+
+                    // Physics equation: s = s0 + v0*t + 0.5*a*t²
+                    float halfTime_squared = 0.5f * atMinusNewest_seconds * atMinusNewest_seconds;
+
+                    return new Vector3(
+                        q2_x + (vel_x * atMinusNewest_seconds) + (averageAcceleration.x * halfTime_squared),
+                        q2_y + (vel_y * atMinusNewest_seconds) + (averageAcceleration.y * halfTime_squared),
+                        q2_z + (vel_z * atMinusNewest_seconds) + (averageAcceleration.z * halfTime_squared)
+                    );
+                }
+            }
+
+            throw new Exception("booboo");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe Vector2 GetVector2AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector2 acceleration)
+        {
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Direct pointers to Vector2 components (offset 1 byte for GONetSyncType)
+                float* q0_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 2].numericValue + 1);
+                float* q1_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 1].numericValue + 1);
+                float* q2_components = (float*)((byte*)&newest.numericValue + 1);
+
+                // Direct component access
+                float q0_x = q0_components[0], q0_y = q0_components[1];
+                float q1_x = q1_components[0], q1_y = q1_components[1];
+                float q2_x = q2_components[0], q2_y = q2_components[1];
+
+                // Direct tick access
+                long q2_ticks = newest.elapsedTicksAtChange;
+                long q1_ticks = bufferPtr[newestBufferIndex + 1].elapsedTicksAtChange;
+                long q0_ticks = bufferPtr[newestBufferIndex + 2].elapsedTicksAtChange;
+
+                // Optimized time calculations
+                const float TICKS_TO_SECONDS = 1e-7f;
+                float diff_q2_q1_seconds = (q2_ticks - q1_ticks) * TICKS_TO_SECONDS;
+                float diff_q1_q0_seconds = (q1_ticks - q0_ticks) * TICKS_TO_SECONDS;
+                float atMinusNewest_seconds = (atElapsedTicks - q2_ticks) * TICKS_TO_SECONDS;
+
+                // Guard against invalid time differences
+                if (diff_q2_q1_seconds <= 0f || diff_q1_q0_seconds <= 0f)
+                {
+                    acceleration = Vector2.zero;
+                    return new Vector2(q2_x, q2_y);
+                }
+
+                // Pre-calculate reciprocals
+                float inv_diff_q2_q1 = 1f / diff_q2_q1_seconds;
+                float inv_diff_q1_q0 = 1f / diff_q1_q0_seconds;
+
+                // Component-wise velocity calculations
+                float vel_q2_q1_x = (q2_x - q1_x) * inv_diff_q2_q1;
+                float vel_q2_q1_y = (q2_y - q1_y) * inv_diff_q2_q1;
+                float vel_q1_q0_x = (q1_x - q0_x) * inv_diff_q1_q0;
+                float vel_q1_q0_y = (q1_y - q0_y) * inv_diff_q1_q0;
+
+                // Acceleration components
+                float accel_x = vel_q2_q1_x - vel_q1_q0_x;
+                float accel_y = vel_q2_q1_y - vel_q1_q0_y;
+
+                acceleration = new Vector2(accel_x, accel_y);
+
+                // Physics equation: s = s0 + v0*t + 0.5*a*t²
+                float halfTime_squared = 0.5f * atMinusNewest_seconds * atMinusNewest_seconds;
+
+                return new Vector2(
+                    q2_x + (vel_q2_q1_x * atMinusNewest_seconds) + (accel_x * halfTime_squared),
+                    q2_y + (vel_q2_q1_y * atMinusNewest_seconds) + (accel_y * halfTime_squared)
+                );
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe Vector4 GetVector4AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector4 acceleration)
+        {
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Direct pointers to Vector4 components (offset 1 byte for GONetSyncType)
+                float* q0_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 2].numericValue + 1);
+                float* q1_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 1].numericValue + 1);
+                float* q2_components = (float*)((byte*)&newest.numericValue + 1);
+
+                // Direct component access
+                float q0_x = q0_components[0], q0_y = q0_components[1], q0_z = q0_components[2], q0_w = q0_components[3];
+                float q1_x = q1_components[0], q1_y = q1_components[1], q1_z = q1_components[2], q1_w = q1_components[3];
+                float q2_x = q2_components[0], q2_y = q2_components[1], q2_z = q2_components[2], q2_w = q2_components[3];
+
+                // Direct tick access
+                long q2_ticks = newest.elapsedTicksAtChange;
+                long q1_ticks = bufferPtr[newestBufferIndex + 1].elapsedTicksAtChange;
+                long q0_ticks = bufferPtr[newestBufferIndex + 2].elapsedTicksAtChange;
+
+                // Optimized time calculations
+                const float TICKS_TO_SECONDS = 1e-7f;
+                float diff_q2_q1_seconds = (q2_ticks - q1_ticks) * TICKS_TO_SECONDS;
+                float diff_q1_q0_seconds = (q1_ticks - q0_ticks) * TICKS_TO_SECONDS;
+                float atMinusNewest_seconds = (atElapsedTicks - q2_ticks) * TICKS_TO_SECONDS;
+
+                // Guard against invalid time differences
+                if (diff_q2_q1_seconds <= 0f || diff_q1_q0_seconds <= 0f)
+                {
+                    acceleration = Vector4.zero;
+                    return new Vector4(q2_x, q2_y, q2_z, q2_w);
+                }
+
+                // Pre-calculate reciprocals
+                float inv_diff_q2_q1 = 1f / diff_q2_q1_seconds;
+                float inv_diff_q1_q0 = 1f / diff_q1_q0_seconds;
+
+                // Component-wise velocity calculations
+                float vel_q2_q1_x = (q2_x - q1_x) * inv_diff_q2_q1;
+                float vel_q2_q1_y = (q2_y - q1_y) * inv_diff_q2_q1;
+                float vel_q2_q1_z = (q2_z - q1_z) * inv_diff_q2_q1;
+                float vel_q2_q1_w = (q2_w - q1_w) * inv_diff_q2_q1;
+
+                float vel_q1_q0_x = (q1_x - q0_x) * inv_diff_q1_q0;
+                float vel_q1_q0_y = (q1_y - q0_y) * inv_diff_q1_q0;
+                float vel_q1_q0_z = (q1_z - q0_z) * inv_diff_q1_q0;
+                float vel_q1_q0_w = (q1_w - q0_w) * inv_diff_q1_q0;
+
+                // Acceleration components
+                float accel_x = vel_q2_q1_x - vel_q1_q0_x;
+                float accel_y = vel_q2_q1_y - vel_q1_q0_y;
+                float accel_z = vel_q2_q1_z - vel_q1_q0_z;
+                float accel_w = vel_q2_q1_w - vel_q1_q0_w;
+
+                acceleration = new Vector4(accel_x, accel_y, accel_z, accel_w);
+
+                // Physics equation: s = s0 + v0*t + 0.5*a*t²
+                float halfTime_squared = 0.5f * atMinusNewest_seconds * atMinusNewest_seconds;
+
+                return new Vector4(
+                    q2_x + (vel_q2_q1_x * atMinusNewest_seconds) + (accel_x * halfTime_squared),
+                    q2_y + (vel_q2_q1_y * atMinusNewest_seconds) + (accel_y * halfTime_squared),
+                    q2_z + (vel_q2_q1_z * atMinusNewest_seconds) + (accel_z * halfTime_squared),
+                    q2_w + (vel_q2_q1_w * atMinusNewest_seconds) + (accel_w * halfTime_squared)
+                );
+            }
+        }
+
+        // Optimized Bezier functions with manual component calculations
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static Vector3 GetQuadraticBezierValue(Vector3 p0, Vector3 p1, Vector3 p2, float t)
         {
-            float u = 1 - t;
-            float uSquared = u * u;
-            float tSquared = t * t;
-            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
+            float u = 1f - t;
+            float u_squared = u * u;
+            float t_squared = t * t;
+            float two_u_t = 2f * u * t;
+
+            return new Vector3(
+                (u_squared * p0.x) + (two_u_t * p1.x) + (t_squared * p2.x),
+                (u_squared * p0.y) + (two_u_t * p1.y) + (t_squared * p2.y),
+                (u_squared * p0.z) + (two_u_t * p1.z) + (t_squared * p2.z)
+            );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static Vector2 GetQuadraticBezierValue(Vector2 p0, Vector2 p1, Vector2 p2, float t)
         {
-            float u = 1 - t;
-            float uSquared = u * u;
-            float tSquared = t * t;
-            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
+            float u = 1f - t;
+            float u_squared = u * u;
+            float t_squared = t * t;
+            float two_u_t = 2f * u * t;
+
+            return new Vector2(
+                (u_squared * p0.x) + (two_u_t * p1.x) + (t_squared * p2.x),
+                (u_squared * p0.y) + (two_u_t * p1.y) + (t_squared * p2.y)
+            );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static Vector4 GetQuadraticBezierValue(Vector4 p0, Vector4 p1, Vector4 p2, float t)
         {
-            float u = 1 - t;
-            float uSquared = u * u;
-            float tSquared = t * t;
-            return (uSquared * p0) + (2 * u * t * p1) + (tSquared * p2);
+            float u = 1f - t;
+            float u_squared = u * u;
+            float t_squared = t * t;
+            float two_u_t = 2f * u * t;
+
+            return new Vector4(
+                (u_squared * p0.x) + (two_u_t * p1.x) + (t_squared * p2.x),
+                (u_squared * p0.y) + (two_u_t * p1.y) + (t_squared * p2.y),
+                (u_squared * p0.z) + (two_u_t * p1.z) + (t_squared * p2.z),
+                (u_squared * p0.w) + (two_u_t * p1.w) + (t_squared * p2.w)
+            );
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe Vector3 GetVector3AccelerationBasedExtrapolation(NumericValueChangeSnapshot[] valueBuffer, long atElapsedTicks, int newestBufferIndex, NumericValueChangeSnapshot newest, out Vector3 acceleration)
+        {
+            // Get direct pointers to Vector3 data - zero overhead access
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                // Direct pointer arithmetic to Vector3 data (offset 1 byte for GONetSyncType)
+                float* q0_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 2].numericValue + 1);
+                float* q1_components = (float*)((byte*)&bufferPtr[newestBufferIndex + 1].numericValue + 1);
+                float* q2_components = (float*)((byte*)&newest.numericValue + 1);
+
+                // Direct component access - no struct copies whatsoever
+                float q0_x = q0_components[0], q0_y = q0_components[1], q0_z = q0_components[2];
+                float q1_x = q1_components[0], q1_y = q1_components[1], q1_z = q1_components[2];
+                float q2_x = q2_components[0], q2_y = q2_components[1], q2_z = q2_components[2];
+
+                // Direct tick access from structs (no property calls)
+                long q2_ticks = newest.elapsedTicksAtChange;
+                long q1_ticks = bufferPtr[newestBufferIndex + 1].elapsedTicksAtChange;
+                long q0_ticks = bufferPtr[newestBufferIndex + 2].elapsedTicksAtChange;
+
+                // Optimized time calculations (compile-time constant)
+                const float TICKS_TO_SECONDS = 1e-7f;
+                float diff_q2_q1_seconds = (q2_ticks - q1_ticks) * TICKS_TO_SECONDS;
+                float diff_q1_q0_seconds = (q1_ticks - q0_ticks) * TICKS_TO_SECONDS;
+                float atMinusNewest_seconds = (atElapsedTicks - q2_ticks) * TICKS_TO_SECONDS;
+
+                // Early exit for invalid time differences
+                if (diff_q2_q1_seconds <= 0f || diff_q1_q0_seconds <= 0f)
+                {
+                    acceleration = new Vector3(0f, 0f, 0f);
+                    return new Vector3(q2_x, q2_y, q2_z);
+                }
+
+                // Pre-calculate reciprocals (multiplication is faster than division)
+                float inv_diff_q2_q1 = 1f / diff_q2_q1_seconds;
+                float inv_diff_q1_q0 = 1f / diff_q1_q0_seconds;
+
+                // Manual component-wise velocity calculations (no Vector3 operators)
+                float vel_q2_q1_x = (q2_x - q1_x) * inv_diff_q2_q1;
+                float vel_q2_q1_y = (q2_y - q1_y) * inv_diff_q2_q1;
+                float vel_q2_q1_z = (q2_z - q1_z) * inv_diff_q2_q1;
+
+                float vel_q1_q0_x = (q1_x - q0_x) * inv_diff_q1_q0;
+                float vel_q1_q0_y = (q1_y - q0_y) * inv_diff_q1_q0;
+                float vel_q1_q0_z = (q1_z - q0_z) * inv_diff_q1_q0;
+
+                // Acceleration components (no Vector3 subtraction)
+                float accel_x = vel_q2_q1_x - vel_q1_q0_x;
+                float accel_y = vel_q2_q1_y - vel_q1_q0_y;
+                float accel_z = vel_q2_q1_z - vel_q1_q0_z;
+
+                // Set output acceleration
+                acceleration = new Vector3(accel_x, accel_y, accel_z);
+
+                // Physics equation: s = s0 + v0*t + 0.5*a*t² (manual component calculation)
+                float halfTime_squared = 0.5f * atMinusNewest_seconds * atMinusNewest_seconds;
+
+                // Final position calculation - all component-wise for maximum performance
+                return new Vector3(
+                    q2_x + (vel_q2_q1_x * atMinusNewest_seconds) + (accel_x * halfTime_squared),
+                    q2_y + (vel_q2_q1_y * atMinusNewest_seconds) + (accel_y * halfTime_squared),
+                    q2_z + (vel_q2_q1_z * atMinusNewest_seconds) + (accel_z * halfTime_squared)
+                );
+            }
         }
 
         const int SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT = 3;
