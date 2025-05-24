@@ -29,10 +29,10 @@ namespace GONet.Utils
     {
         internal const int VALUE_COUNT_NEEDED_TO_EXTRAPOLATE = 2;
 
-        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+        internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges)
         {
             //GONetLog.Debug($"grease");
-            if (valueMonitoringSupport.TryGetBlendedValue(atElapsedTicks, out blendedValue, out didExtrapolate))
+            if (valueMonitoringSupport.TryGetBlendedValue(atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges))
             {
                 //GONetLog.Debug($"grease got first blendo");
                 return true;
@@ -46,11 +46,11 @@ namespace GONet.Utils
                 IGONetAutoMagicalSync_CustomValueBlending customBlending;
                 if (defaultValueBlendings_byValueType.TryGetValue(valueMonitoringSupport.mostRecentChanges[0].numericValue.GONetSyncType, out customBlending))
                 {
-                    return customBlending.TryGetBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolate);
+                    return customBlending.TryGetBlendedValue(valueMonitoringSupport.mostRecentChanges, valueMonitoringSupport.mostRecentChanges_usedSize, atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges);
                 }
             }
 
-            didExtrapolate = false;
+            didExtrapolatePastMostRecentChanges = false;
             blendedValue = default;
             return false;
         }

@@ -37,10 +37,21 @@ namespace GONet.PluginAPI
         string Description { get; }
 
         /// <summary>
-        /// IMPORTANT: <paramref name="valueBuffer"/> is a most recent "actual" value history in the form of an ordered array of <paramref name="valueCount"/> timestamp/value pairs and is sorted in most recent with lowest index to oldest with highest index order.
+        /// <para>
+        /// IMPORTANT: <paramref name="valueBuffer"/> is a most recent "actual" value history in the form of an ordered array of <paramref name="valueCount"/>
+        ///            timestamp/value pairs and is sorted in most recent with lowest index to oldest with highest index order.
+        /// </para>
+        /// <para>
+        /// IMPORTANT: <paramref name="didExtrapolatePastMostRecentChanges"/> should only be true after calling this if <paramref name="blendedValue"/>
+        ///            represents a future value more recent than the most recent (valid) value inside <paramref name="valueBuffer"/>.
+        ///            There are some implementations (e.g., <see cref="GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter"/>) that will 
+        ///            force an extrapolation to be used instead of interpolation between known recent values even though it does not extrapolate past
+        ///            the the most recent known values because it has reasons described therein in which case 
+        ///            <paramref name="didExtrapolatePastMostRecentChanges"/> would be false.
+        /// </para>
         /// </summary>
         /// <returns>true if a blended "best estimate" value at <paramref name="atElapsedTicks"/> was determined based on inputs and set in <paramref name="blendedValue"/>, false otherwise</returns>
-        bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate);
+        bool TryGetBlendedValue(NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges);
     }
 
     #region GONet default implementations (i.e., should be good for general use cases - linear velocity and/or linear acceleration)
@@ -1979,10 +1990,10 @@ namespace GONet.PluginAPI
         }
 
         public bool TryGetBlendedValue(
-            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges)
         {
             blendedValue = default;
-            didExtrapolate = false;
+            didExtrapolatePastMostRecentChanges = false;
 
             if (ShouldLog)
             {
@@ -2064,14 +2075,11 @@ namespace GONet.PluginAPI
                                             //GONetLog.Debug($"avg accel: {averageAcceleration}");
                                             blendedValue = baseSnap.numericValue.UnityEngine_Vector3 + averageAcceleration * (float)TimeSpan.FromTicks(atElapsedTicks - baseSnap.elapsedTicksAtChange).TotalSeconds;
                                         }
-
-                                        didExtrapolate = true;
                                     }
                                     else if (valueCountUsable > 2)
                                     {
                                         Vector3 acceleration;
                                         blendedValue = ValueBlendUtils.GetVector3AccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, iBase, baseSnap, out acceleration);
-                                        didExtrapolate = true;
                                     }
                                     else
                                     {
@@ -2173,11 +2181,10 @@ namespace GONet.PluginAPI
                                                 }
                                             }
                                         }
-                                        didExtrapolate = true;
                                     }
 
                                     //blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
-                                    didExtrapolate = true;
+                                    didExtrapolatePastMostRecentChanges = valueCountUsable == valueCount; // maybe better to use: time, but this seems good for now
                                 }
                                 else
                                 {
