@@ -2179,22 +2179,11 @@ namespace GONet
 
             public SecretaryOfTemporalAffairs()
             {
-                UnityEngine.Debug.Log("=== SecretaryOfTemporalAffairs CONSTRUCTOR START ===");
-
                 // Initialize with zero-based elapsed time
                 alignedState.InitialHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
                 alignedState.State.CachedElapsedSeconds = ElapsedSecondsUnset;
                 alignedState.State.AuthorityOffsetTicks = 0;
                 alignedState.State.TargetOffsetTicks = 0;
-
-                UnityEngine.Debug.Log($"Initialized values:");
-                UnityEngine.Debug.Log($"  InitialHighResTicks: {alignedState.InitialHighResTicks}");
-                UnityEngine.Debug.Log($"  CachedElapsedSeconds: {alignedState.State.CachedElapsedSeconds}");
-                UnityEngine.Debug.Log($"  AuthorityOffsetTicks: {alignedState.State.AuthorityOffsetTicks}");
-                UnityEngine.Debug.Log($"  TargetOffsetTicks: {alignedState.State.TargetOffsetTicks}");
-                UnityEngine.Debug.Log($"  TICKS_TO_SECONDS constant: {TICKS_TO_SECONDS}");
-                UnityEngine.Debug.Log($"  TimeSpan.TicksPerSecond: {TimeSpan.TicksPerSecond}");
-                UnityEngine.Debug.Log("=== SecretaryOfTemporalAffairs CONSTRUCTOR END ===");
             }
 
             public SecretaryOfTemporalAffairs(SecretaryOfTemporalAffairs initFromAuthority) : this()
@@ -2208,11 +2197,9 @@ namespace GONet
 
                 // Ultra-fast path: thread-local cache
                 int currentFrame = Volatile.Read(ref alignedState.UpdateCount);
-                UnityEngine.Debug.Log($"=== GetElapsedTicksFast START === tlsCachedTicks: {tlsCachedTicks}, currentFrame: {currentFrame}, tlsLastFrame: {tlsLastFrame}");
                 if (tlsLastFrame == currentFrame)
                     return tlsCachedTicks;
 
-                UnityEngine.Debug.Log("=== GetElapsedTicksFast next ===");
                 // Fast path: frame cache hit
                 // Unity 2022.3 workaround: read individual fields with memory barriers
                 long lastUpdateFrame = Volatile.Read(ref alignedState.State.LastUpdateFrame);
@@ -2224,7 +2211,6 @@ namespace GONet
                     return tlsCachedTicks;
                 }
 
-                UnityEngine.Debug.Log("=== GetElapsedTicksFast final before calling to exit ===");
                 // Calculate new value - create local copy for thread safety
                 TimeState state;
                 state.AuthorityOffsetTicks = Volatile.Read(ref alignedState.State.AuthorityOffsetTicks);
@@ -2241,22 +2227,17 @@ namespace GONet
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private double GetElapsedSecondsFast()
             {
-                UnityEngine.Debug.Log("=== GetElapsedSecondsFast START ===");
-
                 // Ultra-fast path: thread-local cache
                 int currentFrame = Volatile.Read(ref alignedState.UpdateCount);
-                UnityEngine.Debug.Log($"Current UpdateCount: {currentFrame}, TLS LastFrame: {tlsLastFrame}");
 
                 if (tlsLastFrame == currentFrame)
                 {
-                    UnityEngine.Debug.Log($"TLS Cache HIT! Returning cached seconds: {tlsCachedSeconds}");
                     return tlsCachedSeconds;
                 }
 
                 // Fast path: frame cache hit
                 // Unity 2022.3 workaround: read individual fields with memory barriers
                 long lastUpdateFrame = Volatile.Read(ref alignedState.State.LastUpdateFrame);
-                UnityEngine.Debug.Log($"State LastUpdateFrame: {lastUpdateFrame}");
 
                 if (lastUpdateFrame == currentFrame)
                 {
@@ -2264,11 +2245,8 @@ namespace GONet
                     tlsCachedSeconds = alignedState.State.CachedElapsedSeconds; // double is atomic on 64-bit
                     tlsCachedTicks = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
 
-                    UnityEngine.Debug.Log($"Frame Cache HIT! CachedElapsedSeconds: {tlsCachedSeconds}");
                     return tlsCachedSeconds;
                 }
-
-                UnityEngine.Debug.Log("Cache MISS - Need to calculate new value");
 
                 // Calculate from ticks - create local copy for thread safety
                 TimeState state;
@@ -2280,19 +2258,9 @@ namespace GONet
                 state.CachedElapsedSeconds = alignedState.State.CachedElapsedSeconds;
                 state.LastDeltaTime = alignedState.State.LastDeltaTime;
 
-                UnityEngine.Debug.Log($"State values read:");
-                UnityEngine.Debug.Log($"  AuthorityOffsetTicks: {state.AuthorityOffsetTicks}");
-                UnityEngine.Debug.Log($"  TargetOffsetTicks: {state.TargetOffsetTicks}");
-                UnityEngine.Debug.Log($"  AdjustmentStartTicks: {state.AdjustmentStartTicks}");
-                UnityEngine.Debug.Log($"  CachedElapsedTicks: {state.CachedElapsedTicks}");
-                UnityEngine.Debug.Log($"  CachedElapsedSeconds: {state.CachedElapsedSeconds}");
-
                 long ticks = CalculateElapsedTicks(ref state);
-                UnityEngine.Debug.Log($"CalculateElapsedTicks returned: {ticks} ticks");
 
                 double seconds = ticks * TICKS_TO_SECONDS;
-                UnityEngine.Debug.Log($"Ticks to seconds conversion: {ticks} * {TICKS_TO_SECONDS} = {seconds}");
-                UnityEngine.Debug.Log($"=== GetElapsedSecondsFast END - Returning: {seconds} ===");
 
                 return seconds;
             }
@@ -2300,27 +2268,17 @@ namespace GONet
             [MethodImpl(MethodImplOptions.NoInlining)] // Keep out of hot path
             private long CalculateElapsedTicks(ref TimeState state)
             {
-                UnityEngine.Debug.Log("=== CalculateElapsedTicks START ===");
-
                 long currentHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
                 long initialTicks = Volatile.Read(ref alignedState.InitialHighResTicks);
                 long rawElapsed = currentHighResTicks - initialTicks;
-
-                UnityEngine.Debug.Log($"HighResolutionTimeUtils.Now.Ticks: {currentHighResTicks}");
-                UnityEngine.Debug.Log($"InitialHighResTicks: {initialTicks}");
-                UnityEngine.Debug.Log($"Raw elapsed (current - initial): {rawElapsed}");
 
                 // Fast path: no adjustment in progress
                 long currentOffset = state.AuthorityOffsetTicks;
                 long targetOffset = state.TargetOffsetTicks;
 
-                UnityEngine.Debug.Log($"Current offset: {currentOffset}, Target offset: {targetOffset}");
-
                 if (currentOffset == targetOffset)
                 {
                     long result = rawElapsed + currentOffset;
-                    UnityEngine.Debug.Log($"No adjustment in progress. Result: {rawElapsed} + {currentOffset} = {result}");
-                    UnityEngine.Debug.Log("=== CalculateElapsedTicks END ===");
                     return result;
                 }
 
@@ -2328,22 +2286,14 @@ namespace GONet
                 long adjustmentStart = state.AdjustmentStartTicks;
                 long adjustmentElapsed = currentHighResTicks - adjustmentStart;
 
-                UnityEngine.Debug.Log($"Interpolation in progress:");
-                UnityEngine.Debug.Log($"  Adjustment start: {adjustmentStart}");
-                UnityEngine.Debug.Log($"  Adjustment elapsed: {adjustmentElapsed}");
-                UnityEngine.Debug.Log($"  Adjustment duration: {ADJUSTMENT_DURATION_TICKS}");
-
                 if (adjustmentElapsed >= ADJUSTMENT_DURATION_TICKS)
                 {
                     // Adjustment complete - try to update atomically
-                    UnityEngine.Debug.Log("Adjustment complete - using target offset");
                     var newState = state;
                     newState.AuthorityOffsetTicks = targetOffset;
                     Interlocked.CompareExchange(ref alignedState.State.AuthorityOffsetTicks, targetOffset, currentOffset);
 
                     long result = rawElapsed + targetOffset;
-                    UnityEngine.Debug.Log($"Result: {rawElapsed} + {targetOffset} = {result}");
-                    UnityEngine.Debug.Log("=== CalculateElapsedTicks END ===");
                     return result;
                 }
 
@@ -2352,21 +2302,13 @@ namespace GONet
                 long offsetDiff = targetOffset - currentOffset;
                 currentOffset += (long)(offsetDiff * progress);
 
-                UnityEngine.Debug.Log($"Interpolating:");
-                UnityEngine.Debug.Log($"  Progress: {progress:F4} ({progress * 100:F2}%)");
-                UnityEngine.Debug.Log($"  Offset difference: {offsetDiff}");
-                UnityEngine.Debug.Log($"  Interpolated offset: {currentOffset}");
-
                 long finalResult = rawElapsed + currentOffset;
-                UnityEngine.Debug.Log($"Final result: {rawElapsed} + {currentOffset} = {finalResult}");
-                UnityEngine.Debug.Log("=== CalculateElapsedTicks END ===");
 
                 return finalResult;
             }
 
             internal void SetFromAuthority(long elapsedTicksFromAuthority)
             {
-                GONetLog.Debug($"gikles set from authority, elapsedTicksFromAuthority: {elapsedTicksFromAuthority}");
                 long currentHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
                 long initialTicks = Volatile.Read(ref alignedState.InitialHighResTicks);
                 long currentElapsed = currentHighResTicks - initialTicks;
@@ -2390,7 +2332,6 @@ namespace GONet
                     double newSeconds = elapsedTicksFromAuthority * TICKS_TO_SECONDS;
                     TimeSetFromAuthority(oldSeconds, newSeconds, oldTicks, elapsedTicksFromAuthority);
                 }
-                GONetLog.Debug($"gikles ALL  DONE set from authority, newOffset: {newOffset}, alignedState.State.AdjustmentStartTicks: {alignedState.State.AdjustmentStartTicks}");
             }
 
             // TODO whenever unity version supports it: [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -2488,7 +2429,6 @@ namespace GONet
             {
                 // Fast out-of-order check
                 long lastProcessed = Volatile.Read(ref lastProcessedResponseTicks);
-                GONetLog.Debug($"gikles process time sync...yeah... serverElapsedTicksAtResponse: {serverElapsedTicksAtResponse} <=? lastProcessed: {lastProcessed}");
                 if (serverElapsedTicksAtResponse <= lastProcessed)
                     return;
 
@@ -2502,7 +2442,6 @@ namespace GONet
 
                 // Fast sanity check (branchless)
                 long rttValid = (rttTicks >= 0 & rttTicks <= TimeSpan.FromSeconds(10).Ticks) ? 1 : 0;
-                GONetLog.Debug($"gikles process time sync...yeah... rttValid: {rttValid}");
                 if (rttValid == 0) return;
 
                 float rttSeconds = (float)(rttTicks * (1.0 / TimeSpan.TicksPerSecond));
