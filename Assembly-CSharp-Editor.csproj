@@ -61,6 +61,7 @@
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\HighResolutionTimeUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusHolisticTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\DualStackConnectionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\MemoryPack\MemoryPackTests.cs" />
@@ -69,6 +70,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\HighResolutionTimeUtilsEdgeCaseTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLocalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\Editor\ClassTypeReferencePropertyDrawer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />

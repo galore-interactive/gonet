@@ -64,34 +64,71 @@ namespace GONet.Utils
         [ThreadStatic] private static long threadLocalLastCheck;
         [ThreadStatic] private static long threadLocalLastLocalTicks;
         [ThreadStatic] private static long threadLocalLastUtcTicks;
+        [ThreadStatic] private static bool threadLocalInitialized;
 
-        static HighResolutionTimeUtils()
+        private static volatile bool isInitialized = false;
+        private static readonly object initLock = new object();
+
+        // FIXED: Use a static readonly field that forces initialization on type load
+        private static readonly bool forceInit = InitializeOnLoad();
+
+        private static bool InitializeOnLoad()
         {
-            Initialize();
+            InitializeCore();
+            return true;
         }
 
-        private static void Initialize()
+        // FIXED: Lazy initialization with explicit checks
+        private static readonly Lazy<bool> lazyInitializer = new Lazy<bool>(() =>
         {
-            var now = DateTime.Now;
-            var utcNow = DateTime.UtcNow;
-            var swTicks = stopwatch.ElapsedTicks;
-
-            timeState = new TimeState
+            // This is now a backup in case the static field didn't initialize
+            if (!isInitialized)
             {
-                BaseLocalTicks = now.Ticks,
-                BaseUtcTicks = utcNow.Ticks,
-                BaseStopwatchTicks = swTicks,
-                LastLocalTicks = now.Ticks,
-                LastUtcTicks = utcNow.Ticks
-            };
+                InitializeCore();
+            }
+            return true;
+        }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-            resyncState.LastResyncStopwatchTicks = swTicks;
+        // Force initialization on any access
+        private static void ForceInitialization()
+        {
+            _ = lazyInitializer.Value;
+        }
 
-            UnityEngine.Debug.Log("=== HighResolutionTimeUtils STATIC CONSTRUCTOR ===");
-            UnityEngine.Debug.Log($"Start time ticks: {utcNow.Ticks}, timeState.BaseUtcTicks: {timeState.BaseUtcTicks}");
-            UnityEngine.Debug.Log($"Start time as DateTime: {new DateTime(utcNow.Ticks)}");
-            UnityEngine.Debug.Log($"Stopwatch.IsHighResolution: {Stopwatch.IsHighResolution}");
-            UnityEngine.Debug.Log($"Stopwatch.Frequency: {Stopwatch.Frequency}");
+        private static void InitializeCore()
+        {
+            lock (initLock)
+            {
+                if (isInitialized) return; // Already initialized
+
+                var now = DateTime.Now;
+                var utcNow = DateTime.UtcNow;
+                var swTicks = stopwatch.ElapsedTicks;
+
+                // Initialize all fields atomically
+                var newState = new TimeState
+                {
+                    BaseLocalTicks = now.Ticks,
+                    BaseUtcTicks = utcNow.Ticks,
+                    BaseStopwatchTicks = swTicks,
+                    LastLocalTicks = now.Ticks,
+                    LastUtcTicks = utcNow.Ticks
+                };
+
+                // Use interlocked operations for atomic writes
+                Interlocked.Exchange(ref timeState.BaseLocalTicks, newState.BaseLocalTicks);
+                Interlocked.Exchange(ref timeState.BaseUtcTicks, newState.BaseUtcTicks);
+                Interlocked.Exchange(ref timeState.BaseStopwatchTicks, newState.BaseStopwatchTicks);
+                Interlocked.Exchange(ref timeState.LastLocalTicks, newState.LastLocalTicks);
+                Interlocked.Exchange(ref timeState.LastUtcTicks, newState.LastUtcTicks);
+
+                Interlocked.Exchange(ref resyncState.LastResyncStopwatchTicks, swTicks);
+
+                // Full memory barrier
+                Thread.MemoryBarrier();
+                isInitialized = true;
+                Thread.MemoryBarrier();
+            }
         }
 
         /// <summary>
@@ -102,9 +139,20 @@ namespace GONet.Utils
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                ForceInitialization();
+
+                // Initialize thread-local cache if needed
+                if (!threadLocalInitialized)
+                {
+                    threadLocalLastCheck = 0;
+                    threadLocalLastLocalTicks = 0;
+                    threadLocalLastUtcTicks = 0;
+                    threadLocalInitialized = true;
+                }
+
                 // Fast path - use thread-local cache if very recent
                 long swTicks = stopwatch.ElapsedTicks;
-                if ((swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
+                if (threadLocalLastUtcTicks > 0 && (swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
                 {
                     return new DateTime(threadLocalLastUtcTicks, DateTimeKind.Utc);
                 }
@@ -121,9 +169,20 @@ namespace GONet.Utils
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                ForceInitialization();
+
+                // Initialize thread-local cache if needed
+                if (!threadLocalInitialized)
+                {
+                    threadLocalLastCheck = 0;
+                    threadLocalLastLocalTicks = 0;
+                    threadLocalLastUtcTicks = 0;
+                    threadLocalInitialized = true;
+                }
+
                 // Fast path - use thread-local cache if very recent
                 long swTicks = stopwatch.ElapsedTicks;
-                if ((swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
+                if (threadLocalLastLocalTicks > 0 && (swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
                 {
                     return new DateTime(threadLocalLastLocalTicks, DateTimeKind.Local);
                 }
@@ -139,40 +198,84 @@ namespace GONet.Utils
             threadLocalLastCheck = swTicks;
 
             // Check if resync needed (branch prediction will optimize this)
-            long lastResync = Volatile.Read(ref resyncState.LastResyncStopwatchTicks);
+            long lastResync = Interlocked.Read(ref resyncState.LastResyncStopwatchTicks);
             if (swTicks - lastResync > RESYNC_INTERVAL_TICKS)
             {
                 TryResyncFast();
             }
 
-            // Calculate time with minimal operations
-            TimeState state = timeState; // Struct copy for atomicity
-            long elapsed = swTicks - state.BaseStopwatchTicks;
-            long calculatedTicks = useUtc ?
-                state.BaseUtcTicks + elapsed :
-                state.BaseLocalTicks + elapsed;
+            // Read state with Interlocked for guaranteed visibility
+            long baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
+            long baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
+            long baseStopwatchTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
 
-            // Ensure monotonic (branchless using Math.Max)
-            long lastTicks = useUtc ? state.LastUtcTicks : state.LastLocalTicks;
-            calculatedTicks = Math.Max(calculatedTicks, lastTicks);
-
-            // Update state if we advanced (likely path)
-            if (calculatedTicks > lastTicks)
+            // Emergency re-initialization if we detect uninitialized state
+            if (baseLocalTicks == 0 || baseUtcTicks == 0)
             {
-                if (useUtc)
-                {
-                    // Try to update, but don't retry on contention
-                    Interlocked.CompareExchange(ref timeState.LastUtcTicks, calculatedTicks, lastTicks);
-                    threadLocalLastUtcTicks = calculatedTicks;
-                }
-                else
-                {
-                    Interlocked.CompareExchange(ref timeState.LastLocalTicks, calculatedTicks, lastTicks);
-                    threadLocalLastLocalTicks = calculatedTicks;
-                }
+                InitializeCore();
+
+                // Re-read after initialization
+                baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
+                baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
+                baseStopwatchTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
             }
 
-            return new DateTime(calculatedTicks, useUtc ? DateTimeKind.Utc : DateTimeKind.Local);
+            // Calculate time
+            long elapsed = swTicks - baseStopwatchTicks;
+            long baseTicks = useUtc ? baseUtcTicks : baseLocalTicks;
+            long calculatedTicks = baseTicks + elapsed;
+
+            // Ensure monotonicity with proper synchronization
+            long lastTicksFieldOffset = useUtc ?
+                Marshal.OffsetOf<TimeState>("LastUtcTicks").ToInt64() :
+                Marshal.OffsetOf<TimeState>("LastLocalTicks").ToInt64();
+
+            // Get reference to the appropriate LastTicks field
+            ref long lastTicksRef = ref (useUtc ? ref timeState.LastUtcTicks : ref timeState.LastLocalTicks);
+
+            // Atomic monotonic update loop
+            long finalTicks = calculatedTicks;
+            long currentLast;
+            do
+            {
+                currentLast = Interlocked.Read(ref lastTicksRef);
+
+                // Ensure we never go backwards
+                if (finalTicks <= currentLast)
+                {
+                    finalTicks = currentLast;
+                    break; // No need to update, just use the current value
+                }
+
+                // Try to update to our new value
+                long exchanged = Interlocked.CompareExchange(ref lastTicksRef, finalTicks, currentLast);
+                if (exchanged == currentLast)
+                {
+                    // Success - we updated the value
+                    break;
+                }
+
+                // Another thread updated the value, check if we should use their value
+                if (exchanged >= finalTicks)
+                {
+                    // Their time is newer, use it
+                    finalTicks = exchanged;
+                    break;
+                }
+                // Otherwise, retry with our value
+            } while (true);
+
+            // Update thread-local cache
+            if (useUtc)
+            {
+                threadLocalLastUtcTicks = finalTicks;
+            }
+            else
+            {
+                threadLocalLastLocalTicks = finalTicks;
+            }
+
+            return new DateTime(finalTicks, useUtc ? DateTimeKind.Utc : DateTimeKind.Local);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)] // Keep resync out of hot path
@@ -187,12 +290,12 @@ namespace GONet.Utils
                     var swTicks = stopwatch.ElapsedTicks;
 
                     // Only update resync timestamp
-                    Volatile.Write(ref resyncState.LastResyncStopwatchTicks, swTicks);
+                    Interlocked.Exchange(ref resyncState.LastResyncStopwatchTicks, swTicks);
                     Interlocked.Increment(ref resyncState.ResyncCount);
                 }
                 finally
                 {
-                    Volatile.Write(ref resyncState.IsResyncing, 0);
+                    Interlocked.Exchange(ref resyncState.IsResyncing, 0);
                 }
             }
         }
@@ -203,10 +306,15 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetBulkTimes(Span<long> ticks, bool useUtc)
         {
+            ForceInitialization();
+
             long swTicks = stopwatch.ElapsedTicks;
-            TimeState state = timeState;
-            long baseTicks = useUtc ? state.BaseUtcTicks : state.BaseLocalTicks;
-            long baseSwTicks = state.BaseStopwatchTicks;
+
+            // Use Interlocked reads
+            long baseTicks = useUtc ?
+                Interlocked.Read(ref timeState.BaseUtcTicks) :
+                Interlocked.Read(ref timeState.BaseLocalTicks);
+            long baseSwTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
 
             // Vectorized operation for bulk requests
             for (int i = 0; i < ticks.Length; i++)
