@@ -66,6 +66,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\DualStackConnectionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\MemoryPack\MemoryPackTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\HighPerfTimeSyncTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\NetworkUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
@@ -85,6 +86,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\SecretaryOfTemporalAffairsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetParticipantCompanionBehaviourCustomInspector.cs" />
   </ItemGroup>
