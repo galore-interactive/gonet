@@ -2145,6 +2145,19 @@ namespace GONet
             [ThreadStatic] private static double tlsCachedSeconds;
             [ThreadStatic] private static int tlsLastFrame;
 
+            /// <summary>
+            /// Checks if the previous adjustment has settled and returns the remaining time if not.
+            /// </summary>
+            /// <returns>A tuple: (bool settled, int remainingMilliseconds) where settled is true if adjustment is complete, and remainingMilliseconds is the time left if not.</returns>
+            public (bool settled, int remainingMilliseconds) CheckAdjustmentStatus()
+            {
+                long adjustmentStart = Volatile.Read(ref alignedState.State.AdjustmentStartTicks);
+                long adjustmentElapsed = HighResolutionTimeUtils.UtcNow.Ticks - adjustmentStart;
+                bool settled = adjustmentElapsed >= TimeSpan.TicksPerSecond;
+                int remainingMs = settled ? 0 : (int)((TimeSpan.TicksPerSecond - adjustmentElapsed) / TimeSpan.TicksPerMillisecond);
+                return (settled, remainingMs);
+            }
+
             public long ElapsedTicks
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2393,6 +2406,18 @@ namespace GONet
                     FrameCount = UnityEngine.Time.frameCount;
                 }
             }
+
+            public string DebugState()
+            {
+                long now = HighResolutionTimeUtils.UtcNow.Ticks;
+                long adjustmentStart = Volatile.Read(ref alignedState.State.AdjustmentStartTicks);
+                long adjustmentElapsed = now - adjustmentStart;
+                return $"[SoTA] AuthorityOffsetTicks: {alignedState.State.AuthorityOffsetTicks / (double)TimeSpan.TicksPerSecond:F3}s, " +
+                       $"TargetOffsetTicks: {alignedState.State.TargetOffsetTicks / (double)TimeSpan.TicksPerSecond:F3}s, " +
+                       $"AdjustmentStart: {adjustmentStart / (double)TimeSpan.TicksPerSecond:F3}s, " +
+                       $"AdjustmentElapsed: {adjustmentElapsed / (double)TimeSpan.TicksPerSecond:F3}s, " +
+                       $"ElapsedTicks: {ElapsedTicks / (double)TimeSpan.TicksPerSecond:F3}s";
+            }
         }
 
         /// <summary>
@@ -2400,12 +2425,9 @@ namespace GONet
         /// </summary>
         public static class HighPerfTimeSync
         {
-            // Configuration
-            private const float TIME_SYNC_SMOOTHING = 0.2f;
-            private const long MIN_CORRECTION_TICKS = TimeSpan.TicksPerMillisecond * 10;
-            private const long MAX_CORRECTION_TICKS = TimeSpan.TicksPerSecond * 2;
+            private static long lastAdjustmentTicks = 0;
+            private static int adjustmentCount = 0;
 
-            // Lock-free circular buffer for RTT samples
             [StructLayout(LayoutKind.Sequential)]
             private struct RttSample
             {
@@ -2413,87 +2435,105 @@ namespace GONet
                 public long Timestamp;
             }
 
-            private static readonly RttSample[] rttBuffer = new RttSample[16]; // Power of 2 for fast modulo
+            private static readonly RttSample[] rttBuffer = new RttSample[32];
             private static int rttWriteIndex = 0;
             private static long lastProcessedResponseTicks = 0;
 
-            // Pre-calculated constants
-            private const int RTT_BUFFER_MASK = 15; // For fast modulo 16
+            private const int RTT_BUFFER_MASK = 31;
 
-            // TODO whenever unity version supports it: [MethodImpl(MethodImplOptions.AggressiveOptimization)]
             public static void ProcessTimeSync(
                 long requestUID,
                 long serverElapsedTicksAtResponse,
                 RequestMessage requestMessage,
-                SecretaryOfTemporalAffairs timeAuthority)
+                SecretaryOfTemporalAffairs timeAuthority,
+                bool forceAdjustment = false)
             {
-                // Fast out-of-order check
+                long now = HighResolutionTimeUtils.UtcNow.Ticks;
+                double timeSinceLastAdjustment = (now - lastAdjustmentTicks) / (double)TimeSpan.TicksPerSecond;
+                UnityEngine.Debug.Log($"[TimeSync] Time since last adjustment: {timeSinceLastAdjustment:F3}s");
+
                 long lastProcessed = Volatile.Read(ref lastProcessedResponseTicks);
                 if (serverElapsedTicksAtResponse <= lastProcessed)
+                {
+                    UnityEngine.Debug.Log($"[TimeSync] Skipped: serverElapsedTicksAtResponse ({serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s) <= lastProcessed ({lastProcessed / (double)TimeSpan.TicksPerSecond:F3}s)");
                     return;
+                }
 
-                // Try to update last processed (may fail under contention)
                 Interlocked.CompareExchange(ref lastProcessedResponseTicks, serverElapsedTicksAtResponse, lastProcessed);
 
-                // Calculate RTT
                 long responseReceivedTicks = timeAuthority.ElapsedTicks;
                 long requestSentTicks = requestMessage.OccurredAtElapsedTicks;
                 long rttTicks = responseReceivedTicks - requestSentTicks;
 
-                // Fast sanity check (branchless)
                 long rttValid = (rttTicks >= 0 & rttTicks <= TimeSpan.FromSeconds(10).Ticks) ? 1 : 0;
-                if (rttValid == 0) return;
+                if (rttValid == 0)
+                {
+                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Invalid RTT: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s");
+                    return;
+                }
 
                 float rttSeconds = (float)(rttTicks * (1.0 / TimeSpan.TicksPerSecond));
 
-                // Lock-free RTT buffer update
                 int writeIdx = Interlocked.Increment(ref rttWriteIndex) & RTT_BUFFER_MASK;
                 rttBuffer[writeIdx] = new RttSample { Value = rttSeconds, Timestamp = responseReceivedTicks };
 
-                // Fast median approximation (use recent middle value)
                 float medianRtt = GetFastMedianRtt();
                 long oneWayDelayTicks = (long)(medianRtt * TimeSpan.TicksPerSecond * 0.5);
 
-                // Predict server time
-                long predictedServerTime = serverElapsedTicksAtResponse + oneWayDelayTicks;
-                long currentClientTime = responseReceivedTicks;
-                long timeDifference = predictedServerTime - currentClientTime;
+                // Calculate the actual difference using the client's adjusted time
+                long adjustedServerTimeTicks = serverElapsedTicksAtResponse + oneWayDelayTicks;
+                long adjustedClientTimeTicks = timeAuthority.ElapsedTicks; // Already includes AuthorityOffsetTicks
+                double serverTimeNowSeconds = adjustedServerTimeTicks / (double)TimeSpan.TicksPerSecond;
+                double clientTimeNowSeconds = adjustedClientTimeTicks / (double)TimeSpan.TicksPerSecond;
+                double currentDifferenceSeconds = serverTimeNowSeconds - clientTimeNowSeconds;
 
-                // Branchless significant difference check
-                long absDiff = Math.Abs(timeDifference);
-                if (absDiff <= MIN_CORRECTION_TICKS) return;
+                double absDiffSeconds = Math.Abs(currentDifferenceSeconds);
+                UnityEngine.Debug.Log($"[TimeSync] Difference check: absDiff={absDiffSeconds:F3}s, forceAdjustment={forceAdjustment}");
+                if (!forceAdjustment && absDiffSeconds <= 0.005) // 5ms tolerance
+                {
+                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Difference ({absDiffSeconds:F3}s) below tolerance (5ms)");
+                    return;
+                }
 
-                // Apply bounded, smoothed correction
-                long correction = Math.Sign(timeDifference) * Math.Min(absDiff, MAX_CORRECTION_TICKS);
-                long smoothedCorrection = (long)(correction * TIME_SYNC_SMOOTHING);
-                long newClientTime = currentClientTime + smoothedCorrection;
+                long currentDifference = (long)(currentDifferenceSeconds * TimeSpan.TicksPerSecond);
+                long targetTime = adjustedClientTimeTicks + currentDifference;
+                Interlocked.Increment(ref adjustmentCount);
 
-                timeAuthority.SetFromAuthority(predictedServerTime); // (newClientTime);
+#if DEBUG || ENABLE_TIME_SYNC_LOGGING
+                UnityEngine.Debug.Log($"[TimeSync] Sync (Adjustment #{adjustmentCount}):\n" +
+                                     $"  Median RTT: {medianRtt:F3}s\n" +
+                                     $"  Server time now: {serverTimeNowSeconds:F3}s\n" +
+                                     $"  Client time now: {clientTimeNowSeconds:F3}s\n" +
+                                     $"  Current difference: {currentDifferenceSeconds:F3}s\n" +
+                                     $"  Target time: {targetTime / (double)TimeSpan.TicksPerSecond:F3}s");
+#endif
+
+                timeAuthority.SetFromAuthority(targetTime);
+                Interlocked.Exchange(ref lastAdjustmentTicks, now);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static float GetFastMedianRtt()
             {
-                // Fast approximation: use average of middle quartile
-                float sum = 0;
+                float[] sortedRtt = new float[32];
                 int count = 0;
                 long cutoff = HighResolutionTimeUtils.UtcNow.Ticks - TimeSpan.FromSeconds(10).Ticks;
 
-                // Unrolled loop for performance
-                for (int i = 0; i < 16; i += 4)
+                for (int i = 0; i < 32; i++)
                 {
-                    var s0 = rttBuffer[i];
-                    var s1 = rttBuffer[i + 1];
-                    var s2 = rttBuffer[i + 2];
-                    var s3 = rttBuffer[i + 3];
-
-                    if (s0.Timestamp > cutoff) { sum += s0.Value; count++; }
-                    if (s1.Timestamp > cutoff) { sum += s1.Value; count++; }
-                    if (s2.Timestamp > cutoff) { sum += s2.Value; count++; }
-                    if (s3.Timestamp > cutoff) { sum += s3.Value; count++; }
+                    if (rttBuffer[i].Timestamp > cutoff)
+                    {
+                        sortedRtt[count++] = rttBuffer[i].Value;
+                    }
                 }
 
-                return count > 0 ? sum / count : 0.1f;
+                if (count == 0) return 0.05f;
+                Array.Sort(sortedRtt, 0, count);
+                float median = count % 2 == 0 ? (sortedRtt[count / 2 - 1] + sortedRtt[count / 2]) / 2 : sortedRtt[count / 2];
+#if DEBUG || ENABLE_TIME_SYNC_LOGGING
+                UnityEngine.Debug.Log($"[TimeSync] RTT Samples: {string.Join(", ", sortedRtt.Take(count).Select(v => v.ToString("F3")))}, Median: {median:F3}s");
+#endif
+                return median;
             }
         }
 
