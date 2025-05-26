@@ -1856,7 +1856,7 @@ namespace GONet
 
                     if (SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable))
                     {
-                        GONetLog.Debug("gikles just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
+                        //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
                     }
 
                     mainThread_miscSerializationArrayPool.Return(bytes);
@@ -1883,8 +1883,6 @@ namespace GONet
                 int bytesUsedCount = bitStream.Length_WrittenBytes;
                 byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
                 Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                GONetLog.Debug($"gikles about to send time sync to client....times: {Time.ElapsedTicks}");
 
                 SendBytesToRemoteConnection(connectionToClient, bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable);
 
