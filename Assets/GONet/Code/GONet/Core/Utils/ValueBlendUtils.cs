@@ -784,32 +784,179 @@ namespace GONet.Utils
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool Quaternion_ApplySmoothing_IfAppropriate(ref NumericValueChangeSnapshot[] valueBuffer, int valueCount, ref GONetSyncableValue blendedValue)
+        {
+            const int MIN_VALUE_COUNT_FOR_NORMAL_OPERATION = 3;
+            const float ANGULAR_VELOCITY_CHANGE_THRESHOLD = 45f; // Degrees per second change
+            const float AT_REST_ANGULAR_VELOCITY_THRESHOLD = 5f; // Degrees per second
+            const bool ShouldLog = false;
+
+            // Always calculate smoothed value to maintain state
+            var smoothedValue = GetSmoothedRotation(blendedValue.UnityEngine_Quaternion, valueBuffer, valueCount);
+
+            bool shouldApplySmoothing = false;
+            float smoothingStrength = 1.0f;
+
+            // Detect at-rest transitions
+            bool isLikelyAtRestTransition = false;
+            if (valueCount == 1)
+            {
+                isLikelyAtRestTransition = true;
+            }
+            else if (valueCount == 2)
+            {
+                unsafe
+                {
+                    fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                    {
+                        Quaternion* q0 = (Quaternion*)((byte*)&bufferPtr[0].numericValue + 1);
+                        Quaternion* q1 = (Quaternion*)((byte*)&bufferPtr[1].numericValue + 1);
+
+                        // Calculate angular velocity
+                        float angle = Quaternion.Angle(*q0, *q1);
+                        long timeDelta = bufferPtr[0].elapsedTicksAtChange - bufferPtr[1].elapsedTicksAtChange;
+
+                        if (timeDelta > 0)
+                        {
+                            float deltaTime = (float)(timeDelta * 1e-7);
+                            float angularVelocity = angle / deltaTime;
+
+                            if (angularVelocity < AT_REST_ANGULAR_VELOCITY_THRESHOLD)
+                            {
+                                isLikelyAtRestTransition = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Condition 1: Low value count or at-rest
+            if (valueCount <= MIN_VALUE_COUNT_FOR_NORMAL_OPERATION || isLikelyAtRestTransition)
+            {
+                shouldApplySmoothing = true;
+                if (ShouldLog) GONetLog.Debug($"Applying quaternion smoothing: low value count ({valueCount}) or at-rest");
+            }
+            // Condition 2: Sudden angular velocity change
+            else if (valueCount >= 3)
+            {
+                unsafe
+                {
+                    fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                    {
+                        Quaternion* q0 = (Quaternion*)((byte*)&bufferPtr[0].numericValue + 1);
+                        Quaternion* q1 = (Quaternion*)((byte*)&bufferPtr[1].numericValue + 1);
+                        Quaternion* q2 = (Quaternion*)((byte*)&bufferPtr[2].numericValue + 1);
+
+                        // Calculate angular velocities
+                        float angle1 = Quaternion.Angle(*q0, *q1);
+                        float angle2 = Quaternion.Angle(*q1, *q2);
+
+                        long timeDelta1 = bufferPtr[0].elapsedTicksAtChange - bufferPtr[1].elapsedTicksAtChange;
+                        long timeDelta2 = bufferPtr[1].elapsedTicksAtChange - bufferPtr[2].elapsedTicksAtChange;
+
+                        if (timeDelta1 > 0 && timeDelta2 > 0)
+                        {
+                            float angVel1 = angle1 / ((float)(timeDelta1 * 1e-7));
+                            float angVel2 = angle2 / ((float)(timeDelta2 * 1e-7));
+
+                            float angVelChange = MathF.Abs(angVel1 - angVel2);
+
+                            if (angVelChange > ANGULAR_VELOCITY_CHANGE_THRESHOLD)
+                            {
+                                shouldApplySmoothing = true;
+                                smoothingStrength = angVelChange / 90f < 1.0f ? angVelChange / 90f : 1.0f;
+                                if (ShouldLog) GONetLog.Debug($"Applying quaternion smoothing: angular velocity spike {angVelChange:F1}°/s");
+                            }
+                        }
+
+                        // Check for axis flip (gimbal lock avoidance)
+                        Vector3 axis1, axis2;
+                        float angleOut;
+                        (*q1 * Quaternion.Inverse(*q0)).ToAngleAxis(out angleOut, out axis1);
+                        (*q2 * Quaternion.Inverse(*q1)).ToAngleAxis(out angleOut, out axis2);
+
+                        float axisDot = Vector3.Dot(axis1, axis2);
+                        if (axisDot < 0.5f) // Significant axis change
+                        {
+                            shouldApplySmoothing = true;
+                            if (ShouldLog) GONetLog.Debug($"Applying quaternion smoothing: axis flip detected");
+                        }
+                    }
+                }
+            }
+
+            // Condition 3: Significant difference from smoothed
+            if (!shouldApplySmoothing)
+            {
+                float angleFromSmoothed = Quaternion.Angle(smoothedValue, blendedValue.UnityEngine_Quaternion);
+                const float SMOOTHING_ANGLE_THRESHOLD = 5f; // degrees
+
+                if (angleFromSmoothed > SMOOTHING_ANGLE_THRESHOLD)
+                {
+                    shouldApplySmoothing = true;
+                    smoothingStrength = angleFromSmoothed / 15f < 1.0f ? angleFromSmoothed / 15f : 1.0f;
+                    if (ShouldLog) GONetLog.Debug($"Applying quaternion smoothing: angle delta {angleFromSmoothed:F1}°");
+                }
+            }
+
+            // Apply smoothing
+            if (shouldApplySmoothing)
+            {
+                if (smoothingStrength < 1.0f)
+                {
+                    blendedValue = Quaternion.Slerp(blendedValue.UnityEngine_Quaternion, smoothedValue, smoothingStrength);
+                }
+                else
+                {
+                    blendedValue = smoothedValue;
+                }
+            }
+
+            return shouldApplySmoothing;
+        }
+
         static readonly ConcurrentDictionary<Thread, Dictionary<NumericValueChangeSnapshot[], List<Vector3>>> GetSmoothedVector3_m_outputs_byBufferByThread =
             new ConcurrentDictionary<Thread, Dictionary<NumericValueChangeSnapshot[], List<Vector3>>>();
         static readonly ConcurrentDictionary<Thread, List<Vector3>> GetSmoothedVector3_m_inputs_byThread = new ConcurrentDictionary<Thread, List<Vector3>>();
 
+        // Optimized GetSmoothedVector3 with reduced allocations and better cache usage
         internal static Vector3 GetSmoothedVector3(Vector3 mostRecentValue, NumericValueChangeSnapshot[] olderValuesBuffer, int bufferCount)
         {
+            // Thread-local storage access
             List<Vector3> GetSmoothedVector3_m_inputs;
             if (!GetSmoothedVector3_m_inputs_byThread.TryGetValue(Thread.CurrentThread, out GetSmoothedVector3_m_inputs))
             {
-                GetSmoothedVector3_m_inputs_byThread[Thread.CurrentThread] = GetSmoothedVector3_m_inputs = new List<Vector3>();
+                GetSmoothedVector3_m_inputs_byThread[Thread.CurrentThread] = GetSmoothedVector3_m_inputs = new List<Vector3>(SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT + 1);
             }
             else
             {
                 GetSmoothedVector3_m_inputs.Clear();
             }
 
-            for (int i = bufferCount - 1; i >= 0; --i) // m_inputs is most recent last order, which is the opposite of valueBuffer
+            // Use unsafe access for better performance when adding to inputs
+            unsafe
             {
-                Vector3 value = olderValuesBuffer[i].numericValue.UnityEngine_Vector3;
-                GetSmoothedVector3_m_inputs.Add(value);
+                fixed (NumericValueChangeSnapshot* bufferPtr = olderValuesBuffer)
+                {
+                    // Add values in reverse order more efficiently
+                    for (int i = bufferCount - 1; i >= 0; --i)
+                    {
+                        // Direct pointer access to Vector3 data
+                        Vector3* vecPtr = (Vector3*)((byte*)&bufferPtr[i].numericValue + 1);
+                        GetSmoothedVector3_m_inputs.Add(*vecPtr);
+                    }
+                }
             }
 
-            // Butterworth filter (order 2, cutoff=0.5)
-            if (GetSmoothedVector3_m_inputs.Count < SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT)
+            // Ensure minimum required inputs with optimized filling
+            int currentCount = GetSmoothedVector3_m_inputs.Count;
+            int fillCount = currentCount < SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT ?
+                            SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT - currentCount : 0;
+
+            if (fillCount > 0)
             {
-                for (int i = 0; i < SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+                for (int i = 0; i < fillCount; ++i)
                 {
                     GetSmoothedVector3_m_inputs.Add(mostRecentValue);
                 }
@@ -819,6 +966,7 @@ namespace GONet.Utils
                 GetSmoothedVector3_m_inputs.Add(mostRecentValue);
             }
 
+            // Output buffer management
             Dictionary<NumericValueChangeSnapshot[], List<Vector3>> GetSmoothedVector3_m_outputs_byBuffer;
             if (!GetSmoothedVector3_m_outputs_byBufferByThread.TryGetValue(Thread.CurrentThread, out GetSmoothedVector3_m_outputs_byBuffer))
             {
@@ -828,42 +976,306 @@ namespace GONet.Utils
             List<Vector3> GetSmoothedVector3_m_outputs;
             if (!GetSmoothedVector3_m_outputs_byBuffer.TryGetValue(olderValuesBuffer, out GetSmoothedVector3_m_outputs))
             {
-                GetSmoothedVector3_m_outputs_byBuffer[olderValuesBuffer] = GetSmoothedVector3_m_outputs = new List<Vector3>();
+                GetSmoothedVector3_m_outputs_byBuffer[olderValuesBuffer] = GetSmoothedVector3_m_outputs = new List<Vector3>(SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT + 1);
             }
             else
             {
-                int outputsToRemove = GetSmoothedVector3_m_outputs.Count - GetSmoothedVector3_m_inputs.Count;
-                if (outputsToRemove > 0)
+                // Optimized trimming - only remove what's necessary
+                int targetCount = GetSmoothedVector3_m_inputs.Count;
+                if (GetSmoothedVector3_m_outputs.Count > targetCount)
                 {
-                    GetSmoothedVector3_m_outputs.RemoveRange(0, outputsToRemove); // remove the oldest entries to keep this from growing indefinitely....matching the input count looks to be more to keep than is needed, leaves enough to operate on and is easy to accomplish
+                    GetSmoothedVector3_m_outputs.RemoveRange(0, GetSmoothedVector3_m_outputs.Count - targetCount);
                 }
             }
 
-            if (GetSmoothedVector3_m_outputs.Count < SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT)
+            // Fill outputs if needed
+            int outputCount = GetSmoothedVector3_m_outputs.Count;
+            if (outputCount < SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT)
             {
-                for (int i = 0; i < SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+                int fillCount2 = SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT - outputCount;
+                for (int i = 0; i < fillCount2; ++i)
                 {
                     GetSmoothedVector3_m_outputs.Add(mostRecentValue);
                 }
             }
 
-            Vector3 result = Vector3.zero;
+            // Optimized calculation using component-wise operations to avoid Vector3 operator overhead
+            float result_x = 0f, result_y = 0f, result_z = 0f;
 
             int iLastInput = GetSmoothedVector3_m_inputs.Count - 1;
-            for (int i = 0; i < SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+
+            // Process inputs - unroll for common case of 3 inputs
+            if (SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT == 3)
             {
-                result += GetSmoothedVector3_m_inputs[iLastInput - i] * SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES[i];
+                Vector3 v0 = GetSmoothedVector3_m_inputs[iLastInput];
+                Vector3 v1 = GetSmoothedVector3_m_inputs[iLastInput - 1];
+                Vector3 v2 = GetSmoothedVector3_m_inputs[iLastInput - 2];
+
+                float w0 = SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES[0];
+                float w1 = SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES[1];
+                float w2 = SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES[2];
+
+                result_x = v0.x * w0 + v1.x * w1 + v2.x * w2;
+                result_y = v0.y * w0 + v1.y * w1 + v2.y * w2;
+                result_z = v0.z * w0 + v1.z * w1 + v2.z * w2;
+            }
+            else
+            {
+                // Fallback for different configurations
+                for (int i = 0; i < SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+                {
+                    Vector3 v = GetSmoothedVector3_m_inputs[iLastInput - i];
+                    float weight = SMOOTHING_INPUTS_HISTORY_EFFECTOR_PERCENTAGES[i];
+                    result_x += v.x * weight;
+                    result_y += v.y * weight;
+                    result_z += v.z * weight;
+                }
             }
 
             int iLastOutput = GetSmoothedVector3_m_outputs.Count - 1;
-            for (int i = 0; i < SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+
+            // Process outputs - unroll for common case of 2 outputs
+            if (SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT == 2)
             {
-                result += GetSmoothedVector3_m_outputs[iLastOutput - i] * SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES[i];
+                Vector3 v0 = GetSmoothedVector3_m_outputs[iLastOutput];
+                Vector3 v1 = GetSmoothedVector3_m_outputs[iLastOutput - 1];
+
+                float w0 = SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES[0];
+                float w1 = SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES[1];
+
+                result_x += v0.x * w0 + v1.x * w1;
+                result_y += v0.y * w0 + v1.y * w1;
+                result_z += v0.z * w0 + v1.z * w1;
+            }
+            else
+            {
+                // Fallback for different configurations
+                for (int i = 0; i < SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES_COUNT; ++i)
+                {
+                    Vector3 v = GetSmoothedVector3_m_outputs[iLastOutput - i];
+                    float weight = SMOOTHING_OUTPUTS_HISTORY_EFFECTOR_PERCENTAGES[i];
+                    result_x += v.x * weight;
+                    result_y += v.y * weight;
+                    result_z += v.z * weight;
+                }
             }
 
+            Vector3 result = new Vector3(result_x, result_y, result_z);
             GetSmoothedVector3_m_outputs.Add(result);
 
             return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool Vector3_ApplySmoothing_IfAppropriate(ref NumericValueChangeSnapshot[] valueBuffer, int valueCount, ref GONetSyncableValue blendedValue)
+        {
+            // Add these constants at the class level
+            const int MIN_VALUE_COUNT_FOR_NORMAL_OPERATION = 3; // Below this, we're likely at rest or starting motion
+            const float DIRECTION_CHANGE_THRESHOLD = 90f; // Degrees - for detecting sharp turns
+            const float VELOCITY_CHANGE_THRESHOLD = 0.5f; // Normalized velocity change threshold
+            const bool ShouldLog = false; // Make this a static field if needed
+
+            // Always calculate smoothed value to maintain good state data
+            var smoothedValue = GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
+
+            // Determine if we should apply smoothing
+            bool shouldApplySmoothing = false;
+            float smoothingStrength = 1.0f; // Full smoothing by default when applied
+
+            // Detect at-rest transitions by analyzing the value pattern
+            bool isLikelyAtRestTransition = false;
+            if (valueCount == 1)
+            {
+                // Single value often indicates just came to rest or just started moving
+                isLikelyAtRestTransition = true;
+            }
+            else if (valueCount == 2)
+            {
+                // Check if velocity is very low (potential at-rest)
+                unsafe
+                {
+                    fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                    {
+                        float* pos0 = (float*)((byte*)&bufferPtr[0].numericValue + 1);
+                        float* pos1 = (float*)((byte*)&bufferPtr[1].numericValue + 1);
+
+                        float dx = pos0[0] - pos1[0];
+                        float dy = pos0[1] - pos1[1];
+                        float dz = pos0[2] - pos1[2];
+                        float distSqr = dx * dx + dy * dy + dz * dz;
+
+                        long timeDelta = bufferPtr[0].elapsedTicksAtChange - bufferPtr[1].elapsedTicksAtChange;
+                        if (timeDelta > 0)
+                        {
+                            float deltaTime = (float)(timeDelta * 1e-7); // Ticks to seconds
+                            float velocitySqr = distSqr / (deltaTime * deltaTime);
+
+                            // Very low velocity threshold for at-rest detection
+                            const float AT_REST_VELOCITY_SQR_THRESHOLD = 0.01f; // 0.1 units/second squared
+                            if (velocitySqr < AT_REST_VELOCITY_SQR_THRESHOLD)
+                            {
+                                isLikelyAtRestTransition = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Condition 1: Low value count or likely at-rest transitions
+            if (valueCount <= MIN_VALUE_COUNT_FOR_NORMAL_OPERATION || isLikelyAtRestTransition)
+            {
+                shouldApplySmoothing = true;
+                if (ShouldLog) GONetLog.Debug($"Applying smoothing due to low value count ({valueCount}) or at-rest transition");
+            }
+            // Condition 2: Sharp direction change detection with optimized calculations
+            else if (valueCount >= 2)
+            {
+                // Use unsafe access for maximum performance
+                unsafe
+                {
+                    fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                    {
+                        // Direct component access for velocity calculations
+                        float* snap0_components = (float*)((byte*)&bufferPtr[0].numericValue + 1);
+                        float* snap1_components = (float*)((byte*)&bufferPtr[1].numericValue + 1);
+
+                        long tickDelta1 = bufferPtr[0].elapsedTicksAtChange - bufferPtr[1].elapsedTicksAtChange;
+                        if (tickDelta1 > 0)
+                        {
+                            float deltaTime1 = (float)(tickDelta1 * 1e-7); // Ticks to seconds
+                            float invDeltaTime1 = 1.0f / deltaTime1;
+
+                            // Component-wise velocity calculation
+                            float vel_x = (snap0_components[0] - snap1_components[0]) * invDeltaTime1;
+                            float vel_y = (snap0_components[1] - snap1_components[1]) * invDeltaTime1;
+                            float vel_z = (snap0_components[2] - snap1_components[2]) * invDeltaTime1;
+
+                            float currentVelSqrMag = vel_x * vel_x + vel_y * vel_y + vel_z * vel_z;
+
+                            if (valueCount >= 3 && currentVelSqrMag > 0.01f)
+                            {
+                                float* snap2_components = (float*)((byte*)&bufferPtr[2].numericValue + 1);
+                                long tickDelta2 = bufferPtr[1].elapsedTicksAtChange - bufferPtr[2].elapsedTicksAtChange;
+
+                                if (tickDelta2 > 0)
+                                {
+                                    float deltaTime2 = (float)(tickDelta2 * 1e-7);
+                                    float invDeltaTime2 = 1.0f / deltaTime2;
+
+                                    float prevVel_x = (snap1_components[0] - snap2_components[0]) * invDeltaTime2;
+                                    float prevVel_y = (snap1_components[1] - snap2_components[1]) * invDeltaTime2;
+                                    float prevVel_z = (snap1_components[2] - snap2_components[2]) * invDeltaTime2;
+
+                                    float prevVelSqrMag = prevVel_x * prevVel_x + prevVel_y * prevVel_y + prevVel_z * prevVel_z;
+
+                                    if (prevVelSqrMag > 0.01f)
+                                    {
+                                        // Calculate angle using dot product (avoiding Vector3 construction)
+                                        float dot = vel_x * prevVel_x + vel_y * prevVel_y + vel_z * prevVel_z;
+                                        float currentVelMag = MathF.Sqrt(currentVelSqrMag);
+                                        float prevVelMag = MathF.Sqrt(prevVelSqrMag);
+                                        float cosAngle = dot / (currentVelMag * prevVelMag);
+
+                                        // Clamp to valid range for Acos
+                                        cosAngle = cosAngle > 1.0f ? 1.0f : (cosAngle < -1.0f ? -1.0f : cosAngle);
+                                        float angle = MathF.Acos(cosAngle) * 57.29578f; // Radians to degrees
+
+                                        if (angle > DIRECTION_CHANGE_THRESHOLD)
+                                        {
+                                            shouldApplySmoothing = true;
+                                            // Scale smoothing based on angle severity
+                                            smoothingStrength = angle / 180.0f < 1.0f ? angle / 180.0f : 1.0f;
+                                            if (ShouldLog) GONetLog.Debug($"Applying smoothing due to sharp direction change: {angle:F1}°");
+                                        }
+
+                                        // Check for velocity spike
+                                        float velDiff_x = vel_x - prevVel_x;
+                                        float velDiff_y = vel_y - prevVel_y;
+                                        float velDiff_z = vel_z - prevVel_z;
+                                        float velocityChangeMag = MathF.Sqrt(velDiff_x * velDiff_x + velDiff_y * velDiff_y + velDiff_z * velDiff_z);
+                                        float avgVelMag = (currentVelMag + prevVelMag) * 0.5f;
+
+                                        if (avgVelMag > 0.01f)
+                                        {
+                                            float normalizedVelChange = velocityChangeMag / avgVelMag;
+                                            if (normalizedVelChange > VELOCITY_CHANGE_THRESHOLD)
+                                            {
+                                                shouldApplySmoothing = true;
+                                                if (ShouldLog) GONetLog.Debug($"Applying smoothing due to velocity spike: {normalizedVelChange:F2}");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Condition 3: Check smoothing delta threshold
+            if (!shouldApplySmoothing)
+            {
+                // Only apply smoothing if it would make a meaningful difference
+                float deltaFromSmoothed = (smoothedValue - blendedValue.UnityEngine_Vector3).magnitude;
+                const float SMOOTHING_DELTA_THRESHOLD = 0.05f; // Only smooth if difference is significant
+
+                if (deltaFromSmoothed > SMOOTHING_DELTA_THRESHOLD)
+                {
+                    // Additional jitter check for edge cases
+                    if (valueCount >= 3)
+                    {
+                        unsafe
+                        {
+                            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+                            {
+                                // Quick variance calculation using squared distances
+                                float* pos0 = (float*)((byte*)&bufferPtr[0].numericValue + 1);
+                                float* pos1 = (float*)((byte*)&bufferPtr[1].numericValue + 1);
+                                float* pos2 = (float*)((byte*)&bufferPtr[2].numericValue + 1);
+
+                                // Calculate two deltas
+                                float d1_x = pos0[0] - pos1[0];
+                                float d1_y = pos0[1] - pos1[1];
+                                float d1_z = pos0[2] - pos1[2];
+
+                                float d2_x = pos1[0] - pos2[0];
+                                float d2_y = pos1[1] - pos2[1];
+                                float d2_z = pos1[2] - pos2[2];
+
+                                // Simple variance approximation
+                                float diff_x = d1_x - d2_x;
+                                float diff_y = d1_y - d2_y;
+                                float diff_z = d1_z - d2_z;
+                                float variance = diff_x * diff_x + diff_y * diff_y + diff_z * diff_z;
+
+                                const float JITTER_VARIANCE_THRESHOLD = 0.1f;
+                                if (variance > JITTER_VARIANCE_THRESHOLD)
+                                {
+                                    shouldApplySmoothing = true;
+                                    smoothingStrength = deltaFromSmoothed / 0.2f < 1.0f ? deltaFromSmoothed / 0.2f : 1.0f; // Scale based on delta
+                                    if (ShouldLog) GONetLog.Debug($"Applying smoothing due to jitter: variance={variance:F3}, delta={deltaFromSmoothed:F3}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Apply smoothing with optional strength blending
+            if (shouldApplySmoothing)
+            {
+                if (smoothingStrength < 1.0f)
+                {
+                    // Partial smoothing for gradual transitions
+                    blendedValue = Vector3.Lerp(blendedValue.UnityEngine_Vector3, smoothedValue, smoothingStrength);
+                }
+                else
+                {
+                    blendedValue = smoothedValue;
+                }
+            }
+
+            return shouldApplySmoothing;
         }
     }
 }
