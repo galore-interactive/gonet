@@ -2442,38 +2442,71 @@ namespace GONet
             private const int RTT_BUFFER_MASK = 31;
 
             public static void ProcessTimeSync(
-                long requestUID,
-                long serverElapsedTicksAtResponse,
-                RequestMessage requestMessage,
-                SecretaryOfTemporalAffairs timeAuthority,
-                bool forceAdjustment = false)
+    long requestUID,
+    long serverElapsedTicksAtResponse,
+    RequestMessage requestMessage,
+    SecretaryOfTemporalAffairs timeAuthority,
+    bool forceAdjustment = false)
             {
+                // Add validation
+                if (requestMessage == null || timeAuthority == null)
+                {
+                    UnityEngine.Debug.LogError("[TimeSync] Invalid parameters passed to ProcessTimeSync");
+                    return;
+                }
+
                 long now = HighResolutionTimeUtils.UtcNow.Ticks;
                 double timeSinceLastAdjustment = (now - lastAdjustmentTicks) / (double)TimeSpan.TicksPerSecond;
                 UnityEngine.Debug.Log($"[TimeSync] Time since last adjustment: {timeSinceLastAdjustment:F3}s");
 
+                // IMPROVED: Better handling of lastProcessedResponseTicks
+                // The comparison should only happen for significantly older responses
                 long lastProcessed = Volatile.Read(ref lastProcessedResponseTicks);
-                if (serverElapsedTicksAtResponse <= lastProcessed)
+
+                // Validate server time is reasonable (not negative or too old)
+                if (serverElapsedTicksAtResponse <= 0)
                 {
-                    UnityEngine.Debug.Log($"[TimeSync] Skipped: serverElapsedTicksAtResponse ({serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s) <= lastProcessed ({lastProcessed / (double)TimeSpan.TicksPerSecond:F3}s)");
+                    UnityEngine.Debug.LogWarning($"[TimeSync] Invalid server time: {serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s. Ignoring.");
                     return;
                 }
 
-                Interlocked.CompareExchange(ref lastProcessedResponseTicks, serverElapsedTicksAtResponse, lastProcessed);
+                // Only skip if we're processing a significantly older response AND not forcing
+                if (!forceAdjustment && lastProcessed > 0)
+                {
+                    long timeDiff = lastProcessed - serverElapsedTicksAtResponse;
+                    if (timeDiff > TimeSpan.FromSeconds(1).Ticks) // Only skip if more than 1 second older
+                    {
+                        UnityEngine.Debug.Log($"[TimeSync] Skipped: serverElapsedTicksAtResponse ({serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s) is significantly older than lastProcessed ({lastProcessed / (double)TimeSpan.TicksPerSecond:F3}s)");
+                        return;
+                    }
+                }
+
+                // Update last processed only if this response is newer
+                if (serverElapsedTicksAtResponse > lastProcessed)
+                {
+                    Interlocked.CompareExchange(ref lastProcessedResponseTicks, serverElapsedTicksAtResponse, lastProcessed);
+                }
 
                 long responseReceivedTicks = timeAuthority.ElapsedTicks;
                 long requestSentTicks = requestMessage.OccurredAtElapsedTicks;
                 long rttTicks = responseReceivedTicks - requestSentTicks;
 
-                long rttValid = (rttTicks >= 0 & rttTicks <= TimeSpan.FromSeconds(10).Ticks) ? 1 : 0;
-                if (rttValid == 0)
+                // IMPROVED: Better RTT validation
+                if (rttTicks < 0)
                 {
-                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Invalid RTT: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s");
+                    UnityEngine.Debug.LogWarning($"[TimeSync] Negative RTT detected: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s. Clock may have jumped.");
+                    return;
+                }
+
+                if (rttTicks > TimeSpan.FromSeconds(10).Ticks)
+                {
+                    UnityEngine.Debug.LogWarning($"[TimeSync] RTT too large: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s. Ignoring.");
                     return;
                 }
 
                 float rttSeconds = (float)(rttTicks * (1.0 / TimeSpan.TicksPerSecond));
 
+                // Update RTT buffer
                 int writeIdx = Interlocked.Increment(ref rttWriteIndex) & RTT_BUFFER_MASK;
                 rttBuffer[writeIdx] = new RttSample { Value = rttSeconds, Timestamp = responseReceivedTicks };
 
@@ -2482,17 +2515,33 @@ namespace GONet
 
                 // Calculate the actual difference using the client's adjusted time
                 long adjustedServerTimeTicks = serverElapsedTicksAtResponse + oneWayDelayTicks;
-                long adjustedClientTimeTicks = timeAuthority.ElapsedTicks; // Already includes AuthorityOffsetTicks
+                long adjustedClientTimeTicks = timeAuthority.ElapsedTicks;
                 double serverTimeNowSeconds = adjustedServerTimeTicks / (double)TimeSpan.TicksPerSecond;
                 double clientTimeNowSeconds = adjustedClientTimeTicks / (double)TimeSpan.TicksPerSecond;
                 double currentDifferenceSeconds = serverTimeNowSeconds - clientTimeNowSeconds;
 
                 double absDiffSeconds = Math.Abs(currentDifferenceSeconds);
                 UnityEngine.Debug.Log($"[TimeSync] Difference check: absDiff={absDiffSeconds:F3}s, forceAdjustment={forceAdjustment}");
-                if (!forceAdjustment && absDiffSeconds <= 0.005) // 5ms tolerance
+
+                // IMPROVED: Dynamic threshold based on network conditions
+                double threshold = 0.005; // 5ms base threshold
+                if (medianRtt > 0.1f) // If RTT > 100ms, increase threshold
                 {
-                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Difference ({absDiffSeconds:F3}s) below tolerance (5ms)");
+                    threshold = Math.Min(0.05, medianRtt * 0.1); // Up to 50ms for poor networks
+                }
+
+                if (!forceAdjustment && absDiffSeconds <= threshold)
+                {
+                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Difference ({absDiffSeconds:F3}s) below tolerance ({threshold:F3}s)");
                     return;
+                }
+
+                // IMPROVED: Limit maximum adjustment to prevent huge jumps
+                const double MAX_ADJUSTMENT = 30.0; // 30 seconds max adjustment
+                if (absDiffSeconds > MAX_ADJUSTMENT && !forceAdjustment)
+                {
+                    UnityEngine.Debug.LogWarning($"[TimeSync] Large time difference detected: {absDiffSeconds:F3}s. Clamping to {MAX_ADJUSTMENT}s");
+                    currentDifferenceSeconds = Math.Sign(currentDifferenceSeconds) * MAX_ADJUSTMENT;
                 }
 
                 long currentDifference = (long)(currentDifferenceSeconds * TimeSpan.TicksPerSecond);
