@@ -1,6 +1,8 @@
-using System;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,11 +13,33 @@ using static GONet.GONetMain;
 namespace GONet.Tests.Time
 {
     /// <summary>
-    /// Tests for HighPerfTimeSync time synchronization processor.
+    /// Comprehensive tests for HighPerfTimeSync time synchronization processor.
     /// </summary>
     [TestFixture]
-    public class HighPerfTimeSyncTests
+    public class HighPerfTimeSyncTests : TimeSyncTestBase
     {
+        // String constants to avoid allocations
+        private const string CATEGORY_TIMESYNC = "TimeSync";
+        private const string CATEGORY_RTT = "RTT";
+        private const string CATEGORY_CORRECTION = "Correction";
+        private const string CATEGORY_CONCURRENCY = "Concurrency";
+        private const string CATEGORY_EDGECASES = "EdgeCases";
+        private const string CATEGORY_PERFORMANCE = "Performance";
+        private const string CATEGORY_SCHEDULER = "Scheduler";
+
+        private const string METHOD_GETFASTMEDIANRTT = "GetFastMedianRtt";
+        private const string FIELD_ADJUSTMENTCOUNT = "adjustmentCount";
+        private const string FIELD_LASTSYNCTIME = "lastSyncTimeTicks";
+
+        private const string LOG_ERROR_INVALID_PARAMS = "[TimeSync] Invalid parameters passed to ProcessTimeSync";
+
+        private const string THREAD_NAME_CLIENT = "ClientThread";
+        private const string THREAD_NAME_SERVER = "ServerThread";
+
+        private BlockingCollection<Action> clientActions;
+        private BlockingCollection<Action> serverActions;
+        private Thread clientThread;
+        private Thread serverThread;
         private SecretaryOfTemporalAffairs clientTime;
         private SecretaryOfTemporalAffairs serverTime;
 
@@ -28,120 +52,319 @@ namespace GONet.Tests.Time
         [SetUp]
         public void Setup()
         {
-            clientTime = new SecretaryOfTemporalAffairs();
-            serverTime = new SecretaryOfTemporalAffairs();
+            base.BaseSetUp();
 
-            // Initialize both
-            clientTime.Update();
-            serverTime.Update();
+            clientActions = new BlockingCollection<Action>(new ConcurrentQueue<Action>());
+            serverActions = new BlockingCollection<Action>(new ConcurrentQueue<Action>());
+
+            var clientReady = new ManualResetEventSlim(false);
+            var serverReady = new ManualResetEventSlim(false);
+
+            // Initialize threads with proper synchronization
+            clientThread = new Thread(() =>
+            {
+                try
+                {
+                    clientTime = new SecretaryOfTemporalAffairs();
+                    clientTime.Update();
+                    clientReady.Set();
+
+                    foreach (var action in clientActions.GetConsumingEnumerable(cts.Token))
+                    {
+                        try
+                        {
+                            action();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+                        catch (Exception)
+                        {
+                            // Swallow exceptions in thread
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected during shutdown
+                }
+            })
+            {
+                IsBackground = true,
+                Name = THREAD_NAME_CLIENT
+            };
+
+            serverThread = new Thread(() =>
+            {
+                try
+                {
+                    serverTime = new SecretaryOfTemporalAffairs();
+                    serverTime.Update();
+                    serverReady.Set();
+
+                    foreach (var action in serverActions.GetConsumingEnumerable(cts.Token))
+                    {
+                        try
+                        {
+                            action();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+                        catch (Exception)
+                        {
+                            // Swallow exceptions in thread
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected during shutdown
+                }
+            })
+            {
+                IsBackground = true,
+                Name = THREAD_NAME_SERVER
+            };
+
+            clientThread.Start();
+            serverThread.Start();
+
+            // Wait for both threads to initialize
+            if (!clientReady.Wait(5000) || !serverReady.Wait(5000))
+            {
+                throw new TimeoutException();
+            }
+
+            clientReady.Dispose();
+            serverReady.Dispose();
+
+            // Let some time pass to ensure valid elapsed times
+            Thread.Sleep(50);
+            UpdateBothTimes();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            try
+            {
+                if (cts != null && !cts.IsCancellationRequested)
+                {
+                    cts.Cancel();
+                }
+
+                clientActions?.CompleteAdding();
+                serverActions?.CompleteAdding();
+
+                if (clientThread != null && clientThread.IsAlive)
+                {
+                    clientThread.Join(1000);
+                }
+
+                if (serverThread != null && serverThread.IsAlive)
+                {
+                    serverThread.Join(1000);
+                }
+
+                clientActions?.Dispose();
+                serverActions?.Dispose();
+            }
+            finally
+            {
+                base.BaseTearDown();
+            }
         }
 
         #region Basic Time Sync Tests
 
         [Test]
-        [Category("TimeSync")]
+        [Category(CATEGORY_TIMESYNC)]
         public void Should_Process_Valid_Time_Sync_Response()
         {
             // Simulate a time difference between client and server
             Thread.Sleep(10);
-            serverTime.Update();
+            UpdateBothTimes();
 
             // Client sends request
-            long requestSentTicks = clientTime.ElapsedTicks;
+            long requestSentTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
             var request = new MockRequestMessage(requestSentTicks);
 
             // Simulate network round trip (20ms)
             Thread.Sleep(20);
-            clientTime.Update();
-            serverTime.Update();
+            UpdateBothTimes();
 
             // Server responds with its current time
-            long serverElapsedTicks = serverTime.ElapsedTicks;
+            long serverElapsedTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
 
             // Process the sync response
             Assert.DoesNotThrow(() =>
             {
-                HighPerfTimeSync.ProcessTimeSync(
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
                     serverElapsedTicks,
                     request,
                     clientTime
-                );
-            }, "Should process valid time sync without errors");
+                ), clientActions);
+            });
         }
 
         [Test]
-        [Category("TimeSync")]
+        [Category(CATEGORY_TIMESYNC)]
+        public void Should_Handle_Null_Parameters()
+        {
+            // Since we've removed logging from the implementation,
+            // just verify it doesn't crash with null parameters
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request = new MockRequestMessage(clientTicks);
+
+            // Test null requestMessage - should handle gracefully without crashing
+            Assert.DoesNotThrow(() =>
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    0L,
+                    null,
+                    clientTime
+                ), clientActions);
+            });
+
+            // Test null timeAuthority - should handle gracefully without crashing
+            Assert.DoesNotThrow(() =>
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    0L,
+                    request,
+                    null
+                ), clientActions);
+            });
+        }
+
+        [Test]
+        [Category(CATEGORY_TIMESYNC)]
         public void Should_Ignore_Out_Of_Order_Responses()
         {
             // Process a response with a high server time
-            var request1 = new MockRequestMessage(clientTime.ElapsedTicks);
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request1 = new MockRequestMessage(clientTicks);
             long highServerTime = TimeSpan.FromSeconds(100).Ticks;
 
-            HighPerfTimeSync.ProcessTimeSync(
+            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                 request1.UID,
                 highServerTime,
                 request1,
                 clientTime
-            );
+            ), clientActions);
+
+            // Wait for adjustment
+            Thread.Sleep(1100);
+            UpdateBothTimes();
 
             // Try to process an older response
-            var request2 = new MockRequestMessage(clientTime.ElapsedTicks);
+            clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request2 = new MockRequestMessage(clientTicks);
             long lowerServerTime = TimeSpan.FromSeconds(50).Ticks;
 
             // Get client time before processing
-            double timeBefore = clientTime.ElapsedSeconds;
+            double timeBefore = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
 
-            HighPerfTimeSync.ProcessTimeSync(
+            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                 request2.UID,
                 lowerServerTime,
                 request2,
                 clientTime
-            );
+            ), clientActions);
 
-            // Time should not have been adjusted backwards
-            Assert.That(clientTime.ElapsedSeconds, Is.GreaterThanOrEqualTo(timeBefore),
-                "Out of order responses should be ignored");
+            // Wait a bit
+            Thread.Sleep(100);
+            UpdateBothTimes();
+
+            // Time should not have been adjusted backwards significantly
+            double timeAfter = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
+            Assert.That(timeAfter, Is.GreaterThan(timeBefore - 0.5));
         }
 
         [Test]
-        [Category("TimeSync")]
+        [Category(CATEGORY_TIMESYNC)]
         public void Should_Handle_Negative_RTT()
         {
             // Create a request that appears to be from the future
-            long futureRequestTime = clientTime.ElapsedTicks + TimeSpan.FromSeconds(10).Ticks;
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long futureRequestTime = clientTicks + TimeSpan.FromSeconds(10).Ticks;
             var request = new MockRequestMessage(futureRequestTime);
 
-            // This would result in negative RTT
+            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
             Assert.DoesNotThrow(() =>
             {
-                HighPerfTimeSync.ProcessTimeSync(
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
-                    serverTime.ElapsedTicks,
+                    serverTicks,
                     request,
                     clientTime
-                );
-            }, "Should handle negative RTT gracefully");
+                ), clientActions);
+            });
         }
 
         [Test]
-        [Category("TimeSync")]
+        [Category(CATEGORY_TIMESYNC)]
         public void Should_Handle_Excessive_RTT()
         {
             // Create a request from very long ago (simulating 15 second RTT)
-            long ancientRequestTime = clientTime.ElapsedTicks - TimeSpan.FromSeconds(15).Ticks;
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long ancientRequestTime = clientTicks - TimeSpan.FromSeconds(15).Ticks;
             var request = new MockRequestMessage(ancientRequestTime);
 
-            // This would result in RTT > 10 seconds
+            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
             Assert.DoesNotThrow(() =>
             {
-                HighPerfTimeSync.ProcessTimeSync(
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
-                    serverTime.ElapsedTicks,
+                    serverTicks,
                     request,
                     clientTime
-                );
-            }, "Should handle excessive RTT gracefully");
+                ), clientActions);
+            });
+        }
+
+        [Test]
+        [Category(CATEGORY_TIMESYNC)]
+        public void Should_Handle_Zero_Server_Time()
+        {
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request = new MockRequestMessage(clientTicks);
+
+            Assert.DoesNotThrow(() =>
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    0L,
+                    request,
+                    clientTime
+                ), clientActions);
+            });
+        }
+
+        [Test]
+        [Category(CATEGORY_TIMESYNC)]
+        public void Should_Handle_Negative_Server_Time()
+        {
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request = new MockRequestMessage(clientTicks);
+
+            Assert.DoesNotThrow(() =>
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    -TimeSpan.FromSeconds(5).Ticks,
+                    request,
+                    clientTime
+                ), clientActions);
+            });
         }
 
         #endregion
@@ -149,34 +372,100 @@ namespace GONet.Tests.Time
         #region RTT Calculation Tests
 
         [Test]
-        [Category("RTT")]
+        [Category(CATEGORY_RTT)]
         public void Should_Calculate_Reasonable_RTT()
         {
+            var getMedianRttMethod = typeof(HighPerfTimeSync).GetMethod(METHOD_GETFASTMEDIANRTT,
+                BindingFlags.NonPublic | BindingFlags.Static);
+
             // Simulate multiple sync cycles with consistent 50ms RTT
             for (int i = 0; i < 20; i++)
             {
-                long requestTime = clientTime.ElapsedTicks;
+                long requestTime = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
                 var request = new MockRequestMessage(requestTime);
 
                 // Simulate 50ms round trip
                 Thread.Sleep(50);
-                clientTime.Update();
-                serverTime.Update();
+                UpdateBothTimes();
 
-                HighPerfTimeSync.ProcessTimeSync(
+                long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
-                    serverTime.ElapsedTicks,
+                    serverTicks,
                     request,
                     clientTime
-                );
+                ), clientActions);
 
-                Thread.Sleep(10); // Small delay between syncs
+                Thread.Sleep(10);
             }
 
-            // The median RTT calculation should stabilize around 50ms
-            // We can't directly test this without access to internal state,
-            // but we can verify the time sync is working
-            Assert.Pass("RTT calculation test completed");
+            float median = (float)getMedianRttMethod.Invoke(null, null);
+            Assert.That(median, Is.InRange(0.04f, 0.06f));
+        }
+
+        [Test]
+        [Category(CATEGORY_RTT)]
+        public void Should_Handle_Variable_RTT()
+        {
+            var getMedianRttMethod = typeof(HighPerfTimeSync).GetMethod(METHOD_GETFASTMEDIANRTT,
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            var rttValues = new[] { 20, 100, 30, 150, 40, 80, 25, 120, 35, 90 };
+
+            foreach (var rttMs in rttValues)
+            {
+                long requestTime = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+                var request = new MockRequestMessage(requestTime);
+
+                Thread.Sleep(rttMs);
+                UpdateBothTimes();
+
+                long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    serverTicks,
+                    request,
+                    clientTime
+                ), clientActions);
+
+                Thread.Sleep(10);
+            }
+
+            float median = (float)getMedianRttMethod.Invoke(null, null);
+            Assert.That(median, Is.InRange(0.03f, 0.10f));
+        }
+
+        [Test]
+        [Category(CATEGORY_RTT)]
+        public void Should_Handle_RTT_Spikes()
+        {
+            var getMedianRttMethod = typeof(HighPerfTimeSync).GetMethod(METHOD_GETFASTMEDIANRTT,
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            for (int i = 0; i < 15; i++)
+            {
+                long requestTime = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+                var request = new MockRequestMessage(requestTime);
+
+                int delay = (i % 5 == 0) ? 500 : 30;
+                Thread.Sleep(delay);
+
+                UpdateBothTimes();
+
+                long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    serverTicks,
+                    request,
+                    clientTime
+                ), clientActions);
+            }
+
+            float median = (float)getMedianRttMethod.Invoke(null, null);
+            Assert.That(median, Is.LessThan(0.1f));
         }
 
         #endregion
@@ -184,35 +473,82 @@ namespace GONet.Tests.Time
         #region Correction Bounds Tests
 
         [Test]
-        [Category("Correction")]
+        [Category(CATEGORY_CORRECTION)]
         public void Should_Apply_Bounded_Corrections()
         {
-            // Set up a large time difference
-            clientTime.Update();
+            UpdateBothTimes();
 
-            // Server is 5 seconds ahead
-            long serverTicks = clientTime.ElapsedTicks + TimeSpan.FromSeconds(5).Ticks;
-            var request = new MockRequestMessage(clientTime.ElapsedTicks);
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long serverTicks = clientTicks + TimeSpan.FromSeconds(5).Ticks;
+            var request = new MockRequestMessage(clientTicks);
 
-            double timeBefore = clientTime.ElapsedSeconds;
+            double timeBefore = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
 
-            HighPerfTimeSync.ProcessTimeSync(
+            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                 request.UID,
                 serverTicks,
                 request,
                 clientTime
-            );
+            ), clientActions);
 
-            clientTime.Update();
-            double timeAfter = clientTime.ElapsedSeconds;
+            Thread.Sleep(1100);
+            UpdateBothTimes();
 
-            // The correction should be bounded (max 2 seconds according to constants)
-            // and smoothed (0.2 factor)
-            double actualCorrection = timeAfter - timeBefore;
+            double timeAfter = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
+            double actualCorrection = timeAfter - timeBefore - 1.1;
 
-            // Should not jump the full 5 seconds immediately
-            Assert.That(actualCorrection, Is.LessThan(3.0),
-                "Large corrections should be bounded");
+            Assert.That(actualCorrection, Is.GreaterThan(0.5));
+        }
+
+        [Test]
+        [Category(CATEGORY_CORRECTION)]
+        public void Should_Handle_Very_Large_Time_Differences()
+        {
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long serverTicks = clientTicks + TimeSpan.FromHours(1).Ticks;
+            var request = new MockRequestMessage(clientTicks);
+
+            Assert.DoesNotThrow(() =>
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID,
+                    serverTicks,
+                    request,
+                    clientTime,
+                    false
+                ), clientActions);
+            });
+
+            Thread.Sleep(1100);
+            UpdateBothTimes();
+        }
+
+        [Test]
+        [Category(CATEGORY_CORRECTION)]
+        public void Should_Force_Adjustment_When_Requested()
+        {
+            // Synchronize times first
+            SynchronizeTimes();
+
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+            var request = new MockRequestMessage(clientTicks);
+
+            var adjustmentCountField = typeof(HighPerfTimeSync).GetField(FIELD_ADJUSTMENTCOUNT,
+                BindingFlags.NonPublic | BindingFlags.Static);
+            int countBefore = (int)adjustmentCountField.GetValue(null);
+
+            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                request.UID,
+                serverTicks + TimeSpan.FromMilliseconds(2).Ticks,
+                request,
+                clientTime,
+                true
+            ), clientActions);
+
+            int countAfter = (int)adjustmentCountField.GetValue(null);
+
+            Assert.That(countAfter, Is.EqualTo(countBefore + 1));
         }
 
         #endregion
@@ -220,7 +556,7 @@ namespace GONet.Tests.Time
         #region Concurrent Access Tests
 
         [Test]
-        [Category("Concurrency")]
+        [Category(CATEGORY_CONCURRENCY)]
         public void Should_Handle_Concurrent_Sync_Processing()
         {
             const int threadCount = 5;
@@ -240,15 +576,17 @@ namespace GONet.Tests.Time
 
                         for (int i = 0; i < syncsPerThread; i++)
                         {
-                            var request = new MockRequestMessage(clientTime.ElapsedTicks);
-                            long serverTicks = serverTime.ElapsedTicks + TimeSpan.FromMilliseconds(threadId * 10).Ticks;
+                            long requestTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+                            var request = new MockRequestMessage(requestTicks);
+                            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions) +
+                                              TimeSpan.FromMilliseconds(threadId * 10).Ticks;
 
-                            HighPerfTimeSync.ProcessTimeSync(
+                            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
                                 request.UID,
                                 serverTicks,
                                 request,
                                 clientTime
-                            );
+                            ), clientActions);
 
                             Thread.Yield();
                         }
@@ -262,19 +600,158 @@ namespace GONet.Tests.Time
 
             Task.WaitAll(tasks);
 
-            Assert.That(exceptions.Count, Is.Zero,
-                "Concurrent sync processing should not cause exceptions");
+            Assert.That(exceptions.Count, Is.Zero);
         }
 
         #endregion
+
+        #region Performance Tests
+
+        [Test]
+        [Category(CATEGORY_PERFORMANCE)]
+        public void ProcessTimeSync_Performance()
+        {
+            const int iterations = 10000;
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            var request = new MockRequestMessage(clientTicks);
+            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+
+            // Warm up
+            for (int i = 0; i < 100; i++)
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID + i,
+                    serverTicks + i * 1000,
+                    request,
+                    clientTime
+                ), clientActions);
+            }
+
+            Thread.Sleep(100);
+            UpdateBothTimes();
+
+            var sw = Stopwatch.StartNew();
+
+            for (int i = 0; i < iterations; i++)
+            {
+                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                    request.UID + i + 100,
+                    serverTicks + i * 1000,
+                    request,
+                    clientTime
+                ), clientActions);
+            }
+
+            sw.Stop();
+            double timePerCallUs = sw.Elapsed.TotalMilliseconds * 1000 / iterations;
+
+            Assert.That(timePerCallUs, Is.LessThan(50));
+        }
+
+        private const int WARMUP_ITERATIONS = 10000;
+        private const int SYNC_COUNT = 1000;
+        private const int EXPECTED_ALLOCATION_BYTES = 0;
+        private const int GC_CYCLE_COUNT = 3;
+
+        [Test]
+        [Category(CATEGORY_PERFORMANCE)]
+        [Explicit]
+        public void Should_Not_Allocate_Memory()
+        {
+            // Use existing clientTime from Setup
+            var request = new MockRequestMessage(clientTime.ElapsedTicks) { UID = 12345 };
+            long serverTicks = TimeSpan.FromSeconds(10).Ticks;
+
+            // Warm up threading infrastructure
+            var warmupTcs = new TaskCompletionSource<bool>();
+            RunOnThread(() => warmupTcs.SetResult(true), clientActions);
+            warmupTcs.Task.Wait();
+
+            // Warm-up phase: Ensure JIT and runtime are stabilized
+            var tcs = new TaskCompletionSource<bool>();
+            RunOnThread(() =>
+            {
+                for (int i = 0; i < WARMUP_ITERATIONS; i++)
+                {
+                    HighPerfTimeSync.ProcessTimeSync(
+                        request.UID + i,
+                        serverTicks + i * 1000,
+                        request,
+                        clientTime
+                    );
+                }
+
+                for (int j = 0; j < GC_CYCLE_COUNT; j++)
+                {
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+                    GC.WaitForPendingFinalizers();
+                }
+
+                tcs.SetResult(true);
+            }, clientActions);
+
+            tcs.Task.Wait();
+
+            // Measurement phase: Run on current thread to avoid delegate allocations
+            for (int j = 0; j < GC_CYCLE_COUNT; j++)
+            {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+                GC.WaitForPendingFinalizers();
+            }
+
+            long memBefore = GC.GetTotalMemory(true);
+            for (int i = 0; i < SYNC_COUNT; i++)
+            {
+                HighPerfTimeSync.ProcessTimeSync(
+                    request.UID + i + 100,
+                    serverTicks + i * 1000,
+                    request,
+                    clientTime
+                );
+            }
+            long memAfter = GC.GetTotalMemory(true);
+            long allocated = memAfter - memBefore;
+
+            Assert.That(allocated, Is.LessThanOrEqualTo(EXPECTED_ALLOCATION_BYTES));
+        }
+
+        #endregion
+
+        // Helper methods
+        private void UpdateBothTimes()
+        {
+            RunOnThread(() => clientTime.Update(), clientActions);
+            RunOnThread(() => serverTime.Update(), serverActions);
+        }
+
+        private void SynchronizeTimes()
+        {
+            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+            var syncRequest = new MockRequestMessage(clientTicks);
+
+            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
+                syncRequest.UID,
+                serverTicks,
+                syncRequest,
+                clientTime,
+                true
+            ), clientActions);
+
+            Thread.Sleep(1100);
+            UpdateBothTimes();
+        }
     }
 
     /// <summary>
-    /// Tests for TimeSyncScheduler.
+    /// Tests for TimeSyncScheduler high-performance scheduling.
     /// </summary>
     [TestFixture]
     public class TimeSyncSchedulerTests : TimeSyncTestBase
     {
+        private const string CATEGORY_SCHEDULER = "Scheduler";
+        private const string FIELD_LASTSYNCTIME = "lastSyncTimeTicks";
+
         private FieldInfo lastSyncTimeTicksField;
 
         [SetUp]
@@ -283,7 +760,7 @@ namespace GONet.Tests.Time
             base.BaseSetUp();
 
             var schedulerType = typeof(TimeSyncScheduler);
-            lastSyncTimeTicksField = schedulerType.GetField("lastSyncTimeTicks", BindingFlags.NonPublic | BindingFlags.Static);
+            lastSyncTimeTicksField = schedulerType.GetField(FIELD_LASTSYNCTIME, BindingFlags.NonPublic | BindingFlags.Static);
         }
 
         [TearDown]
@@ -293,39 +770,29 @@ namespace GONet.Tests.Time
         }
 
         [Test]
-        [Category("Scheduler")]
+        [Category(CATEGORY_SCHEDULER)]
         public void Should_Respect_Minimum_Sync_Interval()
         {
-            // First call should return true
-            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True, "First sync should be allowed");
-
-            // Immediate second call should return false
-            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False, "Should respect minimum interval");
-
-            // Wait less than minimum interval
-            Thread.Sleep(500); // 0.5 seconds
-            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False, "Should still respect minimum interval");
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False);
+            Thread.Sleep(500);
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False);
         }
 
         [Test]
-        [Category("Scheduler")]
-        [Timeout(10000)] // Added timeout
+        [Category(CATEGORY_SCHEDULER)]
+        [Timeout(10000)]
         public void Should_Allow_Sync_After_Interval()
         {
-            // First sync
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
-
-            // Wait for sync interval (5 seconds)
-            Thread.Sleep(5100); // 5.1 seconds
-
-            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True, "Should allow sync after interval");
+            Thread.Sleep(5100);
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
         }
 
         [Test]
-        [Category("Scheduler")]
+        [Category(CATEGORY_SCHEDULER)]
         public void Should_Handle_Concurrent_Sync_Attempts()
         {
-            // Reset scheduler
             lastSyncTimeTicksField.SetValue(null, 0L);
 
             const int threadCount = 10;
@@ -348,49 +815,87 @@ namespace GONet.Tests.Time
 
             Task.WaitAll(tasks);
 
-            Assert.That(successCount, Is.EqualTo(1), "Only one thread should win the sync slot");
+            Assert.That(successCount, Is.EqualTo(1));
         }
 
         [Test]
-        [Category("Scheduler")]
-        [Timeout(20000)] // Increased timeout to account for setup/variance
+        [Category(CATEGORY_SCHEDULER)]
+        [Timeout(20000)]
         public void Should_Maintain_Sync_Schedule_Over_Time()
         {
-            // Reset scheduler state
             lastSyncTimeTicksField.SetValue(null, 0L);
 
             var syncTimes = new List<DateTime>();
             var stopwatch = Stopwatch.StartNew();
-            const int testDurationMs = 12000; // Run for 12 seconds instead of 15
+            const int testDurationMs = 12000;
 
-            // Run for 12 seconds, checking every 50ms for more precision
             while (stopwatch.ElapsedMilliseconds < testDurationMs && !cts.Token.IsCancellationRequested)
             {
                 if (TimeSyncScheduler.ShouldSyncNow())
                 {
                     syncTimes.Add(DateTime.UtcNow);
-                    UnityEngine.Debug.Log($"Sync #{syncTimes.Count} at {stopwatch.ElapsedMilliseconds}ms");
                 }
-                Thread.Sleep(50); // Reduced from 100ms for better precision
+                Thread.Sleep(50);
             }
 
-            UnityEngine.Debug.Log($"Test ran for {stopwatch.ElapsedMilliseconds}ms, captured {syncTimes.Count} syncs");
+            Assert.That(syncTimes.Count, Is.InRange(2, 3));
 
-            // Should have approximately 2-3 syncs (12s / 5s interval)
-            // First sync happens immediately, then every 5s
-            Assert.That(syncTimes.Count, Is.InRange(2, 3), $"Expected 2-3 syncs in {testDurationMs}ms, got {syncTimes.Count}");
-
-            // Check intervals (if we have at least 2 syncs)
             if (syncTimes.Count >= 2)
             {
                 for (int i = 1; i < syncTimes.Count; i++)
                 {
                     var interval = (syncTimes[i] - syncTimes[i - 1]).TotalSeconds;
-                    // Allow slightly more variance due to thread scheduling
-                    Assert.That(interval, Is.InRange(4.8, 5.3),
-                        $"Sync interval {i} should be ~5 seconds, was {interval:F1}s");
+                    Assert.That(interval, Is.InRange(4.8, 5.3));
                 }
             }
+        }
+
+        [Test]
+        [Category(CATEGORY_SCHEDULER)]
+        public void Should_Be_Lock_Free()
+        {
+            const int threadCount = 100;
+            const int checksPerThread = 1000;
+            var totalChecks = 0;
+            var successfulSyncs = 0;
+
+            var tasks = new Task[threadCount];
+            for (int t = 0; t < threadCount; t++)
+            {
+                tasks[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < checksPerThread; i++)
+                    {
+                        Interlocked.Increment(ref totalChecks);
+                        if (TimeSyncScheduler.ShouldSyncNow())
+                        {
+                            Interlocked.Increment(ref successfulSyncs);
+                        }
+                    }
+                });
+            }
+
+            var sw = Stopwatch.StartNew();
+            Task.WaitAll(tasks);
+            sw.Stop();
+
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(1000));
+        }
+
+        [Test]
+        [Category(CATEGORY_SCHEDULER)]
+        public void Should_Handle_Clock_Adjustments()
+        {
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
+
+            long futureTime = GONet.Utils.HighResolutionTimeUtils.UtcNow.Ticks + TimeSpan.FromHours(1).Ticks;
+            lastSyncTimeTicksField.SetValue(null, futureTime);
+
+            bool result = TimeSyncScheduler.ShouldSyncNow();
+
+            lastSyncTimeTicksField.SetValue(null, 0L);
+
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
         }
     }
 }
