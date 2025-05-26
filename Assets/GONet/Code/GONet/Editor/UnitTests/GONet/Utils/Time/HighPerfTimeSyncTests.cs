@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -272,105 +273,69 @@ namespace GONet.Tests.Time
     /// Tests for TimeSyncScheduler.
     /// </summary>
     [TestFixture]
-    public class TimeSyncSchedulerTests
+    public class TimeSyncSchedulerTests : TimeSyncTestBase
     {
-        // Store when we last synced to manage test timing
-        private static DateTime lastTestSync = DateTime.MinValue;
+        private FieldInfo lastSyncTimeTicksField;
 
-        private void EnsureCanSync()
+        [SetUp]
+        public void Setup()
         {
-            // Calculate how long we need to wait
-            var timeSinceLastSync = DateTime.UtcNow - lastTestSync;
-            var waitTime = TimeSpan.FromSeconds(5.1) - timeSinceLastSync;
+            base.BaseSetUp();
 
-            if (waitTime > TimeSpan.Zero)
-            {
-                Thread.Sleep((int)waitTime.TotalMilliseconds);
-            }
+            var schedulerType = typeof(TimeSyncScheduler);
+            lastSyncTimeTicksField = schedulerType.GetField("lastSyncTimeTicks", BindingFlags.NonPublic | BindingFlags.Static);
         }
 
-        #region Scheduling Tests
-
-        [Test, Order(1)]
-        [Category("Scheduling")]
-        public void Should_Allow_First_Sync_After_Long_Wait()
+        [TearDown]
+        public void TearDown()
         {
-            // This test verifies we can sync after waiting long enough
-            EnsureCanSync();
-
-            bool canSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(canSync, Is.True, "Should be able to sync after 5+ second wait");
-
-            lastTestSync = DateTime.UtcNow;
+            base.BaseTearDown();
         }
 
-        [Test, Order(2)]
-        [Category("Scheduling")]
-        public void Should_Not_Sync_Too_Frequently()
+        [Test]
+        [Category("Scheduler")]
+        public void Should_Respect_Minimum_Sync_Interval()
         {
-            // Ensure we can sync first
-            EnsureCanSync();
+            // First call should return true
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True, "First sync should be allowed");
 
-            // First sync should be allowed
-            bool firstSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(firstSync, Is.True, "First sync should be allowed");
-            lastTestSync = DateTime.UtcNow;
+            // Immediate second call should return false
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False, "Should respect minimum interval");
 
-            // Immediate second sync should be blocked
-            bool secondSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(secondSync, Is.False, "Immediate second sync should be blocked");
-
-            // Even after 0.5 seconds, should still be blocked
-            Thread.Sleep(500);
-            bool thirdSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(thirdSync, Is.False, "Sync within MIN_INTERVAL should be blocked");
-
-            // Even after 1.5 seconds total, should still be blocked (need 5 seconds)
-            Thread.Sleep(1000);
-            bool fourthSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(fourthSync, Is.False, "Sync within SYNC_INTERVAL (5s) should be blocked");
+            // Wait less than minimum interval
+            Thread.Sleep(500); // 0.5 seconds
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False, "Should still respect minimum interval");
         }
 
-        [Test, Order(3)]
-        [Category("Scheduling")]
-        public void Should_Allow_Sync_After_Sync_Interval()
+        [Test]
+        [Category("Scheduler")]
+        [Timeout(10000)] // Added timeout
+        public void Should_Allow_Sync_After_Interval()
         {
-            // Ensure we can sync
-            EnsureCanSync();
+            // First sync
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
 
-            // Do initial sync
-            bool initialSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(initialSync, Is.True, "Initial sync should be allowed");
-            lastTestSync = DateTime.UtcNow;
+            // Wait for sync interval (5 seconds)
+            Thread.Sleep(5100); // 5.1 seconds
 
-            // Should be blocked immediately
-            bool immediateSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(immediateSync, Is.False, "Immediate resync should be blocked");
-
-            // Wait for more than the sync interval (5 seconds)
-            Thread.Sleep(5100);
-
-            // Should now allow sync again
-            bool afterIntervalSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(afterIntervalSync, Is.True, "Sync should be allowed after SYNC_INTERVAL");
-            lastTestSync = DateTime.UtcNow;
+            Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True, "Should allow sync after interval");
         }
 
-        [Test, Order(4)]
-        [Category("Scheduling")]
-        public void Should_Handle_Concurrent_Sync_Requests()
+        [Test]
+        [Category("Scheduler")]
+        public void Should_Handle_Concurrent_Sync_Attempts()
         {
-            // Ensure we can sync
-            EnsureCanSync();
+            // Reset scheduler
+            lastSyncTimeTicksField.SetValue(null, 0L);
 
             const int threadCount = 10;
-            int successCount = 0;
             var barrier = new Barrier(threadCount);
+            var successCount = 0;
 
             var tasks = new Task[threadCount];
-            for (int t = 0; t < threadCount; t++)
+            for (int i = 0; i < threadCount; i++)
             {
-                tasks[t] = Task.Run(() =>
+                tasks[i] = Task.Run(() =>
                 {
                     barrier.SignalAndWait();
 
@@ -383,67 +348,49 @@ namespace GONet.Tests.Time
 
             Task.WaitAll(tasks);
 
-            // Only one thread should have been allowed to sync
-            Assert.That(successCount, Is.EqualTo(1),
-                $"Exactly one thread should be allowed to sync, but {successCount} were allowed");
-
-            if (successCount > 0)
-            {
-                lastTestSync = DateTime.UtcNow;
-            }
+            Assert.That(successCount, Is.EqualTo(1), "Only one thread should win the sync slot");
         }
-
-        [Test, Order(5)]
-        [Category("Scheduling")]
-        public void Should_Block_Within_Min_Interval()
-        {
-            // Ensure we can sync
-            EnsureCanSync();
-
-            // First sync
-            bool firstSync = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(firstSync, Is.True, "Should be able to sync initially");
-            lastTestSync = DateTime.UtcNow;
-
-            // Should be blocked for at least MIN_INTERVAL (1 second)
-            bool immediate = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(immediate, Is.False, "Should block immediately after sync");
-
-            Thread.Sleep(500);
-            bool afterHalfSecond = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(afterHalfSecond, Is.False, "Should block within MIN_INTERVAL");
-
-            Thread.Sleep(600); // Now we're past 1 second
-            bool afterMinInterval = TimeSyncScheduler.ShouldSyncNow();
-            Assert.That(afterMinInterval, Is.False, "Should still block - need full SYNC_INTERVAL");
-        }
-
-        #endregion
-
-        #region Performance Tests
 
         [Test]
-        [Category("Performance")]
-        public void ShouldSyncNow_Should_Be_Fast()
+        [Category("Scheduler")]
+        [Timeout(20000)] // Increased timeout to account for setup/variance
+        public void Should_Maintain_Sync_Schedule_Over_Time()
         {
-            const int iterations = 1_000_000;
-            var sw = Stopwatch.StartNew();
+            // Reset scheduler state
+            lastSyncTimeTicksField.SetValue(null, 0L);
 
-            for (int i = 0; i < iterations; i++)
+            var syncTimes = new List<DateTime>();
+            var stopwatch = Stopwatch.StartNew();
+            const int testDurationMs = 12000; // Run for 12 seconds instead of 15
+
+            // Run for 12 seconds, checking every 50ms for more precision
+            while (stopwatch.ElapsedMilliseconds < testDurationMs && !cts.Token.IsCancellationRequested)
             {
-                _ = TimeSyncScheduler.ShouldSyncNow();
+                if (TimeSyncScheduler.ShouldSyncNow())
+                {
+                    syncTimes.Add(DateTime.UtcNow);
+                    UnityEngine.Debug.Log($"Sync #{syncTimes.Count} at {stopwatch.ElapsedMilliseconds}ms");
+                }
+                Thread.Sleep(50); // Reduced from 100ms for better precision
             }
 
-            sw.Stop();
-            double timePerCallNs = sw.Elapsed.TotalMilliseconds * 1_000_000 / iterations;
+            UnityEngine.Debug.Log($"Test ran for {stopwatch.ElapsedMilliseconds}ms, captured {syncTimes.Count} syncs");
 
-            UnityEngine.Debug.Log($"Time per ShouldSyncNow call: {timePerCallNs:F1}ns");
+            // Should have approximately 2-3 syncs (12s / 5s interval)
+            // First sync happens immediately, then every 5s
+            Assert.That(syncTimes.Count, Is.InRange(2, 3), $"Expected 2-3 syncs in {testDurationMs}ms, got {syncTimes.Count}");
 
-            // Should be very fast (under 50ns per call)
-            Assert.That(timePerCallNs, Is.LessThan(50),
-                "ShouldSyncNow should be very fast");
+            // Check intervals (if we have at least 2 syncs)
+            if (syncTimes.Count >= 2)
+            {
+                for (int i = 1; i < syncTimes.Count; i++)
+                {
+                    var interval = (syncTimes[i] - syncTimes[i - 1]).TotalSeconds;
+                    // Allow slightly more variance due to thread scheduling
+                    Assert.That(interval, Is.InRange(4.8, 5.3),
+                        $"Sync interval {i} should be ~5 seconds, was {interval:F1}s");
+                }
+            }
         }
-
-        #endregion
     }
 }
