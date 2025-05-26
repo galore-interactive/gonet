@@ -2442,31 +2442,27 @@ namespace GONet
             private const int RTT_BUFFER_MASK = 31;
 
             public static void ProcessTimeSync(
-    long requestUID,
-    long serverElapsedTicksAtResponse,
-    RequestMessage requestMessage,
-    SecretaryOfTemporalAffairs timeAuthority,
-    bool forceAdjustment = false)
+                long requestUID,
+                long serverElapsedTicksAtResponse,
+                RequestMessage requestMessage,
+                SecretaryOfTemporalAffairs timeAuthority,
+                bool forceAdjustment = false)
             {
                 // Add validation
                 if (requestMessage == null || timeAuthority == null)
                 {
-                    UnityEngine.Debug.LogError("[TimeSync] Invalid parameters passed to ProcessTimeSync");
                     return;
                 }
 
                 long now = HighResolutionTimeUtils.UtcNow.Ticks;
                 double timeSinceLastAdjustment = (now - lastAdjustmentTicks) / (double)TimeSpan.TicksPerSecond;
-                UnityEngine.Debug.Log($"[TimeSync] Time since last adjustment: {timeSinceLastAdjustment:F3}s");
 
-                // IMPROVED: Better handling of lastProcessedResponseTicks
                 // The comparison should only happen for significantly older responses
                 long lastProcessed = Volatile.Read(ref lastProcessedResponseTicks);
 
                 // Validate server time is reasonable (not negative or too old)
                 if (serverElapsedTicksAtResponse <= 0)
                 {
-                    UnityEngine.Debug.LogWarning($"[TimeSync] Invalid server time: {serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s. Ignoring.");
                     return;
                 }
 
@@ -2476,7 +2472,6 @@ namespace GONet
                     long timeDiff = lastProcessed - serverElapsedTicksAtResponse;
                     if (timeDiff > TimeSpan.FromSeconds(1).Ticks) // Only skip if more than 1 second older
                     {
-                        UnityEngine.Debug.Log($"[TimeSync] Skipped: serverElapsedTicksAtResponse ({serverElapsedTicksAtResponse / (double)TimeSpan.TicksPerSecond:F3}s) is significantly older than lastProcessed ({lastProcessed / (double)TimeSpan.TicksPerSecond:F3}s)");
                         return;
                     }
                 }
@@ -2491,16 +2486,14 @@ namespace GONet
                 long requestSentTicks = requestMessage.OccurredAtElapsedTicks;
                 long rttTicks = responseReceivedTicks - requestSentTicks;
 
-                // IMPROVED: Better RTT validation
+                // Better RTT validation
                 if (rttTicks < 0)
                 {
-                    UnityEngine.Debug.LogWarning($"[TimeSync] Negative RTT detected: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s. Clock may have jumped.");
                     return;
                 }
 
                 if (rttTicks > TimeSpan.FromSeconds(10).Ticks)
                 {
-                    UnityEngine.Debug.LogWarning($"[TimeSync] RTT too large: {rttTicks / (double)TimeSpan.TicksPerSecond:F3}s. Ignoring.");
                     return;
                 }
 
@@ -2521,9 +2514,8 @@ namespace GONet
                 double currentDifferenceSeconds = serverTimeNowSeconds - clientTimeNowSeconds;
 
                 double absDiffSeconds = Math.Abs(currentDifferenceSeconds);
-                UnityEngine.Debug.Log($"[TimeSync] Difference check: absDiff={absDiffSeconds:F3}s, forceAdjustment={forceAdjustment}");
 
-                // IMPROVED: Dynamic threshold based on network conditions
+                // Dynamic threshold based on network conditions
                 double threshold = 0.005; // 5ms base threshold
                 if (medianRtt > 0.1f) // If RTT > 100ms, increase threshold
                 {
@@ -2532,15 +2524,13 @@ namespace GONet
 
                 if (!forceAdjustment && absDiffSeconds <= threshold)
                 {
-                    UnityEngine.Debug.Log($"[TimeSync] Skipped: Difference ({absDiffSeconds:F3}s) below tolerance ({threshold:F3}s)");
                     return;
                 }
 
-                // IMPROVED: Limit maximum adjustment to prevent huge jumps
+                // Limit maximum adjustment to prevent huge jumps
                 const double MAX_ADJUSTMENT = 30.0; // 30 seconds max adjustment
                 if (absDiffSeconds > MAX_ADJUSTMENT && !forceAdjustment)
                 {
-                    UnityEngine.Debug.LogWarning($"[TimeSync] Large time difference detected: {absDiffSeconds:F3}s. Clamping to {MAX_ADJUSTMENT}s");
                     currentDifferenceSeconds = Math.Sign(currentDifferenceSeconds) * MAX_ADJUSTMENT;
                 }
 
@@ -2548,6 +2538,7 @@ namespace GONet
                 long targetTime = adjustedClientTimeTicks + currentDifference;
                 Interlocked.Increment(ref adjustmentCount);
 
+                /*
 #if DEBUG || ENABLE_TIME_SYNC_LOGGING
                 UnityEngine.Debug.Log($"[TimeSync] Sync (Adjustment #{adjustmentCount}):\n" +
                                      $"  Median RTT: {medianRtt:F3}s\n" +
@@ -2556,6 +2547,7 @@ namespace GONet
                                      $"  Current difference: {currentDifferenceSeconds:F3}s\n" +
                                      $"  Target time: {targetTime / (double)TimeSpan.TicksPerSecond:F3}s");
 #endif
+                */
 
                 timeAuthority.SetFromAuthority(targetTime);
                 Interlocked.Exchange(ref lastAdjustmentTicks, now);
@@ -2579,9 +2571,13 @@ namespace GONet
                 if (count == 0) return 0.05f;
                 Array.Sort(sortedRtt, 0, count);
                 float median = count % 2 == 0 ? (sortedRtt[count / 2 - 1] + sortedRtt[count / 2]) / 2 : sortedRtt[count / 2];
+                
+                /*
 #if DEBUG || ENABLE_TIME_SYNC_LOGGING
                 UnityEngine.Debug.Log($"[TimeSync] RTT Samples: {string.Join(", ", sortedRtt.Take(count).Select(v => v.ToString("F3")))}, Median: {median:F3}s");
 #endif
+                */
+
                 return median;
             }
         }
