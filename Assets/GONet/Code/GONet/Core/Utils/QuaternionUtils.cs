@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.PluginAPI;
 using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -389,6 +390,7 @@ namespace GONet.Utils
         /// Returns an approximation of acos(x) for x in [-1,1]
         /// Minimax polynomial: error ~0.005 radians
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float ApproxAcos(float x)
         {
             return (-0.156583f * x * x - 0.33072f * x + 1.5708f);
@@ -397,6 +399,7 @@ namespace GONet.Utils
         /// <summary>
         /// Taylor-series-based approximation: sin(x) ≈ x * (1 - x^2/6)
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float ApproxSin(float x)
         {
             float x2 = x * x;
@@ -406,6 +409,7 @@ namespace GONet.Utils
         /// <summary>
         /// Taylor-series-based approximation: cos(x) ≈ 1 - x^2/2 + x^4/24
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float ApproxCos(float x)
         {
             float x2 = x * x;
@@ -415,6 +419,7 @@ namespace GONet.Utils
         /// <summary>
         /// Clamp x to [0,1] over [edge0,edge1], then smoothstep
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float SmoothStep(float edge0, float edge1, float x)
         {
             float t = (x - edge0) / (edge1 - edge0);
@@ -426,6 +431,7 @@ namespace GONet.Utils
         /// <summary>
         /// Quaternion logarithm and exponential
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion Log(Quaternion q)
         {
             if (q.w > 1f) q.w = 1f; // clamp for numeric safety
@@ -449,6 +455,7 @@ namespace GONet.Utils
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion Exp(Quaternion q)
         {
             float angle = new Vector3(q.x, q.y, q.z).magnitude;
@@ -475,6 +482,7 @@ namespace GONet.Utils
         /// <summary>
         /// Fast slerp using log-exp, branchless small-angle, and trig approximations
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion SlerpFast(Quaternion a, Quaternion b, float t)
         {
             // dot:
@@ -509,6 +517,7 @@ namespace GONet.Utils
             return Quaternion.SlerpUnclamped(full, approx, factor);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static Quaternion LerpNormalized(Quaternion a, Quaternion b, float t)
         {
             // simple component‐wise LERP + normalize
@@ -524,6 +533,7 @@ namespace GONet.Utils
         /// <summary>
         /// Precomputed half-slerps and final slerp -> fast Squad
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion SquadFast(Quaternion q0, Quaternion q1, Quaternion q2, Quaternion q3, float t)
         {
             // Precompute half-steps
@@ -535,6 +545,129 @@ namespace GONet.Utils
             // Final blend
             float tc = 2f * t * (1f - t);
             return SlerpFast(A, B, tc);
+        }
+
+        /// <summary>
+        /// Ultra-fast quaternion angle calculation using dot product
+        /// Avoids Acos for small angles where precision isn't critical
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float AngleFast(Quaternion a, Quaternion b)
+        {
+            float dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+
+            // Handle edge cases
+            if (dot > 0.99999f) return 0f;
+            if (dot < -0.99999f) return 180f;
+
+            // For small angles, use approximation: angle ≈ 2 * asin(|a - b| / 2)
+            float absDot = dot < 0f ? -dot : dot;
+            if (absDot > 0.95f)
+            {
+                // Small angle approximation
+                float dx = a.x - b.x;
+                float dy = a.y - b.y;
+                float dz = a.z - b.z;
+                float dw = a.w - b.w;
+                float dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz + dw * dw);
+                return dist * 114.59156f; // 2 * 180/PI
+            }
+
+            // Full calculation for larger angles
+            return MathF.Acos(absDot) * 114.59156f; // 2 * 180/PI
+        }
+
+        /// <summary>
+        /// Optimized RotateTowards using SLERP
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quaternion RotateTowardsFast(Quaternion from, Quaternion to, float maxDegreesDelta)
+        {
+            float angle = AngleFast(from, to);
+            if (angle <= 0.01f) return to;
+
+            float t = maxDegreesDelta / angle;
+            t = t > 1f ? 1f : t;
+
+            return SlerpFast(from, to, t);
+        }
+
+        /// <summary>
+        /// Batch quaternion operations for better cache usage
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void BatchSlerp(
+            Quaternion[] results,
+            Quaternion[] from,
+            Quaternion[] to,
+            float[] t,
+            int count)
+        {
+            // Process in batches of 4 for potential SIMD optimization
+            int i = 0;
+            for (; i < count - 3; i += 4)
+            {
+                results[i] = SlerpFast(from[i], to[i], t[i]);
+                results[i + 1] = SlerpFast(from[i + 1], to[i + 1], t[i + 1]);
+                results[i + 2] = SlerpFast(from[i + 2], to[i + 2], t[i + 2]);
+                results[i + 3] = SlerpFast(from[i + 3], to[i + 3], t[i + 3]);
+            }
+
+            // Handle remaining
+            for (; i < count; i++)
+            {
+                results[i] = SlerpFast(from[i], to[i], t[i]);
+            }
+        }
+
+        // For the smoothing implementation, add this optimized version:
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe Quaternion GetSmoothedRotation_Optimized(
+            Quaternion mostRecentValue,
+            NumericValueChangeSnapshot[] olderValuesBuffer,
+            int bufferCount)
+        {
+            const int INPUT_COUNT = 3;
+            const int OUTPUT_COUNT = 2;
+
+            // Stack-allocated arrays for small, fixed sizes
+            Quaternion* inputs = stackalloc Quaternion[INPUT_COUNT];
+            Quaternion* outputs = stackalloc Quaternion[OUTPUT_COUNT];
+            float* inputWeights = stackalloc float[] { 0.35f, 0.1f, 0.1f };
+            float* outputWeights = stackalloc float[] { 0.4f, 0.05f };
+
+            // Fill inputs from buffer
+            fixed (NumericValueChangeSnapshot* bufferPtr = olderValuesBuffer)
+            {
+                int idx = 0;
+                for (int i = bufferCount - 1; i >= 0 && idx < INPUT_COUNT; --i, ++idx)
+                {
+                    inputs[idx] = *(Quaternion*)((byte*)&bufferPtr[i].numericValue + 1);
+                }
+
+                // Fill remaining with most recent if needed
+                for (; idx < INPUT_COUNT; ++idx)
+                {
+                    inputs[idx] = mostRecentValue;
+                }
+            }
+
+            // Compute weighted sum using basis-relative approach
+            Quaternion basis = mostRecentValue;
+            Quaternion invBasis = Quaternion.Inverse(basis);
+            Quaternion accumulator = Quaternion.identity;
+
+            // Process inputs
+            for (int i = 0; i < INPUT_COUNT; ++i)
+            {
+                Quaternion relative = invBasis * inputs[i];
+                accumulator = Quaternion.SlerpUnclamped(accumulator, relative, inputWeights[i]);
+            }
+
+            // Note: For a full implementation, you'd need to handle the output history
+            // This is simplified for demonstration
+
+            return basis * accumulator;
         }
     }
 }

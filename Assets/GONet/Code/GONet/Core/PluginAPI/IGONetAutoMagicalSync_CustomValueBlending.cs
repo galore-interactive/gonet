@@ -17,6 +17,8 @@ using GONet.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace GONet.PluginAPI
@@ -1220,57 +1222,91 @@ namespace GONet.PluginAPI
 
     public class GONetValueBlending_Quaternion_ExtrapolateWithLowPassSmoothingFilter : IGONetAutoMagicalSync_CustomValueBlending
     {
+        /// <summary>
+        /// Enable advanced motion analysis using QuaternionDelta for better quality at the cost of ~50% more CPU.
+        /// Recommended for FPS games and scenarios with varied rotation characteristics.
+        /// </summary>
+        public static bool UseAdvancedMotionAnalysis = true;
+
+        /// <summary>
+        /// Enable debug logging for motion analysis (only works when UseAdvancedMotionAnalysis is true)
+        /// </summary>
+        public static bool EnableMotionAnalysisLogging = false;
+
+        /// <summary>
+        /// Per-object motion profile cache (optional future enhancement)
+        /// </summary>
+        private readonly Dictionary<int, MotionProfile> motionProfiles = new Dictionary<int, MotionProfile>();
+
+        private struct MotionProfile
+        {
+            public float averageAngularVelocity;
+            public float maxAngularVelocity;
+            public int sampleCount;
+
+            public void Update(float angularVelocity)
+            {
+                maxAngularVelocity = angularVelocity > maxAngularVelocity ? angularVelocity : maxAngularVelocity;
+                averageAngularVelocity = (averageAngularVelocity * sampleCount + angularVelocity) / (sampleCount + 1);
+                sampleCount++;
+            }
+        }
+
+        private struct QuaternionDelta
+        {
+            public Quaternion rotation;
+            public float angleRadians;
+            public Vector3 axis;
+            public long timeDelta;
+
+            public float AngularVelocity => timeDelta > 0 ? angleRadians / (timeDelta * 1e-7f) : 0f;
+            public float AngularVelocityDegrees => AngularVelocity * Mathf.Rad2Deg;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private QuaternionDelta ComputeDelta(Quaternion from, Quaternion to, long fromTime, long toTime)
+        {
+            Quaternion delta = to * Quaternion.Inverse(from);
+            float angle;
+            Vector3 axis;
+            delta.ToAngleAxis(out angle, out axis);
+
+            return new QuaternionDelta
+            {
+                rotation = delta,
+                angleRadians = angle * Mathf.Deg2Rad,
+                axis = axis,
+                timeDelta = toTime - fromTime
+            };
+        }
+
         private Quaternion GetQuaternionAccelerationBasedExtrapolation(
             NumericValueChangeSnapshot[] buffer,
             long atElapsedTicks,
             int newestIdx,
             NumericValueChangeSnapshot newestSnap)
         {
-            // assume buffer is sorted ascending by elapsedTicksAtChange
             int N = buffer.Length;
             if (N < 2)
                 return newestSnap.numericValue.UnityEngine_Quaternion;
 
-            // start at whatever index holds your “newest” sample
+            // Use the provided newestIdx as starting point
             int iS2 = newestIdx;
 
-            // helper to pull out the four quaternions (s0 is two steps older than s2,
-            // s3 is one step newer than s2 if we have it)
-            NumericValueChangeSnapshot Get(int idx) => buffer[idx];
-            NumericValueChangeSnapshot? Maybe(int idx) => idx >= 0 && idx < N ? buffer[idx] : (NumericValueChangeSnapshot?)null;
+            // Early bounds check to avoid exceptions
+            int maxIndex = N - 1;
+            int minValidIndex = iS2 + 2 <= maxIndex ? iS2 : maxIndex - 2;
 
-            // “walk” forward or backward until atElapsedTicks ∈ [s1, s2]
-            while (true)
-            {
-                // our candidates:
-                var s2 = Get(iS2);
-                var s1 = Maybe(iS2 + 1);
+            // Clamp iS2 to ensure we have enough samples
+            iS2 = minValidIndex < 0 ? 0 : minValidIndex;
 
-                // if we’re too far *before* s1, shift window forward in time
-                if (s1 != null && atElapsedTicks < s1.Value.elapsedTicksAtChange && (iS2 + 2) < N)
-                {
-                    iS2++;
-                    continue;
-                }
+            // Direct access with bounds already verified
+            var s2_snap = buffer[iS2];
+            var s1_snap = iS2 + 1 <= maxIndex ? buffer[iS2 + 1] : s2_snap;
+            var s0_snap = iS2 + 2 <= maxIndex ? buffer[iS2 + 2] : s1_snap;
+            var s3_snap = iS2 > 0 ? buffer[iS2 - 1] : (NumericValueChangeSnapshot?)null;
 
-                // if we’re too far *after* s2, shift window backward in time
-                if (atElapsedTicks > s2.elapsedTicksAtChange && iS2 > 0)
-                {
-                    iS2--;
-                    continue;
-                }
-
-                // otherwise we’re good
-                break;
-            }
-
-            // rebuild your four samples
-            var s2_snap = Get(iS2);
-            var s1_snap = Maybe(iS2 + 1) ?? s2_snap;   // if we don’t have a real “older” sample, just reuse
-            var s0_snap = Maybe(iS2 + 2) ?? s1_snap;   // same for two steps older
-            var s3_snap = Maybe(iS2 - 1);              // might be null if we’re at the end
-
-            // pull their quaternions
+            // Pull quaternions
             Quaternion q0 = s0_snap.numericValue.UnityEngine_Quaternion;
             Quaternion q1 = s1_snap.numericValue.UnityEngine_Quaternion;
             Quaternion q2 = s2_snap.numericValue.UnityEngine_Quaternion;
@@ -1278,527 +1314,376 @@ namespace GONet.PluginAPI
             long t0 = s0_snap.elapsedTicksAtChange;
             long t1 = s1_snap.elapsedTicksAtChange;
             long t2 = s2_snap.elapsedTicksAtChange;
-            long span = t2 - t1;
 
-            // compute or predict q3 only if we actually need extrapolation later
-            Quaternion q3 = s3_snap.HasValue
-                ? s3_snap.Value.numericValue.UnityEngine_Quaternion
-                : PredictQ3(q0, q1, q2);
+            // Branch based on configuration
+            if (UseAdvancedMotionAnalysis)
+            {
+                return GetQuaternionExtrapolation_Advanced(
+                    q0, q1, q2, t0, t1, t2,
+                    s3_snap, atElapsedTicks);
+            }
+            else
+            {
+                return GetQuaternionExtrapolation_Simple(
+                    q0, q1, q2, t0, t1, t2,
+                    s3_snap, atElapsedTicks);
+            }
+        }
 
-            // now q0→q1→q2 bracket atElapsedTicks, you can compute your t:
-            long spanTicks = s2_snap.elapsedTicksAtChange - s1_snap.elapsedTicksAtChange;
-            float t = spanTicks > 0f
-                ? (atElapsedTicks - s1_snap.elapsedTicksAtChange) / (float)spanTicks
-                : 0f;
+        private Quaternion GetQuaternionExtrapolation_Advanced(
+            Quaternion q0, Quaternion q1, Quaternion q2,
+            long t0, long t1, long t2,
+            NumericValueChangeSnapshot? s3_snap,
+            long atElapsedTicks)
+        {
+            // Use QuaternionDelta for better motion analysis
+            QuaternionDelta delta10 = ComputeDelta(q0, q1, t0, t1);
+            QuaternionDelta delta21 = ComputeDelta(q1, q2, t1, t2);
 
-            t = Mathf.Clamp01(t);
+            // Log motion analysis if enabled
+            if (EnableMotionAnalysisLogging)
+            {
+                GONetLog.Debug($"[Quaternion Motion] Δ1: {delta10.AngularVelocityDegrees:F1}°/s, Δ2: {delta21.AngularVelocityDegrees:F1}°/s");
 
-            // and finally pick SQUAD for in‑bounds, or fall back to true extrapolation when t==1:
+                // Detect acceleration
+                if (delta10.timeDelta > 0 && delta21.timeDelta > 0)
+                {
+                    float accel = (delta21.AngularVelocity - delta10.AngularVelocity) / (delta21.timeDelta * 1e-7f);
+                    GONetLog.Debug($"[Quaternion Motion] Angular acceleration: {accel * Mathf.Rad2Deg:F1}°/s²");
+                }
+            }
+
+            // Check if we have valid deltas
+            if (delta21.timeDelta <= 0)
+                return q2;
+
+            // Compute or use actual q3
+            Quaternion q3;
+            if (s3_snap.HasValue)
+            {
+                q3 = s3_snap.Value.numericValue.UnityEngine_Quaternion;
+            }
+            else if (delta10.timeDelta > 0)
+            {
+                // Use delta information for more accurate prediction
+                q3 = PredictQ3_WithDeltas(q2, delta10, delta21);
+            }
+            else
+            {
+                // Can't predict without valid spans
+                q3 = q2;
+            }
+
+            // Calculate interpolation parameter
+            long deltaFromS1 = atElapsedTicks - t1;
+            float t = delta21.timeDelta > 0 ? deltaFromS1 / (float)delta21.timeDelta : 0f;
+
+            // Determine if we're interpolating or extrapolating
             Quaternion result;
-            if (t < 1f)
+            if (t <= 0f)
+            {
+                result = q1;
+            }
+            else if (t < 1f)
             {
                 result = QuaternionUtilsOptimized.SquadFast(q0, q1, q2, q3, t);
             }
             else
             {
-                // true extrapolation past q2
-                // reuse the same ratio (how far past q2 we are vs the last interval length)
-                float extrapFactor = span > 0f
-                    ? (float)(atElapsedTicks - s2_snap.elapsedTicksAtChange) / span
-                    : 0f;
-
+                float extrapFactor = (atElapsedTicks - t2) / (float)delta21.timeDelta;
                 result = QuaternionUtils.SlerpUnclamped(ref q2, ref q3, extrapFactor);
             }
 
-            { // FINAL attempt to make sure things are not wild or unsmooth (low pass smoothing if necessary)
-                const float maxJumpDegrees = 90f; // TODO make this dynamic to the actual thing being rotated as each thing will have different profile
-                // TODO Adaptive threshold based on packet‐rate or recent jitter:  float maxJumpDegrees = baseThreshold + jitterStrength * 2f;
-
-
-                Quaternion lastQuat = q2;           // the last known “safe” rotation
-                Quaternion predQuat = result;
-
-                // measure the raw jump
-                float jumpAngle = Quaternion.Angle(lastQuat, predQuat);
-                if (jumpAngle > maxJumpDegrees)
-                {
-                    // Log the event so you can tune maxJumpDegrees later
-                    GONetLog.Warning($"[DREETS] Prediction jump too big: {jumpAngle:F1}° → clamping to {maxJumpDegrees}°");
-
-                    // Clamp the jump so you never exceed your threshold
-                    result = Quaternion.RotateTowards(
-                        lastQuat,         // from
-                        predQuat,         // to
-                        maxJumpDegrees    // by no more than this many degrees
-                    );
-                }
-
-                result = QuaternionUtilsOptimized.SlerpFast(
-                    lastQuat,
-                    result,
-                    0.2f   // 20% of the predicted jump per frame
-                );
-            }
+            // Apply constraints with delta information
+            result = ApplyExtrapolationConstraints_WithDeltas(q2, result, delta21);
 
             return result;
-
-            Quaternion PredictQ3(Quaternion q0, Quaternion q1, Quaternion q2)
-            {
-                // acceleration‑based prediction exactly as before
-                var identity = Quaternion.identity;
-                Quaternion d21 = q2 * Quaternion.Inverse(q1);
-                Quaternion d10 = q1 * Quaternion.Inverse(q0);
-                // scale d10 to the q1→q2 span
-                float alpha = span / (float)(t1 - t0);
-                Quaternion d10s = QuaternionUtils.SlerpUnclamped(ref identity, ref d10, alpha);
-                Quaternion dd = d21 * Quaternion.Inverse(d10s);
-                return q2 * d21 * dd;
-            }
         }
 
-        /*
-        private Quaternion GetQuaternionAccelerationBasedExtrapolation______(
-            NumericValueChangeSnapshot[] buffer,
-            long atElapsedTicks,
-            int newestIdx,
-            NumericValueChangeSnapshot newestSnap)
+        private Quaternion GetQuaternionExtrapolation_Simple(
+            Quaternion q0, Quaternion q1, Quaternion q2,
+            long t0, long t1, long t2,
+            NumericValueChangeSnapshot? s3_snap,
+            long atElapsedTicks)
         {
-            int N = buffer.Length;
-            if (N < 2)
-                return newestSnap.numericValue.UnityEngine_Quaternion;
+            // Calculate spans
+            long span21 = t2 - t1;
+            long span10 = t1 - t0;
 
-            int iS2 = newestIdx;
-            NumericValueChangeSnapshot s0 = buffer[iS2 + 2];
-            NumericValueChangeSnapshot s1 = buffer[iS2 + 1];
-            NumericValueChangeSnapshot s2 = buffer[iS2];
-            NumericValueChangeSnapshot? s3 = iS2 > 0 ? buffer[iS2 - 1] : null;
+            if (span21 <= 0)
+                return q2;
 
-            while (atElapsedTicks < s1.elapsedTicksAtChange)
+            // Compute or use actual q3
+            Quaternion q3;
+            if (s3_snap.HasValue)
             {
-                iS2++;
-                s0 = buffer[iS2 + 2];
-                s1 = buffer[iS2 + 1];
-                s2 = buffer[iS2];
-                s3 = iS2 > 0 ? buffer[iS2 - 1] : null;
+                q3 = s3_snap.Value.numericValue.UnityEngine_Quaternion;
             }
-
-            while (atElapsedTicks > s2.elapsedTicksAtChange)
+            else if (span10 > 0)
             {
-                iS2--;
-                s0 = buffer[iS2 + 2];
-                s1 = buffer[iS2 + 1];
-                s2 = buffer[iS2];
-                s3 = iS2 > 0 ? buffer[iS2 - 1] : null;
-            }
-
-
-            Quaternion q0 = s0.numericValue.UnityEngine_Quaternion;
-            Quaternion q1 = s1.numericValue.UnityEngine_Quaternion;
-            Quaternion q2 = s2.numericValue.UnityEngine_Quaternion;
-
-            long t0 = s0.elapsedTicksAtChange;
-            long t1 = s1.elapsedTicksAtChange;
-            long t2 = s2.elapsedTicksAtChange;
-            long span = t2 - t1;
-
-            // 1) gather and sort the last up to 3 snapshots + the newest
-            //    so we always get q0 < q1 < q2 in time, and q3 if present
-            var snaps = new List<NumericValueChangeSnapshot>();
-            snaps.Add(newestSnap);
-            for (int i = 1; i < Math.Min(N, 4); i++)
-            {
-                int idx = (newestIdx + i) % N;
-                snaps.Add(buffer[idx]);
-            }
-            snaps.Sort((a, b) => a.elapsedTicksAtChange.CompareTo(b.elapsedTicksAtChange));
-
-            // 2) assign
-            NumericValueChangeSnapshot s0 = snaps[0];
-            NumericValueChangeSnapshot s1 = snaps[1];
-            NumericValueChangeSnapshot s2 = snaps.Count > 2 ? snaps[2] : snaps[1];
-            NumericValueChangeSnapshot? s3 = snaps.Count > 3 ? snaps[3] : null;
-
-            Quaternion q0 = s0.numericValue.UnityEngine_Quaternion;
-            Quaternion q1 = s1.numericValue.UnityEngine_Quaternion;
-            Quaternion q2 = s2.numericValue.UnityEngine_Quaternion;
-
-            long t0 = s0.elapsedTicksAtChange;
-            long t1 = s1.elapsedTicksAtChange;
-            long t2 = s2.elapsedTicksAtChange;
-            long span = t2 - t1;
-
-            // 3) if we're *before* the earliest sample, just hold it
-            if (atElapsedTicks <= t0)
-                return q0;
-
-            // 4) if we're *inside* any older bracket, simple slerp
-            if (atElapsedTicks < t1)
-            {
-                float innerT = (atElapsedTicks - t0) / (float)(t1 - t0);
-                innerT = Mathf.Clamp01(innerT);
-                return QuaternionUtils.SlerpUnclamped(ref q0, ref q1, innerT);
-            }
-
-            // 5) compute q3 if we didn’t get one from the buffer
-            Quaternion predictedQ3;
-            if (s3.HasValue)
-            {
-                predictedQ3 = s3.Value.numericValue.UnityEngine_Quaternion;
+                q3 = PredictQ3_Simple(q0, q1, q2, span10, span21);
             }
             else
             {
-                // acceleration‑based prediction exactly as before
-                var identity = Quaternion.identity;
-                Quaternion d21 = q2 * Quaternion.Inverse(q1);
-                Quaternion d10 = q1 * Quaternion.Inverse(q0);
-                // scale d10 to the q1→q2 span
-                float alpha = span / (float)(t1 - t0);
-                Quaternion d10s = QuaternionUtils.SlerpUnclamped(ref identity, ref d10, alpha);
-                Quaternion dd = d21 * Quaternion.Inverse(d10s);
-                predictedQ3 = q2 * d21 * dd;
+                q3 = q2;
             }
 
-            // 6) now decide: are we still “inside” the last bracket (with a little hysteresis)?
-            long beyond = atElapsedTicks - t2;
-            const float HYSTERESIS_FACTOR = 1.0f; // 1×span  
-            if (beyond <= span * HYSTERESIS_FACTOR)
+            // Calculate interpolation parameter
+            long deltaFromS1 = atElapsedTicks - t1;
+            float t = span21 > 0 ? deltaFromS1 / (float)span21 : 0f;
+
+            // Determine if we're interpolating or extrapolating
+            Quaternion result;
+            if (t <= 0f)
             {
-                // clamp into SquadFast
-                float t = (atElapsedTicks - t1) / (float)span;
-                t = Mathf.Clamp01(t);
-                return QuaternionUtilsOptimized.SquadFast(q0, q1, q2, predictedQ3, t);
+                result = q1;
+            }
+            else if (t < 1f)
+            {
+                result = QuaternionUtilsOptimized.SquadFast(q0, q1, q2, q3, t);
+            }
+            else
+            {
+                float extrapFactor = (atElapsedTicks - t2) / (float)span21;
+                result = QuaternionUtils.SlerpUnclamped(ref q2, ref q3, extrapFactor);
             }
 
-            // 7) true extrapolation past the hysteresis zone
-            {
-                float t = beyond / (float)span;
-                return QuaternionUtils.SlerpUnclamped(ref q2, ref predictedQ3, t);
-            }
+            // Apply simple constraints
+            result = ApplyExtrapolationConstraints_Simple(q2, result, span21);
+
+            return result;
         }
-        */
 
-        readonly Dictionary<NumericValueChangeSnapshot[], List<Vector3>> extrapolateQuaternionDiffHistory = new Dictionary<NumericValueChangeSnapshot[], List<Vector3>>();
-
-        private void SeeHowWeDid_ExtrapolateQuaternion(NumericValueChangeSnapshot[] valueBuffer, int valueCount)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Quaternion PredictQ3_WithDeltas(Quaternion q2, QuaternionDelta delta10, QuaternionDelta delta21)
         {
-            if (valueCount > 3)
+            // Scale factor based on time ratios
+            float alpha = delta21.timeDelta / (float)delta10.timeDelta;
+
+            // Scale the first delta's rotation
+            Quaternion d10_scaled = Quaternion.SlerpUnclamped(
+                Quaternion.identity,
+                delta10.rotation,
+                alpha);
+
+            // Compute acceleration (change in angular velocity)
+            Quaternion dd = delta21.rotation * Quaternion.Inverse(d10_scaled);
+
+            // Apply to predict next position
+            return q2 * delta21.rotation * dd;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Quaternion PredictQ3_Simple(Quaternion q0, Quaternion q1, Quaternion q2, long span10, long span21)
+        {
+            // Direct quaternion operations
+            Quaternion invQ1 = Quaternion.Inverse(q1);
+            Quaternion d21 = q2 * invQ1;
+            Quaternion d10 = q1 * Quaternion.Inverse(q0);
+
+            float alpha = span21 / (float)span10;
+            Quaternion d10_scaled = Quaternion.SlerpUnclamped(Quaternion.identity, d10, alpha);
+            Quaternion dd = d21 * Quaternion.Inverse(d10_scaled);
+
+            return q2 * d21 * dd;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Quaternion ApplyExtrapolationConstraints_WithDeltas(
+            Quaternion lastKnown,
+            Quaternion predicted,
+            QuaternionDelta recentDelta)
+        {
+            // Use angular velocity from delta for dynamic threshold
+            float angularVelocityDegPerSec = recentDelta.AngularVelocityDegrees;
+
+            // Dynamic threshold based on recent angular velocity
+            const float BASE_MAX_JUMP_DEGREES = 90f;
+            const float MIN_MAX_JUMP_DEGREES = 30f;
+            const float VELOCITY_SCALE_FACTOR = 0.01f; // Tunable
+
+            // Higher velocity = lower threshold (more conservative)
+            float maxJumpDegrees = BASE_MAX_JUMP_DEGREES / (1f + angularVelocityDegPerSec * VELOCITY_SCALE_FACTOR);
+            maxJumpDegrees = maxJumpDegrees < MIN_MAX_JUMP_DEGREES ? MIN_MAX_JUMP_DEGREES : maxJumpDegrees;
+
+            // Measure the jump
+            float jumpAngle = QuaternionUtilsOptimized.AngleFast(lastKnown, predicted);
+
+            if (jumpAngle > maxJumpDegrees)
             {
-                if (!extrapolateQuaternionDiffHistory.ContainsKey(valueBuffer))
+                predicted = QuaternionUtilsOptimized.RotateTowardsFast(lastKnown, predicted, maxJumpDegrees);
+
+                if (EnableMotionAnalysisLogging && jumpAngle > maxJumpDegrees * 1.5f)
                 {
-                    extrapolateQuaternionDiffHistory[valueBuffer] = new List<Vector3>();
+                    GONetLog.Warning($"[Quaternion] Large jump: {jumpAngle:F1}° at {angularVelocityDegPerSec:F1}°/s (clamped to {maxJumpDegrees:F1}°)");
                 }
-
-
-                int newestBufferIndex = 1;
-                var newest = valueBuffer[newestBufferIndex];
-
-                NumericValueChangeSnapshot q0_snap = valueBuffer[newestBufferIndex + 2];
-                Quaternion q0 = q0_snap.numericValue.UnityEngine_Quaternion;
-
-                NumericValueChangeSnapshot q1_snap = valueBuffer[newestBufferIndex + 1];
-                Quaternion q1 = q1_snap.numericValue.UnityEngine_Quaternion;
-
-                NumericValueChangeSnapshot q2_snap = newest;
-                Quaternion q2 = newest.numericValue.UnityEngine_Quaternion;
-                Quaternion diffRotation_q2_q1 = q2 * Quaternion.Inverse(q1);
-
-
-                Quaternion diffRotation_q1_q0 = q1 * Quaternion.Inverse(q0);
-                long q1MinusQ0_ticks = q1_snap.elapsedTicksAtChange - q0_snap.elapsedTicksAtChange;
-                long q2MinusQ1_ticks = q2_snap.elapsedTicksAtChange - q1_snap.elapsedTicksAtChange; // IMPORTANT: This is the main unit of measure...considered the whole of 1, which is why it is the denominator when calculating interpolationTime below
-                float interpolationTime_q1q0 = q2MinusQ1_ticks / (float)q1MinusQ0_ticks;
-                Quaternion identity = Quaternion.identity;
-                Quaternion diffRotation_q1_q0_scaledTo_q2q1_Time =
-                    QuaternionUtils.SlerpUnclamped(
-                        ref identity,
-                        ref diffRotation_q1_q0,
-                        interpolationTime_q1q0);
-
-                Quaternion diffDiff = diffRotation_q2_q1 * Quaternion.Inverse(diffRotation_q1_q0_scaledTo_q2q1_Time);
-                Quaternion q3predicted = q2 * diffRotation_q2_q1 * diffDiff;
-
-
-                {
-                    Vector3 axis_diff_q1_q0 = Vector3.zero;
-                    float ang_diff_q1_q0;
-                    diffRotation_q1_q0.ToAngleAxis(out ang_diff_q1_q0, out axis_diff_q1_q0);
-                    float ang_diff_q1_q0Scaled = ang_diff_q1_q0 * (q1MinusQ0_ticks / (float)TimeSpan.FromSeconds(1).Ticks);
-
-                    Vector3 axis_diff_q2_q1 = Vector3.zero;
-                    float ang_diff_q2_q1;
-                    diffRotation_q2_q1.ToAngleAxis(out ang_diff_q2_q1, out axis_diff_q2_q1);
-                    float ang_diff_q2_q1Scaled = ang_diff_q2_q1 * (q2MinusQ1_ticks / (float)TimeSpan.FromSeconds(1).Ticks);
-
-                    GONetLog.Debug($"\naxis_diff_q1_q0: (x:{axis_diff_q1_q0.x}, y:{axis_diff_q1_q0.y}, z:{axis_diff_q1_q0.z}) ang_diff_q1_q0: {ang_diff_q1_q0} ang_diff_q1_q0Scaled: {ang_diff_q1_q0Scaled}\naxis_diff_q2_q1: (x:{axis_diff_q2_q1.x}, y:{axis_diff_q2_q1.y}, z:{axis_diff_q2_q1.z}) ang_diff_q2_q1: {ang_diff_q2_q1} ang_diff_q2_q1Scaled: {ang_diff_q2_q1Scaled}");
-                    /*
-                                        if (ang > 180)
-                                        {
-                                            ang -= 360;
-                                        }
-
-                                        float dt_FIXME = 0.5f;
-                                        ang = ang * (float)dt_FIXME % 360;
-                                        var extrapd = Quaternion.AngleAxis(ang, axis) * q1;
-                    */
-                }
-
-                int q3actualIndex = newestBufferIndex - 1;
-                var q3actual = valueBuffer[q3actualIndex];
-                long atElapsedTicks_q3Actual = valueBuffer[q3actualIndex].elapsedTicksAtChange;
-                long atMinusQ2_ticks = atElapsedTicks_q3Actual - q2_snap.elapsedTicksAtChange;
-
-                float interpolationTime = atMinusQ2_ticks / (float)q2MinusQ1_ticks;
-                Quaternion extrapolatedPrediction =
-                    QuaternionUtils.SlerpUnclamped(
-                        ref q2,
-                        ref q3predicted,
-                        interpolationTime);
-
-                Quaternion thisIsHowWeDid = q3actual.numericValue.UnityEngine_Quaternion * Quaternion.Inverse(extrapolatedPrediction);
-                extrapolateQuaternionDiffHistory[valueBuffer].Add(ValueBlendUtils.CenterAround180(thisIsHowWeDid.eulerAngles));
-                //GONetLog.Debug($"extrapolated - actual: (x:{thisIsHowWeDid.eulerAngles.x}, y:{thisIsHowWeDid.eulerAngles.y}, z:{thisIsHowWeDid.eulerAngles.z})");
-
-                Vector3 total = new Vector3();
-                foreach (var n in extrapolateQuaternionDiffHistory[valueBuffer])
-                {
-                    total += n;
-                }
-                Vector3 average = total / extrapolateQuaternionDiffHistory[valueBuffer].Count;
-                GONetLog.Debug($"average diff: (x:{average.x}, y:{average.y}, z:{average.z})");
-
-                /* just double checking some numbers to make sure the math is good
-                GONetLog.Debug(string.Concat(
-                    "\nq0: ", q0.eulerAngles,
-                    "\nq1: ", q1.eulerAngles,
-                    "\nq2: ", q2.eulerAngles,
-                    "\nd2: ", diffRotation_q2_q1.eulerAngles,
-                    "\nd1: ", diffRotation_q1_q0_scaledTo_q2q1_Time.eulerAngles,
-                    "\ndd: ", diffDiff.eulerAngles,
-                    "\nsq: ", blendedValue.UnityEngine_Quaternion.eulerAngles,
-                    "\nq3: ", q3.eulerAngles,
-                    "\ninterpolationTime: ", interpolationTime,
-                    ", q0(ms): ", TimeSpan.FromTicks(q0_snap.elapsedTicksAtChange).TotalMilliseconds,
-                    ", q1(ms): ", TimeSpan.FromTicks(q1_snap.elapsedTicksAtChange).TotalMilliseconds,
-                    ", q2(ms): ", TimeSpan.FromTicks(q2_snap.elapsedTicksAtChange).TotalMilliseconds,
-                    ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
-                    ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusQ2_ticks).TotalMilliseconds));
-                //*/
             }
+
+            // Adaptive smoothing based on angular velocity and jump size
+            float velocityFactor = angularVelocityDegPerSec / 360f; // Normalize to revolutions/sec
+            float jumpFactor = jumpAngle / 180f;
+            float smoothingFactor = 0.2f + (velocityFactor * 0.2f) + (jumpFactor * 0.1f);
+            smoothingFactor = smoothingFactor > 0.5f ? 0.5f : (smoothingFactor < 0.2f ? 0.2f : smoothingFactor);
+
+            return QuaternionUtilsOptimized.SlerpFast(lastKnown, predicted, smoothingFactor);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Quaternion ApplyExtrapolationConstraints_Simple(
+            Quaternion lastKnown,
+            Quaternion predicted,
+            long recentSpanTicks)
+        {
+            const float BASE_MAX_JUMP_DEGREES = 90f;
+            const float MIN_MAX_JUMP_DEGREES = 30f;
+
+            // Simple threshold based on update rate
+            float updateRateHz = TimeSpan.TicksPerSecond / (float)recentSpanTicks;
+            float maxJumpDegrees = BASE_MAX_JUMP_DEGREES / (1f + updateRateHz * 0.1f);
+            maxJumpDegrees = maxJumpDegrees < MIN_MAX_JUMP_DEGREES ? MIN_MAX_JUMP_DEGREES : maxJumpDegrees;
+
+            float jumpAngle = QuaternionUtilsOptimized.AngleFast(lastKnown, predicted);
+
+            if (jumpAngle > maxJumpDegrees)
+            {
+                predicted = QuaternionUtilsOptimized.RotateTowardsFast(lastKnown, predicted, maxJumpDegrees);
+            }
+
+            // Fixed smoothing factor
+            return QuaternionUtilsOptimized.SlerpFast(lastKnown, predicted, 0.2f);
         }
 
         public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Quaternion;
 
-        public string Description => "Provides a good blending solution for Quaternions that change with linear velocity and/or fixed acceleration.  Will not perform as well for jittery or somewhat chaotic value changes.";
+        public string Description => UseAdvancedMotionAnalysis
+            ? "Advanced quaternion blending with motion analysis for varied rotation profiles (FPS, vehicles, etc)"
+            : "Optimized quaternion blending for consistent rotation patterns";
 
         public bool TryGetBlendedValue(
-            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks,
+            out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges)
         {
-            //GONetLog.Debug($"[DREETS] valueCount: {valueCount}, atElapsedTicks: {TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds}");
-
             blendedValue = default;
-            didExtrapolate = false;
+            didExtrapolatePastMostRecentChanges = false;
 
             if (valueCount > 0)
             {
-                { // use buffer to determine the actual value that we think is most appropriate for this moment in time
-                    int newestBufferIndex = 0;
-                    NumericValueChangeSnapshot newest = valueBuffer[newestBufferIndex];
-                    int oldestBufferIndex = valueCount - 1;
-                    NumericValueChangeSnapshot oldest = valueBuffer[oldestBufferIndex];
-                    bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) < GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
-                    if (isNewestRecentEnoughToProcess)
+                int newestBufferIndex = 0;
+                NumericValueChangeSnapshot newest = valueBuffer[newestBufferIndex];
+                int oldestBufferIndex = valueCount - 1;
+                NumericValueChangeSnapshot oldest = valueBuffer[oldestBufferIndex];
+
+                bool isNewestRecentEnoughToProcess = (atElapsedTicks - newest.elapsedTicksAtChange) <
+                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS;
+
+                if (isNewestRecentEnoughToProcess)
+                {
+                    const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
+
+                    if (IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH || atElapsedTicks >= newest.elapsedTicksAtChange)
                     {
-                        Quaternion newestValue = newest.numericValue.UnityEngine_Quaternion;
-                        bool shouldAttemptInterExtraPolation = true; // default to true since only float is supported and we can definitely interpolate/extrapolate floats!
-                        if (shouldAttemptInterExtraPolation)
+                        // Find the base snapshot to extrapolate from
+                        int iBase = newestBufferIndex;
+                        if (atElapsedTicks < newest.elapsedTicksAtChange && atElapsedTicks > oldest.elapsedTicksAtChange)
                         {
-                            const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
-                            if (IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH || atElapsedTicks >= newest.elapsedTicksAtChange) // if the adjustedTime is newer than our newest time in buffer, just set the transform to what we have as newest
+                            for (int i = newestBufferIndex; i <= oldestBufferIndex; ++i)
                             {
-                                bool isEnoughInfoToExtrapolate = valueCount >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE; // this is the fastest way to check if newest is different than oldest....in which case we do have two distinct snapshots...from which to derive last velocity
-                                if (isEnoughInfoToExtrapolate)
+                                if (valueBuffer[i].elapsedTicksAtChange <= atElapsedTicks)
                                 {
-                                    if (valueCount > 3)
-                                    {
-                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
-
-                                        /*
-                                        { // at this point, blendedValue is the raw extrapolated value, BUT there may be a need to smooth things out since we can review how well our previous extrapolation did once we get new data and that is essentially what is happening below:
-                                            long TEMP_TicksBetweenSyncs = (long)(TimeSpan.FromSeconds(1 / 20f).Ticks * 0.9); // 20 Hz at the moment....TODO FIXME: maybe average the time between elements instead to be dynamic!!!
-                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
-                                            float timePercentageCompleteBeforeNextSync = atMinusNewest_ticks / (float)TEMP_TicksBetweenSyncs;
-                                            if (timePercentageCompleteBeforeNextSync < 1)
-                                            {
-                                                float timePercentageRemainingBeforeNextSync = 1 - timePercentageCompleteBeforeNextSync;
-
-                                                var newest_last = valueBuffer[newestBufferIndex + 1];
-                                                Quaternion newestAsExtrapolated = // TODO instead of calculating this each time, just store in a correlation buffer
-                                                    GetQuaternionAccelerationBasedExtrapolation(
-                                                        valueBuffer,
-                                                        newest.elapsedTicksAtChange,
-                                                        newestBufferIndex + 1,
-                                                        newest_last);
-
-                                                Quaternion identity = Quaternion.identity;
-                                                Quaternion overExtrapolationNewest = newestAsExtrapolated * Quaternion.Inverse(newest.numericValue.UnityEngine_Quaternion);
-                                                Quaternion overExtrapolationNewest_adjustmentToSmooth =
-                                                    QuaternionUtils.SlerpUnclamped(
-                                                        ref identity,
-                                                        ref overExtrapolationNewest,
-                                                        timePercentageRemainingBeforeNextSync);
-
-                                                //GONetLog.Debug($"smooth by: (x:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.x}, y:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.y}, z:{overExtrapolationNewest_adjustmentToSmooth.eulerAngles.z})");
-
-                                                // TODO UNCOMMENT: blendedValue = blendedValue.UnityEngine_Quaternion * overExtrapolationNewest_adjustmentToSmooth;
-                                            }
-                                        }
-                                        */
-                                        didExtrapolate = true;
-                                    }
-                                    else if (valueCount > 2)
-                                    {
-                                        blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, newestBufferIndex, newest);
-                                        didExtrapolate = true;
-                                    }
-                                    else
-                                    {
-                                        /* { // SQUAD life!  This is much better for dynamic movements, but is a bit more costly on CPU
-                                            NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                            Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
-                                            long atMinusNewest_ticks = atElapsedTicks - newest.elapsedTicksAtChange;
-                                            long newestMinusJustBefore_ticks = newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange;
-                                            float interpolationTime_InitialRaw = atMinusNewest_ticks / (float)newestMinusJustBefore_ticks;
-                                            Quaternion extrapolatedRotation = newestValue * diffRotation;
-
-                                            float interpolationTime1 = 
-                                                interpolationTime_InitialRaw > 1
-                                                    ? interpolationTime_InitialRaw + 0.1f
-                                                    : 1.1f; // ensure at least 1 so math below does not get whack (e.g., atInterpolationTime1_ticks)
-                                            interpolationTime1 = 2.5f; // TODO get rid of me
-                                            Quaternion extrapolated1 = 
-                                                QuaternionUtils.SlerpUnclamped(
-                                                    ref newestValue,
-                                                    ref extrapolatedRotation,
-                                                    interpolationTime1);
-
-                                            float interpolationTime2 = interpolationTime1 * 2;
-                                            Quaternion extrapolated2 =
-                                                QuaternionUtils.SlerpUnclamped(
-                                                    ref newestValue,
-                                                    ref extrapolatedRotation,
-                                                    interpolationTime2);
-
-                                            Quaternion 
-                                                q0 = justBeforeNewest.numericValue.UnityEngine_Quaternion, 
-                                                q1 = newest.numericValue.UnityEngine_Quaternion, 
-                                                q2 = extrapolated1, 
-                                                q3 = extrapolated2;
-
-                                            float atInterpolationTime1_ticks = newest.elapsedTicksAtChange + (atMinusNewest_ticks * interpolationTime1);
-                                            float t1MinusNewest_ticks = atInterpolationTime1_ticks - newest.elapsedTicksAtChange;
-                                            float interpolationTimeSquad = atMinusNewest_ticks / t1MinusNewest_ticks; // % between q1 and q2
-
-                                            { // start working toward moving q0 backward to be equidistant in time from q1 as q1 is to q2
-                                                float newQ0InterpolationBackwardTime = newestMinusJustBefore_ticks / (float)t1MinusNewest_ticks;
-                                                newQ0InterpolationBackwardTime = 1 / newQ0InterpolationBackwardTime;
-                                                q0 =
-                                                    QuaternionUtils.SlerpUnclamped(
-                                                        ref q1,
-                                                        ref q0,
-                                                        newQ0InterpolationBackwardTime);
-                                            }
-
-                                            // We want to interpolate between q1 and q2 by an interpolation factor t
-                                            Quaternion q, a, b, p;
-                                            QuaternionUtils.SquadSetup(ref q0, ref q1, ref q2, ref q3, out q, out a, out b, out p);
-                                            blendedValue = QuaternionUtils.Squad(ref q, ref a, ref b, ref p, interpolationTimeSquad).normalized;
-
-                                            //* just double checking some numbers to make sure the math is good
-                                            GONetLog.Debug(string.Concat(
-                                                "\nq0: ", q0.eulerAngles, 
-                                                "\nq1: ", q1.eulerAngles,
-                                                "\nq2: ", q2.eulerAngles,
-                                                "\nq3: ", q3.eulerAngles, 
-                                                "\nsq: ", blendedValue.UnityEngine_Quaternion.eulerAngles,
-                                                "\ninterpolationTimeSquad: ", interpolationTimeSquad,
-                                                ", interpolationTime_InitialRaw: ", interpolationTime_InitialRaw,
-                                                ", q0(ms): ", TimeSpan.FromTicks(justBeforeNewest.elapsedTicksAtChange).TotalMilliseconds,
-                                                ", q1(ms): ", TimeSpan.FromTicks(newest.elapsedTicksAtChange).TotalMilliseconds,
-                                                ", at(ms): ", TimeSpan.FromTicks(atElapsedTicks).TotalMilliseconds,
-                                                ", q2(ms): ", TimeSpan.FromTicks((long)atInterpolationTime1_ticks).TotalMilliseconds,
-                                                ", atMinusNewest(ms): ", TimeSpan.FromTicks(atMinusNewest_ticks).TotalMilliseconds,
-                                                ", t1MinusNewest(ms): ", TimeSpan.FromTicks((long)t1MinusNewest_ticks).TotalMilliseconds));
-                                            //* /
-                                        }*/
-
-                                        { // Simple impl that works well on more linear movements
-                                            NumericValueChangeSnapshot justBeforeNewest = valueBuffer[newestBufferIndex + 1];
-                                            Quaternion diffRotation = newestValue * Quaternion.Inverse(justBeforeNewest.numericValue.UnityEngine_Quaternion);
-                                            float interpolationTime = (atElapsedTicks - newest.elapsedTicksAtChange) / (float)(newest.elapsedTicksAtChange - justBeforeNewest.elapsedTicksAtChange);
-                                            Quaternion extrapolatedRotation = newestValue * diffRotation;
-                                            blendedValue = QuaternionUtils.SlerpUnclamped(
-                                                ref newestValue,
-                                                ref extrapolatedRotation,
-                                                interpolationTime);
-                                        }
-                                    }
-
-                                    blendedValue = ValueBlendUtils.GetSmoothedRotation(blendedValue.UnityEngine_Quaternion, valueBuffer, valueCount);
-
-                                    //GONetLog.Debug("extroip'd....newest: " + newestValue + " extrap'd: " + blendedValue.UnityEngine_Quaternion);
-                                    didExtrapolate = true;
-                                }
-                                else
-                                {
-                                    blendedValue = newestValue;
-                                    //GONetLog.Debug("QUAT new new beast");
-                                }
-
-                                // SeeHowWeDid_ExtrapolateQuaternion(valueBuffer, valueCount);
-                            }
-                            else if (atElapsedTicks <= oldest.elapsedTicksAtChange) // if the adjustedTime is older than our oldest time in buffer, just set the transform to what we have as oldest
-                            {
-                                blendedValue = oldest.numericValue.UnityEngine_Quaternion;
-                                //GONetLog.Debug("QUAT went old school on 'eem..... at elapsed seconds: " + TimeSpan.FromTicks(atElapsedTicks).TotalSeconds + " blendedValue: " + blendedValue + " valueCount: " + valueCount + " oldest.seconds: " + TimeSpan.FromTicks(oldest.elapsedTicksAtChange).TotalSeconds);
-                            }
-                            else // this is the normal case where we can apply interpolation if the settings call for it!
-                            {
-                                bool didWeLoip = false;
-                                for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
-                                {
-                                    NumericValueChangeSnapshot newer = valueBuffer[i - 1];
-
-                                    if (atElapsedTicks <= newer.elapsedTicksAtChange)
-                                    {
-                                        NumericValueChangeSnapshot older = valueBuffer[i];
-
-                                        float interpolationTime = (atElapsedTicks - older.elapsedTicksAtChange) / (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
-                                        blendedValue = Quaternion.Slerp(
-                                            older.numericValue.UnityEngine_Quaternion,
-                                            newer.numericValue.UnityEngine_Quaternion,
-                                            interpolationTime);
-                                        //GONetLog.Debug("we loip'd 'eem. are they the same value, which should only be the case if our recent quantization equality checks are not working? " + (older.numericValue.UnityEngine_Quaternion.eulerAngles == newer.numericValue.UnityEngine_Quaternion.eulerAngles ? "Yes" : "No"));
-                                        didWeLoip = true;
-                                        break;
-                                    }
-                                }
-                                if (!didWeLoip)
-                                {
-                                    GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
+                                    iBase = i;
+                                    break;
                                 }
                             }
+                        }
+
+                        NumericValueChangeSnapshot baseSnap = valueBuffer[iBase];
+                        int valueCountUsable;
+
+                        // Determine usable value count
+                        if (iBase == newestBufferIndex && valueBuffer[newestBufferIndex].elapsedTicksAtChange > atElapsedTicks)
+                        {
+                            valueCountUsable = 0;
                         }
                         else
                         {
-                            blendedValue = newestValue;
-                            GONetLog.Debug("not a quaternion?");
+                            valueCountUsable = oldestBufferIndex - iBase + 1;
                         }
+
+                        bool isEnoughInfoToExtrapolate = valueCountUsable >= ValueBlendUtils.VALUE_COUNT_NEEDED_TO_EXTRAPOLATE;
+
+                        if (isEnoughInfoToExtrapolate)
+                        {
+                            if (valueCountUsable > 2)
+                            {
+                                blendedValue = GetQuaternionAccelerationBasedExtrapolation(valueBuffer, atElapsedTicks, iBase, baseSnap);
+                            }
+                            else
+                            {
+                                // Simple extrapolation for 2 values
+                                NumericValueChangeSnapshot justBeforeBase = valueBuffer[iBase + 1];
+                                Quaternion baseValue = baseSnap.numericValue.UnityEngine_Quaternion;
+                                Quaternion justBeforeValue = justBeforeBase.numericValue.UnityEngine_Quaternion;
+
+                                Quaternion diffRotation = baseValue * Quaternion.Inverse(justBeforeValue);
+                                float interpolationTime = (atElapsedTicks - baseSnap.elapsedTicksAtChange) /
+                                                        (float)(baseSnap.elapsedTicksAtChange - justBeforeBase.elapsedTicksAtChange);
+                                Quaternion extrapolatedRotation = baseValue * diffRotation;
+                                blendedValue = QuaternionUtils.SlerpUnclamped(
+                                    ref baseValue,
+                                    ref extrapolatedRotation,
+                                    interpolationTime);
+                            }
+
+                            // Only true when we're extrapolating past ALL known data
+                            didExtrapolatePastMostRecentChanges = valueCountUsable == valueCount;
+                        }
+                        else
+                        {
+                            blendedValue = baseSnap.numericValue.UnityEngine_Quaternion;
+                        }
+                    }
+                    else if (atElapsedTicks <= oldest.elapsedTicksAtChange)
+                    {
+                        // Time is before our oldest known value
+                        blendedValue = oldest.numericValue.UnityEngine_Quaternion;
                     }
                     else
                     {
-                        //GONetLog.Debug("data is too old....  now - newest (ms): " + TimeSpan.FromTicks(Time.ElapsedTicks - newest.elapsedTicksAtChange).TotalMilliseconds);
-                        return false; // data is too old...stop processing for now....we do this as we believe we have already processed the latest data and further processing is unneccesary additional resource usage
+                        // Normal interpolation between known values
+                        bool didInterpolate = false;
+                        for (int i = oldestBufferIndex; i > newestBufferIndex; --i)
+                        {
+                            NumericValueChangeSnapshot newer = valueBuffer[i - 1];
+
+                            if (atElapsedTicks <= newer.elapsedTicksAtChange)
+                            {
+                                NumericValueChangeSnapshot older = valueBuffer[i];
+
+                                float interpolationTime = (atElapsedTicks - older.elapsedTicksAtChange) /
+                                                        (float)(newer.elapsedTicksAtChange - older.elapsedTicksAtChange);
+                                blendedValue = Quaternion.Slerp(
+                                    older.numericValue.UnityEngine_Quaternion,
+                                    newer.numericValue.UnityEngine_Quaternion,
+                                    interpolationTime);
+                                didInterpolate = true;
+                                break;
+                            }
+                        }
+
+                        if (!didInterpolate)
+                        {
+                            GONetLog.Debug("Failed to interpolate quaternion - using newest value");
+                            blendedValue = newest.numericValue.UnityEngine_Quaternion;
+                        }
                     }
+
+                    // Apply conditional smoothing after all interpolation/extrapolation
+                    ValueBlendUtils.Quaternion_ApplySmoothing_IfAppropriate(ref valueBuffer, valueCount, ref blendedValue);
+                }
+                else
+                {
+                    // Data is too old - stop processing
+                    return false;
                 }
 
                 return true;
@@ -1807,7 +1692,6 @@ namespace GONet.PluginAPI
             return false;
         }
     }
-
     public class GONetValueBlending_Vector3_GrokOut : IGONetAutoMagicalSync_CustomValueBlending
     {
         public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Vector3;
@@ -2183,8 +2067,8 @@ namespace GONet.PluginAPI
                                         }
                                     }
 
-                                    //blendedValue = ValueBlendUtils.GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);
-                                    didExtrapolatePastMostRecentChanges = valueCountUsable == valueCount; // maybe better to use: time, but this seems good for now
+                                    // BELOW: maybe better to use time `atElapsedTicks > valueBuffer[0].elapsedTicksAtChange`, but this is (currently) accurate and faster comparison
+                                    didExtrapolatePastMostRecentChanges = valueCountUsable == valueCount;
                                 }
                                 else
                                 {
@@ -2225,6 +2109,8 @@ namespace GONet.PluginAPI
                                     if (ShouldLog) GONetLog.Debug("NEVER NEVER in life did we loip 'eem");
                                 }
                             }
+
+                            ValueBlendUtils.Vector3_ApplySmoothing_IfAppropriate(ref valueBuffer, valueCount, ref blendedValue);
                         }
                         else
                         {
