@@ -27,5 +27,6 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 9
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Float, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Float_ExtrapolateWithLowPassSmoothingFilter,
+        Assembly-CSharp
   ShouldSkipSyncRegistrationId: 0

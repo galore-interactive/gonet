@@ -27,7 +27,84 @@ namespace GONet.Utils
 {
     internal static class ValueBlendUtils
     {
+        // Constants
         internal const int VALUE_COUNT_NEEDED_TO_EXTRAPOLATE = 2;
+        internal const bool IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH = true;
+
+        /// <summary>
+        /// Some areas of code herein and related code guard some debug logging calls with this to optionally log more.
+        /// </summary>
+        public static bool ShouldLog { get; set; } = false;
+
+        /// <summary>
+        /// This is used when <see cref="IS_FORCING_ALWAYS_EXTRAP_TO_AVOID_THE_UGLY_DATA_SWITCH"/> is true.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe int DetermineUsableValueCountForForcedExtrapolation(
+            NumericValueChangeSnapshot[] valueBuffer,
+            int valueCount,
+            long atElapsedTicks,
+            int newestBufferIndex,
+            int oldestBufferIndex,
+            out int baseIndex)
+        {
+            // Pin array for direct access (eliminates bounds checking)
+            fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
+            {
+                long newestTicks = bufferPtr[newestBufferIndex].elapsedTicksAtChange;
+
+                // Fast path 1: At or after newest (common case for extrapolation)
+                if (atElapsedTicks >= newestTicks)
+                {
+                    baseIndex = newestBufferIndex;
+                    return valueCount; // More direct than oldestBufferIndex - newestBufferIndex + 1
+                }
+
+                long oldestTicks = bufferPtr[oldestBufferIndex].elapsedTicksAtChange;
+
+                // Fast path 2: Before oldest (rare but quick to check)
+                if (atElapsedTicks <= oldestTicks)
+                {
+                    baseIndex = oldestBufferIndex;
+                    return 1;
+                }
+
+                // For 8-20 values, binary search is optimal
+                // Using pointers for maximum performance
+                int left = newestBufferIndex;
+                int right = oldestBufferIndex;
+
+                // Binary search with pointer arithmetic
+                while (left < right)
+                {
+                    // Bit shift for fast division by 2
+                    int mid = left + ((right - left) >> 1);
+
+                    // Direct pointer access is faster than array indexing
+                    long midTicks = bufferPtr[mid].elapsedTicksAtChange;
+
+                    // Branchless version could be:
+                    // int goLeft = midTicks > atElapsedTicks ? 1 : 0;
+                    // left = goLeft * (mid + 1) + (1 - goLeft) * left;
+                    // right = goLeft * right + (1 - goLeft) * mid;
+                    // But simple branch is actually faster for binary search
+
+                    if (midTicks > atElapsedTicks)
+                    {
+                        left = mid + 1;
+                    }
+                    else
+                    {
+                        right = mid;
+                    }
+                }
+
+                baseIndex = left;
+
+                // Direct calculation
+                return oldestBufferIndex - left + 1;
+            }
+        }
 
         internal static bool TryGetBlendedValue(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueMonitoringSupport, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolatePastMostRecentChanges)
         {
@@ -1073,7 +1150,6 @@ namespace GONet.Utils
             const int MIN_VALUE_COUNT_FOR_NORMAL_OPERATION = 3; // Below this, we're likely at rest or starting motion
             const float DIRECTION_CHANGE_THRESHOLD = 90f; // Degrees - for detecting sharp turns
             const float VELOCITY_CHANGE_THRESHOLD = 0.5f; // Normalized velocity change threshold
-            const bool ShouldLog = false; // Make this a static field if needed
 
             // Always calculate smoothed value to maintain good state data
             var smoothedValue = GetSmoothedVector3(blendedValue.UnityEngine_Vector3, valueBuffer, valueCount);

@@ -2327,13 +2327,69 @@ namespace GONet
                 // Calculate new offset
                 long newOffset = elapsedTicksFromAuthority - currentElapsed;
 
-                // Atomic update of target - Unity 2022.3 compatible approach
+                // Get current offsets
                 long oldTargetOffset = Volatile.Read(ref alignedState.State.TargetOffsetTicks);
                 long oldAuthorityOffset = Volatile.Read(ref alignedState.State.AuthorityOffsetTicks);
 
-                // Try atomic update (may fail under contention, that's OK)
-                Interlocked.CompareExchange(ref alignedState.State.TargetOffsetTicks, newOffset, oldTargetOffset);
-                Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentHighResTicks);
+                // Calculate the size of the adjustment needed
+                long offsetDifference = Math.Abs(newOffset - oldAuthorityOffset);
+
+                /* // DEBUG logging to track what's happening
+                if (offsetDifference > TimeSpan.FromMilliseconds(1).Ticks)
+                {
+                    GONetLog.Debug($"[SetFromAuthority] Current: {(currentElapsed + oldAuthorityOffset) / 10000}ms, " +
+                                  $"Target: {elapsedTicksFromAuthority / 10000}ms, " +
+                                  $"Offset change: {offsetDifference / 10000}ms");
+                }
+                */
+
+                // CRITICAL FIX: Handle large vs small adjustments differently
+                if (offsetDifference > TimeSpan.FromSeconds(1).Ticks)
+                {
+                    // Large adjustment (> 1 second): Apply immediately
+                    // This handles initial connection and major time jumps
+                    GONetLog.Info($"[SetFromAuthority] Large time adjustment: {offsetDifference / 10_000}ms - applying immediately");
+
+                    // Set both authority and target to the new offset (skip interpolation)
+                    Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, newOffset);
+                    Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
+                    Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentHighResTicks);
+
+                    // Clear any cached values to force recalculation
+                    Interlocked.Exchange(ref alignedState.State.LastUpdateFrame, -1);
+                }
+                else if (offsetDifference > TimeSpan.FromMilliseconds(10).Ticks)
+                {
+                    // Medium adjustment (10ms - 1s): Use fast interpolation
+                    // This handles normal drift corrections
+                    //GONetLog.Debug($"[SetFromAuthority] Medium adjustment: {offsetDifference / 10000}ms - fast interpolation");
+
+                    // Set target for interpolation over shorter duration (100ms instead of 1s)
+                    Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
+                    Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentHighResTicks);
+
+                    // Optionally reduce ADJUSTMENT_DURATION_TICKS for this case
+                    // Or apply a portion immediately
+                    long immediateAdjustment = (newOffset - oldAuthorityOffset) / 2; // Apply 50% immediately
+                    long partialOffset = oldAuthorityOffset + immediateAdjustment;
+                    Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, partialOffset);
+                }
+                else if (offsetDifference > TimeSpan.FromMilliseconds(1).Ticks)
+                {
+                    // Small adjustment (1-10ms): Use smooth interpolation
+                    // This handles minor network jitter
+                    //GONetLog.Debug($"[SetFromAuthority] Small adjustment: {offsetDifference / 10000}ms - smooth interpolation");
+
+                    // Normal interpolation over 1 second
+                    Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
+                    Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentHighResTicks);
+                }
+                else
+                {
+                    // Tiny adjustment (< 1ms): Ignore to avoid jitter
+                    // Don't update anything
+                    return;
+                }
 
                 // Fire event if needed (do this last to minimize critical section)
                 if (TimeSetFromAuthority != null)
@@ -2343,6 +2399,9 @@ namespace GONet
                     double newSeconds = elapsedTicksFromAuthority * TICKS_TO_SECONDS;
                     TimeSetFromAuthority(oldSeconds, newSeconds, oldTicks, elapsedTicksFromAuthority);
                 }
+
+                // Force immediate recalculation of cached values
+                Update();
             }
 
             // TODO whenever unity version supports it: [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -2419,25 +2478,42 @@ namespace GONet
         }
 
         /// <summary>
-        /// Lock-free high-performance time sync processor
+        /// High-performance, lock-free NTP-style time synchronization
         /// </summary>
         public static class HighPerfTimeSync
         {
-            private static long lastAdjustmentTicks = 0;
-            private static int adjustmentCount = 0;
-
-            [StructLayout(LayoutKind.Sequential)]
-            private struct RttSample
+            // Cache-line aligned for preventing false sharing
+            [StructLayout(LayoutKind.Explicit, Size = 64)]
+            private struct AlignedSyncState
             {
-                public float Value;
-                public long Timestamp;
+                [FieldOffset(0)] public long lastProcessedServerTime;
+                [FieldOffset(8)] public long lastAdjustmentTicks;
+                [FieldOffset(16)] public int sampleWriteIndex;
+                [FieldOffset(20)] public int adjustmentCount;
             }
 
-            private static readonly RttSample[] rttBuffer = new RttSample[32];
-            private static int rttWriteIndex = 0;
-            private static long lastProcessedResponseTicks = 0;
+            private static AlignedSyncState syncState;
 
-            private const int RTT_BUFFER_MASK = 31;
+            // Circular buffer for offset samples - power of 2 for fast modulo
+            private const int SAMPLE_BUFFER_SIZE = 16;
+            private const int SAMPLE_BUFFER_MASK = SAMPLE_BUFFER_SIZE - 1;
+
+            [StructLayout(LayoutKind.Sequential)]
+            private struct OffsetSample
+            {
+                public long offset;
+                public long rtt;
+                public long timestamp;
+                public double weight;
+            }
+
+            private static readonly OffsetSample[] samples = new OffsetSample[SAMPLE_BUFFER_SIZE];
+
+            // Constants
+            private const long MAX_REASONABLE_RTT = TimeSpan.TicksPerSecond * 10;
+            private const long LOCALHOST_RTT_THRESHOLD = TimeSpan.TicksPerMillisecond * 2;
+            private const long LAN_RTT_THRESHOLD = TimeSpan.TicksPerMillisecond * 10;
+            private const double TICKS_TO_MS = 1.0 / TimeSpan.TicksPerMillisecond;
 
             public static void ProcessTimeSync(
                 long requestUID,
@@ -2446,137 +2522,102 @@ namespace GONet
                 SecretaryOfTemporalAffairs timeAuthority,
                 bool forceAdjustment = false)
             {
-                // Add validation
-                if (requestMessage == null || timeAuthority == null)
-                {
+                // Validate inputs
+                if (requestMessage == null || timeAuthority == null || serverElapsedTicksAtResponse <= 0)
                     return;
-                }
 
-                long now = HighResolutionTimeUtils.UtcNow.Ticks;
-                double timeSinceLastAdjustment = (now - lastAdjustmentTicks) / (double)TimeSpan.TicksPerSecond;
+                // NTP-style time points
+                long t0 = requestMessage.OccurredAtElapsedTicks;  // Client send time
+                long t1 = serverElapsedTicksAtResponse;           // Server process time
+                long t2 = timeAuthority.ElapsedTicks;             // Client receive time
 
-                // The comparison should only happen for significantly older responses
-                long lastProcessed = Volatile.Read(ref lastProcessedResponseTicks);
+                // Calculate RTT and validate
+                long rtt = t2 - t0;
 
-                // Validate server time is reasonable (not negative or too old)
-                if (serverElapsedTicksAtResponse <= 0)
-                {
-                    return;
-                }
+                // Calculate offset
+                long clientMidpoint = (t0 + t2) >> 1;
+                long measuredOffset = t1 - clientMidpoint;
 
-                // Only skip if we're processing a significantly older response AND not forcing
-                if (!forceAdjustment && lastProcessed > 0)
-                {
-                    long timeDiff = lastProcessed - serverElapsedTicksAtResponse;
-                    if (timeDiff > TimeSpan.FromSeconds(1).Ticks) // Only skip if more than 1 second older
-                    {
-                        return;
-                    }
-                }
+                // ADD COMPREHENSIVE DEBUG LOGGING
+                double offsetMs = measuredOffset / (double)TimeSpan.TicksPerMillisecond;
+                double rttMs = rtt / (double)TimeSpan.TicksPerMillisecond;
 
-                // Update last processed only if this response is newer
-                if (serverElapsedTicksAtResponse > lastProcessed)
-                {
-                    Interlocked.CompareExchange(ref lastProcessedResponseTicks, serverElapsedTicksAtResponse, lastProcessed);
-                }
+                //GONetLog.Debug($"[TimeSync] t0={t0 / 10000}ms, t1={t1 / 10000}ms, t2={t2 / 10000}ms");
+                //GONetLog.Debug($"[TimeSync] RTT={rttMs:F2}ms, Offset={offsetMs:F2}ms (server-client)");
+                //GONetLog.Debug($"[TimeSync] Client time: {t2 / 10000}ms, Should be: {(t2 + measuredOffset) / 10000}ms");
 
-                long responseReceivedTicks = timeAuthority.ElapsedTicks;
-                long requestSentTicks = requestMessage.OccurredAtElapsedTicks;
-                long rttTicks = responseReceivedTicks - requestSentTicks;
+                // CRITICAL FIX: Always apply the adjustment, not just conditionally
+                long targetTime = t2 + measuredOffset;
 
-                // Better RTT validation
-                if (rttTicks < 0)
-                {
-                    return;
-                }
+                // Log what we're about to do
+                //GONetLog.Debug($"[TimeSync] Calling SetFromAuthority with targetTime={targetTime / 10000}ms");
 
-                if (rttTicks > TimeSpan.FromSeconds(10).Ticks)
-                {
-                    return;
-                }
-
-                float rttSeconds = (float)(rttTicks * (1.0 / TimeSpan.TicksPerSecond));
-
-                // Update RTT buffer
-                int writeIdx = Interlocked.Increment(ref rttWriteIndex) & RTT_BUFFER_MASK;
-                rttBuffer[writeIdx] = new RttSample { Value = rttSeconds, Timestamp = responseReceivedTicks };
-
-                float medianRtt = GetFastMedianRtt();
-                long oneWayDelayTicks = (long)(medianRtt * TimeSpan.TicksPerSecond * 0.5);
-
-                // Calculate the actual difference using the client's adjusted time
-                long adjustedServerTimeTicks = serverElapsedTicksAtResponse + oneWayDelayTicks;
-                long adjustedClientTimeTicks = timeAuthority.ElapsedTicks;
-                double serverTimeNowSeconds = adjustedServerTimeTicks / (double)TimeSpan.TicksPerSecond;
-                double clientTimeNowSeconds = adjustedClientTimeTicks / (double)TimeSpan.TicksPerSecond;
-                double currentDifferenceSeconds = serverTimeNowSeconds - clientTimeNowSeconds;
-
-                double absDiffSeconds = Math.Abs(currentDifferenceSeconds);
-
-                // Dynamic threshold based on network conditions
-                double threshold = 0.005; // 5ms base threshold
-                if (medianRtt > 0.1f) // If RTT > 100ms, increase threshold
-                {
-                    threshold = Math.Min(0.05, medianRtt * 0.1); // Up to 50ms for poor networks
-                }
-
-                if (!forceAdjustment && absDiffSeconds <= threshold)
-                {
-                    return;
-                }
-
-                // Limit maximum adjustment to prevent huge jumps
-                const double MAX_ADJUSTMENT = 30.0; // 30 seconds max adjustment
-                if (absDiffSeconds > MAX_ADJUSTMENT && !forceAdjustment)
-                {
-                    currentDifferenceSeconds = Math.Sign(currentDifferenceSeconds) * MAX_ADJUSTMENT;
-                }
-
-                long currentDifference = (long)(currentDifferenceSeconds * TimeSpan.TicksPerSecond);
-                long targetTime = adjustedClientTimeTicks + currentDifference;
-                Interlocked.Increment(ref adjustmentCount);
-
-                /*
-#if DEBUG || ENABLE_TIME_SYNC_LOGGING
-                UnityEngine.Debug.Log($"[TimeSync] Sync (Adjustment #{adjustmentCount}):\n" +
-                                     $"  Median RTT: {medianRtt:F3}s\n" +
-                                     $"  Server time now: {serverTimeNowSeconds:F3}s\n" +
-                                     $"  Client time now: {clientTimeNowSeconds:F3}s\n" +
-                                     $"  Current difference: {currentDifferenceSeconds:F3}s\n" +
-                                     $"  Target time: {targetTime / (double)TimeSpan.TicksPerSecond:F3}s");
-#endif
-                */
-
+                // ALWAYS call SetFromAuthority - let it handle smoothing internally
                 timeAuthority.SetFromAuthority(targetTime);
-                Interlocked.Exchange(ref lastAdjustmentTicks, now);
+
+                // Verify it was applied
+                long newTime = timeAuthority.ElapsedTicks;
+                //GONetLog.Debug($"[TimeSync] After SetFromAuthority: time is now {newTime / 10000}ms");
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static float GetFastMedianRtt()
+            private static void StoreSample(long offset, long rtt, long timestamp)
             {
-                float[] sortedRtt = new float[32];
-                int count = 0;
-                long cutoff = HighResolutionTimeUtils.UtcNow.Ticks - TimeSpan.FromSeconds(10).Ticks;
+                int index = Interlocked.Increment(ref syncState.sampleWriteIndex) & SAMPLE_BUFFER_MASK;
 
-                for (int i = 0; i < 32; i++)
+                // Pre-calculate weight for performance
+                double rttMs = rtt * TICKS_TO_MS;
+                double weight = 100.0 / (rttMs + 1.0); // Lower RTT = higher weight
+
+                samples[index] = new OffsetSample
                 {
-                    if (rttBuffer[i].Timestamp > cutoff)
-                    {
-                        sortedRtt[count++] = rttBuffer[i].Value;
-                    }
+                    offset = offset,
+                    rtt = rtt,
+                    timestamp = timestamp,
+                    weight = weight
+                };
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static long CalculateWeightedOffset(bool isLowLatency)
+            {
+                double totalWeight = 0;
+                double weightedSum = 0;
+                long currentTime = HighResolutionTimeUtils.UtcNow.Ticks;
+                long maxAge = TimeSpan.TicksPerSecond * (isLowLatency ? 10 : 30);
+
+                // Use only recent samples
+                int samplesToUse = isLowLatency ? 4 : 8;
+                int startIndex = (syncState.sampleWriteIndex - samplesToUse) & SAMPLE_BUFFER_MASK;
+
+                for (int i = 0; i < samplesToUse; i++)
+                {
+                    int index = (startIndex + i) & SAMPLE_BUFFER_MASK;
+                    ref readonly var sample = ref samples[index];
+
+                    if (sample.timestamp == 0) continue;
+
+                    long age = currentTime - sample.timestamp;
+                    if (age > maxAge) continue;
+
+                    // Age decay: recent samples weighted more
+                    double ageMultiplier = 1.0 - (age / (double)maxAge) * 0.5;
+                    double finalWeight = sample.weight * ageMultiplier;
+
+                    weightedSum += sample.offset * finalWeight;
+                    totalWeight += finalWeight;
                 }
 
-                if (count == 0) return 0.05f;
-                Array.Sort(sortedRtt, 0, count);
-                float median = count % 2 == 0 ? (sortedRtt[count / 2 - 1] + sortedRtt[count / 2]) / 2 : sortedRtt[count / 2];
-                
-                /*
-#if DEBUG || ENABLE_TIME_SYNC_LOGGING
-                UnityEngine.Debug.Log($"[TimeSync] RTT Samples: {string.Join(", ", sortedRtt.Take(count).Select(v => v.ToString("F3")))}, Median: {median:F3}s");
-#endif
-                */
+                return totalWeight > 0 ? (long)(weightedSum / totalWeight) : 0;
+            }
 
-                return median;
+            // Diagnostic method for debugging
+            public static string GetSyncStats()
+            {
+                var latest = samples[(syncState.sampleWriteIndex - 1) & SAMPLE_BUFFER_MASK];
+                return $"Adjustments: {syncState.adjustmentCount}, " +
+                       $"Latest Offset: {latest.offset * TICKS_TO_MS:F2}ms, " +
+                       $"Latest RTT: {latest.rtt * TICKS_TO_MS:F2}ms";
             }
         }
 
@@ -3039,6 +3080,7 @@ namespace GONet
             internal const int MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED = 100;
             internal static readonly ArrayPool<NumericValueChangeSnapshot> mostRecentChangesPool = new ArrayPool<NumericValueChangeSnapshot>(1000, 50, MOST_RECENT_CHANGEs_SIZE_MINIMUM, MOST_RECENT_CHANGEs_SIZE_MAX_EXPECTED);
             internal static readonly long AUTO_STOP_PROCESSING_BLENDING_IF_INACTIVE_FOR_TICKS = TimeSpan.FromSeconds(1).Ticks;
+            internal static readonly long AT_REST_CLEAR_THRESHOLD_TICKS = TimeSpan.FromSeconds(1).Ticks;
 
             /// <summary>
             /// This will be null when <see cref="syncAttribute_ShouldBlendBetweenValuesReceived"/> is false AND/OR if the value type is NOT numeric (although, the latter will be identified early on in either generation or runtime and cause an exception to essentially disallow that!).
@@ -3057,6 +3099,7 @@ namespace GONet
             internal bool hasAwaitingAtRest;
             internal long hasAwaitingAtRest_assumedInitialRestElapsedTicks;
             internal long hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks;
+            internal long hasAwaitingAtRest_lastProcessedAtRestTicks;
             internal GONetSyncableValue hasAwaitingAtRest_value;
 
             /// <summary>
@@ -3071,14 +3114,43 @@ namespace GONet
             /// </summary>
             internal void AddToMostRecentChangeQueue_IfAppropriate(long elapsedTicksAtChange, GONetSyncableValue value)
             {
-                //GONetLog.Debug($"lets see if we add...cap: {mostRecentChanges_capacitySize}");
+                // Check if this is arriving after an at-rest was set but not yet applied
+                if (hasAwaitingAtRest && elapsedTicksAtChange < hasAwaitingAtRest_assumedInitialRestElapsedTicks)
+                {
+                    GONetLog.Debug($"[LATE-ARRIVAL-REJECTED-AWAITING] index:{index} " +
+                        $"valueTime:{TimeSpan.FromTicks(elapsedTicksAtChange).TotalSeconds}s " +
+                        $"value:{value} " +
+                        $"atRestTime:{TimeSpan.FromTicks(hasAwaitingAtRest_assumedInitialRestElapsedTicks).TotalSeconds}s");
+                    return; // Reject updates from before the pending at-rest time
+                }
+
+                // Check if this is arriving after an at-rest was already applied
+                if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 && elapsedTicksAtChange < hasAwaitingAtRest_lastProcessedAtRestTicks)
+                {
+                    GONetLog.Debug($"[LATE-ARRIVAL-REJECTED-PROCESSED] index:{index} " +
+                        $"valueTime:{TimeSpan.FromTicks(elapsedTicksAtChange).TotalSeconds}s " +
+                        $"value:{value} " +
+                        $"lastAtRestTime:{TimeSpan.FromTicks(hasAwaitingAtRest_lastProcessedAtRestTicks).TotalSeconds}s");
+                    return; // Reject updates from before the last processed at-rest time
+                }
+
+                // Log what's being added (only if logging is enabled)
+                if (syncAttribute_ShouldBlendBetweenValuesReceived && ValueBlendUtils.ShouldLog)
+                {
+                    GONetLog.Debug($"[BUFFER-ADD] index:{index} " +
+                        $"time:{TimeSpan.FromTicks(elapsedTicksAtChange).TotalSeconds}s " +
+                        $"value:{value} " +
+                        $"bufferSize:{mostRecentChanges_usedSize} " +
+                        $"hasAwaitingAtRest:{hasAwaitingAtRest}");
+                }
+
+                // Check for duplicate timestamps
                 for (int i = 0; i < mostRecentChanges_usedSize; ++i)
                 {
                     var item = mostRecentChanges[i];
                     if (item.elapsedTicksAtChange == elapsedTicksAtChange)
                     {
-                        //GONetLog.Debug($"lets see if we add...nope");
-                        return; // avoid adding in new items with same timestamp as an existing item as it will mess up value blending, NOTE: This probably only happens just after an 'at rest'
+                        return; // avoid adding items with same timestamp as it will mess up value blending
                     }
 
                     if (item.elapsedTicksAtChange < elapsedTicksAtChange)
@@ -3102,9 +3174,17 @@ namespace GONet
                         if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
                         {
                             ++mostRecentChanges_usedSize;
-                            //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
                         }
-                        //LogBufferContentsIfAppropriate();
+
+                        // Consider clearing lastProcessedAtRestTicks if we're clearly moving again
+                        // Using pre-calculated constant instead of TimeSpan.FromSeconds(1).Ticks
+                        if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 &&
+                            (elapsedTicksAtChange - hasAwaitingAtRest_lastProcessedAtRestTicks) > AT_REST_CLEAR_THRESHOLD_TICKS)
+                        {
+                            GONetLog.Debug($"[AT-REST-CLEARED] index:{index} - object moving again, clearing at-rest protection");
+                            hasAwaitingAtRest_lastProcessedAtRestTicks = 0;
+                        }
+
                         return;
                     }
                 }
@@ -3113,10 +3193,15 @@ namespace GONet
                 {
                     mostRecentChanges[mostRecentChanges_usedSize] = NumericValueChangeSnapshot.Create(elapsedTicksAtChange, value);
                     ++mostRecentChanges_usedSize;
-                    //GONetLog.Debug("added new recent change...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index);
-                }
 
-                //LogBufferContentsIfAppropriate();
+                    // Consider clearing lastProcessedAtRestTicks here too
+                    if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 &&
+                        (elapsedTicksAtChange - hasAwaitingAtRest_lastProcessedAtRestTicks) > AT_REST_CLEAR_THRESHOLD_TICKS)
+                    {
+                        GONetLog.Debug($"[AT-REST-CLEARED] index:{index} - object moving again, clearing at-rest protection");
+                        hasAwaitingAtRest_lastProcessedAtRestTicks = 0;
+                    }
+                }
             }
 
             private void AdjustValueOnExpectedUpcomingNewBaseline_IfAppropriate(ref GONetSyncableValue valueNew, GONetSyncableValue valuePrevious)
@@ -3207,6 +3292,7 @@ namespace GONet
                     useBufferLeadTicks = 0;
                 }
 
+                GONetSyncableValue currentValue = syncCompanion.GetAutoMagicalSyncValue(index);
                 GONetSyncableValue blendedValue;
                 if (ValueBlendUtils.TryGetBlendedValue(this, Time.ElapsedTicks - useBufferLeadTicks, out blendedValue, out bool didExtrapolatePastMostRecentChanges))
                 {
@@ -3214,7 +3300,15 @@ namespace GONet
                     // processing since it is likely that the extrapolation occurred due to lack of information coming from owner since it is at rest.
                     if (!hasAwaitingAtRest || !didExtrapolatePastMostRecentChanges)
                     {
-                        //UnityEngine.Debug.Log($"[DREETS] set index: {index}");
+                        /*
+                        GONetLog.Debug($"[BLEND-APPLY] index:{index} " +
+                            $"currentValue:{currentValue} " +
+                            $"blendedValue:{blendedValue} " +
+                            $"didExtrapolate:{didExtrapolatePastMostRecentChanges} " +
+                            $"hasAwaitingAtRest:{hasAwaitingAtRest} " +
+                            $"bufferSize:{mostRecentChanges_usedSize}");
+                        */
+
                         syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
 
                         //if (hasAwaitingAtRest)
@@ -4847,12 +4941,29 @@ namespace GONet
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_assumedInitialRestElapsedTicks = assumedInitialRestElapsedTicks;
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks = Time.ElapsedTicks - valueBlendingBufferLeadTicks;
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_value = value;
+
+                                /*{
+                                    GONetLog.Debug($"[AT-REST-RECEIVED] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                        $"atRestValue:{value} currentValue:{syncCompanion.GetAutoMagicalSyncValue(index)} " +
+                                        $"bufferSize:{syncCompanion.valuesChangesSupport[index].mostRecentChanges_usedSize} " +
+                                        $"willApplyAt:{TimeSpan.FromTicks(assumedInitialRestElapsedTicks + valueBlendingBufferLeadTicks).TotalSeconds}s");
+
+                                    // Log the buffer contents before clearing
+                                    var changes = syncCompanion.valuesChangesSupport[index];
+                                    for (int j = 0; j < changes.mostRecentChanges_usedSize; j++)
+                                    {
+                                        GONetLog.Debug($"  Buffer[{j}]: time:{TimeSpan.FromTicks(changes.mostRecentChanges[j].elapsedTicksAtChange).TotalSeconds}s " +
+                                            $"value:{changes.mostRecentChanges[j].numericValue}");
+                                    }
+                                }*/
+
                                 long assumedOneWayAtRestDelayTicks = Time.ElapsedTicks - assumedInitialRestElapsedTicks;
                                 long easingDurationTicks = assumedOneWayAtRestDelayTicks - valueBlendingBufferLeadTicks;
 
                                 // NOTE: This will run immediately if one-way network time exceeds valueBlendingBufferLeadTicks (i.e. non-owner will always be extrapolating!)
                                 Global.StartCoroutine(DoAtOrAfterElapsedTicks(() => 
                                 {
+                                    /* BEFORE
                                     syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = false;
                                     // Clearing the recent changes buffer effectively ensures that the new value at rest value is the one applied and no
                                     // blending will occur since this is the only value in the blending buffer....neat trick to not need additional code
@@ -4863,7 +4974,26 @@ namespace GONet
                                     syncCompanion.InitSingle(value, index, assumedInitialRestElapsedTicks);
                                     
                                     //syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_easeUntilElapsedTicks = ;
+                                    */
 
+                                    // AFTER:
+                                    var mostRecentQueuedValue = syncCompanion.valuesChangesSupport[index].mostRecentChanges_usedSize > 0
+                                        ? syncCompanion.valuesChangesSupport[index].mostRecentChanges[0]
+                                        : default;
+
+                                    /*
+                                     GONetLog.Debug($"[AT-REST-APPLYING] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                        $"clearingBuffer:{syncCompanion.valuesChangesSupport[index].mostRecentChanges_usedSize} items " +
+                                        $"lastBufferedValue:{mostRecentQueuedValue.numericValue} " +
+                                        $"currentValue:{syncCompanion.GetAutoMagicalSyncValue(index)} " +
+                                        $"newAtRestValue:{value}");
+                                    */
+
+                                    syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = false;
+                                    syncCompanion.valuesChangesSupport[index].ClearMostRecentChanges();
+                                    syncCompanion.InitSingle(value, index, assumedInitialRestElapsedTicks);
+
+                                    //GONetLog.Debug($"[AT-REST-APPLIED] GNP:{gonetParticipant.GONetId} index:{index} finalValue:{syncCompanion.GetAutoMagicalSyncValue(index)}");
                                 }, assumedInitialRestElapsedTicks + valueBlendingBufferLeadTicks));
                             }
                             else
