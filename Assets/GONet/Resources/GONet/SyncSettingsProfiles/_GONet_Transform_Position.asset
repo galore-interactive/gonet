@@ -30,6 +30,5 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 12
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetValueBlending_Vector3_ExtrapolateWithLowPassSmoothingFilter,
-        Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Vector3_HermiteSpline, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

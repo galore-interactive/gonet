@@ -16,7 +16,7 @@ MonoBehaviour:
   SyncChangesFrequencyOccurrences: 24
   SyncChangesFrequencyUnitOfTime: 0
   SendViaReliability: 1
-  ShouldBlendBetweenValuesReceived: 0
+  ShouldBlendBetweenValuesReceived: 1
   QuantizeDownToBitCount: 0
   QuantizeLowerBound: -1.7014117e+38
   QuantizeUpperBound: 1.7014117e+38
@@ -33,7 +33,8 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 9
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Float, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Float_ExtrapolateWithLowPassSmoothingFilter,
+        Assembly-CSharp
   - ValueType: 12
     CustomValueBlendingType:
       _classRef: GONet.PluginAPI.GONetDefaultValueBlending_Vector3, Assembly-CSharp
