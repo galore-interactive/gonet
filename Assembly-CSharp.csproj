@@ -68,7 +68,6 @@
     <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONet.cs" />
     <Compile Include="Assets\Amazon\Scripts\Credentials.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_2.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Helper.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\DateTimeEx.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodePacket.cs" />
@@ -82,7 +81,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\SyncEvent_GeneratedTypes.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\TokenFactory.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileUtils.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\GONetParticipant_AutoMagicalSyncCompanion_Generated_1.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\QuaternionUtils.cs" />
