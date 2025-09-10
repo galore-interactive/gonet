@@ -536,10 +536,10 @@ namespace GONet
             const string FORMAT = "[{0}]{5}{6} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{7}/{3}s) {4}";
             const string CLIENT = "[Client]";
             const string SERVER = "[Server]";
-            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time.ElapsedSeconds, message,
+            return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time?.ElapsedSeconds, message,
                 GONetMain.IsServer ? SERVER : string.Empty,
                 GONetMain.IsClient ? CLIENT : string.Empty,
-                GONetMain.Time.FrameCount);
+                GONetMain.Time?.FrameCount);
         }
 
         private static void ProcessMessageViaLogger(string logString, string stackTrace, LogType type, LogLevel logLevel)
