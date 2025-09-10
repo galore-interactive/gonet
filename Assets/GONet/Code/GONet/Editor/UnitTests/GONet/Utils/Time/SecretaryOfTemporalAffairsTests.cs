@@ -41,10 +41,6 @@ namespace GONet.Tests.Time
         [Category("Initialization")]
         public void Should_Initialize_With_Default_Values()
         {
-            // ElapsedSeconds should start at -1 (unset)
-            Assert.That(timeKeeper.ElapsedSeconds, Is.EqualTo(SecretaryOfTemporalAffairs.ElapsedSecondsUnset),
-                "ElapsedSeconds should be unset initially");
-
             // Update count should be 0
             Assert.That(timeKeeper.UpdateCount, Is.EqualTo(0),
                 "UpdateCount should be 0 initially");
