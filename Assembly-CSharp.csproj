@@ -124,7 +124,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\HierarchyUtils.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\KeyUtils.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\DatagramQueue.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\BobWad_Generated.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetSpawnSupport_Runtime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\IGONetAutoMagicalSync_CustomValueBlending.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated.cs" />
