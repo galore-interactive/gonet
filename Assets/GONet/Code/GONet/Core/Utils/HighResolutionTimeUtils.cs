@@ -177,6 +177,28 @@ namespace GONet.Utils
 #endif
         }
 
+#if UNITY_EDITOR
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetOnPlayMode()
+        {
+            // Reset the initialization flag
+            isInitialized = false;
+
+            // Clear all cached state
+            timeState = new TimeState();
+            resyncState = new ResyncState();
+
+            // Reset thread-local storage
+            threadLocalLastCheck = 0;
+            threadLocalLastLocalTicks = 0;
+            threadLocalLastUtcTicks = 0;
+            threadLocalInitialized = false;
+
+            // Force re-initialization on next access
+            InitializeCore();
+        }
+#endif
+
         private static void InitializeCore()
         {
             lock (initLock)

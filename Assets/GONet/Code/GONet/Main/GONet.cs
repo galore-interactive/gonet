@@ -2157,9 +2157,9 @@ namespace GONet
             {
                 [FieldOffset(0)] public TimeState State;
                 [FieldOffset(64)] public InterpolationState Interpolation;
-                [FieldOffset(96)] public long InitialStopwatchTicks;  // Store Stopwatch ticks, not DateTime ticks
-                [FieldOffset(104)] public int UpdateCount;
-                [FieldOffset(108)] public long InitialDateTimeTicks;  // Store the DateTime at initialization for reference
+                [FieldOffset(128)] public long InitialStopwatchTicks;  // Store Stopwatch ticks, not DateTime ticks
+                [FieldOffset(136)] public int UpdateCount;
+                [FieldOffset(140)] public long InitialDateTimeTicks;  // Store the DateTime at initialization for reference
             }
 
             private AlignedTimeState alignedState;
@@ -2174,6 +2174,29 @@ namespace GONet
             [ThreadStatic] private static double tlsCachedSeconds;
             [ThreadStatic] private static int tlsLastFrame;
             [ThreadStatic] private static bool tlsInitialized;
+
+
+            // Static fields for Unity Editor play mode handling
+            private static long editorPlayModeStartStopwatchTicks = 0;
+            private static bool isFirstInstanceThisPlaySession = true;
+
+#if UNITY_EDITOR
+            // This runs when entering play mode in Unity Editor
+            [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+            static void ResetStaticsOnPlayMode()
+            {
+                UnityEngine.Debug.Log("MAGOO 1");
+                // Reset static state when entering play mode
+                editorPlayModeStartStopwatchTicks = 0;
+                isFirstInstanceThisPlaySession = true;
+
+                // Clear thread-local storage
+                tlsCachedTicks = 0;
+                tlsCachedSeconds = 0;
+                tlsLastFrame = -1;
+                tlsInitialized = false;
+            }
+#endif
 
             public long ElapsedTicks
             {
@@ -2213,12 +2236,24 @@ namespace GONet
 
             public SecretaryOfTemporalAffairs()
             {
+                UnityEngine.Debug.Log("MAGOO 2");
                 // Initialize using high-resolution monotonic timer
-                long initialStopwatchTicks = Stopwatch.GetTimestamp();
+                // Check if this is the first instance created this play session
+                if (isFirstInstanceThisPlaySession)
+                {
+                    isFirstInstanceThisPlaySession = false;
+                    editorPlayModeStartStopwatchTicks = Stopwatch.GetTimestamp();
+                }
+
+                // Always use the play mode start time as our base (or current time if first instance)
+                long initialStopwatchTicks = editorPlayModeStartStopwatchTicks > 0 ?
+                                             editorPlayModeStartStopwatchTicks :
+                                             Stopwatch.GetTimestamp();
                 long initialDateTimeTicks = DateTime.UtcNow.Ticks;
 
                 // Store both for reference
                 alignedState.InitialStopwatchTicks = initialStopwatchTicks;
+                UnityEngine.Debug.Log($"MAGOO 3 - volly: {Volatile.Read(ref alignedState.InitialStopwatchTicks)}, initialStopwatchTicks: {initialStopwatchTicks}");
                 alignedState.InitialDateTimeTicks = initialDateTimeTicks;
 
                 // Initialize all state to valid starting values
@@ -2336,6 +2371,7 @@ namespace GONet
 
                 // Calculate elapsed stopwatch ticks
                 long elapsedStopwatchTicks = currentStopwatchTicks - initialStopwatchTicks;
+                UnityEngine.Debug.Log($"MAGOO 4 - volly: {Volatile.Read(ref alignedState.InitialStopwatchTicks)}, initialStopwatchTicks: {initialStopwatchTicks}, currentStopwatchTicks: {currentStopwatchTicks}");
 
                 // Guard against wrap-around (shouldn't happen but be safe)
                 if (elapsedStopwatchTicks < 0)
