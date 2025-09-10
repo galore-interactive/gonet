@@ -273,36 +273,30 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category("Authority")]
-        public void Should_Interpolate_To_Authority_Time()
+        public void Should_Handle_Authority_Time_Based_On_Offset_Size()
         {
             timeKeeper.Update(); // Initialize
             Thread.Sleep(10);
-            timeKeeper.Update(); // Get some initial elapsed time
-
+            timeKeeper.Update();
             double initialTime = timeKeeper.ElapsedSeconds;
 
-            // Set authority time significantly ahead
-            long authorityTicks = TimeSpan.FromSeconds(initialTime + 10).Ticks;
-            timeKeeper.SetFromAuthority(authorityTicks);
+            // Test 1: Large offset (>1s) should apply immediately
+            long largeAuthorityTicks = TimeSpan.FromSeconds(initialTime + 10).Ticks;
+            timeKeeper.SetFromAuthority(largeAuthorityTicks);
 
-            // Immediately after setting, time shouldn't jump
             double immediateTime = timeKeeper.ElapsedSeconds;
-            Assert.That(Math.Abs(immediateTime - initialTime), Is.LessThan(1.0),
-                "Time should not immediately jump to authority time");
+            Assert.That(Math.Abs(immediateTime - (initialTime + 10)), Is.LessThan(0.1),
+                "Large adjustments (>1s) should apply immediately");
 
-            // After interpolation duration (1 second), time should reach authority time
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed.TotalSeconds < 1.2) // A bit more than 1 second
-            {
-                timeKeeper.Update();
-                Thread.Sleep(10);
-            }
+            // Test 2: Small offset (<50ms) should interpolate
+            timeKeeper.Update();
+            double currentTime = timeKeeper.ElapsedSeconds;
+            long smallAuthorityTicks = TimeSpan.FromSeconds(currentTime + 0.03).Ticks; // 30ms ahead
+            timeKeeper.SetFromAuthority(smallAuthorityTicks);
 
-            double finalTime = timeKeeper.ElapsedSeconds;
-            double expectedTime = initialTime + 10 + stopwatch.Elapsed.TotalSeconds;
-
-            Assert.That(finalTime, Is.EqualTo(expectedTime).Within(0.1),
-                "Time should interpolate to authority time over 1 second");
+            double afterSmallAdjust = timeKeeper.ElapsedSeconds;
+            Assert.That(Math.Abs(afterSmallAdjust - currentTime), Is.LessThan(0.02),
+                "Small adjustments should interpolate smoothly");
         }
 
         #endregion

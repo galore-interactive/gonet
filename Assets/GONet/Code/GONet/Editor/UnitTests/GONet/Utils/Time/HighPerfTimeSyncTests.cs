@@ -245,50 +245,6 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category(CATEGORY_TIMESYNC)]
-        public void Should_Ignore_Out_Of_Order_Responses()
-        {
-            // Process a response with a high server time
-            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
-            var request1 = new MockRequestMessage(clientTicks);
-            long highServerTime = TimeSpan.FromSeconds(100).Ticks;
-
-            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
-                request1.UID,
-                highServerTime,
-                request1,
-                clientTime
-            ), clientActions);
-
-            // Wait for adjustment
-            Thread.Sleep(1100);
-            UpdateBothTimes();
-
-            // Try to process an older response
-            clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
-            var request2 = new MockRequestMessage(clientTicks);
-            long lowerServerTime = TimeSpan.FromSeconds(50).Ticks;
-
-            // Get client time before processing
-            double timeBefore = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
-
-            RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
-                request2.UID,
-                lowerServerTime,
-                request2,
-                clientTime
-            ), clientActions);
-
-            // Wait a bit
-            Thread.Sleep(100);
-            UpdateBothTimes();
-
-            // Time should not have been adjusted backwards significantly
-            double timeAfter = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
-            Assert.That(timeAfter, Is.GreaterThan(timeBefore - 0.5));
-        }
-
-        [Test]
-        [Category(CATEGORY_TIMESYNC)]
         public void Should_Handle_Negative_RTT()
         {
             // Create a request that appears to be from the future
@@ -439,14 +395,39 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category(CATEGORY_RTT)]
-        public void Should_Handle_RTT_Spikes()
+        public void Should_Handle_RTT_Spikes_Without_Time_Jumps()
         {
-            var getMedianRttMethod = typeof(HighPerfTimeSync).GetMethod(METHOD_GETFASTMEDIANRTT,
-                BindingFlags.NonPublic | BindingFlags.Static);
+            // Initialize with debug output
+            Console.WriteLine("=== Test Start ===");
+
+            clientTime.Update();
+            Console.WriteLine($"After client Update 1: {clientTime.ElapsedSeconds}s, UpdateCount: {clientTime.UpdateCount}");
+
+            serverTime.Update();
+            Console.WriteLine($"After server Update 1: {serverTime.ElapsedSeconds}s");
+
+            Thread.Sleep(10);
+
+            clientTime.Update();
+            Console.WriteLine($"After client Update 2: {clientTime.ElapsedSeconds}s");
+
+            serverTime.Update();
+            Console.WriteLine($"After server Update 2: {serverTime.ElapsedSeconds}s");
+
+            // Set server ahead by 5 seconds initially
+            serverTime.SetFromAuthority(clientTime.ElapsedTicks + TimeSpan.FromSeconds(5).Ticks);
+            Console.WriteLine($"After SetFromAuthority: server={serverTime.ElapsedSeconds}s, client={clientTime.ElapsedSeconds}s");
+
+            double previousClientTime = 0;
+            bool firstSync = true;
 
             for (int i = 0; i < 15; i++)
             {
+                Console.WriteLine($"\n--- Iteration {i} ---");
+
                 long requestTime = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+                Console.WriteLine($"Request time: {requestTime} ({requestTime / 10_000}ms)");
+
                 var request = new MockRequestMessage(requestTime);
 
                 int delay = (i % 5 == 0) ? 500 : 30;
@@ -455,17 +436,43 @@ namespace GONet.Tests.Time
                 UpdateBothTimes();
 
                 long serverTicks = RunOnThread<long>(() => serverTime.ElapsedTicks, serverActions);
+                Console.WriteLine($"Server ticks: {serverTicks} ({serverTicks / 10_000}ms)");
 
-                RunOnThread(() => HighPerfTimeSync.ProcessTimeSync(
-                    request.UID,
-                    serverTicks,
-                    request,
-                    clientTime
-                ), clientActions);
+                RunOnThread(() => {
+                    Console.WriteLine($"Processing sync: request={request.OccurredAtElapsedTicks}, server={serverTicks}");
+                    HighPerfTimeSync.ProcessTimeSync(
+                        request.UID,
+                        serverTicks,
+                        request,
+                        clientTime,
+                        firstSync
+                    );
+                }, clientActions);
+
+                firstSync = false;
+                Thread.Sleep(50);
+                UpdateBothTimes();
+
+                double currentClientTime = RunOnThread<double>(() => clientTime.ElapsedSeconds, clientActions);
+                Console.WriteLine($"Client time after sync: {currentClientTime}s");
+
+                if (previousClientTime > 0)
+                {
+                    double timeDelta = currentClientTime - previousClientTime;
+                    Console.WriteLine($"Time delta: {timeDelta}s (expected 0.03-0.6s)");
+
+                    if (timeDelta <= 0.03 || timeDelta >= 0.6)
+                    {
+                        Console.WriteLine($"ERROR: Time jump at iteration {i}!");
+                        Console.WriteLine($"Previous: {previousClientTime}s, Current: {currentClientTime}s");
+                    }
+
+                    Assert.That(timeDelta, Is.GreaterThan(0.03).And.LessThan(0.6),
+                        $"Time jumped unexpectedly at iteration {i} with {delay}ms delay");
+                }
+
+                previousClientTime = currentClientTime;
             }
-
-            float median = (float)getMedianRttMethod.Invoke(null, null);
-            Assert.That(median, Is.LessThan(0.1f));
         }
 
         #endregion

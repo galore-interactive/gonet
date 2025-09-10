@@ -436,31 +436,6 @@ namespace GONet.Tests.Time
 
         #region Bulk Operations Tests
 
-        [Test]
-        [Category("BulkOperations")]
-        public void GetBulkTimes_Should_Generate_Sequential_Ticks()
-        {
-            const int count = 1000;
-            Span<long> ticks = stackalloc long[count];
-
-            HighResolutionTimeUtils.GetBulkTimes(ticks, true);
-
-            // Verify all ticks are sequential
-            for (int i = 1; i < count; i++)
-            {
-                Assert.That(ticks[i], Is.EqualTo(ticks[i - 1] + 1),
-                    $"Ticks should be sequential at index {i}");
-            }
-
-            // Verify first tick is reasonable (close to current time)
-            var firstDateTime = new DateTime(ticks[0], DateTimeKind.Utc);
-            var now = DateTime.UtcNow;
-            var difference = Math.Abs((now - firstDateTime).TotalSeconds);
-
-            Assert.That(difference, Is.LessThan(1.0),
-                "First tick should represent a time close to now");
-        }
-
         #region Bug Investigation Tests
 
         [Test]
@@ -498,31 +473,6 @@ namespace GONet.Tests.Time
                 "Local time ticks should be greater than DateTime.MinValue");
         }
 
-        [Test]
-        [Category("BugInvestigation")]
-        public void Test_GetBulkTimes_LocalTime()
-        {
-            // Test if GetBulkTimes has the same issue with local time
-            var localTicks = new long[5];
-            var utcTicks = new long[5];
-
-            HighResolutionTimeUtils.GetBulkTimes(localTicks, false); // false = local time
-            HighResolutionTimeUtils.GetBulkTimes(utcTicks, true);   // true = UTC time
-
-            UnityEngine.Debug.Log("=== Bulk Times Test ===");
-            for (int i = 0; i < 5; i++)
-            {
-                var localDt = new DateTime(localTicks[i], DateTimeKind.Local);
-                var utcDt = new DateTime(utcTicks[i], DateTimeKind.Utc);
-                UnityEngine.Debug.Log($"[{i}] Local: {localDt:O}, UTC: {utcDt:O}");
-            }
-
-            // Check if local times are reasonable
-            var firstLocalDt = new DateTime(localTicks[0], DateTimeKind.Local);
-            Assert.That(firstLocalDt.Year, Is.GreaterThan(2000),
-                $"Bulk local time should be recent, not {firstLocalDt:O}");
-        }
-
         #endregion
 
         [Test]
@@ -539,17 +489,13 @@ namespace GONet.Tests.Time
 
             while (DateTime.UtcNow < endTime)
             {
-                switch (random.Next(4))
+                switch (random.Next(3))
                 {
                     case 0:
                         _ = HighResolutionTimeUtils.UtcNow;
                         break;
                     case 1:
                         _ = HighResolutionTimeUtils.Now;
-                        break;
-                    case 2:
-                        // Use heap-allocated buffer instead of stackalloc
-                        HighResolutionTimeUtils.GetBulkTimes(bulkBuffer, true);
                         break;
                     case 3:
                         Thread.Yield();

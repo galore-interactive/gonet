@@ -29,8 +29,8 @@ namespace GONet.Tests.Time
         [SetUp]
         public void Setup()
         {
-            clientTime = null;
-            serverTime = null;
+            clientTime = new();
+            serverTime = new();
             cts = new CancellationTokenSource();
             networkLatencyTicks = TimeSpan.FromMilliseconds(50).Ticks;
             jitterRandom = new System.Random(42);
@@ -44,7 +44,6 @@ namespace GONet.Tests.Time
             {
                 try
                 {
-                    clientTime = new SecretaryOfTemporalAffairs();
                     clientTime.Update();
                     UnityEngine.Debug.Log("Client thread initialized.");
 
@@ -79,7 +78,6 @@ namespace GONet.Tests.Time
             {
                 try
                 {
-                    serverTime = new SecretaryOfTemporalAffairs();
                     serverTime.Update();
                     UnityEngine.Debug.Log("Server thread initialized.");
 
