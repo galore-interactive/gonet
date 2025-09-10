@@ -2107,9 +2107,15 @@ namespace GONet
         #region time (sync) related classes
 
         /// <summary>
+        /// <para>
         /// This manages game (network) time as GONet things are concerned.
         /// Essentially, it keeps track of how much time has passed since start, and is set from the authority/server.
         /// Lengthy and nerdy way of naming this class "Time" just like <see cref="UnityEngine.Time"/> to avoid conflicts in a memorable way!
+        /// </para>
+        /// <para>
+        /// Ultra-high-performance game time manager with lock-free operations.
+        /// Manages network time synchronization with sub-millisecond precision.
+        /// </para>
         /// </summary>
         public sealed class SecretaryOfTemporalAffairs
         {
@@ -2127,46 +2133,47 @@ namespace GONet
                 public long LastUpdateFrame;           // Frame number of last update
                 public double CachedElapsedSeconds;    // Last calculated elapsed seconds
                 public float LastDeltaTime;            // Delta time from last update
+                public int IsInitialized;              // 1 if initialized, 0 otherwise
             }
 
-            // Separate structure for interpolation state - clearer separation of concerns
+            // Separate structure for interpolation state
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             private struct InterpolationState
             {
-                public long EffectiveOffsetTicks;      // Current interpolated offset (what we actually use)
+                public long EffectiveOffsetTicks;      // Current interpolated offset
                 public long LastCalculationTicks;      // When we last calculated interpolation
                 public int Version;                     // Version number for CAS operations
-               
-                // Pack time dilation fields together
-                public long DilationStartOffsetTicks;  // Starting offset when dilation began
-                public long DilationTargetOffsetTicks; // Target offset we're dilating towards
-                public long DilationStartTimeTicks;    // When dilation started
-                public long DilationDurationTicks;     // How long the dilation should take
+
+                // Time dilation fields
+                public long DilationStartOffsetTicks;
+                public long DilationTargetOffsetTicks;
+                public long DilationStartTimeTicks;
+                public long DilationDurationTicks;
             }
 
-            // Ensure 64-byte alignment to prevent false sharing
+            // 128-byte aligned structure to prevent false sharing
             [StructLayout(LayoutKind.Explicit, Size = 128)]
             private struct AlignedTimeState
             {
                 [FieldOffset(0)] public TimeState State;
                 [FieldOffset(64)] public InterpolationState Interpolation;
-                [FieldOffset(96)] public long InitialHighResTicks;
+                [FieldOffset(96)] public long InitialStopwatchTicks;  // Store Stopwatch ticks, not DateTime ticks
                 [FieldOffset(104)] public int UpdateCount;
+                [FieldOffset(108)] public long InitialDateTimeTicks;  // Store the DateTime at initialization for reference
             }
 
             private AlignedTimeState alignedState;
 
-            // Constants for performance
+            // Constants
             private const long ADJUSTMENT_DURATION_TICKS = TimeSpan.TicksPerSecond; // 1 second
             private const double TICKS_TO_SECONDS = 1.0 / TimeSpan.TicksPerSecond;
-            private const double ADJUSTMENT_DURATION_TICKS_RECIPROCAL = 1.0 / ADJUSTMENT_DURATION_TICKS;
-            public const double ElapsedSecondsUnset = -1;
-            public const long ElapsedTicksUnset = -1;
+            private const double SECONDS_TO_TICKS = TimeSpan.TicksPerSecond;
 
             // Thread-local cache for extreme performance
             [ThreadStatic] private static long tlsCachedTicks;
             [ThreadStatic] private static double tlsCachedSeconds;
             [ThreadStatic] private static int tlsLastFrame;
+            [ThreadStatic] private static bool tlsInitialized;
 
             public long ElapsedTicks
             {
@@ -2183,7 +2190,11 @@ namespace GONet
             public double ElapsedSeconds_ClientSimulation
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => ElapsedSeconds - valueBlendingBufferLeadSeconds;
+                get
+                {
+                    double elapsed = ElapsedSeconds;
+                    return elapsed >= 0 ? elapsed - valueBlendingBufferLeadSeconds : 0;
+                }
             }
 
             public float DeltaTime
@@ -2202,153 +2213,167 @@ namespace GONet
 
             public SecretaryOfTemporalAffairs()
             {
-                // Get initial time FIRST before anything else
-                long initialTicks = HighResolutionTimeUtils.UtcNow.Ticks;
+                // Initialize using high-resolution monotonic timer
+                long initialStopwatchTicks = Stopwatch.GetTimestamp();
+                long initialDateTimeTicks = DateTime.UtcNow.Ticks;
 
-                // CRITICAL: Set this immediately
-                alignedState.InitialHighResTicks = initialTicks;
+                // Store both for reference
+                alignedState.InitialStopwatchTicks = initialStopwatchTicks;
+                alignedState.InitialDateTimeTicks = initialDateTimeTicks;
 
-                // Initialize everything else to zero/default
-                alignedState.State.CachedElapsedSeconds = ElapsedSecondsUnset;
-                alignedState.State.CachedElapsedTicks = ElapsedTicksUnset;
+                // Initialize all state to valid starting values
                 alignedState.State.AuthorityOffsetTicks = 0;
                 alignedState.State.TargetOffsetTicks = 0;
-                alignedState.State.AdjustmentStartTicks = initialTicks;  // Use same initial value
+                alignedState.State.AdjustmentStartTicks = 0; // Will be set in ticks when adjustment starts
+                alignedState.State.CachedElapsedTicks = 0;
+                alignedState.State.CachedElapsedSeconds = 0.0;
                 alignedState.State.LastUpdateFrame = -1;
                 alignedState.State.LastDeltaTime = 0f;
+                alignedState.State.IsInitialized = 1;
 
                 alignedState.Interpolation.EffectiveOffsetTicks = 0;
-                alignedState.Interpolation.LastCalculationTicks = initialTicks;  // Use initial time
+                alignedState.Interpolation.LastCalculationTicks = 0;
                 alignedState.Interpolation.Version = 0;
                 alignedState.Interpolation.DilationStartOffsetTicks = 0;
                 alignedState.Interpolation.DilationTargetOffsetTicks = 0;
-                alignedState.Interpolation.DilationStartTimeTicks = initialTicks;  // Use initial time
+                alignedState.Interpolation.DilationStartTimeTicks = 0;
                 alignedState.Interpolation.DilationDurationTicks = 0;
 
                 alignedState.UpdateCount = 0;
+
+                // Ensure all writes are visible
+                Thread.MemoryBarrier();
             }
 
             public SecretaryOfTemporalAffairs(SecretaryOfTemporalAffairs initFromAuthority) : this()
             {
-                SetFromAuthority(initFromAuthority.ElapsedTicks);
+                if (initFromAuthority != null && initFromAuthority.alignedState.State.IsInitialized == 1)
+                {
+                    SetFromAuthority(initFromAuthority.ElapsedTicks);
+                }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private long GetElapsedTicksFast()
             {
-                // Check if we've never been updated
-                if (alignedState.UpdateCount == 0 || 
-                    alignedState.State.CachedElapsedSeconds == ElapsedSecondsUnset ||
-                    alignedState.State.CachedElapsedTicks == ElapsedTicksUnset)
+                // Check initialization with single volatile read
+                if (Volatile.Read(ref alignedState.State.IsInitialized) == 0)
+                    return 0;
+
+                // Initialize thread-local cache if needed
+                if (!tlsInitialized)
                 {
-                    return ElapsedTicksUnset;
+                    tlsLastFrame = -1;
+                    tlsCachedTicks = 0;
+                    tlsCachedSeconds = 0.0;
+                    tlsInitialized = true;
                 }
 
                 // Ultra-fast path: thread-local cache
                 int currentFrame = Volatile.Read(ref alignedState.UpdateCount);
-                if (tlsLastFrame == currentFrame)
+                if (tlsLastFrame == currentFrame && tlsCachedTicks >= 0)
                     return tlsCachedTicks;
 
                 // Fast path: frame cache hit
                 long lastUpdateFrame = Volatile.Read(ref alignedState.State.LastUpdateFrame);
-                if (lastUpdateFrame == currentFrame)
+                if (lastUpdateFrame == currentFrame && lastUpdateFrame >= 0)
                 {
+                    long cachedTicks = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
                     tlsLastFrame = currentFrame;
+                    tlsCachedTicks = cachedTicks;
                     tlsCachedSeconds = alignedState.State.CachedElapsedSeconds;
-                    tlsCachedTicks = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
-                    return tlsCachedTicks;
+                    return cachedTicks;
                 }
 
-                // If we've never had an Update() call, return 0
-                if (lastUpdateFrame == -1)
-                {
-                    return 0;
-                }
-
-                // Need fresh calculation
+                // Calculate fresh value
                 return CalculateElapsedTicks();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private double GetElapsedSecondsFast()
             {
-                // Check if we've never been updated
-                if (alignedState.UpdateCount == 0 ||
-                    alignedState.State.CachedElapsedSeconds == ElapsedSecondsUnset ||
-                    alignedState.State.CachedElapsedTicks == ElapsedTicksUnset)
+                // Check initialization
+                if (Volatile.Read(ref alignedState.State.IsInitialized) == 0)
+                    return 0.0;
+
+                // Initialize thread-local cache if needed
+                if (!tlsInitialized)
                 {
-                    return ElapsedSecondsUnset;
+                    tlsLastFrame = -1;
+                    tlsCachedTicks = 0;
+                    tlsCachedSeconds = 0.0;
+                    tlsInitialized = true;
                 }
 
-                double cachedSeconds = alignedState.State.CachedElapsedSeconds;
-
-                // After first Update(), we should have valid cached seconds
+                // Ultra-fast path: thread-local cache
                 int currentFrame = Volatile.Read(ref alignedState.UpdateCount);
-                if (tlsLastFrame == currentFrame && tlsCachedSeconds > 0)
+                if (tlsLastFrame == currentFrame && tlsCachedSeconds >= 0)
                     return tlsCachedSeconds;
 
+                // Fast path: frame cache hit
                 long lastUpdateFrame = Volatile.Read(ref alignedState.State.LastUpdateFrame);
-                if (lastUpdateFrame == currentFrame && cachedSeconds != ElapsedSecondsUnset)
+                if (lastUpdateFrame == currentFrame && lastUpdateFrame >= 0)
                 {
+                    double cachedSeconds = alignedState.State.CachedElapsedSeconds;
                     tlsLastFrame = currentFrame;
                     tlsCachedSeconds = cachedSeconds;
                     tlsCachedTicks = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
-                    return tlsCachedSeconds;
+                    return cachedSeconds;
                 }
 
                 // Calculate fresh value
                 long ticks = CalculateElapsedTicks();
-
-                // Sanity check - if ticks is negative, something is wrong
-                if (ticks < 0)
-                {
-                    GONetLog.Warning($"Negative elapsed ticks detected: {ticks}");
-                    return 0.0;
-                }
-
-                return ticks * TICKS_TO_SECONDS;
+                return Math.Max(0.0, ticks * TICKS_TO_SECONDS);
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             private long CalculateElapsedTicks()
             {
-                long currentHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
-                long initialTicks = Volatile.Read(ref alignedState.InitialHighResTicks);
-                long rawElapsed = currentHighResTicks - initialTicks;
+                // Get current high-resolution timestamp
+                long currentStopwatchTicks = Stopwatch.GetTimestamp();
+                long initialStopwatchTicks = Volatile.Read(ref alignedState.InitialStopwatchTicks);
+                long lastCached;
 
-                // DEBUG: Log the values
-                GONetLog.Debug($"[CalculateElapsedTicks] Current: {currentHighResTicks}, Initial: {initialTicks}, RawElapsed: {rawElapsed} ({rawElapsed / 10_000}ms)");
+                // Calculate elapsed stopwatch ticks
+                long elapsedStopwatchTicks = currentStopwatchTicks - initialStopwatchTicks;
 
-                if (rawElapsed < 0)
+                // Guard against wrap-around (shouldn't happen but be safe)
+                if (elapsedStopwatchTicks < 0)
                 {
-                    GONetLog.Error($"[CalculateElapsedTicks] NEGATIVE RAW ELAPSED! Current: {currentHighResTicks}, Initial: {initialTicks}");
-                    // This should never happen with monotonic time
-                    return 0;
+                    // Stopwatch wrapped around - very rare but possible on 32-bit systems
+                    lastCached = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
+                    return lastCached > 0 ? lastCached : 0;
                 }
 
-                long effectiveOffset = GetEffectiveOffset(currentHighResTicks);
+                // Convert stopwatch ticks to DateTime ticks
+                // Use double to avoid overflow in multiplication
+                double elapsedSeconds = (double)elapsedStopwatchTicks / Stopwatch.Frequency;
+                long rawElapsedTicks = (long)(elapsedSeconds * TimeSpan.TicksPerSecond);
 
-                GONetLog.Debug($"[CalculateElapsedTicks] EffectiveOffset: {effectiveOffset} ({effectiveOffset / 10_000}ms)");
+                // Apply authority offset
+                long effectiveOffset = GetEffectiveOffset(rawElapsedTicks);
+                long result = rawElapsedTicks + effectiveOffset;
 
-                long result = rawElapsed + effectiveOffset;
-
-                if (result < 0)
+                // Ensure monotonicity - time never goes backwards
+                lastCached = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
+                if (result < lastCached && lastCached > 0)
                 {
-                    GONetLog.Error($"[CalculateElapsedTicks] NEGATIVE RESULT! RawElapsed: {rawElapsed}, Offset: {effectiveOffset}");
-                    return 0;
+                    return lastCached;
                 }
 
-                return result;
+                // Sanity check - elapsed time shouldn't exceed 1 year for a single session
+                const long maxReasonableElapsed = 365L * TimeSpan.TicksPerDay;
+                if (result > maxReasonableElapsed)
+                {
+                    return lastCached > 0 ? lastCached : 0;
+                }
+
+                return Math.Max(0, result);
             }
 
-            /// <summary>
-            /// Gets the current effective offset, handling interpolation if needed.
-            /// This is the key separation - we calculate interpolation here without modifying authority offset.
-            /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private long GetEffectiveOffset(long currentHighResTicks)
+            private long GetEffectiveOffset(long currentElapsedTicks)
             {
-                // Read all values once to avoid multiple volatile reads
                 long authorityOffset = Volatile.Read(ref alignedState.State.AuthorityOffsetTicks);
                 long targetOffset = Volatile.Read(ref alignedState.State.TargetOffsetTicks);
                 long progress65536;
@@ -2364,69 +2389,63 @@ namespace GONet
                     return authorityOffset;
                 }
 
-                // Check if we need to recalculate (avoid thrashing)
+                // Avoid recalculation thrashing
                 long lastCalc = Volatile.Read(ref alignedState.Interpolation.LastCalculationTicks);
-                long timeSinceLastCalc = currentHighResTicks - lastCalc;
+                long timeSinceLastCalc = currentElapsedTicks - lastCalc;
                 if (timeSinceLastCalc < TimeSpan.TicksPerMillisecond)
                 {
                     return Volatile.Read(ref alignedState.Interpolation.EffectiveOffsetTicks);
                 }
 
-                // Time dilation path - optimized without floating point
-                long dilationStart = Volatile.Read(ref alignedState.Interpolation.DilationStartTimeTicks);
+                // Time dilation path
                 long dilationDuration = Volatile.Read(ref alignedState.Interpolation.DilationDurationTicks);
-
-                if (dilationDuration > 0) // We're dilating
+                if (dilationDuration > 0)
                 {
-                    long elapsed = currentHighResTicks - dilationStart;
+                    long dilationStart = Volatile.Read(ref alignedState.Interpolation.DilationStartTimeTicks);
+                    long elapsed = currentElapsedTicks - dilationStart;
 
                     if (elapsed >= dilationDuration)
                     {
-                        // Dilation complete - snap to target
+                        // Dilation complete
                         long target = Volatile.Read(ref alignedState.Interpolation.DilationTargetOffsetTicks);
                         Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, target);
                         Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, target);
-                        Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0); // Clear dilation
+                        Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
                         return target;
                     }
 
-                    // Calculate dilated offset using integer math (avoid floating point)
+                    // Calculate dilated offset using fixed-point math
                     long startOffset = Volatile.Read(ref alignedState.Interpolation.DilationStartOffsetTicks);
                     long targetDilationOffset = Volatile.Read(ref alignedState.Interpolation.DilationTargetOffsetTicks);
                     long offsetDelta = targetDilationOffset - startOffset;
 
-                    // Use fixed-point arithmetic for precise interpolation without floats
-                    // Multiply by 65536 (2^16) for 16 bits of fractional precision
+                    // 16-bit fixed-point interpolation
                     progress65536 = (elapsed << 16) / dilationDuration;
 
-                    // Cubic easing using integer math
+                    // Cubic easing
                     long easedProgress65536;
-                    if (progress65536 < 32768) // First half (0.5 in fixed point)
+                    if (progress65536 < 32768) // First half
                     {
-                        // 4 * t^3 in fixed point
                         long t = progress65536;
                         easedProgress65536 = (4 * ((t * t) >> 16) * t) >> 16;
                     }
                     else
                     {
-                        // 1 - ((-2t + 2)^3) / 2 in fixed point
-                        long t = progress65536 - 65536; // t - 1
-                        long tTimes2 = t << 1; // -2t (since t is negative)
+                        long t = progress65536 - 65536;
+                        long tTimes2 = t << 1;
                         long pow3 = ((tTimes2 * tTimes2) >> 16) * tTimes2 >> 16;
                         easedProgress65536 = 65536 - (pow3 >> 1);
                     }
 
                     long newEffectiveOffset = startOffset + ((offsetDelta * easedProgress65536) >> 16);
-
                     Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, newEffectiveOffset);
-                    Interlocked.Exchange(ref alignedState.Interpolation.LastCalculationTicks, currentHighResTicks);
-
+                    Interlocked.Exchange(ref alignedState.Interpolation.LastCalculationTicks, currentElapsedTicks);
                     return newEffectiveOffset;
                 }
 
-                // Standard interpolation path (existing code but optimized)
+                // Standard interpolation path
                 long adjustmentStart = Volatile.Read(ref alignedState.State.AdjustmentStartTicks);
-                long adjustmentElapsed = currentHighResTicks - adjustmentStart;
+                long adjustmentElapsed = currentElapsedTicks - adjustmentStart;
 
                 if (adjustmentElapsed >= ADJUSTMENT_DURATION_TICKS)
                 {
@@ -2442,19 +2461,23 @@ namespace GONet
                 long interpolatedOffset = authorityOffset + ((offsetDiff * progress65536) >> 16);
 
                 Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, interpolatedOffset);
-                Interlocked.Exchange(ref alignedState.Interpolation.LastCalculationTicks, currentHighResTicks);
-
+                Interlocked.Exchange(ref alignedState.Interpolation.LastCalculationTicks, currentElapsedTicks);
                 return interpolatedOffset;
             }
 
             internal void SetFromAuthority(long elapsedTicksFromAuthority)
             {
-                long currentHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
-                long initialTicks = Volatile.Read(ref alignedState.InitialHighResTicks);
-                long currentElapsed = currentHighResTicks - initialTicks;
+                // Validate input
+                if (elapsedTicksFromAuthority < 0)
+                {
+                    // Silently ignore negative values
+                    return;
+                }
 
-                long newOffset = elapsedTicksFromAuthority - currentElapsed;
+                long currentElapsedTicks = CalculateElapsedTicks();
                 long oldEffectiveOffset = Volatile.Read(ref alignedState.Interpolation.EffectiveOffsetTicks);
+
+                long newOffset = elapsedTicksFromAuthority - currentElapsedTicks;
                 long adjustment = newOffset - oldEffectiveOffset;
                 long adjustmentAbs = Math.Abs(adjustment);
 
@@ -2468,12 +2491,11 @@ namespace GONet
                     Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, newOffset);
-                    Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0); // Clear any dilation
+                    Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
                 }
                 else if (adjustment < -TimeSpan.FromMilliseconds(50).Ticks)
                 {
                     // Backwards adjustment - use time dilation
-                    // Take 2-5 seconds based on size of adjustment
                     long duration = Math.Min(
                         TimeSpan.FromSeconds(5).Ticks,
                         Math.Max(TimeSpan.FromSeconds(2).Ticks, adjustmentAbs * 20)
@@ -2481,7 +2503,7 @@ namespace GONet
 
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationStartOffsetTicks, oldEffectiveOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationTargetOffsetTicks, newOffset);
-                    Interlocked.Exchange(ref alignedState.Interpolation.DilationStartTimeTicks, currentHighResTicks);
+                    Interlocked.Exchange(ref alignedState.Interpolation.DilationStartTimeTicks, currentElapsedTicks);
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, duration);
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                 }
@@ -2489,8 +2511,8 @@ namespace GONet
                 {
                     // Forward/small adjustment - standard interpolation
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
-                    Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentHighResTicks);
-                    Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0); // Clear dilation
+                    Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentElapsedTicks);
+                    Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
                 }
 
                 // Update and fire events
@@ -2499,7 +2521,7 @@ namespace GONet
 
                 if (TimeSetFromAuthority != null)
                 {
-                    long oldTicks = currentElapsed + oldEffectiveOffset;
+                    long oldTicks = Math.Max(0, currentElapsedTicks + oldEffectiveOffset);
                     double oldSeconds = oldTicks * TICKS_TO_SECONDS;
                     double newSeconds = elapsedTicksFromAuthority * TICKS_TO_SECONDS;
                     TimeSetFromAuthority(oldSeconds, newSeconds, oldTicks, elapsedTicksFromAuthority);
@@ -2510,37 +2532,28 @@ namespace GONet
             {
                 int newUpdateCount = Interlocked.Increment(ref alignedState.UpdateCount);
 
-                // Calculate new values
-                long currentHighResTicks = HighResolutionTimeUtils.UtcNow.Ticks;
-                long initialTicks = Volatile.Read(ref alignedState.InitialHighResTicks);
-                long rawElapsed = currentHighResTicks - initialTicks;
-
-                // Get the current effective offset (handles interpolation internally)
-                long effectiveOffset = GetEffectiveOffset(currentHighResTicks);
-
-                // Calculate elapsed time using effective offset
-                long newElapsedTicks = rawElapsed + effectiveOffset;
+                // Calculate new values using high-resolution timer
+                long newElapsedTicks = CalculateElapsedTicks();
                 double newElapsedSeconds = newElapsedTicks * TICKS_TO_SECONDS;
 
                 // Get old elapsed seconds for delta calculation
                 double oldElapsedSeconds = alignedState.State.CachedElapsedSeconds;
 
-                // Calculate delta time with clamping
+                // Calculate delta time
                 float deltaTime = 0f;
-                if (oldElapsedSeconds != ElapsedSecondsUnset)
+                if (oldElapsedSeconds >= 0 && newElapsedSeconds > oldElapsedSeconds)
                 {
                     deltaTime = (float)(newElapsedSeconds - oldElapsedSeconds);
-                    // Branchless clamp between 0 and 0.1
                     deltaTime = Math.Min(Math.Max(deltaTime, 0.0f), 0.1f);
                 }
 
                 // Update cached values atomically
                 Interlocked.Exchange(ref alignedState.State.CachedElapsedTicks, newElapsedTicks);
-                alignedState.State.CachedElapsedSeconds = newElapsedSeconds; // double is atomic on 64-bit
-                alignedState.State.LastDeltaTime = deltaTime; // float is atomic
+                alignedState.State.CachedElapsedSeconds = newElapsedSeconds;
+                alignedState.State.LastDeltaTime = deltaTime;
                 Interlocked.Exchange(ref alignedState.State.LastUpdateFrame, newUpdateCount);
 
-                // Memory barrier to ensure all writes are visible
+                // Ensure all writes are visible
                 Thread.MemoryBarrier();
 
                 if (IsUnityMainThread)
@@ -2551,26 +2564,21 @@ namespace GONet
 
             public string DebugState()
             {
-                long now = HighResolutionTimeUtils.UtcNow.Ticks;
-                long adjustmentStart = Volatile.Read(ref alignedState.State.AdjustmentStartTicks);
-                long adjustmentElapsed = now - adjustmentStart;
-
+                long currentElapsed = CalculateElapsedTicks();
                 long authorityOffset = Volatile.Read(ref alignedState.State.AuthorityOffsetTicks);
                 long targetOffset = Volatile.Read(ref alignedState.State.TargetOffsetTicks);
                 long effectiveOffset = Volatile.Read(ref alignedState.Interpolation.EffectiveOffsetTicks);
 
                 bool isInterpolating = authorityOffset != targetOffset;
-                double interpolationProgress = isInterpolating ?
-                    Math.Min(1.0, adjustmentElapsed / (double)ADJUSTMENT_DURATION_TICKS) : 1.0;
 
-                return $"[SoTA] AuthorityOffset: {authorityOffset / (double)TimeSpan.TicksPerSecond:F3}s, " +
-                       $"TargetOffset: {targetOffset / (double)TimeSpan.TicksPerSecond:F3}s, " +
-                       $"EffectiveOffset: {effectiveOffset / (double)TimeSpan.TicksPerSecond:F3}s, " +
-                       $"AdjustmentElapsed: {adjustmentElapsed / (double)TimeSpan.TicksPerSecond:F3}s, " +
-                       $"InterpolationProgress: {interpolationProgress:P1}, " +
-                       $"ElapsedTime: {ElapsedTicks / (double)TimeSpan.TicksPerSecond:F3}s, " +
+                return $"[SoTA] ElapsedTime: {currentElapsed / SECONDS_TO_TICKS:F3}s, " +
+                       $"AuthorityOffset: {authorityOffset / SECONDS_TO_TICKS:F3}s, " +
+                       $"TargetOffset: {targetOffset / SECONDS_TO_TICKS:F3}s, " +
+                       $"EffectiveOffset: {effectiveOffset / SECONDS_TO_TICKS:F3}s, " +
+                       $"Interpolating: {isInterpolating}, " +
                        $"UpdateCount: {UpdateCount}, " +
-                       $"DeltaTime: {DeltaTime:F3}s";
+                       $"DeltaTime: {DeltaTime:F3}s, " +
+                       $"Initialized: {alignedState.State.IsInitialized == 1}";
             }
 
             public (bool settled, int remainingMilliseconds) CheckAdjustmentStatus()
@@ -2584,7 +2592,8 @@ namespace GONet
                     return (true, 0);
 
                 long adjustmentStart = Volatile.Read(ref alignedState.State.AdjustmentStartTicks);
-                long adjustmentElapsed = HighResolutionTimeUtils.UtcNow.Ticks - adjustmentStart;
+                long currentElapsed = CalculateElapsedTicks();
+                long adjustmentElapsed = currentElapsed - adjustmentStart;
 
                 int remainingMs = Math.Max(0,
                     (int)((ADJUSTMENT_DURATION_TICKS - adjustmentElapsed) / TimeSpan.TicksPerMillisecond));

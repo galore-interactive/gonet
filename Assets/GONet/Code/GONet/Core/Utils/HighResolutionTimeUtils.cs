@@ -125,6 +125,19 @@ namespace GONet.Utils
         // Force initialization on type load
         private static readonly bool forceInit = InitializeOnLoad();
 
+        static HighResolutionTimeUtils()
+        {
+            // Force initialization of all components in the right order
+            InitializeOnLoad();
+
+            // Warm up the timer with a few calls
+            for (int i = 0; i < 3; i++)
+            {
+                var dummy = UtcNow;
+                Thread.SpinWait(100);
+            }
+        }
+
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
         private static extern uint TimeBeginPeriod(uint uMilliseconds);
@@ -302,7 +315,9 @@ namespace GONet.Utils
 
             // Check if resync needed
             long lastResync = Interlocked.Read(ref resyncState.LastResyncStopwatchTicks);
-            if (swTicks - lastResync > RESYNC_INTERVAL_TICKS)
+            // IMPORTANT: Compare stopwatch ticks directly, don't convert RESYNC_INTERVAL_TICKS
+            long resyncIntervalInSwTicks = (RESYNC_INTERVAL_TICKS * Stopwatch.Frequency) / TimeSpan.TicksPerSecond;
+            if (swTicks - lastResync > resyncIntervalInSwTicks)
             {
                 TryResyncWithSystemTime();
             }
@@ -321,10 +336,16 @@ namespace GONet.Utils
                 baseStopwatchTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
             }
 
-            // Calculate time
-            long elapsed = swTicks - baseStopwatchTicks;
+            // Calculate elapsed time
+            long elapsedStopwatchTicks = swTicks - baseStopwatchTicks;
+
+            // CRITICAL: Use double to avoid overflow when converting
+            // Convert Stopwatch ticks to seconds first, then to DateTime ticks
+            double elapsedSeconds = (double)elapsedStopwatchTicks / Stopwatch.Frequency;
+            long elapsedDateTimeTicks = (long)(elapsedSeconds * TimeSpan.TicksPerSecond);
+
             long baseTicks = useUtc ? baseUtcTicks : baseLocalTicks;
-            long calculatedTicks = baseTicks + elapsed;
+            long calculatedTicks = baseTicks + elapsedDateTimeTicks;
 
             // Ensure monotonicity
             ref long lastTicksRef = ref (useUtc ? ref timeState.LastUtcTicks : ref timeState.LastLocalTicks);
@@ -340,7 +361,6 @@ namespace GONet.Utils
                     finalTicks = currentLast;
                     break;
                 }
-
                 long exchanged = Interlocked.CompareExchange(ref lastTicksRef, finalTicks, currentLast);
                 if (exchanged == currentLast) break;
                 if (exchanged >= finalTicks)
