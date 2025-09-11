@@ -529,6 +529,8 @@ namespace GONet
                 NetworkData item = client.incomingNetworkData_mustProcessAfterClientInitialized.Dequeue();
                 ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(item);
             }
+
+            Client_SyncTimeWithServer_SendInitialBarrage();
         }
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
@@ -1771,7 +1773,7 @@ namespace GONet
         static readonly float CLIENT_SYNC_TIME_EVERY_TICKS_FLOAT__POST_GAP_CLOSED = (float)CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED;
         static readonly long DIFF_TICKS_TOO_BIG_FOR_EASING = TimeSpan.FromSeconds(1f).Ticks; // if you are over a second out of sync...do not ease as that will take forever
         static bool client_hasSentSyncTimeRequest;
-        static DateTime client_lastSyncTimeRequestSent;
+        static long client_lastSyncTimeRequestSentTicks;
         const int CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE = 60;
         private static readonly Dictionary<long, RequestMessage> client_lastFewTimeSyncsSentByUID = new(CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE);
         private static readonly List<long> client_uidCleanupBuffer = new(CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE);
@@ -1792,92 +1794,94 @@ namespace GONet
             valueBlendingBufferLeadTicks = timeSpan.Ticks;
         }
 
+
+        private static void Client_SyncTimeWithServer_SendInitialBarrage()
+        {
+            // Send barrage of 5 time sync requests if not already synced.
+            // This is basically the earliest point at which it makes sense to go ahead and initiate the time sync. We want to happen as soon as possible.
+            client_hasSentSyncTimeRequest = true; // Assume barrage is part of initial sync
+            long startTicks = Time.ElapsedTicks;
+            bool syncNeeded = true; // Could check processed data for a sync response
+            if (syncNeeded)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    Client_SyncTimeWithServer_SendRequest(startTicks + i);
+                    if (i < 4) Thread.SpinWait(1000); // ~1 frame delay
+                }
+                client_lastSyncTimeRequestSentTicks = startTicks;
+                TimeSyncScheduler.ResetOnConnection();
+            }
+        }
+
+
         /// <summary>
         /// "IfAppropriate" is to indicate this runs on a schedule....if it is not the right time, this will do nothing.
         /// UPDATED to use TimeSyncScheduler for better performance
         /// </summary>
         private static void Client_SyncTimeWithServer_Initiate_IfAppropriate()
         {
-            // First sync sent immediately
-            if (!client_hasSentSyncTimeRequest)
+            // Gap-closing phase: Frequent syncs until gap closed
+            if (!client_hasClosedTimeSyncGapWithServer)
             {
+                long nowTicks = Time.ElapsedTicks;
+                if (nowTicks - client_lastSyncTimeRequestSentTicks < CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED)
+                {
+                    return;
+                }
+
                 client_hasSentSyncTimeRequest = true;
-                client_lastSyncTimeRequestSent = DateTime.UtcNow;
-                SendTimeSyncRequest();
+                client_lastSyncTimeRequestSentTicks = nowTicks;
+                Client_SyncTimeWithServer_SendRequest(nowTicks);
                 return;
             }
 
-            // ensure scheduler respects frequent initial syncs
+            // Maintenance phase: Use scheduler
             if (!TimeSyncScheduler.ShouldSyncNow())
             {
                 return;
             }
 
-            if (!client_hasClosedTimeSyncGapWithServer)
+            client_hasSentSyncTimeRequest = true;
+            client_lastSyncTimeRequestSentTicks = Time.ElapsedTicks;
+            Client_SyncTimeWithServer_SendRequest(client_lastSyncTimeRequestSentTicks);
+        }
+
+        static void Client_SyncTimeWithServer_SendRequest(long baseTicks)
+        {
+            RequestMessage timeSync = new RequestMessage(Time.RawElapsedTicks + (baseTicks % 1000));
+            client_lastFewTimeSyncsSentByUID[timeSync.UID] = timeSync;
+            if (client_lastFewTimeSyncsSentByUID.Count > CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE)
             {
-                DateTime now = DateTime.UtcNow;
-                if (client_hasSentSyncTimeRequest &&
-                    (now - client_lastSyncTimeRequestSent).Duration().Ticks < CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED)
+                client_uidCleanupBuffer.Clear();
+                long oldestTicks = long.MaxValue;
+                long oldestUID = 0;
+                foreach (var kvp in client_lastFewTimeSyncsSentByUID)
                 {
-                    return;
+                    if (kvp.Value.OccurredAtElapsedTicks < oldestTicks)
+                    {
+                        oldestTicks = kvp.Value.OccurredAtElapsedTicks;
+                        oldestUID = kvp.Key;
+                    }
                 }
+                client_lastFewTimeSyncsSentByUID.Remove(oldestUID);
             }
 
-            client_hasSentSyncTimeRequest = true;
-            client_lastSyncTimeRequestSent = DateTime.UtcNow;
-
-            SendTimeSyncRequest();
-
-            static void SendTimeSyncRequest()
+            using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                RequestMessage timeSync = new RequestMessage(Time.RawElapsedTicks);
-
-                client_lastFewTimeSyncsSentByUID[timeSync.UID] = timeSync;
-
-                // Clean up old entries to prevent memory growth
-                if (client_lastFewTimeSyncsSentByUID.Count > CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE)
+                uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
+                bitStream.WriteUInt(messageID);
+                bitStream.WriteLong(timeSync.OccurredAtElapsedTicks);
+                bitStream.WriteLong(timeSync.UID);
+                bitStream.WriteCurrentPartialByte();
+                int bytesUsedCount = bitStream.Length_WrittenBytes;
+                byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
+                Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
+                if (SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable))
                 {
-                    client_uidCleanupBuffer.Clear();
-                    long oldestTicks = long.MaxValue;
-                    long oldestUID = 0;
-
-                    // Find and remove the oldest entry without LINQ
-                    foreach (var kvp in client_lastFewTimeSyncsSentByUID)
-                    {
-                        if (kvp.Value.OccurredAtElapsedTicks < oldestTicks)
-                        {
-                            oldestTicks = kvp.Value.OccurredAtElapsedTicks;
-                            oldestUID = kvp.Key;
-                        }
-                    }
-                    client_lastFewTimeSyncsSentByUID.Remove(oldestUID);
+                    GONetLog.Debug($"Sent time sync: t0={timeSync.OccurredAtElapsedTicks}, UID={timeSync.UID}");
                 }
-
-                using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
-                {
-                    { // header...just message type/id...well, and now time 
-                        uint messageID = messageTypeToMessageIDMap[typeof(RequestMessage)];
-                        bitStream.WriteUInt(messageID);
-
-                        bitStream.WriteLong(timeSync.OccurredAtElapsedTicks);
-                    }
-
-                    // body
-                    bitStream.WriteLong(timeSync.UID);
-
-                    bitStream.WriteCurrentPartialByte();
-
-                    int bytesUsedCount = bitStream.Length_WrittenBytes;
-                    byte[] bytes = mainThread_miscSerializationArrayPool.Borrow(bytesUsedCount);
-                    Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
-
-                    if (SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable))
-                    {
-                        //GONetLog.Debug("just sent time sync to server....my time (seconds): " + TimeSpan.FromTicks(timeSync.OccurredAtElapsedTicks).TotalSeconds);
-                    }
-
-                    mainThread_miscSerializationArrayPool.Return(bytes);
-                }
+                mainThread_miscSerializationArrayPool.Return(bytes);
             }
         }
 
@@ -2645,25 +2649,21 @@ namespace GONet
         /// </summary>
         public static class TimeSyncScheduler
         {
-            private static long lastSyncTimeTicks;
-            private const long SYNC_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 5;
-            private const long MIN_INTERVAL_TICKS = TimeSpan.TicksPerMillisecond * 50; // 0.05s
-            private static bool isInitialSync = true;
+            private static long lastSyncTimeTicks = 0;
+            private static readonly long SYNC_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 5;
+            private static readonly long MIN_INTERVAL_TICKS = TimeSpan.TicksPerSecond;
+
+            public static void ResetOnConnection()
+            {
+                lastSyncTimeTicks = Time.ElapsedTicks;
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool ShouldSyncNow()
             {
-                long now = HighResolutionTimeUtils.GetTimeSyncTicks_Internal();
+                long now = Time.ElapsedTicks;
                 long lastSync = Volatile.Read(ref lastSyncTimeTicks);
                 long elapsed = now - lastSync;
-                if (isInitialSync)
-                {
-                    if (client_hasSentSyncTimeRequest && elapsed < MIN_INTERVAL_TICKS) // Wait for response
-                        return false;
-                    isInitialSync = client_hasClosedTimeSyncGapWithServer;
-                    Interlocked.Exchange(ref lastSyncTimeTicks, now);
-                    return true;
-                }
                 if (elapsed < MIN_INTERVAL_TICKS) return false;
                 if (elapsed < SYNC_INTERVAL_TICKS) return false;
                 return Interlocked.CompareExchange(ref lastSyncTimeTicks, now, lastSync) == lastSync;
