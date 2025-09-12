@@ -190,7 +190,7 @@ namespace GONet
             double adjustmentSeconds = toElapsedSeconds - fromElapsedSeconds;
             if (Math.Abs(adjustmentSeconds) > 0.01) // More than 10ms adjustment
             {
-                GONetLog.Debug($"Time adjusted by {adjustmentSeconds:F3} seconds (from {fromElapsedSeconds:F3} to {toElapsedSeconds:F3})");
+                GONetLog.Debug($"Local time adjusted from authority (i.e., server) by {adjustmentSeconds:F3} seconds (from {fromElapsedSeconds:F3} to {toElapsedSeconds:F3}), which is more than expected, but not necessarily a bad thing.");
             }
         }
 
@@ -1766,6 +1766,11 @@ namespace GONet
         /// to every <see cref="CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED"/> ticks for maintenance.
         /// </summary>
         static readonly long CLIENT_SYNC_TIME_GAP_TICKS = TimeSpan.FromSeconds(1f / 60f).Ticks;
+        static readonly long CLIENT_ABSURD_MAX_RTT_TICKS = TimeSpan.FromSeconds(10).Ticks;
+        static readonly long CLIENT_MAX_ADJUSTMENT_TOLERANCE_TICKS = TimeSpan.FromMilliseconds(100).Ticks; // Maximum adjustment tolerance for gap closure
+        static readonly long CLIENT_MIN_RTT_ESTIMATE_TICKS = TimeSpan.FromMilliseconds(10).Ticks >> 1; // 5ms one-way
+        private static int clientStableSyncCount; // Thread-safe, no lock needed for simple increment
+        private const int CLIENT_STABLE_SYNC_THRESHOLD = 3;
         static bool client_hasClosedTimeSyncGapWithServer;
         static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__UNTIL_GAP_CLOSED = TimeSpan.FromMilliseconds(50).Ticks; // 0.05s
         static readonly long CLIENT_SYNC_TIME_EVERY_TICKS__POST_GAP_CLOSED = TimeSpan.FromSeconds(5f).Ticks;
@@ -1879,7 +1884,7 @@ namespace GONet
                 Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, bytesUsedCount);
                 if (SendBytesToRemoteConnections(bytes, bytesUsedCount, GONetChannel.TimeSync_Unreliable))
                 {
-                    GONetLog.Debug($"Sent time sync: t0={timeSync.OccurredAtElapsedTicks}, UID={timeSync.UID}");
+                    //GONetLog.Debug($"Sent time sync: t0={timeSync.OccurredAtElapsedTicks}, UID={timeSync.UID}");
                 }
                 mainThread_miscSerializationArrayPool.Return(bytes);
             }
@@ -1895,7 +1900,7 @@ namespace GONet
 
                     bitStream.WriteLong(Time.ElapsedTicks);
 
-                    GONetLog.Debug($"Server responding to time sync request from client.  My time (seconds): {TimeSpan.FromTicks(Time.ElapsedTicks).TotalSeconds}, ticks: {Time.ElapsedTicks}");
+                    //GONetLog.Debug($"Server responding to time sync request from client.  My time (seconds): {TimeSpan.FromTicks(Time.ElapsedTicks).TotalSeconds}, ticks: {Time.ElapsedTicks}");
                 }
 
                 // body
@@ -1915,47 +1920,97 @@ namespace GONet
 
         private static void Client_SyncTimeWithServer_ProcessResponse(long requestUID, long server_elapsedTicksAtSendResponse)
         {
-            if (client_lastFewTimeSyncsSentByUID.TryGetValue(requestUID, out RequestMessage requestMessage)) // if we cannot find it, we cannot really do anything....now can we?
+            if (!client_lastFewTimeSyncsSentByUID.TryGetValue(requestUID, out RequestMessage requestMessage))
             {
-                // Force first sync to be immediate and close gap
-                HighPerfTimeSync.ProcessTimeSync(requestUID, server_elapsedTicksAtSendResponse, requestMessage, Time, forceAdjustment: client_isFirstTimeSync);
-                if (client_isFirstTimeSync)
+                GONetLog.Warning($"No matching request for UID: {requestUID}, skipping process");
+                return; // Early exit if no matching request
+            }
+            //GONetLog.Debug($"Processing sync for UID: {requestUID}, t0: {requestMessage.OccurredAtElapsedTicks} ticks ({TimeSpan.FromTicks(requestMessage.OccurredAtElapsedTicks).TotalSeconds:F3}s), t1: {server_elapsedTicksAtSendResponse} ticks ({TimeSpan.FromTicks(server_elapsedTicksAtSendResponse).TotalSeconds:F3}s)");
+
+            // Force first sync to be immediate and close gap
+            bool isFirstSync = client_isFirstTimeSync;
+            HighPerfTimeSync.ProcessTimeSync(
+                requestUID,
+                server_elapsedTicksAtSendResponse,
+                requestMessage,
+                Time,
+                forceAdjustment: isFirstSync
+            );
+
+            if (isFirstSync)
+            {
+                client_isFirstTimeSync = false;
+                GONetLog.Info("Initial time sync completed. Initial gap should be closed.");
+            }
+
+            long responseReceivedTicks = Time.RawElapsedTicks;
+            long requestSentTicks = requestMessage.OccurredAtElapsedTicks;
+            long rtt_ticks = responseReceivedTicks - requestSentTicks;
+            //GONetLog.Debug($"Calculated RTT: {rtt_ticks} ticks ({TimeSpan.FromTicks(rtt_ticks).TotalMilliseconds:F3}ms / {TimeSpan.FromTicks(rtt_ticks).TotalSeconds:F3}s)");
+
+            if (rtt_ticks <= 0 || rtt_ticks >= CLIENT_ABSURD_MAX_RTT_TICKS)
+            {
+                GONetLog.Warning($"Invalid RTT: {rtt_ticks} ticks ({TimeSpan.FromTicks(rtt_ticks).TotalMilliseconds:F3}ms / {TimeSpan.FromTicks(rtt_ticks).TotalSeconds:F3}s), skipping gap check");
+                goto Cleanup;
+            }
+
+            GONetClient.connectionToServer.RTT_Latest = (float)(rtt_ticks * HighResolutionTimeUtils.TICKS_TO_SECONDS); // Inline division
+            long oneWayDelayTicks = (rtt_ticks >> 1); // Initial estimate
+            //GONetLog.Debug($"Initial one-way delay estimate: {oneWayDelayTicks} ticks ({TimeSpan.FromTicks(oneWayDelayTicks).TotalMilliseconds:F3}ms)");
+
+            if (GONetClient.connectionToServer.RTT_RecentAverage > 0)
+            {
+                //GONetLog.Debug($"Using RTT_RecentAverage: {GONetClient.connectionToServer.RTT_RecentAverage:F3}s, recalculating one-way delay");
+                oneWayDelayTicks = (long)(GONetClient.connectionToServer.RTT_RecentAverage * TimeSpan.TicksPerSecond) >> 1;
+                //GONetLog.Debug($"Updated one-way delay: {oneWayDelayTicks} ticks ({TimeSpan.FromTicks(oneWayDelayTicks).TotalMilliseconds:F3}ms)");
+            }
+            else
+            {
+                //GONetLog.Debug($"No RTT_RecentAverage, using minimum estimate: {CLIENT_MIN_RTT_ESTIMATE_TICKS} ticks ({TimeSpan.FromTicks(CLIENT_MIN_RTT_ESTIMATE_TICKS).TotalMilliseconds:F3}ms)");
+                oneWayDelayTicks = Math.Max(oneWayDelayTicks, CLIENT_MIN_RTT_ESTIMATE_TICKS); // Minimum 5ms
+            }
+
+            long currentEffectiveTicks = responseReceivedTicks + Time.GetEffectiveOffsetTicks_Internal();
+            long predictedServerTime = server_elapsedTicksAtSendResponse + oneWayDelayTicks;
+            long diffTicksABS = Math.Abs(currentEffectiveTicks - predictedServerTime);
+            /*
+            GONetLog.Debug($"Predicted server time: {predictedServerTime} ticks ({TimeSpan.FromTicks(predictedServerTime).TotalSeconds:F3}s), " +
+                           $"currentEffectiveTicks: {currentEffectiveTicks} ticks ({TimeSpan.FromTicks(currentEffectiveTicks).TotalSeconds:F3}s), " +
+                           $"diffTicksABS: {diffTicksABS} ticks ({TimeSpan.FromTicks(diffTicksABS).TotalMilliseconds:F3}ms / {TimeSpan.FromTicks(diffTicksABS).TotalSeconds:F3}s)");
+            */
+
+            long adjustmentTicks = Time.GetAdjustmentTicks_Internal();
+            //GONetLog.Debug($"Adjustment: {adjustmentTicks} ticks ({TimeSpan.FromTicks(adjustmentTicks).TotalMilliseconds:F3}ms / {TimeSpan.FromTicks(adjustmentTicks).TotalSeconds:F3}s)");
+
+            if (!client_hasClosedTimeSyncGapWithServer)
+            {
+                GONetLog.Debug($"Gap not closed yet. Checking conditions...");
+                if (diffTicksABS < CLIENT_SYNC_TIME_GAP_TICKS || Math.Abs(adjustmentTicks) < CLIENT_MAX_ADJUSTMENT_TOLERANCE_TICKS)
                 {
-                    client_isFirstTimeSync = false;
-                    GONetLog.Info("Initial time sync completed. Initial gap should be closed.");
-                }
-
-                // The high-perf system handles RTT calculation internally, but we can still update connection stats
-                long responseReceivedTicks_Client = Time.RawElapsedTicks;
-                long requestSentTicks_Client = requestMessage.OccurredAtElapsedTicks;
-                long rtt_ticks = responseReceivedTicks_Client - requestSentTicks_Client;
-
-                if (rtt_ticks > 0 && rtt_ticks < TimeSpan.FromSeconds(10).Ticks) // Sanity check
-                {
-                    GONetClient.connectionToServer.RTT_Latest = (float)TimeSpan.FromTicks(rtt_ticks).TotalSeconds;
-
-                    // The actual time adjustment is now handled by HighPerfTimeSync.ProcessTimeSync
-                    // which called Time.SetFromAuthority internally with smooth interpolation
-
-                    // Check if we've closed the gap
-                    if (!client_hasClosedTimeSyncGapWithServer)
+                    GONetLog.Debug($"Condition met: diffTicksABS < {CLIENT_SYNC_TIME_GAP_TICKS} ticks ({TimeSpan.FromTicks(CLIENT_SYNC_TIME_GAP_TICKS).TotalMilliseconds:F3}ms) or adjustment < 100ms");
+                    Interlocked.Increment(ref clientStableSyncCount);
+                    GONetLog.Debug($"stableSyncCount now: {clientStableSyncCount}");
+                    if (clientStableSyncCount >= CLIENT_STABLE_SYNC_THRESHOLD)
                     {
-                        // Get the actual adjusted time difference
-                        long oneWayDelayTicks = TimeSpan.FromSeconds(GONetClient.connectionToServer.RTT_RecentAverage).Ticks >> 1;
-                        long predictedServerTime = server_elapsedTicksAtSendResponse + oneWayDelayTicks;
-                        long diffTicksABS = Math.Abs(responseReceivedTicks_Client - predictedServerTime);
-
-                        if (diffTicksABS < CLIENT_SYNC_TIME_GAP_TICKS)
-                        {
-                            client_hasClosedTimeSyncGapWithServer = true;
-                            GONetLog.Info("Time sync gap closed. Switching to less frequent sync schedule.");
-                        }
+                        GONetLog.Debug($"Stable sync threshold reached: {CLIENT_STABLE_SYNC_THRESHOLD}, closing gap");
+                        client_hasClosedTimeSyncGapWithServer = true;
+                        Interlocked.Exchange(ref clientStableSyncCount, 0); // Reset atomically
+                        GONetLog.Info("Time sync gap closed after stable syncs. Switching to maintenance mode.");
                     }
                 }
-
-                // Clean up processed request
-                client_lastFewTimeSyncsSentByUID.Remove(requestUID);
+                else
+                {
+                    GONetLog.Debug($"Condition not met, resetting stableSyncCount");
+                    Interlocked.Exchange(ref clientStableSyncCount, 0); // Reset on divergence
+                }
             }
+            else
+            {
+                //GONetLog.Debug($"Maintenance mode active, last diffTicksABS: {diffTicksABS} ticks ({TimeSpan.FromTicks(diffTicksABS).TotalMilliseconds:F3}ms / {TimeSpan.FromTicks(diffTicksABS).TotalSeconds:F3}s)");
+            }
+
+        Cleanup:
+            client_lastFewTimeSyncsSentByUID.Remove(requestUID);
         }
 
         #endregion
@@ -2299,6 +2354,21 @@ namespace GONet
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal long GetAdjustmentTicks_Internal()
+            {
+                return (Volatile.Read(ref alignedState.Interpolation.EffectiveOffsetTicks) -
+                        Volatile.Read(ref alignedState.State.AuthorityOffsetTicks)) * TimeSpan.TicksPerSecond;
+
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal long GetEffectiveOffsetTicks_Internal()
+            {
+                return Volatile.Read(ref alignedState.Interpolation.EffectiveOffsetTicks);
+
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private long GetElapsedTicksFast()
             {
                 if (Volatile.Read(ref alignedState.State.IsInitialized) == 0)
@@ -2484,7 +2554,7 @@ namespace GONet
                 long newOffset = elapsedTicksFromAuthority - currentRawTicks;  // target (server raw now) - raw = true offset
                 long adjustment = newOffset - oldEffectiveOffset;
                 long adjustmentAbs = Math.Abs(adjustment);
-                GONetLog.Debug($"Authority Set: RawTicks={currentRawTicks}, EffectiveTicks={currentEffectiveTicks}, OldOffset={oldEffectiveOffset}, NewOffset={newOffset}, Adjustment_Sec={TimeSpan.FromTicks(adjustment).TotalSeconds:F3}, Mode={(adjustmentAbs > TimeSpan.FromSeconds(1).Ticks ? "Immediate" : (adjustment < -TimeSpan.FromMilliseconds(50).Ticks ? "Dilation" : "Interpolation"))}");
+                //GONetLog.Debug($"Authority Set: RawTicks={currentRawTicks}, EffectiveTicks={currentEffectiveTicks}, OldOffset={oldEffectiveOffset}, NewOffset={newOffset}, Adjustment_Sec={TimeSpan.FromTicks(adjustment).TotalSeconds:F3}, Mode={(adjustmentAbs > TimeSpan.FromSeconds(1).Ticks ? "Immediate" : (adjustment < -TimeSpan.FromMilliseconds(50).Ticks ? "Dilation" : "Interpolation"))}");
                 
                 if (!forceImmediate && adjustmentAbs < TimeSpan.FromMilliseconds(1).Ticks)
                     return;

@@ -111,7 +111,8 @@ namespace GONet.Utils
         // Constants
         private const long RESYNC_INTERVAL_TICKS = 10L * TimeSpan.TicksPerSecond; // 10 seconds
         private const long MAX_DRIFT_TICKS = 1L * TimeSpan.TicksPerSecond; // 1 second max drift
-        private const double TICKS_TO_SECONDS = 1.0 / TimeSpan.TicksPerSecond;
+        
+        public  const double TICKS_TO_SECONDS = 1.0 / TimeSpan.TicksPerSecond;
 
         // Thread-local cache to reduce contention
         [ThreadStatic] private static long threadLocalLastCheck;
