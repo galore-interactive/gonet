@@ -75,8 +75,6 @@ namespace GONet
             }
         }
 
-        static bool client_isFirstTimeSync = true;
-
         /// <summary>
         /// When a <see cref="GONetParticipant"/> could not be looked up with <paramref name="currentGONetId"/>, then we will try another way here with all info passed in.
         /// </summary>
@@ -1788,6 +1786,8 @@ namespace GONet
         internal static readonly float BLENDING_BUFFER_LEAD_SECONDS_DEFAULT = 0.25f; // 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: 0.25f
         internal static float valueBlendingBufferLeadSeconds = BLENDING_BUFFER_LEAD_SECONDS_DEFAULT;
         internal static long valueBlendingBufferLeadTicks = TimeSpan.FromSeconds(BLENDING_BUFFER_LEAD_SECONDS_DEFAULT).Ticks;
+        
+        static bool client_isFirstTimeSync = true;
 
         /// <summary>
         /// 0 is to always extrapolate pretty much.....here is a decent delay to get good interpolation: TimeSpan.FromMilliseconds(250).Ticks;
@@ -2604,17 +2604,20 @@ namespace GONet
             internal void Update()
             {
                 int newUpdateCount = Interlocked.Increment(ref alignedState.UpdateCount);
-                long newElapsedTicks = CalculateElapsedTicks();
-                double newElapsedSeconds = newElapsedTicks * TICKS_TO_SECONDS;
-                double oldElapsedSeconds = alignedState.State.CachedElapsedSeconds;
+                long newElapsedTicks = CalculateElapsedTicks(); // Includes interpolation/dilation
+                double newElapsedSecondsDouble = newElapsedTicks * TICKS_TO_SECONDS;
+                double oldElapsedSeconds = Interlocked.Exchange(ref alignedState.State.CachedElapsedSeconds, newElapsedSecondsDouble); // Atomic read-and-write
                 float deltaTime = 0f;
-                if (oldElapsedSeconds >= 0 && newElapsedSeconds > oldElapsedSeconds)
+                if (oldElapsedSeconds >= 0 && newElapsedSecondsDouble > oldElapsedSeconds)
                 {
-                    deltaTime = (float)(newElapsedSeconds - oldElapsedSeconds);
-                    deltaTime = Math.Min(Math.Max(deltaTime, 0.0f), 0.1f);
+                    deltaTime = (float)(newElapsedSecondsDouble - oldElapsedSeconds);
+                    // Adjust clamping based on sync state
+                    if (!client_isFirstTimeSync && Volatile.Read(ref alignedState.Interpolation.DilationDurationTicks) == 0) // Only clamp in steady state
+                        deltaTime = Math.Clamp(deltaTime, 0.0f, 0.1f); // Use Math.Clamp for clarity
+                    else if (deltaTime > 1.0f) // Log large initial or dilation deltas
+                        GONetLog.Info($"Adjusted deltaTime: {deltaTime:F3}s at frame {newUpdateCount}");
                 }
                 Interlocked.Exchange(ref alignedState.State.CachedElapsedTicks, newElapsedTicks);
-                alignedState.State.CachedElapsedSeconds = newElapsedSeconds;
                 alignedState.State.LastDeltaTime = deltaTime;
                 Interlocked.Exchange(ref alignedState.State.LastUpdateFrame, newUpdateCount);
                 Thread.MemoryBarrier();
