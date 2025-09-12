@@ -243,6 +243,8 @@ namespace Assets.GONet.Code.GONet.Editor.Generation
 
             }
 
+            // Note: This was added by Shaun manually, because the whole TT file extension and processing update pipeline has gotten a little bit disconnected. This was just faster for now. I don't intend on making many more changes here, so hopefully we'll be all right. But I also did add this to the.TT file. 
+            this.Write($"\t[MemoryPack.MemoryPackUnion({(++iPersistentEvents - 1).ToString()}, typeof({typeof(SyncEvent_Time_ElapsedTicks_SetFromAuthority).FullName}))]\r\n\t");
 
 #line default
 #line hidden

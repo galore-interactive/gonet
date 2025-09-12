@@ -48,6 +48,11 @@ namespace GONet.Utils
                     return ticks;
                 }
             }
+
+            internal static void Stop()
+            {
+                _stopwatch.Stop();
+            }
         }
 
         // Pack related fields together for better cache locality
@@ -120,6 +125,15 @@ namespace GONet.Utils
         // Force initialization on type load
         private static readonly bool forceInit = InitializeOnLoad();
 
+
+        private static volatile int shutdownState = 0; // 0 = false, 1 = true
+
+        private static bool isShuttingDown
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => shutdownState == 1;
+        }
+
         static HighResolutionTimeUtils()
         {
             InitializeOnLoad();
@@ -143,8 +157,10 @@ namespace GONet.Utils
         [RuntimeInitializeOnLoadMethod]
         static void InitializeShutdown()
         {
+            Application.quitting -= Shutdown; // Unregister first to avoid re-adding
             Application.quitting += () => Shutdown();
 #if UNITY_EDITOR
+            UnityEditor.EditorApplication.quitting -= () => Shutdown();
             UnityEditor.EditorApplication.quitting += () => Shutdown();
 #endif
         }
@@ -216,6 +232,8 @@ namespace GONet.Utils
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                if (isShuttingDown) return DateTime.UtcNow; // Fallback during shutdown
+
                 if (!isInitialized) InitializeCore();
                 if (!threadLocalInitialized)
                 {
@@ -241,6 +259,8 @@ namespace GONet.Utils
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                if (isShuttingDown) return DateTime.Now; // Fallback during shutdown
+
                 if (!isInitialized) InitializeCore();
                 if (!threadLocalInitialized)
                 {
@@ -326,6 +346,8 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static DateTime GetTimeCore(bool useUtc, long swTicks)
         {
+            if (isShuttingDown) return useUtc ? DateTime.UtcNow : DateTime.Now;
+
             threadLocalLastCheck = swTicks;
             long baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
             long baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
@@ -345,6 +367,7 @@ namespace GONet.Utils
             ref long lastTicksRef = ref (useUtc ? ref timeState.LastUtcTicks : ref timeState.LastLocalTicks);
             long finalTicks = calculatedTicks;
             long currentLast;
+           
             do
             {
                 currentLast = Interlocked.Read(ref lastTicksRef);
@@ -361,10 +384,12 @@ namespace GONet.Utils
                     break;
                 }
             } while (true);
+
             if (useUtc)
                 threadLocalLastUtcTicks = finalTicks;
             else
                 threadLocalLastLocalTicks = finalTicks;
+
             return new DateTime(finalTicks, useUtc ? DateTimeKind.Utc : DateTimeKind.Local);
         }
 
@@ -373,9 +398,18 @@ namespace GONet.Utils
         /// </summary>
         public static void Shutdown()
         {
+            if (Interlocked.CompareExchange(ref shutdownState, 1, 0) == 0)
+            {
+                MonotonicStopwatch.Stop();
+
+                threadLocalLastCheck = 0;
+                threadLocalLastLocalTicks = 0;
+                threadLocalLastUtcTicks = 0;
+                threadLocalInitialized = false;
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-            TimeEndPeriod(1);
+                TimeEndPeriod(1);
 #endif
+            }
         }
 
         /// <summary>
