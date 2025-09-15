@@ -2715,6 +2715,20 @@ namespace GONet
                 
                 timeAuthority.SetFromAuthority(targetTimeTicks, forceAdjustment);
             }
+
+            /// <summary>
+            /// Resets the time sync state for testing purposes.
+            /// This should only be used in test scenarios to ensure clean state between tests.
+            /// </summary>
+            internal static void ResetForTesting()
+            {
+                // Reset the minimum RTT tracking state
+                minRttState = new MinRttState
+                {
+                    MinRttTicks = long.MaxValue,
+                    MinTimeTicks = 0
+                };
+            }
         }
 
         /// <summary>
