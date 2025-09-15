@@ -6,9 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/GONet/Sample/Projectile/ProjectileTest.unity
-    guid: 53f2fb63b22c53b4f853744b0db656ee
-  - enabled: 1
     path: Assets/GONet/Sample/JustAnotherScene.unity
     guid: 989864b0a9a81b24e8d350fa6f716855
+  - enabled: 1
+    path: Assets/GONet/Sample/Projectile/ProjectileTest.unity
+    guid: 53f2fb63b22c53b4f853744b0db656ee
   m_configObjects: {}

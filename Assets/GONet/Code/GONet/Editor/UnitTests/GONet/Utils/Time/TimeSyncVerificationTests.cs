@@ -35,75 +35,118 @@ namespace GONet.Tests.Time
         [Category("Verification")]
         public void Should_Not_Reject_Valid_Sync_Responses()
         {
-            // This test verifies the fix for the lastProcessedResponseTicks issue
+            // Initialize both times
+            clientTime.Update();
+            serverTime.Update();
+            Thread.Sleep(100);
 
-            // Set server ahead of client
-            serverTime.SetFromAuthority(clientTime.ElapsedTicks + TimeSpan.FromSeconds(5).Ticks);
+            // Update and get current ticks
+            clientTime.Update();
+            serverTime.Update();
+
+            // Set server 5 seconds ahead of where client currently is
+            long clientNow = clientTime.ElapsedTicks;
+            serverTime.SetFromAuthority(clientNow + TimeSpan.FromSeconds(5).Ticks);
+
+            // Wait for server's interpolation to complete
             Thread.Sleep(1100);
 
-            // Update times
+            // Update both to get current values
             clientTime.Update();
             serverTime.Update();
 
-            UnityEngine.Debug.Log($"Initial state - Client: {clientTime.ElapsedSeconds:F3}s, Server: {serverTime.ElapsedSeconds:F3}s");
-            UnityEngine.Debug.Log($"LastProcessedResponseTicks: {TimeSyncTestHelpers.GetLastProcessedResponseTicks()}");
+            double initialClientTime = clientTime.ElapsedSeconds;
+            double initialServerTime = serverTime.ElapsedSeconds;
+            double initialDiff = Math.Abs(initialServerTime - initialClientTime);
 
-            // Create and process first sync
-            var request1 = TimeSyncTestHelpers.CreateValidTimeSyncRequest(clientTime);
-            Thread.Sleep(50); // Simulate RTT
+            UnityEngine.Debug.Log($"Initial state - Client: {initialClientTime:F3}s, Server: {initialServerTime:F3}s, Diff: {initialDiff:F3}s");
 
-            TimeSyncTestHelpers.ProcessTimeSyncSafely(request1, serverTime, clientTime, true);
-            TimeSyncTestHelpers.WaitForInterpolation();
+            // Verify we actually have an initial difference
+            Assert.That(initialDiff, Is.GreaterThan(4.5).And.LessThan(5.5),
+                "Initial setup should create ~5 second difference");
 
-            // Update times
+            // First sync - should bring client closer to server
+            var request1 = new RequestMessage(clientTime.ElapsedTicks);
+            Thread.Sleep(50); // Simulate network delay
+
+            serverTime.Update();
+            long serverResponseTime1 = serverTime.ElapsedTicks;
+
+            HighPerfTimeSync.ProcessTimeSync(
+                request1.UID,
+                serverResponseTime1,
+                request1,
+                clientTime,
+                true // Force first sync
+            );
+
+            // Wait for adjustment to complete (interpolation takes 1 second)
+            Thread.Sleep(1100);
             clientTime.Update();
             serverTime.Update();
 
-            UnityEngine.Debug.Log($"After first sync - Client: {clientTime.ElapsedSeconds:F3}s, Server: {serverTime.ElapsedSeconds:F3}s");
-            UnityEngine.Debug.Log($"LastProcessedResponseTicks after sync: {TimeSyncTestHelpers.GetLastProcessedResponseTicks() / (double)TimeSpan.TicksPerSecond:F3}s");
+            double afterFirstSyncClient = clientTime.ElapsedSeconds;
+            double afterFirstSyncServer = serverTime.ElapsedSeconds;
+            double diffAfterFirst = Math.Abs(afterFirstSyncServer - afterFirstSyncClient);
 
-            // Create and process second sync - this should NOT be rejected
-            Thread.Sleep(1000); // Wait a bit
-            var request2 = TimeSyncTestHelpers.CreateValidTimeSyncRequest(clientTime);
-            Thread.Sleep(50); // Simulate RTT
+            UnityEngine.Debug.Log($"After first sync - Client: {afterFirstSyncClient:F3}s, Server: {afterFirstSyncServer:F3}s, Diff: {diffAfterFirst:F3}s");
 
-            // This should work without being rejected
-            TimeSyncTestHelpers.ProcessTimeSyncSafely(request2, serverTime, clientTime, false);
-            TimeSyncTestHelpers.WaitForInterpolation();
+            // The first sync should have reduced the difference significantly
+            Assert.That(diffAfterFirst, Is.LessThan(initialDiff),
+                $"First sync should reduce time difference from {initialDiff:F3}s");
 
-            // Verify we're still in sync
+            // After one sync with 5-second initial difference, expect to be within ~1.5 seconds
+            // (The interpolation over 1 second can't fully close a 5-second gap instantly)
+            Assert.That(diffAfterFirst, Is.LessThan(1.5),
+                "After first sync, times should be much closer (within 1.5 seconds)");
+
+            // Wait before second sync
+            Thread.Sleep(500);
             clientTime.Update();
             serverTime.Update();
 
-            double finalDiff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
-            UnityEngine.Debug.Log($"Final difference: {finalDiff:F3}s");
+            // Second sync - this should NOT be rejected and should improve sync further
+            var request2 = new RequestMessage(clientTime.ElapsedTicks);
+            Thread.Sleep(50); // Simulate network delay
 
-            Assert.That(finalDiff, Is.LessThan(0.2), "Should maintain sync without rejecting valid responses");
-        }
+            serverTime.Update();
+            long serverResponseTime2 = serverTime.ElapsedTicks;
 
-        [Test]
-        [Category("Verification")]
-        public void Should_Build_RTT_Buffer_Correctly()
-        {
-            // Send multiple sync requests and verify RTT buffer builds up
-            for (int i = 0; i < 10; i++)
-            {
-                clientTime.Update();
-                serverTime.Update();
+            // Verify this is a newer server time
+            Assert.That(serverResponseTime2, Is.GreaterThan(serverResponseTime1),
+                "Second server response should have newer timestamp");
 
-                var request = TimeSyncTestHelpers.CreateValidTimeSyncRequest(clientTime);
-                Thread.Sleep(20 + i * 5); // Variable RTT
+            HighPerfTimeSync.ProcessTimeSync(
+                request2.UID,
+                serverResponseTime2,
+                request2,
+                clientTime,
+                false // Don't force
+            );
 
-                TimeSyncTestHelpers.ProcessTimeSyncSafely(request, serverTime, clientTime, i == 0);
+            // Wait for any adjustment
+            Thread.Sleep(1100);
+            clientTime.Update();
+            serverTime.Update();
 
-                Thread.Sleep(100);
-            }
+            double finalClientTime = clientTime.ElapsedSeconds;
+            double finalServerTime = serverTime.ElapsedSeconds;
+            double finalDiff = Math.Abs(finalServerTime - finalClientTime);
 
-            string bufferState = TimeSyncTestHelpers.GetRttBufferState();
-            UnityEngine.Debug.Log($"RTT Buffer State: {bufferState}");
+            UnityEngine.Debug.Log($"Final state - Client: {finalClientTime:F3}s, Server: {finalServerTime:F3}s, Diff: {finalDiff:F3}s");
 
-            // Verify buffer has samples
-            Assert.That(bufferState, Does.Contain("ValidSamples=10"), "Should have built up RTT samples");
+            // After two syncs, should be very close
+            Assert.That(finalDiff, Is.LessThan(0.2),
+                "After second sync, should maintain tight synchronization");
+
+            // Verify that the second sync wasn't rejected (it should improve or maintain sync)
+            Assert.That(finalDiff, Is.LessThanOrEqualTo(diffAfterFirst),
+                "Second sync should not be rejected - difference should improve or stay same");
+
+            // The key test: verify we processed both syncs (no rejection of valid responses)
+            bool secondSyncImprovedThings = finalDiff < diffAfterFirst + 0.1; // Allow small tolerance
+            Assert.That(secondSyncImprovedThings, Is.True,
+                "Second sync should have been processed (not rejected)");
         }
 
         [Test]

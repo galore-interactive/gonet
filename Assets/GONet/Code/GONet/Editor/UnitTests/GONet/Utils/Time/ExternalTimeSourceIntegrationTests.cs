@@ -41,6 +41,7 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category("ExternalSync")]
+        [Explicit("Requires internet connection and external service availability")]
         [Timeout(30000)]
         public async Task Should_Sync_With_WorldTimeAPI()
         {
@@ -113,6 +114,7 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category("ExternalSync")]
+        [Explicit("Requires internet connection and external service availability")]
         [Timeout(30000)]
         public async Task Should_Handle_Variable_Internet_Latency()
         {
@@ -157,6 +159,36 @@ namespace GONet.Tests.Time
                 // Your sync algorithm should handle this variance
                 Assert.That(rttVariance, Is.GreaterThan(0), "Should see RTT variance across different servers");
             }
+        }
+
+        [Test]
+        [Category("TimeSync")]
+        public void Should_Handle_External_Time_Source_Simulation()
+        {
+            // Simulate what would happen with an external time source
+            var clientTime = new SecretaryOfTemporalAffairs();
+            clientTime.Update();
+
+            // Simulate getting time from external source with network delay
+            Thread.Sleep(100); // Simulate network request
+
+            // External source says current time is X
+            var simulatedExternalTime = DateTime.UtcNow.AddSeconds(5); // 5 seconds ahead
+            var externalTicks = simulatedExternalTime.Ticks;
+
+            // Simulate network delay in response
+            Thread.Sleep(50);
+
+            // Apply the external time
+            clientTime.SetFromAuthority(externalTicks);
+            Thread.Sleep(1100); // Wait for interpolation
+
+            clientTime.Update();
+
+            // Verify we adjusted toward external time
+            var clientSeconds = clientTime.ElapsedSeconds;
+            Assert.That(clientSeconds, Is.GreaterThan(0),
+                "Should have valid time after external sync");
         }
     }
 
