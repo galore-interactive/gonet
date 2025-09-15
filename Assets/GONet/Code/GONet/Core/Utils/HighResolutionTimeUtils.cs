@@ -18,18 +18,42 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using UnityEngine;
 
 namespace GONet.Utils
 {
     /// <summary>
     /// Ultra-high-performance monotonic timer with minimal overhead.
-    /// Optimized for frequent calls (millions per second).
-    /// Provides high-resolution timing utilities with precision exceeding <see cref="DateTime"/> (~15ms).
+    /// Optimized for frequent calls (millions per second) with special support for time sync operations.
     /// </summary>
     public static class HighResolutionTimeUtils
     {
-        // Stopwatch is already highly optimized and uses QPC on Windows
-        private static readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        // Monotonic stopwatch wrapper to ensure time never goes backwards
+        private static class MonotonicStopwatch
+        {
+            private static readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+            private static long _lastElapsedTicks = 0;
+            public static long ElapsedTicks
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get
+                {
+                    long ticks = _stopwatch.ElapsedTicks;
+                    long last;
+                    do
+                    {
+                        last = Volatile.Read(ref _lastElapsedTicks);
+                        if (ticks <= last) return last;
+                    } while (Interlocked.CompareExchange(ref _lastElapsedTicks, ticks, last) != last);
+                    return ticks;
+                }
+            }
+
+            internal static void Stop()
+            {
+                _stopwatch.Stop();
+            }
+        }
 
         // Pack related fields together for better cache locality
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -52,13 +76,43 @@ namespace GONet.Utils
             [FieldOffset(0)] public long LastResyncStopwatchTicks;
             [FieldOffset(8)] public long ResyncCount;
             [FieldOffset(16)] public int IsResyncing;
+            [FieldOffset(20)] public long LastDriftCorrection;
         }
-
         private static ResyncState resyncState;
+
+        // Platform-specific configuration
+        private static class PlatformConfig
+        {
+            public static readonly bool IsMobile = Application.isMobilePlatform;
+            public static readonly bool IsWindows = Application.platform == RuntimePlatform.WindowsPlayer
+                                                   || Application.platform == RuntimePlatform.WindowsEditor;
+            public static readonly long ResolutionTicks = GetPlatformResolution();
+            public static readonly int CacheDurationTicks = IsMobile ?
+                (int)(TimeSpan.TicksPerMillisecond * 10) : // 10ms cache on mobile for battery
+                (int)TimeSpan.TicksPerMillisecond; // 1ms cache on desktop
+
+            private static long GetPlatformResolution()
+            {
+                switch (Application.platform)
+                {
+                    case RuntimePlatform.WindowsPlayer:
+                    case RuntimePlatform.WindowsEditor:
+                        return TimeSpan.FromMilliseconds(15.6).Ticks; // Windows default timer
+                    case RuntimePlatform.Android:
+                        return TimeSpan.FromMilliseconds(10).Ticks; // Conservative Android
+                    case RuntimePlatform.IPhonePlayer:
+                        return TimeSpan.FromMilliseconds(1).Ticks; // iOS has good timers
+                    default:
+                        return TimeSpan.FromMilliseconds(1).Ticks; // macOS/Linux
+                }
+            }
+        }
 
         // Constants
         private const long RESYNC_INTERVAL_TICKS = 10L * TimeSpan.TicksPerSecond; // 10 seconds
         private const long MAX_DRIFT_TICKS = 1L * TimeSpan.TicksPerSecond; // 1 second max drift
+        
+        public  const double TICKS_TO_SECONDS = 1.0 / TimeSpan.TicksPerSecond;
 
         // Thread-local cache to reduce contention
         [ThreadStatic] private static long threadLocalLastCheck;
@@ -69,43 +123,88 @@ namespace GONet.Utils
         private static volatile bool isInitialized = false;
         private static readonly object initLock = new object();
 
-        // FIXED: Use a static readonly field that forces initialization on type load
+        // Force initialization on type load
         private static readonly bool forceInit = InitializeOnLoad();
+
+
+        private static volatile int shutdownState = 0; // 0 = false, 1 = true
+
+        private static bool isShuttingDown
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => shutdownState == 1;
+        }
+
+        static HighResolutionTimeUtils()
+        {
+            InitializeOnLoad();
+            for (int i = 0; i < 3; i++)
+            {
+                var dummy = UtcNow;
+                Thread.SpinWait(100);
+            }
+        }
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+        private static extern uint TimeBeginPeriod(uint uMilliseconds);
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+        private static extern uint TimeEndPeriod(uint uMilliseconds);
+#endif
+
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+#endif
+        [RuntimeInitializeOnLoadMethod]
+        static void InitializeShutdown()
+        {
+            Application.quitting -= Shutdown; // Unregister first to avoid re-adding
+            Application.quitting += () => Shutdown();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.quitting -= () => Shutdown();
+            UnityEditor.EditorApplication.quitting += () => Shutdown();
+#endif
+        }
 
         private static bool InitializeOnLoad()
         {
+            InitializePlatformTimer();
             InitializeCore();
             return true;
         }
 
-        // FIXED: Lazy initialization with explicit checks
-        private static readonly Lazy<bool> lazyInitializer = new Lazy<bool>(() =>
+        private static void InitializePlatformTimer()
         {
-            // This is now a backup in case the static field didn't initialize
-            if (!isInitialized)
-            {
-                InitializeCore();
-            }
-            return true;
-        }, LazyThreadSafetyMode.ExecutionAndPublication);
-
-        // Force initialization on any access
-        private static void ForceInitialization()
-        {
-            _ = lazyInitializer.Value;
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            TimeBeginPeriod(1);
+#elif UNITY_ANDROID
+#elif UNITY_IOS
+#endif
         }
+
+#if UNITY_EDITOR
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetOnPlayMode()
+        {
+            isInitialized = false;
+            timeState = new TimeState();
+            resyncState = new ResyncState();
+            threadLocalLastCheck = 0;
+            threadLocalLastLocalTicks = 0;
+            threadLocalLastUtcTicks = 0;
+            threadLocalInitialized = false;
+            InitializeCore();
+        }
+#endif
 
         private static void InitializeCore()
         {
             lock (initLock)
             {
-                if (isInitialized) return; // Already initialized
-
+                if (isInitialized) return;
+                var swTicks = MonotonicStopwatch.ElapsedTicks;
+                var utcNow = DateTime.UtcNow; // Single initial call for compatibility baseline
                 var now = DateTime.Now;
-                var utcNow = DateTime.UtcNow;
-                var swTicks = stopwatch.ElapsedTicks;
-
-                // Initialize all fields atomically
                 var newState = new TimeState
                 {
                     BaseLocalTicks = now.Ticks,
@@ -114,17 +213,12 @@ namespace GONet.Utils
                     LastLocalTicks = now.Ticks,
                     LastUtcTicks = utcNow.Ticks
                 };
-
-                // Use interlocked operations for atomic writes
                 Interlocked.Exchange(ref timeState.BaseLocalTicks, newState.BaseLocalTicks);
                 Interlocked.Exchange(ref timeState.BaseUtcTicks, newState.BaseUtcTicks);
                 Interlocked.Exchange(ref timeState.BaseStopwatchTicks, newState.BaseStopwatchTicks);
                 Interlocked.Exchange(ref timeState.LastLocalTicks, newState.LastLocalTicks);
                 Interlocked.Exchange(ref timeState.LastUtcTicks, newState.LastUtcTicks);
-
                 Interlocked.Exchange(ref resyncState.LastResyncStopwatchTicks, swTicks);
-
-                // Full memory barrier
                 Thread.MemoryBarrier();
                 isInitialized = true;
                 Thread.MemoryBarrier();
@@ -132,16 +226,16 @@ namespace GONet.Utils
         }
 
         /// <summary>
-        /// Gets the current UTC time. Optimized for maximum performance.
+        /// Gets the current UTC time with backward compatibility. Uses high-resolution deltas after initial system time anchor.
         /// </summary>
         public static DateTime UtcNow
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                ForceInitialization();
+                if (isShuttingDown) return DateTime.UtcNow; // Fallback during shutdown
 
-                // Initialize thread-local cache if needed
+                if (!isInitialized) InitializeCore();
                 if (!threadLocalInitialized)
                 {
                     threadLocalLastCheck = 0;
@@ -149,29 +243,26 @@ namespace GONet.Utils
                     threadLocalLastUtcTicks = 0;
                     threadLocalInitialized = true;
                 }
-
-                // Fast path - use thread-local cache if very recent
-                long swTicks = stopwatch.ElapsedTicks;
-                if (threadLocalLastUtcTicks > 0 && (swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
+                long swTicks = MonotonicStopwatch.ElapsedTicks;
+                if (threadLocalLastUtcTicks > 0 && (swTicks - threadLocalLastCheck) < PlatformConfig.CacheDurationTicks)
                 {
                     return new DateTime(threadLocalLastUtcTicks, DateTimeKind.Utc);
                 }
-
                 return GetTimeCore(true, swTicks);
             }
         }
 
         /// <summary>
-        /// Gets the current local time. Optimized for maximum performance.
+        /// Gets the current local time with backward compatibility. Uses high-resolution deltas after initial system time anchor.
         /// </summary>
         public static DateTime Now
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                ForceInitialization();
+                if (isShuttingDown) return DateTime.Now; // Fallback during shutdown
 
-                // Initialize thread-local cache if needed
+                if (!isInitialized) InitializeCore();
                 if (!threadLocalInitialized)
                 {
                     threadLocalLastCheck = 0;
@@ -179,148 +270,161 @@ namespace GONet.Utils
                     threadLocalLastUtcTicks = 0;
                     threadLocalInitialized = true;
                 }
-
-                // Fast path - use thread-local cache if very recent
-                long swTicks = stopwatch.ElapsedTicks;
-                if (threadLocalLastLocalTicks > 0 && (swTicks - threadLocalLastCheck) < TimeSpan.TicksPerMillisecond)
+                long swTicks = MonotonicStopwatch.ElapsedTicks;
+                if (threadLocalLastLocalTicks > 0 && (swTicks - threadLocalLastCheck) < PlatformConfig.CacheDurationTicks)
                 {
                     return new DateTime(threadLocalLastLocalTicks, DateTimeKind.Local);
                 }
-
                 return GetTimeCore(false, swTicks);
+            }
+        }
+
+        /// <summary>
+        /// Gets the current UTC elapsed ticks for high-precision operations.
+        /// </summary>
+        public static long UtcNowTicks
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (!isInitialized) InitializeCore();
+                long swTicks = MonotonicStopwatch.ElapsedTicks;
+                long baseStopwatchTicks = Volatile.Read(ref timeState.BaseStopwatchTicks);
+                long baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
+                return baseUtcTicks + (swTicks - baseStopwatchTicks);
+            }
+        }
+
+        /// <summary>
+        /// Gets the current local elapsed ticks for high-precision operations.
+        /// </summary>
+        public static long NowTicks
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (!isInitialized) InitializeCore();
+                long swTicks = MonotonicStopwatch.ElapsedTicks;
+                long baseStopwatchTicks = Volatile.Read(ref timeState.BaseStopwatchTicks);
+                long baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
+                return baseLocalTicks + (swTicks - baseStopwatchTicks);
+            }
+        }
+
+        /// <summary>
+        /// IMPORTANT: GONet internal use only.
+        /// Gets current elapsed ticks specifically for time sync operations.
+        /// Bypasses all caching for maximum accuracy.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static long GetTimeSyncTicks_Internal()
+        {
+            if (!isInitialized) InitializeCore();
+            long swTicks = MonotonicStopwatch.ElapsedTicks;
+            long baseStopwatchTicks = Volatile.Read(ref timeState.BaseStopwatchTicks);
+            return swTicks - baseStopwatchTicks;
+        }
+
+        /// <summary>
+        /// Gets multiple time samples for NTP-style median filtering in time sync
+        /// </summary>
+        public static void GetTimeSyncSamples(Span<long> samples)
+        {
+            if (!isInitialized) InitializeCore();
+            for (int i = 0; i < samples.Length; i++)
+            {
+                samples[i] = GetTimeSyncTicks_Internal();
+                if (i < samples.Length - 1)
+                {
+                    if (PlatformConfig.IsMobile)
+                        Thread.SpinWait(100);
+                    else
+                        Thread.SpinWait(10);
+                }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static DateTime GetTimeCore(bool useUtc, long swTicks)
         {
-            // Update thread-local check time
+            if (isShuttingDown) return useUtc ? DateTime.UtcNow : DateTime.Now;
+
             threadLocalLastCheck = swTicks;
-
-            // Check if resync needed (branch prediction will optimize this)
-            long lastResync = Interlocked.Read(ref resyncState.LastResyncStopwatchTicks);
-            if (swTicks - lastResync > RESYNC_INTERVAL_TICKS)
-            {
-                TryResyncFast();
-            }
-
-            // Read state with Interlocked for guaranteed visibility
             long baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
             long baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
             long baseStopwatchTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
-
-            // Emergency re-initialization if we detect uninitialized state
             if (baseLocalTicks == 0 || baseUtcTicks == 0)
             {
                 InitializeCore();
-
-                // Re-read after initialization
                 baseLocalTicks = Interlocked.Read(ref timeState.BaseLocalTicks);
                 baseUtcTicks = Interlocked.Read(ref timeState.BaseUtcTicks);
                 baseStopwatchTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
             }
-
-            // Calculate time
-            long elapsed = swTicks - baseStopwatchTicks;
+            long elapsedStopwatchTicks = swTicks - baseStopwatchTicks;
+            double elapsedSeconds = (double)elapsedStopwatchTicks / Stopwatch.Frequency;
+            long elapsedDateTimeTicks = (long)(elapsedSeconds * TimeSpan.TicksPerSecond);
             long baseTicks = useUtc ? baseUtcTicks : baseLocalTicks;
-            long calculatedTicks = baseTicks + elapsed;
-
-            // Ensure monotonicity with proper synchronization
-            long lastTicksFieldOffset = useUtc ?
-                Marshal.OffsetOf<TimeState>("LastUtcTicks").ToInt64() :
-                Marshal.OffsetOf<TimeState>("LastLocalTicks").ToInt64();
-
-            // Get reference to the appropriate LastTicks field
+            long calculatedTicks = baseTicks + elapsedDateTimeTicks;
             ref long lastTicksRef = ref (useUtc ? ref timeState.LastUtcTicks : ref timeState.LastLocalTicks);
-
-            // Atomic monotonic update loop
             long finalTicks = calculatedTicks;
             long currentLast;
+           
             do
             {
                 currentLast = Interlocked.Read(ref lastTicksRef);
-
-                // Ensure we never go backwards
                 if (finalTicks <= currentLast)
                 {
                     finalTicks = currentLast;
-                    break; // No need to update, just use the current value
-                }
-
-                // Try to update to our new value
-                long exchanged = Interlocked.CompareExchange(ref lastTicksRef, finalTicks, currentLast);
-                if (exchanged == currentLast)
-                {
-                    // Success - we updated the value
                     break;
                 }
-
-                // Another thread updated the value, check if we should use their value
+                long exchanged = Interlocked.CompareExchange(ref lastTicksRef, finalTicks, currentLast);
+                if (exchanged == currentLast) break;
                 if (exchanged >= finalTicks)
                 {
-                    // Their time is newer, use it
                     finalTicks = exchanged;
                     break;
                 }
-                // Otherwise, retry with our value
             } while (true);
 
-            // Update thread-local cache
             if (useUtc)
-            {
                 threadLocalLastUtcTicks = finalTicks;
-            }
             else
-            {
                 threadLocalLastLocalTicks = finalTicks;
-            }
 
             return new DateTime(finalTicks, useUtc ? DateTimeKind.Utc : DateTimeKind.Local);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)] // Keep resync out of hot path
-        private static void TryResyncFast()
+        /// <summary>
+        /// Cleanup method for application shutdown
+        /// </summary>
+        public static void Shutdown()
         {
-            // Quick non-blocking attempt
-            if (Interlocked.CompareExchange(ref resyncState.IsResyncing, 1, 0) == 0)
+            if (Interlocked.CompareExchange(ref shutdownState, 1, 0) == 0)
             {
-                try
-                {
-                    // Minimal resync - no drift correction for max performance
-                    var swTicks = stopwatch.ElapsedTicks;
+                MonotonicStopwatch.Stop();
 
-                    // Only update resync timestamp
-                    Interlocked.Exchange(ref resyncState.LastResyncStopwatchTicks, swTicks);
-                    Interlocked.Increment(ref resyncState.ResyncCount);
-                }
-                finally
-                {
-                    Interlocked.Exchange(ref resyncState.IsResyncing, 0);
-                }
+                threadLocalLastCheck = 0;
+                threadLocalLastLocalTicks = 0;
+                threadLocalLastUtcTicks = 0;
+                threadLocalInitialized = false;
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                TimeEndPeriod(1);
+#endif
             }
         }
 
         /// <summary>
-        /// High-performance bulk time generation for benchmarking.
+        /// Gets diagnostic information about timer performance
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetBulkTimes(Span<long> ticks, bool useUtc)
+        public static string GetDiagnostics()
         {
-            ForceInitialization();
-
-            long swTicks = stopwatch.ElapsedTicks;
-
-            // Use Interlocked reads
-            long baseTicks = useUtc ?
-                Interlocked.Read(ref timeState.BaseUtcTicks) :
-                Interlocked.Read(ref timeState.BaseLocalTicks);
-            long baseSwTicks = Interlocked.Read(ref timeState.BaseStopwatchTicks);
-
-            // Vectorized operation for bulk requests
-            for (int i = 0; i < ticks.Length; i++)
-            {
-                ticks[i] = baseTicks + (swTicks - baseSwTicks) + i;
-            }
+            long resyncCount = Interlocked.Read(ref resyncState.ResyncCount);
+            long lastDrift = Interlocked.Read(ref resyncState.LastDriftCorrection);
+            return $"[HighResTimer] Platform: {Application.platform}, " +
+                   $"Resolution: {PlatformConfig.ResolutionTicks / 10000}ms, " +
+                   $"Cache: {PlatformConfig.CacheDurationTicks / 10000}ms, " +
+                   $"Resyncs: {resyncCount}, " +
+                   $"LastDrift: {lastDrift / 10000}ms";
         }
     }
 }

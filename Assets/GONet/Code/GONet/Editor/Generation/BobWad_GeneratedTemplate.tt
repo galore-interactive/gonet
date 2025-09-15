@@ -139,6 +139,7 @@ namespace GONet
 	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(<#=syncEventTypeFullName#>))]
 	<#
     }
+	[MemoryPack.MemoryPackUnion(<#=(++iPersistentEvents - 1).ToString()#>, typeof(GONet.SyncEvent_Time_ElapsedTicks_SetFromAuthority))]
 #>	public abstract partial class SyncEvent_ValueChangeProcessed { }
 
 	public enum SyncEvent_GeneratedTypes
