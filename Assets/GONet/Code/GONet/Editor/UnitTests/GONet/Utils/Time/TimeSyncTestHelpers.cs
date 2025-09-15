@@ -57,49 +57,6 @@ namespace GONet.Tests.Time
         }
 
         /// <summary>
-        /// Gets the current RTT buffer state for debugging
-        /// </summary>
-        public static string GetRttBufferState()
-        {
-            var timeSyncType = typeof(HighPerfTimeSync);
-            var rttBufferField = timeSyncType.GetField("rttBuffer", BindingFlags.NonPublic | BindingFlags.Static);
-            var rttWriteIndexField = timeSyncType.GetField("rttWriteIndex", BindingFlags.NonPublic | BindingFlags.Static);
-
-            var buffer = rttBufferField?.GetValue(null) as Array;
-            var writeIndex = (int)(rttWriteIndexField?.GetValue(null) ?? 0);
-
-            if (buffer == null) return "RTT buffer not found";
-
-            var sampleType = buffer.GetType().GetElementType();
-            var timestampField = sampleType?.GetField("Timestamp");
-            var valueField = sampleType?.GetField("Value");
-
-            int validSamples = 0;
-            float minRtt = float.MaxValue;
-            float maxRtt = float.MinValue;
-
-            for (int i = 0; i < buffer.Length; i++)
-            {
-                var sample = buffer.GetValue(i);
-                if (sample != null && timestampField != null && valueField != null)
-                {
-                    long timestamp = (long)timestampField.GetValue(sample);
-                    float value = (float)valueField.GetValue(sample);
-
-                    if (timestamp > 0)
-                    {
-                        validSamples++;
-                        minRtt = Math.Min(minRtt, value);
-                        maxRtt = Math.Max(maxRtt, value);
-                    }
-                }
-            }
-
-            return $"RTT Buffer: WriteIndex={writeIndex}, ValidSamples={validSamples}, " +
-                   $"MinRTT={minRtt:F3}s, MaxRTT={maxRtt:F3}s";
-        }
-
-        /// <summary>
         /// Gets the last processed response ticks for debugging
         /// </summary>
         public static long GetLastProcessedResponseTicks()

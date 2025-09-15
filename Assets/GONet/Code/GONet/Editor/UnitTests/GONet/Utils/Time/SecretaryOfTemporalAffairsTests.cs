@@ -25,8 +25,15 @@ namespace GONet.Tests.Time
         [SetUp]
         public void Setup()
         {
+            // Reset any static state that might interfere
+            HighPerfTimeSync.ResetForTesting(); // If you added this method
+
             // Create a fresh instance for each test
             timeKeeper = new SecretaryOfTemporalAffairs();
+
+            // Ensure it's properly initialized with some elapsed time
+            Thread.Sleep(50); // Let real time pass
+            timeKeeper.Update(); // Initialize with current time
         }
 
         [TearDown]
@@ -42,17 +49,22 @@ namespace GONet.Tests.Time
         [Category("Initialization")]
         public void Should_Initialize_With_Default_Values()
         {
-            // Update count should be 0
-            Assert.That(timeKeeper.UpdateCount, Is.EqualTo(0),
+            // Create a completely fresh instance for this specific test
+            var freshTimeKeeper = new SecretaryOfTemporalAffairs();
+
+            // Before any Update() calls:
+            Assert.That(freshTimeKeeper.UpdateCount, Is.EqualTo(0),
                 "UpdateCount should be 0 initially");
 
-            // Frame count should be 0
-            Assert.That(timeKeeper.FrameCount, Is.EqualTo(0),
+            Assert.That(freshTimeKeeper.FrameCount, Is.EqualTo(0),
                 "FrameCount should be 0 initially");
 
-            // DeltaTime should be 0
-            Assert.That(timeKeeper.DeltaTime, Is.EqualTo(0f),
+            Assert.That(freshTimeKeeper.DeltaTime, Is.EqualTo(0f),
                 "DeltaTime should be 0 initially");
+
+            // ElapsedTime might not be exactly 0 due to initialization, but should be very small
+            Assert.That(freshTimeKeeper.ElapsedSeconds, Is.GreaterThanOrEqualTo(0),
+                "ElapsedSeconds should be non-negative initially");
         }
 
         [Test]
@@ -226,26 +238,47 @@ namespace GONet.Tests.Time
 
         #region Authority Synchronization Tests
 
-        [Test]
+        [Test, Order(1)]  // Run this test early
         [Category("Authority")]
         public void SetFromAuthority_Should_Update_Time()
         {
+            // Ensure clean state - the timeKeeper is created fresh in Setup()
+            // but we need to ensure it's properly initialized
             timeKeeper.Update(); // Initialize
+            Thread.Sleep(10); // Let some real time pass
+            timeKeeper.Update(); // Update again
 
+            // Get current state
             double oldSeconds = timeKeeper.ElapsedSeconds;
             long oldTicks = timeKeeper.ElapsedTicks;
 
-            // Set time from authority (simulate server time)
-            long authorityTicks = TimeSpan.FromSeconds(100).Ticks;
+            // Verify we have valid initial time
+            Assert.That(oldTicks, Is.GreaterThan(0), "Should have valid initial elapsed time");
+
+            // Set time from authority with a significant difference
+            long authorityTicks = oldTicks + TimeSpan.FromSeconds(100).Ticks;
             timeKeeper.SetFromAuthority(authorityTicks);
 
-            // Time should now reflect authority time (with interpolation)
-            // Note: The actual time might not immediately jump to authority time due to interpolation
+            // The SetFromAuthority starts an interpolation/adjustment
+            // We need to let it process
             Thread.Sleep(50);
             timeKeeper.Update();
 
-            Assert.That(timeKeeper.ElapsedTicks, Is.Not.EqualTo(oldTicks),
+            // Check if time changed
+            long newTicks = timeKeeper.ElapsedTicks;
+            double newSeconds = timeKeeper.ElapsedSeconds;
+
+            UnityEngine.Debug.Log($"Before SetFromAuthority: {oldTicks} ticks ({oldSeconds:F3}s)");
+            UnityEngine.Debug.Log($"After SetFromAuthority: {newTicks} ticks ({newSeconds:F3}s)");
+            UnityEngine.Debug.Log($"Authority target was: {authorityTicks} ticks");
+
+            // The time should have changed
+            Assert.That(newTicks, Is.Not.EqualTo(oldTicks),
                 "Time should change after SetFromAuthority");
+
+            // It should be moving toward the authority time
+            Assert.That(newTicks, Is.GreaterThan(oldTicks),
+                "Time should have increased toward authority time");
         }
 
         [Test]

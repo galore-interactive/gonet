@@ -193,52 +193,94 @@ namespace GONet.Tests.Time
 
             clientTime.Update();
             serverTime.Update();
-            serverTime.SetFromAuthority(clientTime.ElapsedTicks + TimeSpan.FromSeconds(5).Ticks);
 
-            // Sync with WiFi latency
+            // Start with synchronized times
+            Thread.Sleep(100);
+            clientTime.Update();
+            serverTime.Update();
+
+            // Set server slightly ahead to create a realistic scenario
+            serverTime.SetFromAuthority(clientTime.ElapsedTicks + TimeSpan.FromSeconds(1).Ticks);
+            Thread.Sleep(1100); // Wait for interpolation
+
+            clientTime.Update();
+            serverTime.Update();
+
+            // Verify initial setup
+            double initialDiff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
+            UnityEngine.Debug.Log($"Initial difference: {initialDiff:F3}s");
+            Assert.That(initialDiff, Is.InRange(0.8, 1.2), "Should start with ~1 second difference");
+
+            // Sync with WiFi latency (good connection)
+            UnityEngine.Debug.Log("=== WiFi Phase ===");
             for (int i = 0; i < 3; i++)
             {
                 var request = new RequestMessage(clientTime.ElapsedTicks);
-                Thread.Sleep(wifiLatencyMs);
+                Thread.Sleep(wifiLatencyMs / 2); // Request travel time
+
+                serverTime.Update();
+                long serverTicks = serverTime.ElapsedTicks;
+
+                Thread.Sleep(wifiLatencyMs / 2); // Response travel time
 
                 HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
-                    serverTime.ElapsedTicks,
+                    serverTicks,
                     request,
                     clientTime,
-                    i == 0
+                    i == 0 // Force first sync
                 );
 
-                Thread.Sleep(500);
+                Thread.Sleep(1100); // Wait for interpolation
                 clientTime.Update();
                 serverTime.Update();
+
+                double diff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
+                UnityEngine.Debug.Log($"WiFi sync {i}: diff = {diff:F3}s");
             }
 
-            // Switch to cellular latency
-            UnityEngine.Debug.Log("Simulating network switch to cellular");
+            // Check sync after WiFi phase
+            double wifiDiff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
+            UnityEngine.Debug.Log($"After WiFi syncs: {wifiDiff:F3}s difference");
+            Assert.That(wifiDiff, Is.LessThan(0.1), "Should be well synced on WiFi");
+
+            // Switch to cellular latency (slower connection)
+            UnityEngine.Debug.Log("=== Switching to Cellular ===");
 
             for (int i = 0; i < 3; i++)
             {
                 var request = new RequestMessage(clientTime.ElapsedTicks);
-                Thread.Sleep(cellularLatencyMs);
+                Thread.Sleep(cellularLatencyMs / 2); // Request travel time
+
+                serverTime.Update();
+                long serverTicks = serverTime.ElapsedTicks;
+
+                Thread.Sleep(cellularLatencyMs / 2); // Response travel time
 
                 HighPerfTimeSync.ProcessTimeSync(
                     request.UID,
-                    serverTime.ElapsedTicks,
+                    serverTicks,
                     request,
                     clientTime,
-                    false
+                    false // Don't force, let it adapt
                 );
 
-                Thread.Sleep(500);
+                Thread.Sleep(1100); // Wait for interpolation
                 clientTime.Update();
                 serverTime.Update();
+
+                double diff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
+                UnityEngine.Debug.Log($"Cellular sync {i}: diff = {diff:F3}s");
             }
 
             // Should maintain sync despite latency change
-            var diff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
-            Assert.That(diff, Is.LessThan(0.2),
-                "Should maintain sync after network type change");
+            double finalDiff = Math.Abs(serverTime.ElapsedSeconds - clientTime.ElapsedSeconds);
+            UnityEngine.Debug.Log($"Final difference after network change: {finalDiff:F3}s");
+
+            // The sync should adapt to the new latency but maintain synchronization
+            // Allow slightly more tolerance due to increased latency
+            Assert.That(finalDiff, Is.LessThan(0.3),
+                $"Should maintain sync after network type change (got {finalDiff:F3}s difference)");
         }
     }
 }

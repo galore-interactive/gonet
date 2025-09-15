@@ -13,6 +13,14 @@ namespace GONet.Tests.Time
     /// </summary>
     public abstract class TimeSyncTestBase
     {
+
+        // Mock request message for testing
+        internal class MockRequestMessage : RequestMessage
+        {
+            public MockRequestMessage(long occurredAtTicks) : base(occurredAtTicks) { }
+        }
+
+
         protected CancellationTokenSource cts;
 
         [SetUp]
@@ -111,6 +119,8 @@ namespace GONet.Tests.Time
             var lastSyncTimeField = schedulerType.GetField("lastSyncTimeTicks",
                 BindingFlags.NonPublic | BindingFlags.Static);
             lastSyncTimeField?.SetValue(null, 0L);
+
+            HighPerfTimeSync.ResetForTesting();
         }
 
         /// <summary>
