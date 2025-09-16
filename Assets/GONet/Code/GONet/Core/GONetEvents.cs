@@ -81,6 +81,31 @@ namespace GONet
 
     #endregion
 
+    #region RPC Support
+
+    [MemoryPackable]
+    internal partial class RpcEvent : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+        public uint RpcId { get; set; }
+        public uint GONetId { get; set; }
+        public byte[] Data { get; set; }
+        public long CorrelationId { get; set; } // For request-response
+        public bool IsSingularRecipientOnly { get; set; }
+    }
+
+    [MemoryPackable]
+    internal partial class RpcResponseEvent : ITransientEvent
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+        public long CorrelationId { get; set; }
+        public byte[] Data { get; set; }
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; }
+        public bool IsSingularRecipientOnly => true;
+    }
+    #endregion
+
     [MemoryPackable]
     public partial class ServerSaysClientInitializationCompletion : ITransientEvent
     {
