@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace GONet
@@ -281,5 +282,107 @@ namespace GONet
         public virtual void OnGONetParticipantDisabled() { }
 
         public virtual void OnGONetParticipant_OwnerAuthorityIdSet() { }
+
+        #region RPC Support
+        // 0 parameters
+        protected void CallRpc(string methodName)
+        {
+            EventBus.CallRpcInternal(this, methodName);
+        }
+
+        // 1 parameter
+        protected void CallRpc<T1>(string methodName, T1 arg1)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1);
+        }
+
+        // 2 parameters
+        protected void CallRpc<T1, T2>(string methodName, T1 arg1, T2 arg2)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2);
+        }
+
+        // 3 parameters
+        protected void CallRpc<T1, T2, T3>(string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3);
+        }
+
+        // 4 parameters
+        protected void CallRpc<T1, T2, T3, T4>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4);
+        }
+
+        // 5 parameters
+        protected void CallRpc<T1, T2, T3, T4, T5>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5);
+        }
+
+        // 6 parameters
+        protected void CallRpc<T1, T2, T3, T4, T5, T6>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+        }
+
+        // 7 parameters
+        protected void CallRpc<T1, T2, T3, T4, T5, T6, T7>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        }
+
+        // 8 parameters
+        protected void CallRpc<T1, T2, T3, T4, T5, T6, T7, T8>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+        }
+
+        // Async versions with return values - generic pushed to EventBus
+        protected async Task<TResult> CallRpcAsync<TResult>(string methodName)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult>(this, methodName);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1>(string methodName, T1 arg1)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1>(this, methodName, arg1);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2>(string methodName, T1 arg1, T2 arg2)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2>(this, methodName, arg1, arg2);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3>(string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3>(this, methodName, arg1, arg2, arg3);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3, T4>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4>(this, methodName, arg1, arg2, arg3, arg4);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3, T4, T5>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5>(this, methodName, arg1, arg2, arg3, arg4, arg5);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6>(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        }
+
+        protected async Task<TResult> CallRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+        }
+        #endregion
     }
 }

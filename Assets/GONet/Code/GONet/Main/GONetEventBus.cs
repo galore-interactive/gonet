@@ -429,7 +429,7 @@ namespace GONet
 
         #region RPC Support
 
-        internal readonly Dictionary<uint, Action<GONetEventEnvelope<RpcEvent>>> rpcHandlers = new();
+        private readonly Dictionary<uint, Func<GONetEventEnvelope<RpcEvent>, Task>> rpcHandlers = new Dictionary<uint, Func<GONetEventEnvelope<RpcEvent>, Task>>();
         private readonly ConcurrentDictionary<long, object> pendingResponses = new(); // TaskCompletionSource<T>
         private readonly ObjectPool<RpcEvent> rpcEventPool = new(100, 10);
         private readonly ObjectPool<RpcResponseEvent> rpcResponsePool = new(100, 10);
@@ -454,13 +454,24 @@ namespace GONet
             return currentRpcContext.Value;
         }
 
+        internal static void SetCurrentRpcContext(GONetRpcContext? context)
+        {
+            currentRpcContext = context;
+        }
+
         internal void InitializeRpcSystem()
         {
             Subscribe<RpcEvent>(HandleIncomingRpc);
             Subscribe<RpcResponseEvent>(HandleRpcResponse);
         }
 
-        private void HandleIncomingRpc(GONetEventEnvelope<RpcEvent> envelope)
+
+        internal void RegisterRpcHandler(uint rpcId, Func<GONetEventEnvelope<RpcEvent>, Task> handler)
+        {
+            rpcHandlers[rpcId] = handler;
+        }
+
+        private async void HandleIncomingRpc(GONetEventEnvelope<RpcEvent> envelope)
         {
             var rpcEvent = envelope.Event;
 
@@ -475,9 +486,8 @@ namespace GONet
 
             try
             {
-                handler(envelope);
-
-                // If this RPC expects a response, the handler will send it
+                await handler(envelope);
+                // The handler will send response if needed
             }
             catch (Exception ex)
             {
@@ -490,9 +500,7 @@ namespace GONet
                     errorResponse.CorrelationId = rpcEvent.CorrelationId;
                     errorResponse.Success = false;
                     errorResponse.ErrorMessage = ex.Message;
-
                     Publish(errorResponse, targetClientAuthorityId: envelope.SourceAuthorityId);
-
                     rpcResponsePool.Return(errorResponse);
                 }
             }
@@ -514,18 +522,38 @@ namespace GONet
                 return;
             }
 
-            // Cast to the appropriate TaskCompletionSource type
-            // The actual type is stored when registering the pending response
-            if (tcsObj is TaskCompletionSource<object> tcs)
+            // The tcsObj should be a TaskCompletionSource<T> where T is the actual return type
+            // We'll handle deserialization in the specific typed methods
+            if (tcsObj is IResponseHandler responseHandler)
+            {
+                responseHandler.HandleResponse(response);
+            }
+        }
+
+        // Interface for handling typed responses
+        internal interface IResponseHandler
+        {
+            void HandleResponse(RpcResponseEvent response);
+        }
+
+        // Generic response handler implementation
+        internal class ResponseHandler<T> : IResponseHandler
+        {
+            private readonly TaskCompletionSource<T> tcs;
+
+            public ResponseHandler(TaskCompletionSource<T> tcs)
+            {
+                this.tcs = tcs;
+            }
+
+            public void HandleResponse(RpcResponseEvent response)
             {
                 if (response.Success)
                 {
                     try
                     {
-                        // The generated code knows the actual type
-                        // This will be handled by the specific generated method
-                        // For now, we just complete with the raw data
-                        tcs.TrySetResult(response.Data);
+                        var result = SerializationUtils.DeserializeFromBytes<T>(response.Data);
+                        tcs.TrySetResult(result);
                     }
                     catch (Exception ex)
                     {
@@ -586,6 +614,2741 @@ namespace GONet
                         new TimeoutException($"RPC request timed out after 30 seconds (correlation: {correlationId})"));
                 }
             });
+        }
+
+        private readonly Dictionary<Type, Dictionary<string, RpcMetadata>> rpcMetadata = new Dictionary<Type, Dictionary<string, RpcMetadata>>();
+
+        public void RegisterRpcMetadata(Type componentType, Dictionary<string, RpcMetadata> metadata)
+        {
+            rpcMetadata[componentType] = metadata;
+        }
+
+        // HandleServerRpc - 0 parameters
+        private void HandleServerRpc(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch0(instance, methodName);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc0(instance, methodName, metadata.IsReliable);
+            }
+        }
+
+        // HandleServerRpc - 1 parameter
+        private void HandleServerRpc<T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch1(instance, methodName, arg1);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc1(instance, methodName, metadata.IsReliable, arg1);
+            }
+        }
+
+        // HandleServerRpc - 2 parameters
+        private void HandleServerRpc<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch2(instance, methodName, arg1, arg2);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc2(instance, methodName, metadata.IsReliable, arg1, arg2);
+            }
+        }
+
+        // HandleServerRpc - 3 parameters
+        private void HandleServerRpc<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch3(instance, methodName, arg1, arg2, arg3);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc3(instance, methodName, metadata.IsReliable, arg1, arg2, arg3);
+            }
+        }
+
+        // HandleServerRpc - 4 parameters
+        private void HandleServerRpc<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch4(instance, methodName, arg1, arg2, arg3, arg4);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc4(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4);
+            }
+        }
+
+        // HandleServerRpc - 5 parameters
+        private void HandleServerRpc<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch5(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc5(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5);
+            }
+        }
+
+        // HandleServerRpc - 6 parameters
+        private void HandleServerRpc<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch6(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc6(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6);
+            }
+        }
+
+        // HandleServerRpc - 7 parameters
+        private void HandleServerRpc<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch7(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc7(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            }
+        }
+
+        // HandleServerRpc - 8 parameters
+        private void HandleServerRpc<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch8(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+            }
+            else
+            {
+                SendRpc8(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            }
+        }
+
+        // HandleClientRpc - 0 parameters
+        private void HandleClientRpc(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch0(instance, methodName);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 1 parameter
+        private void HandleClientRpc<T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch1(instance, methodName, arg1);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData1<T1> { Arg1 = arg1 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 2 parameters
+        private void HandleClientRpc<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch2(instance, methodName, arg1, arg2);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 3 parameters
+        private void HandleClientRpc<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch3(instance, methodName, arg1, arg2, arg3);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 4 parameters
+        private void HandleClientRpc<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch4(instance, methodName, arg1, arg2, arg3, arg4);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 5 parameters
+        private void HandleClientRpc<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch5(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 6 parameters
+        private void HandleClientRpc<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch6(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 7 parameters
+        private void HandleClientRpc<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch7(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleClientRpc - 8 parameters
+        private void HandleClientRpc<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (GONetMain.IsServer)
+            {
+                // Execute locally on server
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch8(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+
+                // Then broadcast to all clients
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"ClientRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 0 parameters
+        private void HandleTargetRpc(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch0(instance, methodName);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 1 parameter
+        private void HandleTargetRpc<T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch1(instance, methodName, arg1);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData1<T1> { Arg1 = arg1 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 2 parameters
+        private void HandleTargetRpc<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch2(instance, methodName, arg1, arg2);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 3 parameters
+        private void HandleTargetRpc<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch3(instance, methodName, arg1, arg2, arg3);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 4 parameters
+        private void HandleTargetRpc<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch4(instance, methodName, arg1, arg2, arg3, arg4);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 5 parameters
+        private void HandleTargetRpc<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch5(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 6 parameters
+        private void HandleTargetRpc<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch6(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 7 parameters
+        private void HandleTargetRpc<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch7(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        // HandleTargetRpc - 8 parameters
+        private void HandleTargetRpc<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (GONetMain.IsServer)
+            {
+                ushort targetId = GONetMain.OwnerAuthorityId_Unset;
+
+                switch (metadata.Target)
+                {
+                    case RpcTarget.Owner:
+                        targetId = instance.GONetParticipant.OwnerAuthorityId;
+                        break;
+                    case RpcTarget.All:
+                        targetId = GONetMain.OwnerAuthorityId_Unset;
+                        break;
+                    case RpcTarget.Others:
+                        // Need special handling to exclude owner
+                        break;
+                }
+
+                // Execute locally if server is the target
+                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)
+                {
+                    if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                    {
+                        var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            dispatcher.Dispatch8(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                        }
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
+                    }
+                }
+
+                // Send to target client(s)
+                var rpcId = GetRpcId(instance.GetType(), methodName);
+                var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+                int bytesUsed;
+                bool needsReturn;
+                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                var rpcEvent = BorrowRpcEvent();
+                rpcEvent.RpcId = rpcId;
+                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                rpcEvent.Data = serialized;
+                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;
+                Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: metadata.IsReliable);
+
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+                ReturnRpcEvent(rpcEvent);
+            }
+            else
+            {
+                GONetLog.Warning($"TargetRpc {methodName} can only be called from server");
+            }
+        }
+
+        private void SendRpc0(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc1<T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData1<T1> { Arg1 = arg1 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc2
+        private void SendRpc2<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc3
+        private void SendRpc3<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc4
+        private void SendRpc4<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc5
+        private void SendRpc5<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc6
+        private void SendRpc6<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc7
+        private void SendRpc7<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // SendRpc8
+        private void SendRpc8<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        // 0 parameters
+        internal void CallRpcInternal(GONetParticipantCompanionBehaviour instance, string methodName)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata);
+                    break;
+            }
+        }
+
+        // 1 parameter
+        internal void CallRpcInternal<T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1);
+                    break;
+            }
+        }
+
+        // 2 parameters
+        internal void CallRpcInternal<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2);
+                    break;
+            }
+        }
+
+        // 3 parameters
+        internal void CallRpcInternal<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3);
+                    break;
+            }
+        }
+
+        // 4 parameters
+        internal void CallRpcInternal<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+                    break;
+            }
+        }
+
+        // 5 parameters
+        internal void CallRpcInternal<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+                    break;
+            }
+        }
+
+        // 6 parameters
+        internal void CallRpcInternal<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+                    break;
+            }
+        }
+
+        // 7 parameters
+        internal void CallRpcInternal<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    break;
+            }
+        }
+
+        // 8 parameters
+        internal void CallRpcInternal<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return;
+            }
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    HandleServerRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    break;
+                case RpcType.ClientRpc:
+                    HandleClientRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    break;
+                case RpcType.TargetRpc:
+                    HandleTargetRpc(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    break;
+            }
+        }
+
+        // 0 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+
+            return await HandleServerRpcAsync<TResult>(instance, methodName, metadata);
+        }
+
+        // 1 parameter
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
+                !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+
+            return await HandleServerRpcAsync<TResult, T1>(instance, methodName, metadata, arg1);
+        }
+
+        // CallRpcInternalAsync - 2 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2>(instance, methodName, metadata, arg1, arg2);
+        }
+
+        // CallRpcInternalAsync - 3 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata, arg1, arg2, arg3);
+        }
+
+        // CallRpcInternalAsync - 4 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+        }
+
+        // CallRpcInternalAsync - 5 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+        }
+
+        // CallRpcInternalAsync - 6 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+        }
+
+        // CallRpcInternalAsync - 7 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        }
+
+        // CallRpcInternalAsync - 8 parameters
+        internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            if (metadata.Type != RpcType.ServerRpc)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
+                return default(TResult);
+            }
+            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+        }
+
+        // HandleServerRpcAsync - 0 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync0<TResult>(instance, methodName);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult>(instance, methodName, metadata.IsReliable);
+            }
+        }
+
+        // HandleServerRpcAsync - 1 parameter
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync1<TResult, T1>(instance, methodName, arg1);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1>(instance, methodName, metadata.IsReliable, arg1);
+            }
+        }
+
+        // HandleServerRpcAsync - 2 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync2<TResult, T1, T2>(instance, methodName, arg1, arg2);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2>(instance, methodName, metadata.IsReliable, arg1, arg2);
+            }
+        }
+
+        // HandleServerRpcAsync - 3 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync3<TResult, T1, T2, T3>(instance, methodName, arg1, arg2, arg3);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3);
+            }
+        }
+
+        // HandleServerRpcAsync - 4 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync4<TResult, T1, T2, T3, T4>(instance, methodName, arg1, arg2, arg3, arg4);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4);
+            }
+        }
+
+        // HandleServerRpcAsync - 5 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync5<TResult, T1, T2, T3, T4, T5>(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5);
+            }
+        }
+
+        // HandleServerRpcAsync - 6 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync6<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6);
+            }
+        }
+
+        // HandleServerRpcAsync - 7 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync7<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            }
+        }
+
+        // HandleServerRpcAsync - 8 parameters
+        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        return await dispatcher.DispatchAsync8<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                return default(TResult);
+            }
+            else
+            {
+                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            }
+        }
+
+        private async Task<TResult> SendRpcAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 1 parameter
+        private async Task<TResult> SendRpcAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData1<T1> { Arg1 = arg1 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 2 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 3 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 4 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 5 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 6 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 7 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcAsync - 8 parameters
+        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+
+            var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+
+            return await tcs.Task;
+        }
+
+        #region dead zone now???
+        private readonly Dictionary<Type, IRpcDispatcher> rpcDispatchers = new Dictionary<Type, IRpcDispatcher>();
+
+        public void RegisterRpcDispatcher(Type componentType, IRpcDispatcher dispatcher)
+        {
+            rpcDispatchers[componentType] = dispatcher;
+        }
+
+        // 0 parameters
+        public void CallRpc(GONetParticipantCompanionBehaviour instance, string methodName)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch0(instance, methodName);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc0(instance, methodName);
+            }
+        }
+
+        // 1 parameter
+        public void CallRpc<T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch1(instance, methodName, arg1);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc1(instance, methodName, arg1);
+            }
+        }
+
+        // 2 parameters
+        public void CallRpc<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch2(instance, methodName, arg1, arg2);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc2(instance, methodName, arg1, arg2);
+            }
+        }
+
+        // 3 parameters
+        public void CallRpc<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch3(instance, methodName, arg1, arg2, arg3);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc3(instance, methodName, arg1, arg2, arg3);
+            }
+        }
+
+        // 4 parameters
+        public void CallRpc<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch4(instance, methodName, arg1, arg2, arg3, arg4);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc4(instance, methodName, arg1, arg2, arg3, arg4);
+            }
+        }
+
+        // 5 parameters
+        public void CallRpc<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch5(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc5(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+            }
+        }
+
+        // 6 parameters
+        public void CallRpc<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch6(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc6(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+            }
+        }
+
+        // 7 parameters
+        public void CallRpc<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch7(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc7(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            }
+        }
+
+        // 8 parameters
+        public void CallRpc<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            if (GONetMain.IsServer)
+            {
+                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                {
+                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
+                    SetCurrentRpcContext(context);
+                    try
+                    {
+                        dispatcher.Dispatch8(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                    finally
+                    {
+                        SetCurrentRpcContext(null);
+                    }
+                }
+                else
+                {
+                    GONetLog.Warning($"No RPC dispatcher found for {instance.GetType().Name}.{methodName}");
+                }
+            }
+            else
+            {
+                SendRpc8(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            }
+        }
+        #endregion
+
+        // Private send methods
+        private void SendRpc0(GONetParticipantCompanionBehaviour instance, string methodName)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            Publish(rpcEvent, shouldPublishReliably: true);
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc1<T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData1<T1> { Arg1 = arg1 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc2<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc3<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc4<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc5<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc6<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc7<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private void SendRpc8<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            var rpcEvent = BorrowRpcEvent();
+            rpcEvent.RpcId = rpcId;
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.Data = serialized;
+            Publish(rpcEvent, shouldPublishReliably: true);
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+            ReturnRpcEvent(rpcEvent);
+        }
+
+        private uint GetRpcId(Type componentType, string methodName)
+        {
+            string fullName = $"{componentType.FullName}.{methodName}";
+            return (uint)fullName.GetHashCode();
         }
         #endregion
 
