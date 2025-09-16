@@ -17,7 +17,13 @@ using UnityEngine;
 /// 2. Task<bool> Returns: RequestRelease() returns success/failure that clients check
 /// 3. Void RPCs: NotifyAttemptedClaimWhileOwned() for fire-and-forget notifications
 /// 4. ClientRpc: BroadcastClaimChanged() for server-to-all-clients notifications
-/// 5. RPC Context: Access via GONetEventBus.CurrentRpcContext during RPC execution
+/// 5. RPC Context: Access via GONetEventBus.GetCurrentRpcContext() during RPC execution
+/// 
+/// HOW TO CALL RPCs:
+/// - Use CallRpc(nameof(MethodName), args...) for fire-and-forget calls
+/// - Use await CallRpcAsync<TResult>(nameof(MethodName), args...) for calls with return values
+/// - The CallRpc methods are inherited from GONetParticipantCompanionBehaviour
+/// - RPCs are routed at runtime based on generated metadata
 /// 
 /// VISUAL FEEDBACK:
 /// - Green: Available to claim
@@ -105,7 +111,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     {
         if (isClaimedByMe)
         {
-            bool releaseSuccess = await this.RequestRelease();
+            // Use CallRpcAsync for RPCs with return values
+            bool releaseSuccess = await CallRpcAsync<bool>(nameof(RequestRelease));
 
             if (releaseSuccess)
             {
@@ -118,7 +125,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         }
         else if (ClaimedByAuthorityId == GONetMain.OwnerAuthorityId_Unset)
         {
-            ClaimResult result = await this.RequestClaim();
+            // Use CallRpcAsync for RPCs with return values
+            ClaimResult result = await CallRpcAsync<ClaimResult>(nameof(RequestClaim));
 
             if (result.Success)
             {
@@ -141,14 +149,14 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         }
         else
         {
-            this.NotifyAttemptedClaimWhileOwned(ClaimedByAuthorityId);
+            // Use CallRpc for fire-and-forget (void RPCs)
+            CallRpc(nameof(NotifyAttemptedClaimWhileOwned), ClaimedByAuthorityId);
         }
     }
 
     [ServerRpc(IsMineRequired = false)]
-    async Task<ClaimResult> RequestClaim()
+    internal async Task<ClaimResult> RequestClaim()
     {
-        // Get context when needed
         var context = GONetEventBus.GetCurrentRpcContext();
 
         if (ClaimedByAuthorityId != GONetMain.OwnerAuthorityId_Unset)
@@ -170,7 +178,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 
         GONetLog.Debug($"Authority {context.SourceAuthorityId} claimed {name} (Remote: {context.IsSourceRemote})");
 
-        this.BroadcastClaimChanged(context.SourceAuthorityId, true);
+        // Use CallRpc for ClientRpc calls
+        CallRpc(nameof(BroadcastClaimChanged), context.SourceAuthorityId, true);
 
         return new ClaimResult
         {
@@ -183,7 +192,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     }
 
     [ServerRpc(IsMineRequired = false)]
-    async Task<bool> RequestRelease()
+    internal async Task<bool> RequestRelease()
     {
         var context = GONetEventBus.GetCurrentRpcContext();
 
@@ -197,15 +206,15 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 
         GONetLog.Debug($"Authority {context.SourceAuthorityId} released {name}");
 
-        this.BroadcastClaimChanged(context.SourceAuthorityId, false);
+        // Use CallRpc for ClientRpc calls
+        CallRpc(nameof(BroadcastClaimChanged), context.SourceAuthorityId, false);
 
         return true;
     }
 
     [ServerRpc(IsMineRequired = false)]
-    void NotifyAttemptedClaimWhileOwned(ushort currentOwnerAuthorityId)
+    internal void NotifyAttemptedClaimWhileOwned(ushort currentOwnerAuthorityId)
     {
-        // Could access context if needed
         var context = GONetEventBus.CurrentRpcContext;
         if (context.HasValue)
         {
@@ -214,7 +223,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     }
 
     [ClientRpc]
-    void BroadcastClaimChanged(ushort authorityId, bool wasClaimed)
+    internal void BroadcastClaimChanged(ushort authorityId, bool wasClaimed)
     {
         if (wasClaimed)
         {
@@ -235,7 +244,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     }
 
     [ServerRpc(IsMineRequired = false)]
-    async Task<ClaimStatus> GetStatus()
+    internal async Task<ClaimStatus> GetStatus()
     {
         return new ClaimStatus
         {
@@ -257,7 +266,6 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
             targetColor = claimedColor;
     }
 }
-
 
 [MemoryPackable]
 public partial struct ClaimResult
