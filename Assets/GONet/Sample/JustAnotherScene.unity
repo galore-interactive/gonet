@@ -548,6 +548,7 @@ GameObject:
   - component: {fileID: 83734070}
   - component: {fileID: 83734072}
   - component: {fileID: 83734071}
+  - component: {fileID: 83734073}
   m_Layer: 0
   m_Name: Follower (2)
   m_TagString: Untagged
@@ -611,6 +612,25 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   wasInstantiatedForce: 0
+--- !u!114 &83734073
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 83734069}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &98726659
 GameObject:
   m_ObjectHideFlags: 0
@@ -1266,6 +1286,7 @@ GameObject:
   - component: {fileID: 213496369}
   - component: {fileID: 213496368}
   - component: {fileID: 213496367}
+  - component: {fileID: 213496370}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -1359,6 +1380,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 213496365}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &213496370
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 213496365}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &217975546
 GameObject:
   m_ObjectHideFlags: 0
@@ -2235,6 +2268,7 @@ GameObject:
   - component: {fileID: 558011415}
   - component: {fileID: 558011414}
   - component: {fileID: 558011413}
+  - component: {fileID: 558011416}
   m_Layer: 0
   m_Name: GameObject (1)
   m_TagString: Untagged
@@ -2296,6 +2330,25 @@ Transform:
   - {fileID: 689917977}
   m_Father: {fileID: 957399348}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &558011416
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 558011412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &576211971
 GameObject:
   m_ObjectHideFlags: 0
@@ -2994,6 +3047,7 @@ GameObject:
   - component: {fileID: 662001352}
   - component: {fileID: 662001351}
   - component: {fileID: 662001350}
+  - component: {fileID: 662001353}
   m_Layer: 0
   m_Name: GameObject (2)
   m_TagString: Untagged
@@ -3055,6 +3109,25 @@ Transform:
   - {fileID: 1274029167}
   m_Father: {fileID: 957399348}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &662001353
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 662001349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &663791315
 GameObject:
   m_ObjectHideFlags: 0
@@ -3066,6 +3139,7 @@ GameObject:
   - component: {fileID: 663791318}
   - component: {fileID: 663791317}
   - component: {fileID: 663791316}
+  - component: {fileID: 663791319}
   m_Layer: 0
   m_Name: GameObject (5)
   m_TagString: Untagged
@@ -3127,6 +3201,25 @@ Transform:
   - {fileID: 1287291312}
   m_Father: {fileID: 957399348}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &663791319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 663791315}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &671478574
 GameObject:
   m_ObjectHideFlags: 0
@@ -3345,6 +3438,7 @@ GameObject:
   - component: {fileID: 689917980}
   - component: {fileID: 689917979}
   - component: {fileID: 689917978}
+  - component: {fileID: 689917981}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -3438,6 +3532,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 689917976}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &689917981
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 689917976}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &690535848
 GameObject:
   m_ObjectHideFlags: 0
@@ -3584,6 +3690,7 @@ GameObject:
   - component: {fileID: 718822871}
   - component: {fileID: 718822870}
   - component: {fileID: 718822869}
+  - component: {fileID: 718822872}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -3677,6 +3784,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 718822867}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &718822872
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 718822867}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &745084916
 GameObject:
   m_ObjectHideFlags: 0
@@ -3930,6 +4049,7 @@ GameObject:
   - component: {fileID: 846898750}
   - component: {fileID: 846898752}
   - component: {fileID: 846898751}
+  - component: {fileID: 846898753}
   m_Layer: 0
   m_Name: Follower (5)
   m_TagString: Untagged
@@ -3993,6 +4113,25 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   wasInstantiatedForce: 0
+--- !u!114 &846898753
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846898749}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &851763219
 GameObject:
   m_ObjectHideFlags: 0
@@ -4328,6 +4467,7 @@ GameObject:
   - component: {fileID: 886734278}
   - component: {fileID: 886734280}
   - component: {fileID: 886734279}
+  - component: {fileID: 886734281}
   m_Layer: 0
   m_Name: Follower (1)
   m_TagString: Untagged
@@ -4391,6 +4531,25 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   wasInstantiatedForce: 0
+--- !u!114 &886734281
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 886734277}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &906251888
 GameObject:
   m_ObjectHideFlags: 0
@@ -4403,6 +4562,7 @@ GameObject:
   - component: {fileID: 906251892}
   - component: {fileID: 906251891}
   - component: {fileID: 906251890}
+  - component: {fileID: 906251893}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -4496,6 +4656,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 906251888}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &906251893
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 906251888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &910441029
 GameObject:
   m_ObjectHideFlags: 0
@@ -5137,6 +5309,7 @@ GameObject:
   - component: {fileID: 1169517294}
   - component: {fileID: 1169517295}
   - component: {fileID: 1169517296}
+  - component: {fileID: 1169517297}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -5198,6 +5371,25 @@ MonoBehaviour:
   radius: 5
   angularSpeed: 30
   rotationSpeed: 90
+--- !u!114 &1169517297
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1169517293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &1171946638
 GameObject:
   m_ObjectHideFlags: 0
@@ -5505,6 +5697,7 @@ GameObject:
   - component: {fileID: 1220025781}
   - component: {fileID: 1220025780}
   - component: {fileID: 1220025779}
+  - component: {fileID: 1220025782}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -5598,6 +5791,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1220025777}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1220025782
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1220025777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1228075000
 GameObject:
   m_ObjectHideFlags: 0
@@ -5610,6 +5815,7 @@ GameObject:
   - component: {fileID: 1228075004}
   - component: {fileID: 1228075003}
   - component: {fileID: 1228075002}
+  - component: {fileID: 1228075005}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -5703,6 +5909,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1228075000}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1228075005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1228075000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1241335255
 GameObject:
   m_ObjectHideFlags: 0
@@ -5876,6 +6094,7 @@ GameObject:
   - component: {fileID: 1274029170}
   - component: {fileID: 1274029169}
   - component: {fileID: 1274029168}
+  - component: {fileID: 1274029171}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -5969,6 +6188,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1274029166}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1274029171
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1274029166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1284639026
 GameObject:
   m_ObjectHideFlags: 0
@@ -6017,6 +6248,7 @@ GameObject:
   - component: {fileID: 1287291315}
   - component: {fileID: 1287291314}
   - component: {fileID: 1287291313}
+  - component: {fileID: 1287291316}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -6110,6 +6342,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1287291311}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1287291316
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1287291311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1295973115
 GameObject:
   m_ObjectHideFlags: 0
@@ -6429,6 +6673,7 @@ GameObject:
   - component: {fileID: 1352096248}
   - component: {fileID: 1352096247}
   - component: {fileID: 1352096246}
+  - component: {fileID: 1352096249}
   m_Layer: 0
   m_Name: GameObject (3)
   m_TagString: Untagged
@@ -6490,6 +6735,25 @@ Transform:
   - {fileID: 1220025778}
   m_Father: {fileID: 254957503}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1352096249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1352096245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &1378540223
 GameObject:
   m_ObjectHideFlags: 0
@@ -6502,6 +6766,7 @@ GameObject:
   - component: {fileID: 1378540227}
   - component: {fileID: 1378540226}
   - component: {fileID: 1378540225}
+  - component: {fileID: 1378540228}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -6595,6 +6860,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1378540223}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1378540228
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378540223}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1379740522
 GameObject:
   m_ObjectHideFlags: 0
@@ -6756,6 +7033,7 @@ GameObject:
   - component: {fileID: 1501127586}
   - component: {fileID: 1501127588}
   - component: {fileID: 1501127587}
+  - component: {fileID: 1501127589}
   m_Layer: 0
   m_Name: Follower
   m_TagString: Untagged
@@ -6819,6 +7097,25 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   wasInstantiatedForce: 0
+--- !u!114 &1501127589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1501127585}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &1508591690
 GameObject:
   m_ObjectHideFlags: 0
@@ -7855,6 +8152,7 @@ GameObject:
   - component: {fileID: 1913900894}
   - component: {fileID: 1913900893}
   - component: {fileID: 1913900892}
+  - component: {fileID: 1913900895}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -7948,6 +8246,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1913900890}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1913900895
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1913900890}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1945280334
 GameObject:
   m_ObjectHideFlags: 0
@@ -8228,6 +8538,7 @@ GameObject:
   - component: {fileID: 2019747862}
   - component: {fileID: 2019747861}
   - component: {fileID: 2019747860}
+  - component: {fileID: 2019747863}
   m_Layer: 0
   m_Name: GameObject (4)
   m_TagString: Untagged
@@ -8289,6 +8600,25 @@ Transform:
   - {fileID: 1913900891}
   m_Father: {fileID: 957399348}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2019747863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019747859}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &2035904135
 GameObject:
   m_ObjectHideFlags: 0
@@ -8535,6 +8865,7 @@ GameObject:
   - component: {fileID: 2092998501}
   - component: {fileID: 2092998503}
   - component: {fileID: 2092998502}
+  - component: {fileID: 2092998504}
   m_Layer: 0
   m_Name: Follower (4)
   m_TagString: Untagged
@@ -8598,6 +8929,25 @@ MonoBehaviour:
   IsPositionSyncd: 1
   IsRotationSyncd: 0
   wasInstantiatedForce: 0
+--- !u!114 &2092998504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2092998500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aa4c8e6d44b7de4fa570807cea3e66f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  availableColor: {r: 0, g: 1, b: 0, a: 1}
+  hoverAvailableColor: {r: 0, g: 1, b: 1, a: 1}
+  claimedColor: {r: 1, g: 0, b: 0, a: 1}
+  claimedByMeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  hoverUnavailableColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorTransitionSpeed: 5
 --- !u!1 &2110385471
 GameObject:
   m_ObjectHideFlags: 0
@@ -8610,6 +8960,7 @@ GameObject:
   - component: {fileID: 2110385475}
   - component: {fileID: 2110385474}
   - component: {fileID: 2110385473}
+  - component: {fileID: 2110385476}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -8703,6 +9054,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2110385471}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &2110385476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2110385471}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04075f4e0618b8a458926c3ead21e9fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

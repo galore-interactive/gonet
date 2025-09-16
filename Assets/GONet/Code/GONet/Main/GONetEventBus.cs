@@ -13,12 +13,13 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using GONet.Utils;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace GONet
 {
@@ -425,6 +426,168 @@ namespace GONet
                 }
             }
         }
+
+        #region RPC Support
+
+        internal readonly Dictionary<uint, Action<GONetEventEnvelope<RpcEvent>>> rpcHandlers = new();
+        private readonly ConcurrentDictionary<long, object> pendingResponses = new(); // TaskCompletionSource<T>
+        private readonly ObjectPool<RpcEvent> rpcEventPool = new(100, 10);
+        private readonly ObjectPool<RpcResponseEvent> rpcResponsePool = new(100, 10);
+
+        [ThreadStatic]
+        private static GONetRpcContext? currentRpcContext;
+
+        /// <summary>
+        /// Gets the current RPC context. Only valid during RPC method execution.
+        /// Returns null if not currently executing an RPC.
+        /// </summary>
+        public static GONetRpcContext? CurrentRpcContext => currentRpcContext;
+
+        /// <summary>
+        /// Gets the current RPC context, throwing if not available.
+        /// Use this when you know you're in an RPC context.
+        /// </summary>
+        public static GONetRpcContext GetCurrentRpcContext()
+        {
+            if (!currentRpcContext.HasValue)
+                throw new InvalidOperationException("No RPC context available. This can only be accessed during RPC method execution.");
+            return currentRpcContext.Value;
+        }
+
+        internal void InitializeRpcSystem()
+        {
+            Subscribe<RpcEvent>(HandleIncomingRpc);
+            Subscribe<RpcResponseEvent>(HandleRpcResponse);
+        }
+
+        private void HandleIncomingRpc(GONetEventEnvelope<RpcEvent> envelope)
+        {
+            var rpcEvent = envelope.Event;
+
+            if (!rpcHandlers.TryGetValue(rpcEvent.RpcId, out var handler))
+            {
+                GONetLog.Warning($"No handler registered for RPC ID: 0x{rpcEvent.RpcId:X8}");
+                return;
+            }
+
+            // Set context for this RPC execution
+            currentRpcContext = new GONetRpcContext(envelope);
+
+            try
+            {
+                handler(envelope);
+
+                // If this RPC expects a response, the handler will send it
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"Error executing RPC handler for ID 0x{rpcEvent.RpcId:X8}: {ex.Message}");
+
+                if (rpcEvent.CorrelationId != 0)
+                {
+                    var errorResponse = rpcResponsePool.Borrow();
+                    errorResponse.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    errorResponse.CorrelationId = rpcEvent.CorrelationId;
+                    errorResponse.Success = false;
+                    errorResponse.ErrorMessage = ex.Message;
+
+                    Publish(errorResponse, targetClientAuthorityId: envelope.SourceAuthorityId);
+
+                    rpcResponsePool.Return(errorResponse);
+                }
+            }
+            finally
+            {
+                // Clear context after execution
+                currentRpcContext = null;
+            }
+        }
+
+        private void HandleRpcResponse(GONetEventEnvelope<RpcResponseEvent> envelope)
+        {
+            var response = envelope.Event;
+
+            // Find the pending request
+            if (!pendingResponses.TryRemove(response.CorrelationId, out var tcsObj))
+            {
+                GONetLog.Warning($"Received RPC response for unknown correlation ID: {response.CorrelationId}");
+                return;
+            }
+
+            // Cast to the appropriate TaskCompletionSource type
+            // The actual type is stored when registering the pending response
+            if (tcsObj is TaskCompletionSource<object> tcs)
+            {
+                if (response.Success)
+                {
+                    try
+                    {
+                        // The generated code knows the actual type
+                        // This will be handled by the specific generated method
+                        // For now, we just complete with the raw data
+                        tcs.TrySetResult(response.Data);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.TrySetException(ex);
+                    }
+                }
+                else
+                {
+                    tcs.TrySetException(new Exception(response.ErrorMessage ?? "RPC failed"));
+                }
+            }
+        }
+
+        // Helper methods for the generated code to use
+
+        internal RpcEvent BorrowRpcEvent()
+        {
+            return rpcEventPool.Borrow();
+        }
+
+        internal void ReturnRpcEvent(RpcEvent rpcEvent)
+        {
+            rpcEvent.RpcId = 0;
+            rpcEvent.GONetId = 0;
+            rpcEvent.Data = null;
+            rpcEvent.CorrelationId = 0;
+            rpcEvent.IsSingularRecipientOnly = false;
+            rpcEventPool.Return(rpcEvent);
+        }
+
+        internal RpcResponseEvent BorrowRpcResponseEvent()
+        {
+            return rpcResponsePool.Borrow();
+        }
+
+        internal void ReturnRpcResponseEvent(RpcResponseEvent response)
+        {
+            response.CorrelationId = 0;
+            response.Data = null;
+            response.Success = false;
+            response.ErrorMessage = null;
+            rpcResponsePool.Return(response);
+        }
+
+        // For the generated code to register pending responses with proper typing
+        internal void RegisterPendingResponse<T>(long correlationId, TaskCompletionSource<T> tcs)
+        {
+            pendingResponses[correlationId] = tcs;
+
+            // Set up timeout
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30)); // 30 second timeout
+
+                if (pendingResponses.TryRemove(correlationId, out var pendingTcs))
+                {
+                    (pendingTcs as TaskCompletionSource<T>)?.TrySetException(
+                        new TimeoutException($"RPC request timed out after 30 seconds (correlation: {correlationId})"));
+                }
+            });
+        }
+        #endregion
 
         private const int MAX_PUBLISH_CALL_DEPTH = 256;
         /// <summary>

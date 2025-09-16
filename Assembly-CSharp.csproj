@@ -61,6 +61,7 @@
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GONet\Sample\GONetMouseEventRelay.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\BitConverter.cs" />
@@ -111,6 +112,7 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Tests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CRC32.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\SequenceBuffer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetRpcs.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliablePacketController.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\TypeUtils.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleInputSync.cs" />
@@ -137,6 +139,7 @@
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeLogLevel.cs" />
+    <Compile Include="Assets\GONet\Sample\ClaimableObjectViaRpcs.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetClient.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\PacketHeader.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\ConnectTokenData.cs" />

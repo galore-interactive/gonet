@@ -23,52 +23,52 @@
         {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject (1)",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject (2)",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject (4)",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject (5)",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://JustAnotherScene/Followers/Follower",
             "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 3
         },
         {
             "location": "scene://JustAnotherScene/Followers/Follower (1)",
             "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 3
         },
         {
             "location": "scene://JustAnotherScene/Followers/Follower (2)",
             "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 3
         },
         {
             "location": "scene://JustAnotherScene/Followers/Follower (4)",
             "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 3
         },
         {
             "location": "scene://JustAnotherScene/Followers/Follower (5)",
             "unityGuid": "",
-            "codeGenerationId": 1
+            "codeGenerationId": 3
         },
         {
             "location": "scene://JustAnotherScene/GONet_GlobalContext",
@@ -78,7 +78,7 @@
         {
             "location": "scene://JustAnotherScene/NADA/GameObject (3)",
             "unityGuid": "",
-            "codeGenerationId": 2
+            "codeGenerationId": 4
         },
         {
             "location": "scene://ProjectileTest/GONet_GlobalContext",
