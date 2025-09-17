@@ -42,10 +42,14 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     public Color hoverUnavailableColor = Color.gray;
     public float colorTransitionSpeed = 5f;
 
-    [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, ShouldBlendBetweenValuesReceived = false)]
+    [GONetAutoMagicalSync(
+        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
+        ShouldBlendBetweenValuesReceived = false)]
     public ushort ClaimedByAuthorityId { get; set; } = GONetMain.OwnerAuthorityId_Unset;
 
-    [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, ShouldBlendBetweenValuesReceived = false)]
+    [GONetAutoMagicalSync(
+        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
+        ShouldBlendBetweenValuesReceived = false)]
     public int TotalClaimCount { get; set; }
 
     private Renderer objectRenderer;
