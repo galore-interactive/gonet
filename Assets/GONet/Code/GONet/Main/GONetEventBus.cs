@@ -513,6 +513,12 @@ namespace GONet
 
         private void HandleRpcResponse(GONetEventEnvelope<RpcResponseEvent> envelope)
         {
+            // Don't process responses we generated for others
+            if (envelope.TargetClientAuthorityId != GONetMain.MyAuthorityId && envelope.TargetClientAuthorityId != GONetMain.OwnerAuthorityId_Unset)
+            {
+                return;
+            }
+
             var response = envelope.Event;
 
             // Find the pending request
@@ -3345,10 +3351,41 @@ namespace GONet
             ReturnRpcEvent(rpcEvent);
         }
 
-        private uint GetRpcId(Type componentType, string methodName)
+        public static unsafe uint GetRpcId(Type componentType, string methodName)
         {
-            string fullName = $"{componentType.FullName}.{methodName}";
-            return (uint)fullName.GetHashCode();
+            string typeName = componentType.FullName;
+
+            // FNV-1a hash
+            const uint fnvPrime = 16777619;
+            uint hash = 2166136261;
+
+            // Hash type name
+            fixed (char* ptr = typeName)
+            {
+                char* p = ptr;
+                while (*p != 0)
+                {
+                    hash ^= *p++;
+                    hash *= fnvPrime;
+                }
+            }
+
+            // Hash separator
+            hash ^= '.';
+            hash *= fnvPrime;
+
+            // Hash method name
+            fixed (char* ptr = methodName)
+            {
+                char* p = ptr;
+                while (*p != 0)
+                {
+                    hash ^= *p++;
+                    hash *= fnvPrime;
+                }
+            }
+
+            return hash;
         }
         #endregion
 
