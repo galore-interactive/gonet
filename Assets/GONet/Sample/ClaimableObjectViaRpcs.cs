@@ -42,11 +42,23 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     public Color hoverUnavailableColor = Color.gray;
     public float colorTransitionSpeed = 5f;
 
+    // NOTE: Have to let it know not to use the default profile because the default profile will force the
+    //       blending of this value when we don't want it to blend because it is a use short. For the time
+    //       being, you have to tell it to use this profile that allows the use of the attribute properties
+    //       to be the ones that are applied, which in this case says that we do not want to blend a use short
+    //       because it's not really blendable. Whatever we've got to figure out how to make this a little bit
+    //       better, but for now, this is what we do.
     [GONetAutoMagicalSync(
         GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
         ShouldBlendBetweenValuesReceived = false)]
     public ushort ClaimedByAuthorityId { get; set; } = GONetMain.OwnerAuthorityId_Unset;
 
+    // NOTE: Have to let it know not to use the default profile because the default profile will force the
+    //       blending of this value when we don't want it to blend because it is a use short. For the time
+    //       being, you have to tell it to use this profile that allows the use of the attribute properties
+    //       to be the ones that are applied, which in this case says that we do not want to blend a use short
+    //       because it's not really blendable. Whatever we've got to figure out how to make this a little bit
+    //       better, but for now, this is what we do.
     [GONetAutoMagicalSync(
         GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
         ShouldBlendBetweenValuesReceived = false)]
