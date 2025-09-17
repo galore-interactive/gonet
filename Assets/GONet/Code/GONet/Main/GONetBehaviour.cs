@@ -285,42 +285,70 @@ namespace GONet
 
         #region RPC Support
         // 0 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc(string methodName)
         {
             EventBus.CallRpcInternal(this, methodName);
         }
 
         // 1 parameter
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1>(string methodName, T1 arg1)
         {
             EventBus.CallRpcInternal(this, methodName, arg1);
         }
 
         // 2 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1, T2>(string methodName, T1 arg1, T2 arg2)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2);
         }
 
         // 3 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1, T2, T3>(string methodName, T1 arg1, T2 arg2, T3 arg3)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3);
         }
 
         // 4 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1, T2, T3, T4>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4);
         }
 
         // 5 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1, T2, T3, T4, T5>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5);
         }
 
         // 6 parameters
+        /// <summary>
+        /// NOTE: This method does NOT USE reflection, even though you're passing in a string <paramref name="methodName"/>. 
+        ///       Instead, generated code and dictionary lookups are used.
+        /// </summary>
         protected void CallRpc<T1, T2, T3, T4, T5, T6>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
@@ -333,6 +361,90 @@ namespace GONet
         }
 
         // 8 parameters
+        /// <summary>
+        /// Invokes a fire-and-forget Remote Procedure Call (RPC) on this <see cref="GONetParticipant"/> across the network.
+        /// This method is for RPCs that return <c>void</c> or <see cref="Task"/> without a result value.
+        /// <remarks>
+        /// <para><b>Performance Note:</b> This method does NOT use reflection. Instead, generated code and dictionary lookups are used for optimal performance.</para>
+        /// <para>
+        /// <b>methodName</b>: The name of the RPC method to invoke. Use <c>nameof(YourMethodName)</c> for compile-time safety, better refactoring support and to avoid string literal garbage/typos.
+        /// </para>
+        /// 
+        /// <para><b>Required Attributes:</b></para>
+        /// <para>The target method MUST be decorated with ONE of these attributes:</para>
+        /// <list type="bullet">
+        ///   <item><see cref="ServerRpcAttribute"/> - Client → Server (optionally relayed to other clients)</item>
+        ///   <item><see cref="ClientRpcAttribute"/> - Server → All clients</item>
+        ///   <item><see cref="TargetRpcAttribute"/> - Server → Specific client(s)</item>
+        /// </list>
+        /// 
+        /// <para><b>Routing Behavior by RPC Type:</b></para>
+        /// <list type="table">
+        ///   <listheader>
+        ///     <term>RPC Type</term>
+        ///     <description>Routing Behavior</description>
+        ///   </listheader>
+        ///   <item>
+        ///     <term><see cref="ServerRpcAttribute"/></term>
+        ///     <description>
+        ///       Sent from client to server. Set <see cref="GONetRpcAttribute.IsMineRequired"/>=<c>false</c> to allow any client to call.
+        ///       Can relay to other clients using <see cref="ServerRpcAttribute.Relay"/> property (<see cref="RelayMode.None"/>/<see cref="RelayMode.Others"/>/<see cref="RelayMode.All"/>/<see cref="RelayMode.Owner"/>).
+        ///     </description>
+        ///   </item>
+        ///   <item>
+        ///     <term><see cref="ClientRpcAttribute"/></term>
+        ///     <description>Can only be called by server. Broadcasts to all connected clients.</description>
+        ///   </item>
+        ///   <item>
+        ///     <term><see cref="TargetRpcAttribute"/></term>
+        ///     <description>
+        ///       Can only be called by server. Routes based on <see cref="TargetRpcAttribute.Target"/> property:
+        ///       <see cref="RpcTarget.Owner"/>, <see cref="RpcTarget.Others"/>, <see cref="RpcTarget.All"/>, or <see cref="RpcTarget.SpecificAuthority"/>.
+        ///     </description>
+        ///   </item>
+        /// </list>
+        /// 
+        /// <para><b>Targeting Specific Authorities</b> (<see cref="TargetRpcAttribute"/> with <see cref="RpcTarget.SpecificAuthority"/>):</para>
+        /// <para>Option 1 - First parameter is authority ID:</para>
+        /// <code>
+        /// [TargetRpc(RpcTarget.SpecificAuthority)]
+        /// void NotifyPlayer(ushort targetAuthorityId, string message) { }
+        /// // Usage: CallRpc(nameof(NotifyPlayer), playerAuthId, "Hello!")
+        /// </code>
+        /// <para>Option 2 - Use property/field name:</para>
+        /// <code>
+        /// public ushort CurrentOwnerId { get; set; }
+        /// 
+        /// [TargetRpc(nameof(CurrentOwnerId))]
+        /// void NotifyOwner(string message) { }
+        /// // Usage: CallRpc(nameof(NotifyOwner), "Item claimed!")
+        /// </code>
+        /// 
+        /// <para><b>Common Usage Patterns:</b></para>
+        /// <code>
+        /// // ServerRpc - Client requests action
+        /// [ServerRpc(IsMineRequired = false)]
+        /// void RequestPickup(int itemId) { /* validate and apply */ }
+        /// CallRpc(nameof(RequestPickup), 42);
+        /// 
+        /// // ClientRpc - Server broadcasts event
+        /// [ClientRpc]
+        /// void OnPlayerScored(ushort playerId, int points) { }
+        /// if (GONetMain.IsServer) 
+        ///     CallRpc(nameof(OnPlayerScored), playerId, 10);
+        /// 
+        /// // TargetRpc - Server notifies specific client
+        /// [TargetRpc(RpcTarget.SpecificAuthority)]
+        /// void ShowDamage(ushort targetAuth, float damage) { }
+        /// if (GONetMain.IsServer) 
+        ///     CallRpc(nameof(ShowDamage), victimId, 25f);
+        /// </code>
+        /// </remarks>
+        /// </summary>
+        /// <seealso cref="CallRpcAsync{TResult}(string)"/>
+        /// <seealso cref="ServerRpcAttribute"/>
+        /// <seealso cref="ClientRpcAttribute"/>
+        /// <seealso cref="TargetRpcAttribute"/>
         protected void CallRpc<T1, T2, T3, T4, T5, T6, T7, T8>(string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
         {
             EventBus.CallRpcInternal(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
