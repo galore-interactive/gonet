@@ -42,10 +42,10 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     public Color hoverUnavailableColor = Color.gray;
     public float colorTransitionSpeed = 5f;
 
-    [GONetAutoMagicalSync]
+    [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, ShouldBlendBetweenValuesReceived = false)]
     public ushort ClaimedByAuthorityId { get; set; } = GONetMain.OwnerAuthorityId_Unset;
 
-    [GONetAutoMagicalSync]
+    [GONetAutoMagicalSync(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, ShouldBlendBetweenValuesReceived = false)]
     public int TotalClaimCount { get; set; }
 
     private Renderer objectRenderer;
@@ -178,8 +178,10 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 
         GONetLog.Debug($"Authority {context.SourceAuthorityId} claimed {name} (Remote: {context.IsSourceRemote})");
 
-        // Use CallRpc for ClientRpc calls
-        CallRpc(nameof(BroadcastClaimChanged), context.SourceAuthorityId, true);
+        if (GONetMain.IsServer)
+        {
+            CallRpc(nameof(BroadcastClaimChanged), ClaimedByAuthorityId, true);
+        }
 
         return new ClaimResult
         {
@@ -206,8 +208,10 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 
         GONetLog.Debug($"Authority {context.SourceAuthorityId} released {name}");
 
-        // Use CallRpc for ClientRpc calls
-        CallRpc(nameof(BroadcastClaimChanged), context.SourceAuthorityId, false);
+        if (GONetMain.IsServer)
+        {
+            CallRpc(nameof(BroadcastClaimChanged), ClaimedByAuthorityId, false);
+        }
 
         return true;
     }

@@ -1451,7 +1451,7 @@ namespace GONet.Generation
             sb.AppendLine("    {");
             foreach (var method in rpcMethods)
             {
-                uint rpcId = GetRpcId(componentType, method.Name);
+                uint rpcId = GONetEventBus.GetRpcId(componentType, method.Name);
                 sb.AppendLine($"        internal const uint {method.Name}_RpcId = 0x{rpcId:X8};");
             }
             sb.AppendLine("    }");
@@ -1600,8 +1600,8 @@ namespace GONet.Generation
                 // Async method with return value
                 sb.AppendLine($"                var result = await instance.{method.Name}({argList});");
                 sb.AppendLine();
-                sb.AppendLine("                // Send response if correlation ID is present");
-                sb.AppendLine("                if (rpcEvent.CorrelationId != 0)");
+                sb.AppendLine("                // Only send response to remote clients, not to server itself");
+                sb.AppendLine("                if (rpcEvent.CorrelationId != 0 && envelope.SourceAuthorityId != GONetMain.MyAuthorityId)");
                 sb.AppendLine("                {");
                 sb.AppendLine("                    var response = eventBus.BorrowRpcResponseEvent();");
                 sb.AppendLine("                    response.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
@@ -1672,23 +1672,6 @@ namespace GONet.Generation
             }
 
             return type.Name;
-        }
-
-        private static uint GetRpcId(Type componentType, string methodName)
-        {
-            string fullName = $"{componentType.FullName}.{methodName}";
-
-            // FNV-1a hash algorithm
-            const uint fnvPrime = 16777619;
-            uint hash = 2166136261;
-
-            foreach (char c in fullName)
-            {
-                hash ^= c;
-                hash *= fnvPrime;
-            }
-
-            return hash;
         }
 
         private static void GenerateRpcRegistration(StringBuilder sb, MethodInfo method, Type componentType, string className)
