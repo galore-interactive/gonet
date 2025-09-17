@@ -1,5 +1,6 @@
 ﻿using GONet;
 using MemoryPack;
+using System.Collections;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -17,7 +18,9 @@ using UnityEngine;
 /// 2. Task<bool> Returns: RequestRelease() returns success/failure that clients check
 /// 3. Void RPCs: NotifyAttemptedClaimWhileOwned() for fire-and-forget notifications
 /// 4. ClientRpc: BroadcastClaimChanged() for server-to-all-clients notifications
-/// 5. RPC Context: Access via GONetEventBus.GetCurrentRpcContext() during RPC execution
+/// 5. TargetRpc with SpecificAuthority: NotifyClaimerOfAttemptedTheft() uses a property name
+///    to dynamically target the RPC to whoever has claimed the object
+/// 6. RPC Context: Access via GONetEventBus.GetCurrentRpcContext() during RPC execution
 /// 
 /// HOW TO CALL RPCs:
 /// - Use CallRpc(nameof(MethodName), args...) for fire-and-forget calls
@@ -31,6 +34,7 @@ using UnityEngine;
 /// - Yellow: Claimed by you
 /// - Red: Claimed by another player
 /// - Gray: Hovering over unavailable object
+/// - Flash + Scale Bounce: Someone tried to steal your claimed object!
 /// </summary>
 public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 {
@@ -42,6 +46,13 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     public Color hoverUnavailableColor = Color.gray;
     public float colorTransitionSpeed = 5f;
 
+    [Header("Theft Attempt Feedback")]
+    public Color attemptedTheftFlashColor = new Color(1f, 0.5f, 0f); // Orange
+    public float flashDuration = 0.3f;
+    public float bounceScale = 1.3f; // Max scale during bounce
+    public float bounceDuration = 0.6f;
+    public AnimationCurve bounceCurve = AnimationCurve.EaseInOut(0, 0, 1, 1); // Customizable in Inspector
+
     // NOTE: Have to let it know not to use the default profile because the default profile will force the
     //       blending of this value when we don't want it to blend because it is a use short. For the time
     //       being, you have to tell it to use this profile that allows the use of the attribute properties
@@ -49,7 +60,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     //       because it's not really blendable. Whatever we've got to figure out how to make this a little bit
     //       better, but for now, this is what we do.
     [GONetAutoMagicalSync(
-        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
+        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
         ShouldBlendBetweenValuesReceived = false)]
     public ushort ClaimedByAuthorityId { get; set; } = GONetMain.OwnerAuthorityId_Unset;
 
@@ -60,14 +71,18 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     //       because it's not really blendable. Whatever we've got to figure out how to make this a little bit
     //       better, but for now, this is what we do.
     [GONetAutoMagicalSync(
-        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY, 
+        GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___EMPTY_USE_ATTRIBUTE_PROPERTIES_DIRECTLY,
         ShouldBlendBetweenValuesReceived = false)]
     public int TotalClaimCount { get; set; }
 
     private Renderer objectRenderer;
     private Color targetColor;
+    private Color originalColor;
     private bool isMouseOver;
     private bool isClaimedByMe;
+    private bool isFlashing;
+    private Vector3 originalScale;
+    private Coroutine bounceCoroutine;
 
     protected override void Awake()
     {
@@ -78,11 +93,20 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
             objectRenderer = GetComponentInChildren<Renderer>();
         }
         targetColor = availableColor;
+        originalColor = availableColor;
+        originalScale = transform.localScale;
+
+        // Initialize bounce curve if not set in Inspector
+        if (bounceCurve == null || bounceCurve.length == 0)
+        {
+            bounceCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+            bounceCurve.AddKey(0.5f, 1.2f); // Peak in the middle
+        }
     }
 
     void Update()
     {
-        if (objectRenderer != null)
+        if (objectRenderer != null && !isFlashing)
         {
             objectRenderer.material.color = Color.Lerp(
                 objectRenderer.material.color,
@@ -166,7 +190,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         else
         {
             // Use CallRpc for fire-and-forget (void RPCs)
-            CallRpc(nameof(NotifyAttemptedClaimWhileOwned), ClaimedByAuthorityId);
+            // This will notify the server about the attempt
+            CallRpc(nameof(NotifyAttemptedClaimWhileOwned));
         }
     }
 
@@ -233,13 +258,45 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     }
 
     [ServerRpc(IsMineRequired = false)]
-    internal void NotifyAttemptedClaimWhileOwned(ushort currentOwnerAuthorityId)
+    internal void NotifyAttemptedClaimWhileOwned()
     {
         var context = GONetEventBus.CurrentRpcContext;
         if (context.HasValue)
         {
-            GONetLog.Debug($"Authority {context.Value.SourceAuthorityId} tried to claim object owned by Authority {currentOwnerAuthorityId}");
+            GONetLog.Debug($"Authority {context.Value.SourceAuthorityId} tried to claim object owned by Authority {ClaimedByAuthorityId}");
+
+            // Server routes this to the player who claimed it using TargetRpc
+            if (GONetMain.IsServer)
+            {
+                // The TargetRpc will be sent to the authority specified by ClaimedByAuthorityId property
+                CallRpc(nameof(NotifyClaimerOfAttemptedTheft), context.Value.SourceAuthorityId);
+            }
         }
+    }
+
+    /// <summary>
+    /// TargetRpc sent only to the player who has claimed this object when someone else tries to steal it.
+    /// Uses the ClaimedByAuthorityId property to determine the target recipient.
+    /// This provides direct feedback to the claiming player that someone attempted to "steal" their object.
+    /// </summary>
+    [TargetRpc(nameof(ClaimedByAuthorityId))]
+    internal void NotifyClaimerOfAttemptedTheft(ushort attemptingAuthorityId)
+    {
+        // This runs only on the client that has claimed this object
+        GONetLog.Warning($"⚠️ Authority {attemptingAuthorityId} tried to steal YOUR claimed object: {name}!");
+
+        // Trigger visual feedback
+        StartCoroutine(FlashWarning());
+
+        if (bounceCoroutine != null)
+        {
+            StopCoroutine(bounceCoroutine);
+        }
+        bounceCoroutine = StartCoroutine(BounceScale());
+
+        // You could also trigger UI notifications, sound effects, etc.
+        // UIManager.ShowNotification($"Player {attemptingAuthorityId} tried to steal {name}!");
+        // AudioManager.PlaySound("theft_attempt_warning");
     }
 
     [ClientRpc]
@@ -276,14 +333,88 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
 
     void UpdateVisualState()
     {
-        if (isMouseOver) return;
+        if (isMouseOver || isFlashing) return;
 
         if (ClaimedByAuthorityId == GONetMain.OwnerAuthorityId_Unset)
+        {
             targetColor = availableColor;
+            originalColor = availableColor;
+        }
         else if (isClaimedByMe)
+        {
             targetColor = claimedByMeColor;
+            originalColor = claimedByMeColor;
+        }
         else
+        {
             targetColor = claimedColor;
+            originalColor = claimedColor;
+        }
+    }
+
+    IEnumerator FlashWarning()
+    {
+        isFlashing = true;
+        Color currentColor = objectRenderer.material.color;
+
+        // Flash to warning color
+        float elapsed = 0;
+        while (elapsed < flashDuration)
+        {
+            objectRenderer.material.color = Color.Lerp(currentColor, attemptedTheftFlashColor, elapsed / flashDuration);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Flash back to original
+        elapsed = 0;
+        while (elapsed < flashDuration)
+        {
+            objectRenderer.material.color = Color.Lerp(attemptedTheftFlashColor, originalColor, elapsed / flashDuration);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        objectRenderer.material.color = originalColor;
+        isFlashing = false;
+    }
+
+    IEnumerator BounceScale()
+    {
+        float elapsed = 0;
+
+        while (elapsed < bounceDuration)
+        {
+            float normalizedTime = elapsed / bounceDuration;
+
+            // Use the animation curve for non-linear bounce
+            float curveValue = bounceCurve.Evaluate(normalizedTime);
+
+            // Apply elastic/bounce effect
+            float scaleMultiplier = 1f + (bounceScale - 1f) * curveValue;
+
+            // For extra bounce effect, add a secondary oscillation
+            float secondaryBounce = Mathf.Sin(normalizedTime * Mathf.PI * 4) * 0.05f * (1f - normalizedTime);
+            scaleMultiplier += secondaryBounce;
+
+            transform.localScale = originalScale * scaleMultiplier;
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.localScale = originalScale;
+        bounceCoroutine = null;
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+
+        if (bounceCoroutine != null)
+        {
+            StopCoroutine(bounceCoroutine);
+        }
     }
 }
 

@@ -48,12 +48,29 @@ namespace GONet
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
     /// <summary>
-    /// Server to specific target client.
+    /// Server to specific target client/authority.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public class TargetRpcAttribute : GONetRpcAttribute
     {
-        public RpcTarget Target { get; set; } = RpcTarget.Owner;
+        public RpcTarget Target { get; }
+        
+        /// <summary>
+        /// Optional convenience to use a local property name to read authority from
+        /// </summary>
+        public string TargetPropertyName { get; }
+
+        public TargetRpcAttribute(RpcTarget target = RpcTarget.All)
+        {
+            Target = target;
+            TargetPropertyName = null;
+        }
+
+        public TargetRpcAttribute(string targetPropertyName)
+        {
+            Target = RpcTarget.SpecificAuthority;
+            TargetPropertyName = targetPropertyName;
+        }
     }
 
     public enum RelayMode { None, Others, All, Owner }
@@ -68,7 +85,8 @@ namespace GONet
     {
         Owner,
         Others,
-        All
+        All,
+        SpecificAuthority
     }
 
     public class RpcMetadata
@@ -77,6 +95,7 @@ namespace GONet
         public bool IsReliable { get; set; }
         public bool IsMineRequired { get; set; }
         public RpcTarget Target { get; set; } // For TargetRpc
+        public string TargetPropertyName { get; set; }
     }
 
     /// <summary>

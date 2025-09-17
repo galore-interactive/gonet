@@ -1457,7 +1457,7 @@ namespace GONet.Generation
             sb.AppendLine("    }");
             sb.AppendLine();
 
-            // Add initialization class with RuntimeInitializeOnLoadMethod
+            // Add initialization class
             sb.AppendLine($"    internal static class {className}_RpcInitializer");
             sb.AppendLine("    {");
             sb.AppendLine("        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.BeforeSceneLoad)]");
@@ -1481,6 +1481,30 @@ namespace GONet.Generation
             }
             sb.AppendLine();
 
+            // Generate property accessor delegates for TargetRpcs with property names
+            sb.AppendLine("        // Property accessor delegates to avoid reflection");
+            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort>> TargetPropertyAccessors = ");
+            sb.AppendLine("            new Dictionary<string, Func<object, ushort>>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.TargetPropertyName))
+                {
+                    // Verify the property exists and is the right type
+                    var property = componentType.GetProperty(targetAttr.TargetPropertyName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (property != null && property.PropertyType == typeof(ushort))
+                    {
+                        sb.AppendLine($"            {{ nameof({className}.{method.Name}), ");
+                        sb.AppendLine($"              (obj) => (({className})obj).{targetAttr.TargetPropertyName} }},");
+                    }
+                }
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
             // Generate RPC metadata dictionary
             sb.AppendLine("        public static readonly Dictionary<string, RpcMetadata> Metadata = new Dictionary<string, RpcMetadata>");
             sb.AppendLine("        {");
@@ -1488,7 +1512,8 @@ namespace GONet.Generation
             {
                 var attr = method.GetCustomAttribute<GONetRpcAttribute>();
                 string rpcType = "RpcType.ServerRpc";
-                string target = "RpcTarget.Owner";
+                string target = "RpcTarget.All";
+                string targetPropertyName = "null";
 
                 if (attr is ClientRpcAttribute)
                 {
@@ -1497,9 +1522,20 @@ namespace GONet.Generation
                 else if (attr is TargetRpcAttribute targetAttr)
                 {
                     rpcType = "RpcType.TargetRpc";
+                    target = $"RpcTarget.{targetAttr.Target}";
+                    if (!string.IsNullOrEmpty(targetAttr.TargetPropertyName))
+                    {
+                        targetPropertyName = $"\"{targetAttr.TargetPropertyName}\"";
+                    }
                 }
 
-                sb.AppendLine($"            {{ nameof({className}.{method.Name}), new RpcMetadata {{ Type = {rpcType}, IsReliable = {attr.IsReliable.ToString().ToLower()}, IsMineRequired = {attr.IsMineRequired.ToString().ToLower()}, Target = {target} }} }},");
+                sb.AppendLine($"            {{ nameof({className}.{method.Name}), new RpcMetadata {{ ");
+                sb.AppendLine($"                Type = {rpcType}, ");
+                sb.AppendLine($"                IsReliable = {attr.IsReliable.ToString().ToLower()}, ");
+                sb.AppendLine($"                IsMineRequired = {attr.IsMineRequired.ToString().ToLower()}, ");
+                sb.AppendLine($"                Target = {target}, ");
+                sb.AppendLine($"                TargetPropertyName = {targetPropertyName} ");
+                sb.AppendLine("            }},");
             }
             sb.AppendLine("        };");
             sb.AppendLine();
@@ -1516,6 +1552,7 @@ namespace GONet.Generation
             sb.AppendLine("                isInitialized = true;");
             sb.AppendLine($"                GONetMain.EventBus.RegisterRpcDispatcher(typeof({className}), new {className}_RpcDispatcher());");
             sb.AppendLine($"                GONetMain.EventBus.RegisterRpcMetadata(typeof({className}), Metadata);");
+            sb.AppendLine($"                GONetMain.EventBus.RegisterTargetPropertyAccessors(typeof({className}), TargetPropertyAccessors);");
             sb.AppendLine("                RegisterRpcHandlers();");
             sb.AppendLine($"                GONetLog.Debug(\"Initialized RPC dispatcher for {className}\");");
             sb.AppendLine("            }");
@@ -1525,7 +1562,6 @@ namespace GONet.Generation
             sb.AppendLine();
             sb.AppendLine("        internal static void EnsureInitialized()");
             sb.AppendLine("        {");
-            sb.AppendLine("            // Forces static constructor to run");
             sb.AppendLine("            _ = Metadata;");
             sb.AppendLine("        }");
 
@@ -1571,12 +1607,74 @@ namespace GONet.Generation
             bool returnsValue = method.ReturnType.IsGenericType && method.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
             bool isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
 
+            // Get the attribute to check what type of RPC this is
+            var attr = method.GetCustomAttribute<GONetRpcAttribute>();
+            bool isTargetRpc = attr is TargetRpcAttribute;
+
             sb.AppendLine($"            eventBus.RegisterRpcHandler({className}_RpcIds.{method.Name}_RpcId, async (envelope) =>");
             sb.AppendLine("            {");
             sb.AppendLine("                var rpcEvent = envelope.Event;");
             sb.AppendLine($"                var instance = GONetMain.GetGONetParticipantById(rpcEvent.GONetId)?.GetComponent<{className}>();");
             sb.AppendLine("                if (instance == null) return;");
             sb.AppendLine();
+
+            if (isTargetRpc)
+            {
+                var targetAttr = (TargetRpcAttribute)attr;
+
+                // Generate target checking logic based on RpcTarget
+                switch (targetAttr.Target)
+                {
+                    case RpcTarget.Owner:
+                        sb.AppendLine("                // Check if we should execute this TargetRpc");
+                        sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
+                        sb.AppendLine("                if (gnp.OwnerAuthorityId != GONetMain.MyAuthorityId)");
+                        sb.AppendLine("                {");
+                        sb.AppendLine("                    return; // Not the owner, don't execute");
+                        sb.AppendLine("                }");
+                        break;
+
+                    case RpcTarget.Others:
+                        sb.AppendLine("                // Check if we should execute this TargetRpc");
+                        sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
+                        sb.AppendLine("                if (gnp.OwnerAuthorityId == GONetMain.MyAuthorityId)");
+                        sb.AppendLine("                {");
+                        sb.AppendLine("                    return; // We're the owner, don't execute");
+                        sb.AppendLine("                }");
+                        break;
+
+                    case RpcTarget.All:
+                        // Execute for everyone, no check needed
+                        break;
+
+                    case RpcTarget.SpecificAuthority:
+                        if (!string.IsNullOrWhiteSpace(targetAttr.TargetPropertyName))
+                        {
+                            // Property-based targeting
+                            sb.AppendLine($"                // Check target from property: {targetAttr.TargetPropertyName}");
+                            sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
+                            sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                            sb.AppendLine("                {");
+                            sb.AppendLine("                    return; // Not the target, don't execute");
+                            sb.AppendLine("                }");
+                        }
+                        else if (hasParameters && parameters[0].ParameterType == typeof(ushort))
+                        {
+                            // First parameter is the target authority
+                            sb.AppendLine("                // Check target from first parameter");
+                            string dataTypeName = GetParameterDataStructName(method);
+                            sb.AppendLine($"                var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(rpcEvent.Data);");
+                            sb.AppendLine($"                ushort targetAuthority = args.{parameters[0].Name};");
+                            sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                            sb.AppendLine("                {");
+                            sb.AppendLine("                    return; // Not the target, don't execute");
+                            sb.AppendLine("                }");
+                            hasParameters = false; // We already deserialized
+                        }
+                        break;
+                }
+                sb.AppendLine();
+            }
 
             // Deserialize parameters if needed
             if (hasParameters)
@@ -1672,145 +1770,6 @@ namespace GONet.Generation
             }
 
             return type.Name;
-        }
-
-        private static void GenerateRpcRegistration(StringBuilder sb, MethodInfo method, Type componentType, string className)
-        {
-            var parameters = method.GetParameters();
-            var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-
-            sb.AppendLine($"            eventBus.RegisterRpcHandler({className}_RpcIds.{method.Name}_RpcId, async (gonetId, data) =>");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                var instance = GONetMain.GetGONetParticipantById(gonetId)?.GetComponent<{className}>();");
-            sb.AppendLine("                if (instance != null)");
-            sb.AppendLine("                {");
-
-            // Handle parameters
-            if (parameters.Length > 0)
-            {
-                string dataTypeName = GetParameterDataStructName(method);
-                sb.AppendLine($"                    var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
-
-                string argList = string.Join(", ", parameters.Select((p, i) => $"args.Arg{i + 1}"));
-
-                if (method.ReturnType == typeof(void))
-                {
-                    sb.AppendLine($"                    instance.{method.Name}({argList});");
-                }
-                else if (typeof(Task).IsAssignableFrom(method.ReturnType))
-                {
-                    sb.AppendLine($"                    await instance.{method.Name}({argList});");
-                }
-            }
-            else
-            {
-                if (method.ReturnType == typeof(void))
-                {
-                    sb.AppendLine($"                    instance.{method.Name}();");
-                }
-                else if (typeof(Task).IsAssignableFrom(method.ReturnType))
-                {
-                    sb.AppendLine($"                    await instance.{method.Name}();");
-                }
-            }
-
-            sb.AppendLine("                }");
-            sb.AppendLine("            });");
-            sb.AppendLine();
-        }
-
-        private static void GenerateRpcCompanionClass(Type componentType, IEnumerable<MethodInfo> rpcMethods)
-        {
-            var sb = new StringBuilder();
-            string className = componentType.Name;
-            string companionClassName = $"{className}_RpcDispatcher_Generated";
-
-            // File header
-            sb.AppendLine("// GENERATED BY GONet - DO NOT EDIT");
-            sb.AppendLine("using System;");
-            sb.AppendLine("using System.Collections.Generic;");
-            sb.AppendLine("using System.Threading.Tasks;");
-            sb.AppendLine("using UnityEngine;");
-            sb.AppendLine("using GONet;");
-            sb.AppendLine("using GONet.Utils;");
-            sb.AppendLine("using MemoryPack;");
-            sb.AppendLine();
-            sb.AppendLine($"namespace {(string.IsNullOrWhiteSpace(componentType.Namespace) ? "GONet" : componentType.Namespace)}");
-            sb.AppendLine("{");
-
-            // Dispatcher class
-            sb.AppendLine($"    internal class {companionClassName} : IRpcDispatcher");
-            sb.AppendLine("    {");
-
-            // Generate const strings for method names
-            foreach (var method in rpcMethods)
-            {
-                sb.AppendLine($"        private const string {method.Name.ToUpper()} = nameof({className}.{method.Name});");
-            }
-            sb.AppendLine();
-
-            // Generate RPC metadata dictionary
-            sb.AppendLine("        public static readonly Dictionary<string, RpcMetadata> Metadata = new Dictionary<string, RpcMetadata>");
-            sb.AppendLine("        {");
-            foreach (var method in rpcMethods)
-            {
-                var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-                string rpcType = "RpcType.ServerRpc"; // default
-
-                if (attr is ClientRpcAttribute)
-                    rpcType = "RpcType.ClientRpc";
-                else if (attr is TargetRpcAttribute targetAttr)
-                {
-                    rpcType = "RpcType.TargetRpc";
-                    // Add target info to metadata
-                }
-
-                sb.AppendLine($"            {{ nameof({className}.{method.Name}), new RpcMetadata {{ Type = {rpcType}, IsReliable = {attr.IsReliable.ToString().ToLower()}, IsMineRequired = {attr.IsMineRequired.ToString().ToLower()} }} }},");
-            }
-            sb.AppendLine("        };");
-            sb.AppendLine();
-
-            // Generate dispatcher methods for each parameter count
-            GenerateDispatcherMethods(sb, componentType, rpcMethods);
-
-            // Static constructor to register
-            sb.AppendLine();
-            sb.AppendLine($"        static {companionClassName}()");
-            sb.AppendLine("        {");
-            sb.AppendLine($"            GONetMain.EventBus.RegisterRpcDispatcher(typeof({className}), new {companionClassName}());");
-            sb.AppendLine($"            GONetMain.EventBus.RegisterRpcMetadata(typeof({className}), Metadata);");
-            sb.AppendLine("            RegisterRpcHandlers();");
-            sb.AppendLine("        }");
-
-            // RPC handler registration
-            sb.AppendLine();
-            sb.AppendLine("        private static void RegisterRpcHandlers()");
-            sb.AppendLine("        {");
-            sb.AppendLine("            var eventBus = GONetMain.EventBus;");
-            foreach (var method in rpcMethods)
-            {
-                GenerateRpcRegistration(sb, method, componentType);
-            }
-            sb.AppendLine("        }");
-
-            sb.AppendLine("    }");
-
-            // Generate parameter data structures
-            foreach (var method in rpcMethods.Where(m => m.GetParameters().Any()))
-            {
-                GenerateParameterDataStruct(sb, method);
-            }
-
-            sb.AppendLine("}");
-
-            string rpcsFolderPath = $"{GENERATED_FILE_PATH}RPCs/";
-            if (!Directory.Exists(rpcsFolderPath))
-            {
-                Directory.CreateDirectory(rpcsFolderPath);
-            }
-
-            string filePath = $"{rpcsFolderPath}{companionClassName}.cs";
-            File.WriteAllText(filePath, sb.ToString());
         }
 
         private static void GenerateDispatcherMethods(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
@@ -1931,253 +1890,6 @@ namespace GONet.Generation
             sb.AppendLine();
         }
 
-        private static void GenerateRpcRegistration(StringBuilder sb, MethodInfo method, Type componentType)
-        {
-            var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-            bool hasReturn = method.ReturnType != typeof(void) && method.ReturnType != typeof(Task);
-            bool isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
-            var parameters = method.GetParameters();
-
-            sb.AppendLine($"            eventBus.rpcHandlers[{method.Name}_RpcId] = async (envelope) =>");
-            sb.AppendLine("            {");
-
-            // Get the instance from the GONetId in the event
-            sb.AppendLine("                var gonetParticipant = GONetMain.GetGONetParticipantById(envelope.Event.GONetId);");
-            sb.AppendLine("                if (gonetParticipant == null)");
-            sb.AppendLine("                {");
-            sb.AppendLine($"                    GONetLog.Warning(\"No GONetParticipant found for ID: \" + envelope.Event.GONetId);");
-            sb.AppendLine("                    return;");
-            sb.AppendLine("                }");
-            sb.AppendLine();
-            sb.AppendLine($"                var instance = gonetParticipant.GetComponent<{componentType.Name}>();");
-            sb.AppendLine("                if (instance == null)");
-            sb.AppendLine("                {");
-            sb.AppendLine($"                    GONetLog.Warning(\"No {componentType.Name} component found on GONetParticipant\");");
-            sb.AppendLine("                    return;");
-            sb.AppendLine("                }");
-
-            // IsMineRequired check
-            if (attr.IsMineRequired)
-            {
-                sb.AppendLine();
-                sb.AppendLine("                if (envelope.SourceAuthorityId != gonetParticipant.OwnerAuthorityId)");
-                sb.AppendLine("                {");
-                sb.AppendLine($"                    GONetLog.Warning(\"IsMine check failed for {method.Name}\");");
-                sb.AppendLine("                    return;");
-                sb.AppendLine("                }");
-            }
-
-            // Deserialize parameters
-            if (parameters.Any())
-            {
-                sb.AppendLine();
-                sb.AppendLine($"                var data = SerializationUtils.DeserializeFromBytes<{method.Name}Data>(envelope.Event.Data);");
-            }
-
-            // Build method call arguments
-            string args = string.Join(", ", parameters.Select(p => $"data.{p.Name}"));
-
-            // Call the method
-            if (hasReturn)
-            {
-                sb.AppendLine();
-                sb.AppendLine("                try");
-                sb.AppendLine("                {");
-
-                string callPrefix = isAsync ? "await " : "";
-                sb.AppendLine($"                    var result = {callPrefix}instance.{method.Name}({args});");
-
-                sb.AppendLine();
-                sb.AppendLine("                    var response = eventBus.BorrowRpcResponseEvent();");
-                sb.AppendLine($"                    response.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
-                sb.AppendLine("                    response.CorrelationId = envelope.Event.CorrelationId;");
-                sb.AppendLine("                    response.Success = true;");
-
-                sb.AppendLine();
-                sb.AppendLine("                    int responseBytesUsed;");
-                sb.AppendLine("                    bool responseNeedsReturn;");
-                sb.AppendLine("                    response.Data = SerializationUtils.SerializeToBytes(result, out responseBytesUsed, out responseNeedsReturn);");
-
-                sb.AppendLine();
-                sb.AppendLine("                    eventBus.Publish(response, targetClientAuthorityId: envelope.SourceAuthorityId);");
-
-                sb.AppendLine();
-                sb.AppendLine("                    if (responseNeedsReturn)");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        SerializationUtils.ReturnByteArray(response.Data);");
-                sb.AppendLine("                    }");
-
-                sb.AppendLine("                    eventBus.ReturnRpcResponseEvent(response);");
-                sb.AppendLine("                }");
-                sb.AppendLine("                catch (Exception ex)");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    throw;");
-                sb.AppendLine("                }");
-            }
-            else
-            {
-                sb.AppendLine();
-                string callPrefix = isAsync ? "await " : "";
-                sb.AppendLine($"                {callPrefix}instance.{method.Name}({args});");
-            }
-
-            sb.AppendLine("            };");
-        }
-
-        private static void GenerateRpcExtensionMethod(StringBuilder sb, Type componentType, MethodInfo method)
-        {
-            var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-            var parameters = method.GetParameters();
-            string paramList = string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}"));
-            string argList = string.Join(", ", parameters.Select(p => p.Name));
-
-            sb.AppendLine();
-
-            // Generate appropriate signature based on return type
-            bool isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
-            string returnTypeStr = method.ReturnType == typeof(void) ? "void" :
-                                  method.ReturnType.Name.Replace("`1", "");
-
-            if (isAsync && method.ReturnType.IsGenericType)
-            {
-                var genericArg = method.ReturnType.GetGenericArguments()[0];
-                returnTypeStr = $"async Task<{genericArg.Name}>";
-            }
-            else if (isAsync)
-            {
-                returnTypeStr = "async Task";
-            }
-
-            string methodSignature = $"public static {returnTypeStr} {method.Name}(this {componentType.Name} instance";
-            if (parameters.Any())
-            {
-                methodSignature += $", {paramList}";
-            }
-            methodSignature += ")";
-
-            sb.AppendLine($"        {methodSignature}");
-            sb.AppendLine("        {");
-
-            if (attr is ServerRpcAttribute serverRpc)
-            {
-                GenerateServerRpcBody(sb, method, serverRpc, argList);
-            }
-            else if (attr is ClientRpcAttribute)
-            {
-                GenerateClientRpcBody(sb, method, argList);
-            }
-            else if (attr is TargetRpcAttribute targetRpc)
-            {
-                GenerateTargetRpcBody(sb, method, targetRpc, argList);
-            }
-
-            sb.AppendLine("        }");
-        }
-
-        private static void GenerateServerRpcBody(StringBuilder sb, MethodInfo method, ServerRpcAttribute attr, string argList)
-        {
-            var parameters = method.GetParameters();
-            bool hasParams = parameters.Any();
-            bool isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
-            bool hasReturn = method.ReturnType != typeof(void) && method.ReturnType != typeof(Task);
-
-            sb.AppendLine("            if (GONetMain.IsServer)");
-            sb.AppendLine("            {");
-
-            if (attr.IsMineRequired)
-            {
-                sb.AppendLine("                if (!instance.IsMine)");
-                sb.AppendLine("                {");
-                sb.AppendLine($"                    GONetLog.Warning(\"Cannot call {method.Name} - IsMine check failed\");");
-                if (hasReturn)
-                {
-                    sb.AppendLine("                    return default;");
-                }
-                else
-                {
-                    sb.AppendLine("                    return;");
-                }
-                sb.AppendLine("                }");
-            }
-
-            // Create minimal context for local server execution
-            sb.AppendLine("                // Create minimal context for local server execution");
-            sb.AppendLine("                var localContext = new GONetRpcContext(");
-            sb.AppendLine("                    GONetMain.MyAuthorityId,");
-            sb.AppendLine($"                    {attr.IsReliable.ToString().ToLower()},");
-            sb.AppendLine("                    instance.GONetParticipant.GONetId);");
-            sb.AppendLine();
-            sb.AppendLine("                GONetEventBus.SetCurrentRpcContext(localContext);");
-            sb.AppendLine();
-            sb.AppendLine("                try");
-            sb.AppendLine("                {");
-
-            string callStr = isAsync ? "return await " : hasReturn ? "return " : "";
-            sb.AppendLine($"                    {callStr}instance.{method.Name}({argList});");
-
-            sb.AppendLine("                }");
-            sb.AppendLine("                finally");
-            sb.AppendLine("                {");
-            sb.AppendLine("                    GONetEventBus.SetCurrentRpcContext(null);");
-            sb.AppendLine("                }");
-
-            sb.AppendLine("            }");
-            sb.AppendLine("            else // Client sends to server");
-            sb.AppendLine("            {");
-
-            if (hasParams)
-            {
-                sb.AppendLine($"                var data = new {method.Name}Data {{ {string.Join(", ", parameters.Select(p => $"{p.Name} = {p.Name}"))} }};");
-                sb.AppendLine("                int bytesUsed;");
-                sb.AppendLine("                bool needsReturn;");
-                sb.AppendLine("                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);");
-            }
-
-            sb.AppendLine("                var rpcEvent = GONetMain.EventBus.BorrowRpcEvent();");
-            sb.AppendLine($"                rpcEvent.RpcId = {method.Name}_RpcId;");
-            sb.AppendLine("                rpcEvent.GONetId = instance.GONetParticipant.GONetId;");
-            sb.AppendLine($"                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                rpcEvent.Data = serialized;");
-            }
-
-            if (hasReturn)
-            {
-                sb.AppendLine("                rpcEvent.CorrelationId = GUID.Generate().AsInt64();");
-                sb.AppendLine($"                var tcs = new TaskCompletionSource<{method.ReturnType.GetGenericArguments()[0].Name}>();");
-                sb.AppendLine("                GONetMain.EventBus.RegisterPendingResponse(rpcEvent.CorrelationId, tcs);");
-            }
-
-            string reliability = attr.IsReliable ? "true" : "false";
-            sb.AppendLine($"                GONetMain.EventBus.Publish(rpcEvent, shouldPublishReliably: {reliability});");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                if (needsReturn)");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    SerializationUtils.ReturnByteArray(serialized);");
-                sb.AppendLine("                }");
-            }
-
-            sb.AppendLine("                GONetMain.EventBus.ReturnRpcEvent(rpcEvent);");
-
-            if (hasReturn)
-            {
-                sb.AppendLine("                return await tcs.Task;");
-            }
-
-            sb.AppendLine("            }");
-        }
-
-        private static uint GenerateRpcId(Type componentType, MethodInfo method)
-        {
-            // Generate deterministic ID based on type and method signature
-            string signature = $"{componentType.FullName}.{method.Name}({string.Join(",", method.GetParameters().Select(p => p.ParameterType.FullName))})";
-            return (uint)signature.GetHashCode();
-        }
-
         private static void ValidateRpcMethod(MethodInfo method, List<string> errors, bool isOnGONetGlobal, bool isOnGONetLocal)
         {
             var attr = method.GetCustomAttribute<GONetRpcAttribute>();
@@ -2293,169 +2005,6 @@ namespace GONet.Generation
             }
 
             return false;
-        }
-
-        private static void GenerateParameterDataStruct(StringBuilder sb, MethodInfo method)
-        {
-            sb.AppendLine();
-            sb.AppendLine("    [MemoryPackable]");
-            sb.AppendLine($"    public partial struct {method.Name}Data");
-            sb.AppendLine("    {");
-
-            foreach (var param in method.GetParameters())
-            {
-                sb.AppendLine($"        public {param.ParameterType.FullName} {param.Name};");
-            }
-
-            sb.AppendLine("    }");
-        }
-
-        private static void GenerateClientRpcBody(StringBuilder sb, MethodInfo method, string argList)
-        {
-            var parameters = method.GetParameters();
-            bool hasParams = parameters.Any();
-            var attr = method.GetCustomAttribute<ClientRpcAttribute>();
-
-            sb.AppendLine("            if (GONetMain.IsServer)");
-            sb.AppendLine("            {");
-
-            // Create minimal context for local server execution
-            sb.AppendLine("                // Execute locally on server with context");
-            sb.AppendLine("                var localContext = new GONetRpcContext(");
-            sb.AppendLine("                    GONetMain.MyAuthorityId,");
-            sb.AppendLine($"                    {attr.IsReliable.ToString().ToLower()},");
-            sb.AppendLine("                    instance.GONetParticipant.GONetId);");
-            sb.AppendLine();
-            sb.AppendLine("                GONetEventBus.SetCurrentRpcContext(localContext);");
-            sb.AppendLine();
-            sb.AppendLine("                try");
-            sb.AppendLine("                {");
-            sb.AppendLine($"                    instance.{method.Name}({argList});");
-            sb.AppendLine("                }");
-            sb.AppendLine("                finally");
-            sb.AppendLine("                {");
-            sb.AppendLine("                    GONetEventBus.SetCurrentRpcContext(null);");
-            sb.AppendLine("                }");
-            sb.AppendLine();
-
-            // Broadcast to all clients
-            sb.AppendLine("                // Broadcast to all clients");
-            if (hasParams)
-            {
-                sb.AppendLine($"                var data = new {method.Name}Data {{ {string.Join(", ", parameters.Select(p => $"{p.Name} = {p.Name}"))} }};");
-                sb.AppendLine("                int bytesUsed;");
-                sb.AppendLine("                bool needsReturn;");
-                sb.AppendLine("                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);");
-            }
-
-            sb.AppendLine("                var rpcEvent = GONetMain.EventBus.BorrowRpcEvent();");
-            sb.AppendLine($"                rpcEvent.RpcId = {method.Name}_RpcId;");
-            sb.AppendLine("                rpcEvent.GONetId = instance.GONetParticipant.GONetId;");
-            sb.AppendLine($"                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                rpcEvent.Data = serialized;");
-            }
-
-            string reliability = attr.IsReliable ? "true" : "false";
-            sb.AppendLine($"                GONetMain.EventBus.Publish(rpcEvent, shouldPublishReliably: {reliability});");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                if (needsReturn)");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    SerializationUtils.ReturnByteArray(serialized);");
-                sb.AppendLine("                }");
-            }
-
-            sb.AppendLine("                GONetMain.EventBus.ReturnRpcEvent(rpcEvent);");
-            sb.AppendLine("            }");
-        }
-
-        private static void GenerateTargetRpcBody(StringBuilder sb, MethodInfo method, TargetRpcAttribute attr, string argList)
-        {
-            var parameters = method.GetParameters();
-            bool hasParams = parameters.Any();
-
-            sb.AppendLine("            if (GONetMain.IsServer)");
-            sb.AppendLine("            {");
-
-            // Determine target
-            sb.AppendLine("                // Determine target");
-            switch (attr.Target)
-            {
-                case RpcTarget.Owner:
-                    sb.AppendLine("                ushort targetId = instance.GONetParticipant.OwnerAuthorityId;");
-                    break;
-                case RpcTarget.All:
-                    sb.AppendLine("                ushort targetId = GONetMain.OwnerAuthorityId_Unset;");
-                    break;
-                case RpcTarget.Others:
-                    sb.AppendLine("                // TODO: Handle Others - need to exclude owner");
-                    sb.AppendLine("                ushort targetId = GONetMain.OwnerAuthorityId_Unset;");
-                    break;
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("                // Execute locally on server if it matches target");
-            sb.AppendLine("                if (targetId == GONetMain.MyAuthorityId || targetId == GONetMain.OwnerAuthorityId_Unset)");
-            sb.AppendLine("                {");
-
-            // Create minimal context for local execution
-            sb.AppendLine("                    var localContext = new GONetRpcContext(");
-            sb.AppendLine("                        GONetMain.MyAuthorityId,");
-            sb.AppendLine($"                        {attr.IsReliable.ToString().ToLower()},");
-            sb.AppendLine("                        instance.GONetParticipant.GONetId);");
-            sb.AppendLine();
-            sb.AppendLine("                    GONetEventBus.SetCurrentRpcContext(localContext);");
-            sb.AppendLine();
-            sb.AppendLine("                    try");
-            sb.AppendLine("                    {");
-            sb.AppendLine($"                        instance.{method.Name}({argList});");
-            sb.AppendLine("                    }");
-            sb.AppendLine("                    finally");
-            sb.AppendLine("                    {");
-            sb.AppendLine("                        GONetEventBus.SetCurrentRpcContext(null);");
-            sb.AppendLine("                    }");
-            sb.AppendLine("                }");
-            sb.AppendLine();
-
-            // Send to target client(s)
-            sb.AppendLine("                // Send to target client(s)");
-            if (hasParams)
-            {
-                sb.AppendLine($"                var data = new {method.Name}Data {{ {string.Join(", ", parameters.Select(p => $"{p.Name} = {p.Name}"))} }};");
-                sb.AppendLine("                int bytesUsed;");
-                sb.AppendLine("                bool needsReturn;");
-                sb.AppendLine("                byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);");
-            }
-
-            sb.AppendLine("                var rpcEvent = GONetMain.EventBus.BorrowRpcEvent();");
-            sb.AppendLine($"                rpcEvent.RpcId = {method.Name}_RpcId;");
-            sb.AppendLine("                rpcEvent.GONetId = instance.GONetParticipant.GONetId;");
-            sb.AppendLine($"                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                rpcEvent.Data = serialized;");
-            }
-
-            sb.AppendLine("                rpcEvent.IsSingularRecipientOnly = targetId != GONetMain.OwnerAuthorityId_Unset;");
-
-            string reliability = attr.IsReliable ? "true" : "false";
-            sb.AppendLine($"                GONetMain.EventBus.Publish(rpcEvent, targetClientAuthorityId: targetId, shouldPublishReliably: {reliability});");
-
-            if (hasParams)
-            {
-                sb.AppendLine("                if (needsReturn)");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    SerializationUtils.ReturnByteArray(serialized);");
-                sb.AppendLine("                }");
-            }
-
-            sb.AppendLine("                GONetMain.EventBus.ReturnRpcEvent(rpcEvent);");
-            sb.AppendLine("            }");
         }
         #endregion
     }
