@@ -17,6 +17,7 @@ using MemoryPack;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
@@ -59,8 +60,7 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte[] BorrowByteArray(int minimumSize)
         {
-            ArrayPool<byte> arrayPool;
-            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out arrayPool))
+            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out ArrayPool<byte> arrayPool))
             {
                 arrayPool = new ArrayPool<byte>(25, 1, MTU_x8, MTU_x32);
                 byteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
@@ -75,6 +75,26 @@ namespace GONet.Utils
         public static void ReturnByteArray(byte[] borrowed)
         {
             byteArrayPoolByThreadMap[Thread.CurrentThread].Return(borrowed);
+        }
+
+        /// <summary>
+        /// NOT required that <paramref name="borrowed"/> was returned from a call to <see cref="BorrowByteArray(int)"/> and not already passed in here.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryReturnByteArray(byte[] borrowed)
+        {
+            if (byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out ArrayPool<byte> arrayPool))
+            {
+                try
+                {
+                    arrayPool.Return(borrowed);
+                    return true;
+                }
+                catch (NotBorrowedFromPoolException) { }
+                catch (NullReferenceException) { }
+            }
+
+            return false;
         }
 
         /*

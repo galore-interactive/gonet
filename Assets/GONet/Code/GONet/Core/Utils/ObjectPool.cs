@@ -15,6 +15,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace GONet.Utils
 {
@@ -213,6 +216,22 @@ namespace GONet.Utils
             ++totalReturned;
 
             //ObjectReturned?.Invoke(this, @object);
+        }
+
+        /// <summary>
+        /// NOT required that <paramref name="borrowed"/> was returned from a call to <see cref="Borrow"/> and not already passed in here.
+        /// </summary>
+        public bool TryReturn(T borrowed)
+        {
+            try
+            {
+                Return(borrowed);
+                return true;
+            }
+            catch (NotBorrowedFromPoolException) { }
+            catch (NullReferenceException) { }
+
+            return false;
         }
 
         /// <summary>

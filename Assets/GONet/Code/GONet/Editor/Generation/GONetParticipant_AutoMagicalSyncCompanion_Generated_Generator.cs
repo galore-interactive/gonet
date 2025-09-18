@@ -1481,64 +1481,14 @@ namespace GONet.Generation
             }
             sb.AppendLine();
 
-            // Generate property accessor delegates for TargetRpcs with property names
-            sb.AppendLine("        // Property accessor delegates to avoid reflection");
-            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort>> TargetPropertyAccessors = ");
-            sb.AppendLine("            new Dictionary<string, Func<object, ushort>>");
-            sb.AppendLine("        {");
+            // Generate property accessor delegates for TargetRpcs
+            GenerateTargetPropertyAccessors(sb, componentType, rpcMethods);
 
-            foreach (var method in rpcMethods)
-            {
-                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
-                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.TargetPropertyName))
-                {
-                    // Verify the property exists and is the right type
-                    var property = componentType.GetProperty(targetAttr.TargetPropertyName,
-                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (property != null && property.PropertyType == typeof(ushort))
-                    {
-                        sb.AppendLine($"            {{ nameof({className}.{method.Name}), ");
-                        sb.AppendLine($"              (obj) => (({className})obj).{targetAttr.TargetPropertyName} }},");
-                    }
-                }
-            }
-            sb.AppendLine("        };");
-            sb.AppendLine();
+            // Generate validation delegates if any
+            GenerateValidationDelegates(sb, componentType, rpcMethods);
 
             // Generate RPC metadata dictionary
-            sb.AppendLine("        public static readonly Dictionary<string, RpcMetadata> Metadata = new Dictionary<string, RpcMetadata>");
-            sb.AppendLine("        {");
-            foreach (var method in rpcMethods)
-            {
-                var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-                string rpcType = "RpcType.ServerRpc";
-                string target = "RpcTarget.All";
-                string targetPropertyName = "null";
-
-                if (attr is ClientRpcAttribute)
-                {
-                    rpcType = "RpcType.ClientRpc";
-                }
-                else if (attr is TargetRpcAttribute targetAttr)
-                {
-                    rpcType = "RpcType.TargetRpc";
-                    target = $"RpcTarget.{targetAttr.Target}";
-                    if (!string.IsNullOrEmpty(targetAttr.TargetPropertyName))
-                    {
-                        targetPropertyName = $"\"{targetAttr.TargetPropertyName}\"";
-                    }
-                }
-
-                sb.AppendLine($"            {{ nameof({className}.{method.Name}), new RpcMetadata {{ ");
-                sb.AppendLine($"                Type = {rpcType}, ");
-                sb.AppendLine($"                IsReliable = {attr.IsReliable.ToString().ToLower()}, ");
-                sb.AppendLine($"                IsMineRequired = {attr.IsMineRequired.ToString().ToLower()}, ");
-                sb.AppendLine($"                Target = {target}, ");
-                sb.AppendLine($"                TargetPropertyName = {targetPropertyName} ");
-                sb.AppendLine("            }},");
-            }
-            sb.AppendLine("        };");
-            sb.AppendLine();
+            GenerateMetadataDictionary(sb, componentType, rpcMethods);
 
             // Generate dispatcher methods
             GenerateDispatcherMethods(sb, componentType, rpcMethods);
@@ -1552,8 +1502,26 @@ namespace GONet.Generation
             sb.AppendLine("                isInitialized = true;");
             sb.AppendLine($"                GONetMain.EventBus.RegisterRpcDispatcher(typeof({className}), new {className}_RpcDispatcher());");
             sb.AppendLine($"                GONetMain.EventBus.RegisterRpcMetadata(typeof({className}), Metadata);");
-            sb.AppendLine($"                GONetMain.EventBus.RegisterTargetPropertyAccessors(typeof({className}), TargetPropertyAccessors);");
+
+            // Only register if we have accessors
+            sb.AppendLine("                if (TargetPropertyAccessors.Count > 0)");
+            sb.AppendLine($"                    GONetMain.EventBus.RegisterTargetPropertyAccessors(typeof({className}), TargetPropertyAccessors);");
+            sb.AppendLine("                if (MultiTargetPropertyAccessors.Count > 0)");
+            sb.AppendLine($"                    GONetMain.EventBus.RegisterMultiTargetPropertyAccessors(typeof({className}), MultiTargetPropertyAccessors);");
+            sb.AppendLine("                if (SingleTargetValidators.Count > 0)");
+            sb.AppendLine($"                    GONetMain.EventBus.RegisterSingleTargetValidators(typeof({className}), SingleTargetValidators);");
+            sb.AppendLine("                if (MultiTargetValidators.Count > 0)");
+            sb.AppendLine($"                    GONetMain.EventBus.RegisterMultiTargetValidators(typeof({className}), MultiTargetValidators);");
+
             sb.AppendLine("                RegisterRpcHandlers();");
+
+            // Register RpcId mappings
+            foreach (var method in rpcMethods)
+            {
+                uint rpcId = GONetEventBus.GetRpcId(componentType, method.Name);
+                sb.AppendLine($"                GONetMain.EventBus.RegisterRpcIdMapping(0x{rpcId:X8}, nameof({className}.{method.Name}));");
+            }
+
             sb.AppendLine($"                GONetLog.Debug(\"Initialized RPC dispatcher for {className}\");");
             sb.AppendLine("            }");
             sb.AppendLine("        }");
@@ -1565,18 +1533,20 @@ namespace GONet.Generation
             sb.AppendLine("            _ = Metadata;");
             sb.AppendLine("        }");
 
-            // RPC handler registration
-            sb.AppendLine();
-            sb.AppendLine("        private static void RegisterRpcHandlers()");
-            sb.AppendLine("        {");
-            sb.AppendLine("            var eventBus = GONetMain.EventBus;");
-
-            foreach (var method in rpcMethods)
             {
-                GenerateRpcHandlerRegistration(sb, method, className);
-            }
+                // RPC handler registration
+                sb.AppendLine();
+                sb.AppendLine("        private static void RegisterRpcHandlers()");
+                sb.AppendLine("        {");
+                sb.AppendLine("            var eventBus = GONetMain.EventBus;");
 
-            sb.AppendLine("        }");
+                foreach (var method in rpcMethods)
+                {
+                    GenerateRpcHandlerRegistration(sb, method, className);
+                }
+
+                sb.AppendLine("        }");
+            }
             sb.AppendLine("    }");
             sb.AppendLine();
 
@@ -1600,6 +1570,182 @@ namespace GONet.Generation
             File.WriteAllText(filePath, sb.ToString());
         }
 
+        private static void GenerateTargetPropertyAccessors(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
+        {
+            // Single target accessors
+            sb.AppendLine("        // Property accessor delegates for single targets");
+            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort>> TargetPropertyAccessors = ");
+            sb.AppendLine("            new Dictionary<string, Func<object, ushort>>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.TargetPropertyName) && !targetAttr.IsMultipleTargets)
+                {
+                    var property = componentType.GetProperty(targetAttr.TargetPropertyName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (property != null && property.PropertyType == typeof(ushort))
+                    {
+                        sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                        sb.AppendLine($"              (obj) => (({componentType.Name})obj).{targetAttr.TargetPropertyName} }},");
+                    }
+                }
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Multi-target accessors that fill buffer
+            sb.AppendLine("        // Property accessor delegates for multiple targets (fills buffer, returns count)");
+            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort[], int>> MultiTargetPropertyAccessors = ");
+            sb.AppendLine("            new Dictionary<string, Func<object, ushort[], int>>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.TargetPropertyName) && targetAttr.IsMultipleTargets)
+                {
+                    var property = componentType.GetProperty(targetAttr.TargetPropertyName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (property != null)
+                    {
+                        if (property.PropertyType == typeof(List<ushort>))
+                        {
+                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"              (obj, buffer) => ");
+                            sb.AppendLine($"              {{");
+                            sb.AppendLine($"                  var list = (({componentType.Name})obj).{targetAttr.TargetPropertyName};");
+                            sb.AppendLine($"                  if (list == null) return 0;");
+                            sb.AppendLine($"                  int count = Math.Min(list.Count, buffer.Length);");
+                            sb.AppendLine($"                  for (int i = 0; i < count; i++) buffer[i] = list[i];");
+                            sb.AppendLine($"                  return count;");
+                            sb.AppendLine($"              }} }},");
+                        }
+                        else if (property.PropertyType == typeof(ushort[]))
+                        {
+                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"              (obj, buffer) => ");
+                            sb.AppendLine($"              {{");
+                            sb.AppendLine($"                  var array = (({componentType.Name})obj).{targetAttr.TargetPropertyName};");
+                            sb.AppendLine($"                  if (array == null) return 0;");
+                            sb.AppendLine($"                  int count = Math.Min(array.Length, buffer.Length);");
+                            sb.AppendLine($"                  Array.Copy(array, buffer, count);");
+                            sb.AppendLine($"                  return count;");
+                            sb.AppendLine($"              }} }},");
+                        }
+                    }
+                }
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+        }
+
+        private static void GenerateValidationDelegates(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
+        {
+            // Single target validators
+            sb.AppendLine("        // Validation delegates for single targets");
+            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort, ushort[], int, int>> SingleTargetValidators = ");
+            sb.AppendLine("            new Dictionary<string, Func<object, ushort, ushort[], int, int>>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.ValidationMethodName) && !targetAttr.IsMultipleTargets)
+                {
+                    var validationMethod = componentType.GetMethod(targetAttr.ValidationMethodName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (validationMethod != null)
+                    {
+                        sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                        sb.AppendLine($"              (obj, source, targets, count) => ");
+                        sb.AppendLine($"              {{");
+                        sb.AppendLine($"                  if (count != 1) return 0;");
+                        sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+                        sb.AppendLine($"                  return instance.{targetAttr.ValidationMethodName}(source, targets[0]) ? 1 : 0;");
+                        sb.AppendLine($"              }} }},");
+                    }
+                }
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Multi-target validators
+            sb.AppendLine("        // Validation delegates for multiple targets (modifies buffer in-place)");
+            sb.AppendLine("        private static readonly Dictionary<string, Func<object, ushort, ushort[], int, int>> MultiTargetValidators = ");
+            sb.AppendLine("            new Dictionary<string, Func<object, ushort, ushort[], int, int>>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.ValidationMethodName) && targetAttr.IsMultipleTargets)
+                {
+                    var validationMethod = componentType.GetMethod(targetAttr.ValidationMethodName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (validationMethod != null)
+                    {
+                        sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                        sb.AppendLine($"              (obj, source, targets, count) => ");
+                        sb.AppendLine($"              {{");
+                        sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+                        sb.AppendLine($"                  return instance.{targetAttr.ValidationMethodName}(source, targets, count);");
+                        sb.AppendLine($"              }} }},");
+                    }
+                }
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+        }
+
+        private static void GenerateMetadataDictionary(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
+        {
+            sb.AppendLine("        public static readonly Dictionary<string, RpcMetadata> Metadata = new Dictionary<string, RpcMetadata>");
+            sb.AppendLine("        {");
+
+            foreach (var method in rpcMethods)
+            {
+                var attr = method.GetCustomAttribute<GONetRpcAttribute>();
+                string rpcType = "RpcType.ServerRpc";
+                string target = "RpcTarget.All";
+                string targetPropertyName = "null";
+                string isMultipleTargets = "false";
+                string validationMethodName = "null";
+
+                if (attr is ClientRpcAttribute)
+                {
+                    rpcType = "RpcType.ClientRpc";
+                }
+                else if (attr is TargetRpcAttribute targetAttr)
+                {
+                    rpcType = "RpcType.TargetRpc";
+                    target = $"RpcTarget.{targetAttr.Target}";
+                    if (!string.IsNullOrEmpty(targetAttr.TargetPropertyName))
+                    {
+                        targetPropertyName = $"\"{targetAttr.TargetPropertyName}\"";
+                        isMultipleTargets = targetAttr.IsMultipleTargets ? "true" : "false";
+                    }
+                    if (!string.IsNullOrEmpty(targetAttr.ValidationMethodName))
+                    {
+                        validationMethodName = $"\"{targetAttr.ValidationMethodName}\"";
+                    }
+                }
+
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), new RpcMetadata {{ ");
+                sb.AppendLine($"                Type = {rpcType}, ");
+                sb.AppendLine($"                IsReliable = {attr.IsReliable.ToString().ToLower()}, ");
+                sb.AppendLine($"                IsMineRequired = {attr.IsMineRequired.ToString().ToLower()}, ");
+                sb.AppendLine($"                Target = {target}, ");
+                sb.AppendLine($"                TargetPropertyName = {targetPropertyName},");
+                sb.AppendLine($"                IsMultipleTargets = {isMultipleTargets},");
+                sb.AppendLine($"                ValidationMethodName = {validationMethodName}");
+                sb.AppendLine("            }},");
+            }
+            sb.AppendLine("        };");
+            sb.AppendLine();
+        }
+
         private static void GenerateRpcHandlerRegistration(StringBuilder sb, MethodInfo method, string className)
         {
             var parameters = method.GetParameters();
@@ -1607,9 +1753,9 @@ namespace GONet.Generation
             bool returnsValue = method.ReturnType.IsGenericType && method.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
             bool isAsync = typeof(Task).IsAssignableFrom(method.ReturnType);
 
-            // Get the attribute to check what type of RPC this is
-            var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-            bool isTargetRpc = attr is TargetRpcAttribute;
+            // Check if this is a TargetRpc
+            var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+            bool isTargetRpc = targetAttr != null;
 
             sb.AppendLine($"            eventBus.RegisterRpcHandler({className}_RpcIds.{method.Name}_RpcId, async (envelope) =>");
             sb.AppendLine("            {");
@@ -1618,65 +1764,67 @@ namespace GONet.Generation
             sb.AppendLine("                if (instance == null) return;");
             sb.AppendLine();
 
+            // Add target checking for TargetRpc
             if (isTargetRpc)
             {
-                var targetAttr = (TargetRpcAttribute)attr;
+                sb.AppendLine("                // Check if we should execute this TargetRpc");
 
-                // Generate target checking logic based on RpcTarget
-                switch (targetAttr.Target)
+                if (!string.IsNullOrEmpty(targetAttr.TargetPropertyName))
                 {
-                    case RpcTarget.Owner:
-                        sb.AppendLine("                // Check if we should execute this TargetRpc");
-                        sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
-                        sb.AppendLine("                if (gnp.OwnerAuthorityId != GONetMain.MyAuthorityId)");
-                        sb.AppendLine("                {");
-                        sb.AppendLine("                    return; // Not the owner, don't execute");
-                        sb.AppendLine("                }");
-                        break;
-
-                    case RpcTarget.Others:
-                        sb.AppendLine("                // Check if we should execute this TargetRpc");
-                        sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
-                        sb.AppendLine("                if (gnp.OwnerAuthorityId == GONetMain.MyAuthorityId)");
-                        sb.AppendLine("                {");
-                        sb.AppendLine("                    return; // We're the owner, don't execute");
-                        sb.AppendLine("                }");
-                        break;
-
-                    case RpcTarget.All:
-                        // Execute for everyone, no check needed
-                        break;
-
-                    case RpcTarget.SpecificAuthority:
-                        if (!string.IsNullOrWhiteSpace(targetAttr.TargetPropertyName))
-                        {
-                            // Property-based targeting
-                            sb.AppendLine($"                // Check target from property: {targetAttr.TargetPropertyName}");
-                            sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
-                            sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                    // Property-based targeting
+                    sb.AppendLine($"                // Check target from property: {targetAttr.TargetPropertyName}");
+                    sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
+                    sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                    sb.AppendLine("                {");
+                    sb.AppendLine("                    return; // Not the target, don't execute");
+                    sb.AppendLine("                }");
+                }
+                else
+                {
+                    // Enum-based targeting
+                    switch (targetAttr.Target)
+                    {
+                        case RpcTarget.Owner:
+                            sb.AppendLine("                // Check if we're the owner");
+                            sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
+                            sb.AppendLine("                if (gnp.OwnerAuthorityId != GONetMain.MyAuthorityId)");
                             sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // Not the target, don't execute");
+                            sb.AppendLine("                    return; // Not the owner, don't execute");
                             sb.AppendLine("                }");
-                        }
-                        else if (hasParameters && parameters[0].ParameterType == typeof(ushort))
-                        {
-                            // First parameter is the target authority
-                            sb.AppendLine("                // Check target from first parameter");
-                            string dataTypeName = GetParameterDataStructName(method);
-                            sb.AppendLine($"                var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(rpcEvent.Data);");
-                            sb.AppendLine($"                ushort targetAuthority = args.{parameters[0].Name};");
-                            sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                            break;
+
+                        case RpcTarget.Others:
+                            sb.AppendLine("                // Check if we're NOT the owner");
+                            sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
+                            sb.AppendLine("                if (gnp.OwnerAuthorityId == GONetMain.MyAuthorityId)");
                             sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // Not the target, don't execute");
+                            sb.AppendLine("                    return; // We're the owner, don't execute");
                             sb.AppendLine("                }");
-                            hasParameters = false; // We already deserialized
-                        }
-                        break;
+                            break;
+
+                        case RpcTarget.All:
+                            // Execute for everyone, no check needed
+                            break;
+
+                        case RpcTarget.SpecificAuthority:
+                            // First parameter should be the target
+                            if (hasParameters && parameters[0].ParameterType == typeof(ushort))
+                            {
+                                sb.AppendLine("                // Check target from first parameter");
+                                sb.AppendLine("                var args = SerializationUtils.DeserializeFromBytes<" + GetParameterDataStructName(method) + ">(rpcEvent.Data);");
+                                sb.AppendLine($"                if (args.{parameters[0].Name} != GONetMain.MyAuthorityId)");
+                                sb.AppendLine("                {");
+                                sb.AppendLine("                    return; // Not the target, don't execute");
+                                sb.AppendLine("                }");
+                                hasParameters = false; // We already deserialized
+                            }
+                            break;
+                    }
                 }
                 sb.AppendLine();
             }
 
-            // Deserialize parameters if needed
+            // Deserialize parameters if needed (and not already done)
             if (hasParameters)
             {
                 string dataTypeName = GetParameterDataStructName(method);
@@ -1701,22 +1849,18 @@ namespace GONet.Generation
                 sb.AppendLine("                // Only send response to remote clients, not to server itself");
                 sb.AppendLine("                if (rpcEvent.CorrelationId != 0 && envelope.SourceAuthorityId != GONetMain.MyAuthorityId)");
                 sb.AppendLine("                {");
-                sb.AppendLine("                    var response = eventBus.BorrowRpcResponseEvent();");
+                sb.AppendLine("                    int bytesUsed;");
+                sb.AppendLine("                    bool needsReturn;");
+                sb.AppendLine("                    byte[] responseData = SerializationUtils.SerializeToBytes(result, out bytesUsed, out needsReturn);");
+                sb.AppendLine();
+                sb.AppendLine("                    var response = RpcResponseEvent.Borrow();");
                 sb.AppendLine("                    response.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;");
                 sb.AppendLine("                    response.CorrelationId = rpcEvent.CorrelationId;");
                 sb.AppendLine("                    response.Success = true;");
-                sb.AppendLine();
-                sb.AppendLine("                    int bytesUsed;");
-                sb.AppendLine("                    bool needsReturn;");
-                sb.AppendLine("                    response.Data = SerializationUtils.SerializeToBytes(result, out bytesUsed, out needsReturn);");
+                sb.AppendLine("                    response.Data = responseData;");
                 sb.AppendLine();
                 sb.AppendLine("                    eventBus.Publish(response, targetClientAuthorityId: envelope.SourceAuthorityId, shouldPublishReliably: true);");
-                sb.AppendLine();
-                sb.AppendLine("                    if (needsReturn)");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        SerializationUtils.ReturnByteArray(response.Data);");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                    eventBus.ReturnRpcResponseEvent(response);");
+                sb.AppendLine("                    // Publish auto-returns the event and the data");
                 sb.AppendLine("                }");
             }
             else
@@ -1818,9 +1962,10 @@ namespace GONet.Generation
                     {
                         sb.AppendLine($"                    typed.{method.Name}({args});");
                     }
-                    else if (typeof(Task).IsAssignableFrom(method.ReturnType))
+                    else if (method.ReturnType == typeof(Task))
                     {
-                        sb.AppendLine($"                    typed.{method.Name}({args}).GetAwaiter().GetResult();");
+                        // For async Task methods (including TargetRpc), we need to handle them properly
+                        sb.AppendLine($"                    _ = typed.{method.Name}({args});"); // Fire and forget
                     }
                     sb.AppendLine("                    break;");
                 }
@@ -1916,11 +2061,11 @@ namespace GONet.Generation
             }
             else if (attr is ClientRpcAttribute || attr is TargetRpcAttribute)
             {
-                if (!isVoid)
+                if (!isVoid && !isTask)  // Allow Task for async TargetRpc
                 {
-                    errors.Add($"ERROR: {methodId} - {attr.GetType().Name} must return void");
+                    errors.Add($"ERROR: {methodId} - {attr.GetType().Name} must return void or Task");
                     errors.Add($"  Current: {returnType.Name}");
-                    errors.Add($"  FIX: Change to 'void {method.Name}(...)'");
+                    errors.Add($"  FIX: Change to 'void {method.Name}(...)' or 'async Task {method.Name}(...)'");
                 }
             }
 
