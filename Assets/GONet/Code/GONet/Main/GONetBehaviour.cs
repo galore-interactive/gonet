@@ -495,6 +495,48 @@ namespace GONet
         {
             return await EventBus.CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(this, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         }
+
+        /// <summary>
+        /// Retrieves the complete validation report for a previously validated TargetRpc call.
+        /// </summary>
+        /// <param name="reportId">The unique identifier of the validation report, obtained from RpcDeliveryReport.ValidationReportId</param>
+        /// <returns>
+        /// The full RpcValidationResult containing detailed validation information including:
+        /// - AllowedTargets: Array of authority IDs that were allowed to receive the RPC
+        /// - DeniedTargets: Array of authority IDs that were denied
+        /// - DenialReason: Detailed explanation of why targets were denied
+        /// - ModifiedData: The modified message data if the validator transformed it
+        /// Returns null if the report ID is invalid, expired, or if called from a client.
+        /// </returns>
+        /// <remarks>
+        /// This method can is called from the client and run on the server. Validation reports are stored temporarily
+        /// and expire after approximately 60 seconds or when the storage limit (1000 reports) is exceeded.
+        /// Use this for debugging validation issues or retrieving detailed information about why
+        /// certain targets were denied or how messages were modified during validation.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// var deliveryReport = await SendTeamMessageConfirmed("Hello team!");
+        /// if (deliveryReport.ValidationReportId != 0)
+        /// {
+        ///     var fullReport = await GetFullRpcValidationReport(deliveryReport.ValidationReportId);
+        ///     if (fullReport.HasValue)
+        ///     {
+        ///         Debug.Log($"Denied to {fullReport.Value.DeniedCount} targets: {fullReport.Value.DenialReason}");
+        ///     }
+        /// }
+        /// </code>
+        /// </example>
+        [ServerRpc]
+        public async Task<RpcValidationResult?> GetFullRpcValidationReport(ulong reportId)
+        {
+            if (GONetMain.IsServer && EventBus.TryGetStoredRpcValidationReport(reportId, out RpcValidationResult report))
+            {
+                // Could add permission checks here - maybe only the original caller can retrieve
+                return report;
+            }
+            return null;
+        }
         #endregion
     }
 }

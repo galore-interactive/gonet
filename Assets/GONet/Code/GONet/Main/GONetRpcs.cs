@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using GONet.Utils;
 using MemoryPack;
 using System;
 using System.Threading.Tasks;
@@ -99,7 +100,188 @@ namespace GONet
         public string TargetPropertyName { get; set; } // For TargetRpc
         public bool IsMultipleTargets { get; set; } // For TargetRpc
         public string ValidationMethodName { get; set; } // For TargetRpc
+        public bool ExpectsDeliveryReport { get; set; }
     }
+
+    [MemoryPackable]
+    public partial struct RpcDeliveryReport
+    {
+        public ushort[] DeliveredTo { get; set; }
+        public ushort[] FailedDelivery { get; set; }
+        public string FailureReason { get; set; }
+        public bool WasModified { get; set; } // was the message modified before delivery
+        public ulong ValidationReportId { get; set; }  // for retrieving full details, if applicable
+    }
+
+    public struct RpcValidationResult
+    {
+        public ushort[] AllowedTargets;
+        public int AllowedCount;
+        public ushort[] DeniedTargets;
+        public int DeniedCount;
+        public string DenialReason;
+        public byte[] ModifiedData;  // Optional modified message
+
+        public static RpcValidationResult AllowAll(ushort[] targets, int count)
+        {
+            return new RpcValidationResult
+            {
+                AllowedTargets = targets,
+                AllowedCount = count
+            };
+        }
+
+        public static RpcValidationResult DenyAll(string reason)
+        {
+            return new RpcValidationResult
+            {
+                AllowedCount = 0,
+                DenialReason = reason
+            };
+        }
+    }
+
+    #region event Support
+
+    [MemoryPackable]
+    public partial class RpcEvent : ITransientEvent, ISelfReturnEvent
+    {
+        private static readonly ObjectPool<RpcEvent> rpcEventPool = new(100, 10);
+        public long OccurredAtElapsedTicks { get; set; }
+        public uint RpcId { get; set; }
+        public uint GONetId { get; set; }
+        public byte[] Data { get; set; }
+        public long CorrelationId { get; set; } // For request-response
+        public bool IsSingularRecipientOnly { get; set; }
+
+        internal static RpcEvent Borrow()
+        {
+            return rpcEventPool.Borrow();
+        }
+
+        public void Return()
+        {
+            Return(this);
+        }
+
+        private static void Return(RpcEvent evt)
+        {
+            SerializationUtils.TryReturnByteArray(evt.Data); // may or may not be borrowed from there
+
+            evt.OccurredAtElapsedTicks = 0;
+            evt.RpcId = 0;
+            evt.GONetId = 0;
+            evt.Data = null;
+            evt.CorrelationId = 0;
+            evt.IsSingularRecipientOnly = false;
+
+            rpcEventPool.TryReturn(evt);  // using try return here because stuff coming over the network is created fresh from message pack or memory pack (they just know it up, they don't borrow it). Some of these are just not going to be able to be returned successfully when they're coming across the wire as opposed to when we're controlling it by creating the new event and then publishing it initially.
+        }
+    }
+
+    [MemoryPackable]
+    public partial class RpcResponseEvent : ITransientEvent, ISelfReturnEvent
+    {
+        private static readonly ObjectPool<RpcResponseEvent> rpcResponsePool = new(100, 10);
+        public long OccurredAtElapsedTicks { get; set; }
+        public long CorrelationId { get; set; }
+        public byte[] Data { get; set; }
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; }
+        public bool IsSingularRecipientOnly => true;
+
+        internal static RpcResponseEvent Borrow()
+        {
+            return rpcResponsePool.Borrow();
+        }
+
+        public void Return()
+        {
+            Return(this);
+        }
+
+        private static void Return(RpcResponseEvent evt)
+        {
+            SerializationUtils.TryReturnByteArray(evt.Data); // may or may not be borrowed from there
+
+            evt.OccurredAtElapsedTicks = 0;
+            evt.CorrelationId = 0;
+            evt.Data = null;
+            evt.Success = false;
+            evt.ErrorMessage = null;
+
+            rpcResponsePool.TryReturn(evt);  // using try return here because stuff coming over the network is created fresh from message pack or memory pack (they just know it up, they don't borrow it). Some of these are just not going to be able to be returned successfully when they're coming across the wire as opposed to when we're controlling it by creating the new event and then publishing it initially.
+        }
+    }
+
+    [MemoryPackable]
+    public partial class RoutedRpcEvent : ITransientEvent, ISelfReturnEvent
+    {
+        private static readonly ObjectPool<RoutedRpcEvent> routedRpcEventPool = new(50, 10);
+
+        public long OccurredAtElapsedTicks { get; set; }
+        public uint RpcId { get; set; }
+        public uint GONetId { get; set; }
+        public ushort[] TargetAuthorities { get; set; } = new ushort[64];
+        public int TargetCount { get; set; }
+        public byte[] Data { get; set; }
+        public long CorrelationId { get; set; }
+
+        internal static RoutedRpcEvent Borrow()
+        {
+            return routedRpcEventPool.Borrow();
+        }
+
+        public void Return()
+        {
+            Return(this);
+        }
+
+        private static void Return(RoutedRpcEvent evt)
+        {
+            SerializationUtils.TryReturnByteArray(evt.Data);
+
+            evt.OccurredAtElapsedTicks = 0;
+            evt.RpcId = 0;
+            evt.GONetId = 0;
+            evt.TargetCount = 0;
+            evt.Data = null;
+            evt.CorrelationId = 0;
+            // Don't null TargetAuthorities array, just reset count
+
+            routedRpcEventPool.TryReturn(evt);  // using try return here because stuff coming over the network is created fresh from message pack or memory pack (they just know it up, they don't borrow it). Some of these are just not going to be able to be returned successfully when they're coming across the wire as opposed to when we're controlling it by creating the new event and then publishing it initially.
+        }
+    }
+
+    [MemoryPackable]
+    public partial class RpcDeliveryReportEvent : ITransientEvent, ISelfReturnEvent
+    {
+        private static readonly ObjectPool<RpcDeliveryReportEvent> pool = new(50, 10);
+
+        public long OccurredAtElapsedTicks { get; set; }
+        public RpcDeliveryReport Report { get; set; }
+        public long CorrelationId { get; set; }
+
+        internal static RpcDeliveryReportEvent Borrow()
+        {
+            return pool.Borrow();
+        }
+
+        public void Return()
+        {
+            Return(this);
+        }
+
+        private static void Return(RpcDeliveryReportEvent evt)
+        {
+            evt.OccurredAtElapsedTicks = 0;
+            evt.Report = default;
+            evt.CorrelationId = 0;
+            pool.Return(evt);
+        }
+    }
+    
+    #endregion
 
     /// <summary>
     /// Context information provided to RPC methods when they include this as a parameter.
