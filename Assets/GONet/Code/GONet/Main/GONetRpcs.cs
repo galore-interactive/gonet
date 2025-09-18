@@ -48,28 +48,28 @@ namespace GONet
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
     /// <summary>
-    /// Server to specific target client/authority.
+    /// Anyone (i.e., server or client) to 1+ specific target client/authority.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public class TargetRpcAttribute : GONetRpcAttribute
     {
         public RpcTarget Target { get; }
-        
-        /// <summary>
-        /// Optional convenience to use a local property name to read authority from
-        /// </summary>
         public string TargetPropertyName { get; }
+        public bool IsMultipleTargets { get; }
+        public string ValidationMethodName { get; }
 
         public TargetRpcAttribute(RpcTarget target = RpcTarget.All)
         {
             Target = target;
-            TargetPropertyName = null;
         }
 
-        public TargetRpcAttribute(string targetPropertyName)
+        // Single constructor for property-based targeting
+        public TargetRpcAttribute(string targetPropertyName, bool isMultipleTargets = false, string validationMethod = null)
         {
-            Target = RpcTarget.SpecificAuthority;
+            Target = isMultipleTargets ? RpcTarget.MultipleAuthorities : RpcTarget.SpecificAuthority;
             TargetPropertyName = targetPropertyName;
+            IsMultipleTargets = isMultipleTargets;
+            ValidationMethodName = validationMethod;
         }
     }
 
@@ -86,7 +86,8 @@ namespace GONet
         Owner,
         Others,
         All,
-        SpecificAuthority
+        SpecificAuthority,  // Single target
+        MultipleAuthorities // List of targets
     }
 
     public class RpcMetadata
@@ -95,7 +96,9 @@ namespace GONet
         public bool IsReliable { get; set; }
         public bool IsMineRequired { get; set; }
         public RpcTarget Target { get; set; } // For TargetRpc
-        public string TargetPropertyName { get; set; }
+        public string TargetPropertyName { get; set; } // For TargetRpc
+        public bool IsMultipleTargets { get; set; } // For TargetRpc
+        public string ValidationMethodName { get; set; } // For TargetRpc
     }
 
     /// <summary>
