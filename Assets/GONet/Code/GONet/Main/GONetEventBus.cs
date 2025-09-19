@@ -22,6 +22,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using static UnityEngine.Networking.UnityWebRequest;
 
 namespace GONet
 {
@@ -493,26 +494,6 @@ namespace GONet
             enhancedValidatorsByType[type] = validators;
         }
 
-        // Store pending delivery report request
-        private void StorePendingDeliveryReport(long correlationId, string methodName)
-        {
-            var tcs = new TaskCompletionSource<RpcDeliveryReport>();
-            pendingDeliveryReports[correlationId] = tcs;
-
-            // Set timeout to clean up if no response
-            _ = Task.Delay(5000).ContinueWith(t =>
-            {
-                if (pendingDeliveryReports.TryGetValue(correlationId, out var pending))
-                {
-                    pending.TrySetResult(new RpcDeliveryReport
-                    {
-                        FailureReason = "Timeout waiting for delivery report"
-                    });
-                    pendingDeliveryReports.Remove(correlationId);
-                }
-            });
-        }
-
         // Send delivery report back to caller
         private void SendDeliveryReport(ushort targetAuthority, RpcDeliveryReport report, RpcMetadata metadata, long correlationId = 0)
         {
@@ -528,15 +509,22 @@ namespace GONet
         private void HandleDeliveryReport(GONetEventEnvelope<RpcDeliveryReportEvent> envelope)
         {
             var evt = envelope.Event;
+
+            // Check both places for the correlation
             if (pendingDeliveryReports.TryGetValue(evt.CorrelationId, out var tcs))
             {
                 tcs.TrySetResult(evt.Report);
                 pendingDeliveryReports.Remove(evt.CorrelationId);
             }
+            else if (pendingResponses.TryRemove(evt.CorrelationId, out var handler) &&
+                     handler is DeliveryReportHandler reportHandler)
+            {
+                reportHandler.HandleDeliveryReport(evt);
+            }
         }
 
         // Method to await delivery report
-        public Task<RpcDeliveryReport> WaitForDeliveryReport(long correlationId)
+        internal Task<RpcDeliveryReport> WaitForDeliveryReport(long correlationId)
         {
             if (pendingDeliveryReports.TryGetValue(correlationId, out var tcs))
             {
@@ -1715,14 +1703,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
 
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
-
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
 
                     // Execute locally if we're a target
@@ -1963,14 +1943,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
 
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
 
@@ -2221,13 +2193,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -2463,13 +2428,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -2705,13 +2663,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -2947,13 +2898,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -3189,13 +3133,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -3431,13 +3368,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -3673,13 +3603,6 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    // Generate correlation ID if expecting delivery report
-                    if (metadata.ExpectsDeliveryReport)
-                    {
-                        routedRpc.CorrelationId = GUID.Generate().AsInt64();
-                        // Store pending request for later correlation
-                        StorePendingDeliveryReport(routedRpc.CorrelationId, methodName);
-                    }
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -4185,7 +4108,7 @@ namespace GONet
                 return default(TResult);
             }
 
-            return await HandleServerRpcAsync<TResult>(instance, methodName, metadata);
+            return await HandleRpcAsync<TResult>(instance, methodName, metadata);
         }
 
         // 1 parameter
@@ -4204,7 +4127,7 @@ namespace GONet
                 return default(TResult);
             }
 
-            return await HandleServerRpcAsync<TResult, T1>(instance, methodName, metadata, arg1);
+            return await HandleRpcAsync<TResult, T1>(instance, methodName, metadata, arg1);
         }
 
         // CallRpcInternalAsync - 2 parameters
@@ -4220,7 +4143,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2>(instance, methodName, metadata, arg1, arg2);
+            return await HandleRpcAsync<TResult, T1, T2>(instance, methodName, metadata, arg1, arg2);
         }
 
         // CallRpcInternalAsync - 3 parameters
@@ -4236,7 +4159,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata, arg1, arg2, arg3);
+            return await HandleRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata, arg1, arg2, arg3);
         }
 
         // CallRpcInternalAsync - 4 parameters
@@ -4252,7 +4175,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+            return await HandleRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata, arg1, arg2, arg3, arg4);
         }
 
         // CallRpcInternalAsync - 5 parameters
@@ -4268,7 +4191,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+            return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
         }
 
         // CallRpcInternalAsync - 6 parameters
@@ -4284,7 +4207,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+            return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
         }
 
         // CallRpcInternalAsync - 7 parameters
@@ -4300,7 +4223,7 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         }
 
         // CallRpcInternalAsync - 8 parameters
@@ -4316,460 +4239,1806 @@ namespace GONet
                 GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
                 return default(TResult);
             }
-            return await HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         }
 
-        // HandleServerRpcAsync - 0 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        // HandleRpcAsync - 0 parameters
+        private async Task<TResult> HandleRpcAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
         {
-            if (GONetMain.IsServer)
+            switch (metadata.Type)
             {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
                     {
-                        return await dispatcher.DispatchAsync0<TResult>(instance, methodName);
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync0<TResult>(instance, methodName);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
                     }
-                    finally
+                    else
                     {
-                        SetCurrentRpcContext(null);
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult>(instance, methodName, metadata.IsReliable);
                     }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync0<TResult>(instance, methodName);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult>(instance, methodName, metadata);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 1 parameters
+        private async Task<TResult> HandleRpcAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync1<TResult, T1>(instance, methodName, arg1);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1>(instance, methodName, metadata.IsReliable, arg1);
+                    }
+
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync1<TResult, T1>(instance, methodName, arg1);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1>(instance, methodName, metadata, arg1);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 2 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync2<TResult, T1, T2>(instance, methodName, arg1, arg2);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2>(instance, methodName, metadata.IsReliable, arg1, arg2);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync2<TResult, T1, T2>(instance, methodName, arg1, arg2);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2>(instance, methodName, metadata, arg1, arg2);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 3 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync3<TResult, T1, T2, T3>(instance, methodName, arg1, arg2, arg3);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync3<TResult, T1, T2, T3>(instance, methodName, arg1, arg2, arg3);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3>(instance, methodName, metadata, arg1, arg2, arg3);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 4 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync4<TResult, T1, T2, T3, T4>(instance, methodName, arg1, arg2, arg3, arg4);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync4<TResult, T1, T2, T3, T4>(instance, methodName, arg1, arg2, arg3, arg4);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata, arg1, arg2, arg3, arg4);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 5 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync5<TResult, T1, T2, T3, T4, T5>(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync5<TResult, T1, T2, T3, T4, T5>(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 6 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync6<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync6<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 7 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync7<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync7<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleRpcAsync - 8 parameters
+        /// <summary>
+        /// Handles asynchronous RPC execution based on the RPC type, executing locally or sending to appropriate targets.
+        /// </summary>
+        private async Task<TResult> HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server executes ServerRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync8<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client sends ServerRpc to server and waits for response
+                        return await SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                case RpcType.ClientRpc:
+                    if (GONetMain.IsServer)
+                    {
+                        // Server sends rpc to all clients
+                        // This shouldn't return a value typically
+                        SendRpcToDirectRemotes(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                        return default(TResult);
+                    }
+                    else
+                    {
+                        // Client executes ClientRpc locally
+                        if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        {
+                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
+                            SetCurrentRpcContext(context);
+                            try
+                            {
+                                return await dispatcher.DispatchAsync8<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                            }
+                            finally
+                            {
+                                SetCurrentRpcContext(null);
+                            }
+                        }
+                        return default(TResult);
+                    }
+                case RpcType.TargetRpc:
+                    if (typeof(TResult) == typeof(RpcDeliveryReport))
+                    {
+                        // TargetRpc with delivery report goes through special handling
+                        return await HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+                    else
+                    {
+                        // Regular async TargetRpc (if such a thing exists)
+                        GONetLog.Warning($"Async TargetRpc without delivery report not supported: {methodName}");
+                        return default(TResult);
+                    }
+                default:
+                    GONetLog.Error($"Unknown RPC type: {metadata.Type} for {methodName}");
+                    return default(TResult);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 0 parameters
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
                 return default(TResult);
+            }
+
+            // Determine targets
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+
+            try
+            {
+                // Get targets from property or metadata
+                targetCount = DetermineTargets(instance, methodName, metadata, targetBuffer);
+
+                if (targetCount == 0)
+                {
+                    // No targets, return empty report
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    // Client: Send to server for routing and validation
+                    var tcs = new TaskCompletionSource<RpcDeliveryReport>();
+                    pendingDeliveryReports[correlationId] = tcs;
+
+                    // Create routed event
+                    var routedRpc = RoutedRpcEvent.Borrow();
+                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                    routedRpc.TargetCount = targetCount;
+                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    routedRpc.CorrelationId = correlationId;
+
+                    // Send to server
+                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server,
+                        shouldPublishReliably: metadata.IsReliable);
+
+                    // Set timeout
+                    _ = Task.Delay(5000).ContinueWith(t =>
+                    {
+                        if (pendingDeliveryReports.Remove(correlationId, out var pending))
+                        {
+                            pending.TrySetResult(new RpcDeliveryReport
+                            {
+                                FailureReason = "Timeout waiting for delivery report"
+                            });
+                        }
+                    });
+
+                    // Wait for delivery report
+                    var report = await tcs.Task;
+                    return (TResult)(object)report;
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+
+                    // Validate targets
+                    RpcValidationResult validationResult;
+                    if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
+                        validators.TryGetValue(methodName, out var validator))
+                    {
+                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
+                    }
+                    else
+                    {
+                        validationResult = Server_DefaultValidation(targetBuffer, targetCount);
+                    }
+
+                    // Store validation report if significant
+                    ulong reportId = 0;
+                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    {
+                        reportId = StoreValidationReport(validationResult);
+                    }
+
+                    // Route to allowed targets
+                    if (validationResult.AllowedCount > 0)
+                    {
+                        for (int i = 0; i < validationResult.AllowedCount; i++)
+                        {
+                            var rpcEvent = RpcEvent.Borrow();
+                            rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                            rpcEvent.IsSingularRecipientOnly = true;
+
+                            Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i],
+                                shouldPublishReliably: metadata.IsReliable);
+                        }
+                    }
+
+                    // Create delivery report
+                    var deliveryReport = new RpcDeliveryReport
+                    {
+                        DeliveredTo = validationResult.AllowedTargets ?? Array.Empty<ushort>(),
+                        FailedDelivery = validationResult.DeniedTargets ?? Array.Empty<ushort>(),
+                        FailureReason = validationResult.DenialReason,
+                        WasModified = validationResult.ModifiedData != null,
+                        ValidationReportId = reportId
+                    };
+
+                    // Server returns the report directly
+                    return (TResult)(object)deliveryReport;
+                }
+
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 1 parameter
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData1<T1> { Arg1 = arg1 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData1<T1> { Arg1 = arg1 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 2 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 3 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 4 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 5 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 6 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 7 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // HandleTargetRpcWithDeliveryReportAsync - 8 parameters
+        /// <summary>
+        /// Handles asynchronous TargetRpc calls expecting a delivery report.
+        /// </summary>
+        private async Task<TResult> HandleTargetRpcWithDeliveryReportAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            // This should only be called for Task<RpcDeliveryReport>
+            if (typeof(TResult) != typeof(RpcDeliveryReport))
+            {
+                GONetLog.Error($"HandleTargetRpcWithDeliveryReportAsync called for wrong return type: {typeof(TResult).Name}");
+                return default(TResult);
+            }
+            // Determine targets (may need arg1 for parameter-based targeting)
+            ushort[] targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            int targetCount = 0;
+            try
+            {
+                // Get targets - if SpecificAuthority/MultipleAuthorities, arg1 might be the target(s)
+                targetCount = DetermineTargetsWithArg(instance, methodName, metadata, targetBuffer, arg1);
+                if (targetCount == 0)
+                {
+                    return (TResult)(object)new RpcDeliveryReport
+                    {
+                        FailureReason = "No targets determined",
+                        DeliveredTo = Array.Empty<ushort>(),
+                        FailedDelivery = Array.Empty<ushort>()
+                    };
+                }
+                // Create correlation for delivery report
+                var correlationId = GUID.Generate().AsInt64();
+                if (GONetMain.IsClient && !GONetMain.IsServer)
+                {
+                    var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+                    
+                    // Serialize the arguments
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    
+                    return await SendToServerWithDataDoReporting<TResult>(instance, methodName, metadata, targetBuffer, targetCount, correlationId, serialized);
+                }
+                else if (GONetMain.IsServer)
+                {
+                    // Server: Validate, route, and generate delivery report
+                    // Serialize for validation
+                    var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                }
+                return default(TResult);
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        // Reusable method to handle server-side logic
+        private RpcDeliveryReport SendToValidatedClientsWithDataDoReporting(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, 
+            ushort[] targetBuffer, int targetCount,
+            byte[] serialized, int bytesUsed, bool needsReturn)
+        {
+            // Validate targets
+            RpcValidationResult validationResult;
+            if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
+                validators.TryGetValue(methodName, out var validator))
+            {
+                validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
             }
             else
             {
-                return await SendRpcAsync<TResult>(instance, methodName, metadata.IsReliable);
+                validationResult = Server_DefaultValidation(targetBuffer, targetCount);
             }
+
+            // Store validation report if significant
+            ulong reportId = 0;
+            if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            // Use modified data if provided
+            byte[] dataToSend = validationResult.ModifiedData ?? serialized;
+
+            // Route to allowed targets
+            if (validationResult.AllowedCount > 0)
+            {
+                for (int i = 0; i < validationResult.AllowedCount; i++)
+                {
+                    // Copy data for each target since Publish auto-returns
+                    byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                    Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serializedCopy;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    rpcEvent.IsSingularRecipientOnly = true;
+                    Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i],
+                        shouldPublishReliably: metadata.IsReliable);
+                }
+            }
+
+            if (needsReturn)
+            {
+                SerializationUtils.ReturnByteArray(serialized);
+            }
+
+            // Create delivery report
+            var deliveryReport = new RpcDeliveryReport
+            {
+                DeliveredTo = validationResult.AllowedTargets ?? Array.Empty<ushort>(),
+                FailedDelivery = validationResult.DeniedTargets ?? Array.Empty<ushort>(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.ModifiedData != null,
+                ValidationReportId = reportId
+            };
+
+            return deliveryReport;
         }
 
-        // HandleServerRpcAsync - 1 parameter
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1)
+        // Reusable method to handle client-side logic
+        private async Task<TResult> SendToServerWithDataDoReporting<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, ushort[] targetBuffer, int targetCount, long correlationId, byte[] data)
         {
-            if (GONetMain.IsServer)
+            // Client: Send to server for routing and validation
+            var tcs = new TaskCompletionSource<RpcDeliveryReport>();
+            pendingDeliveryReports[correlationId] = tcs;
+            // Create routed event
+            var routedRpc = RoutedRpcEvent.Borrow();
+            routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+            routedRpc.GONetId = instance.GONetParticipant.GONetId;
+            routedRpc.TargetCount = targetCount;
+            Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+            routedRpc.Data = data;
+            routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            routedRpc.CorrelationId = correlationId;
+
+            // Send to server
+            Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server,
+                shouldPublishReliably: metadata.IsReliable);
+
+            // Set timeout
+            _ = Task.Delay(5000).ContinueWith(t =>
             {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                if (pendingDeliveryReports.Remove(correlationId, out var pending))
                 {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
+                    pending.TrySetResult(new RpcDeliveryReport
                     {
-                        return await dispatcher.DispatchAsync1<TResult, T1>(instance, methodName, arg1);
-                    }
-                    finally
+                        FailureReason = "Timeout waiting for delivery report"
+                    });
+                }
+            });
+            // Wait for delivery report
+            var report = await tcs.Task;
+            return (TResult)(object)report;
+        }
+
+        // Helper method to determine targets (extracted from HandleTargetRpc logic)
+        private int DetermineTargets(GONetParticipantCompanionBehaviour instance, string methodName,
+            RpcMetadata metadata, ushort[] targetBuffer)
+        {
+            int targetCount = 0;
+
+            if (!string.IsNullOrEmpty(metadata.TargetPropertyName))
+            {
+                if (metadata.IsMultipleTargets)
+                {
+                    if (multiTargetBufferAccessorsByType.TryGetValue(instance.GetType(), out var accessors) &&
+                        accessors.TryGetValue(methodName, out var accessor))
                     {
-                        SetCurrentRpcContext(null);
+                        targetCount = accessor(instance, targetBuffer);
                     }
                 }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                else
+                {
+                    if (targetPropertyAccessorsByType.TryGetValue(instance.GetType(), out var accessors) &&
+                        accessors.TryGetValue(methodName, out var accessor))
+                    {
+                        targetBuffer[0] = accessor(instance);
+                        targetCount = 1;
+                    }
+                }
             }
             else
             {
-                return await SendRpcAsync<TResult, T1>(instance, methodName, metadata.IsReliable, arg1);
-            }
-        }
-
-        // HandleServerRpcAsync - 2 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                // Handle enum-based targeting
+                switch (metadata.Target)
                 {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync2<TResult, T1, T2>(instance, methodName, arg1, arg2);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
+                    case RpcTarget.Owner:
+                        targetBuffer[0] = instance.GONetParticipant.OwnerAuthorityId;
+                        targetCount = 1;
+                        break;
+                    case RpcTarget.All:
+                        // Include all connected authorities
+                        targetBuffer[0] = GONetMain.MyAuthorityId;
+                        targetCount = 1;
+                        if (GONetMain.IsServer)
+                        {
+                            foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
+                            {
+                                if (targetCount < MAX_RPC_TARGETS)
+                                {
+                                    targetBuffer[targetCount++] = client.ConnectionToClient.OwnerAuthorityId;
+                                }
+                            }
+                        }
+                        break;
+                    case RpcTarget.Others:
+                        // All except owner
+                        var ownerId = instance.GONetParticipant.OwnerAuthorityId;
+                        if (GONetMain.IsServer)
+                        {
+                            if (GONetMain.MyAuthorityId != ownerId)
+                            {
+                                targetBuffer[targetCount++] = GONetMain.MyAuthorityId;
+                            }
+                            foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
+                            {
+                                if (client.ConnectionToClient.OwnerAuthorityId != ownerId && targetCount < MAX_RPC_TARGETS)
+                                {
+                                    targetBuffer[targetCount++] = client.ConnectionToClient.OwnerAuthorityId;
+                                }
+                            }
+                        }
+                        break;
                 }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
             }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2>(instance, methodName, metadata.IsReliable, arg1, arg2);
-            }
+
+            return targetCount;
         }
 
-        // HandleServerRpcAsync - 3 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3)
+        // Helper method that handles parameter-based targeting
+        private int DetermineTargetsWithArg<T1>(GONetParticipantCompanionBehaviour instance, string methodName,
+            RpcMetadata metadata, ushort[] targetBuffer, T1 arg1)
         {
-            if (GONetMain.IsServer)
+            // Check if arg1 is the target(s) for parameter-based targeting
+            if (metadata.Target == RpcTarget.SpecificAuthority && typeof(T1) == typeof(ushort))
             {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                targetBuffer[0] = (ushort)(object)arg1;
+                return 1;
+            }
+            else if (metadata.Target == RpcTarget.MultipleAuthorities)
+            {
+                if (typeof(T1) == typeof(List<ushort>))
                 {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
+                    var list = (List<ushort>)(object)arg1;
+                    int count = Math.Min(list.Count, MAX_RPC_TARGETS);
+                    for (int i = 0; i < count; i++)
                     {
-                        return await dispatcher.DispatchAsync3<TResult, T1, T2, T3>(instance, methodName, arg1, arg2, arg3);
+                        targetBuffer[i] = list[i];
                     }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
+                    return count;
                 }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                else if (typeof(T1) == typeof(ushort[]))
+                {
+                    var array = (ushort[])(object)arg1;
+                    int count = Math.Min(array.Length, MAX_RPC_TARGETS);
+                    Array.Copy(array, targetBuffer, count);
+                    return count;
+                }
             }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3);
-            }
+
+            // Fall back to regular target determination
+            return DetermineTargets(instance, methodName, metadata, targetBuffer);
         }
 
-        // HandleServerRpcAsync - 4 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync4<TResult, T1, T2, T3, T4>(instance, methodName, arg1, arg2, arg3, arg4);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4);
-            }
-        }
-
-        // HandleServerRpcAsync - 5 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync5<TResult, T1, T2, T3, T4, T5>(instance, methodName, arg1, arg2, arg3, arg4, arg5);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5);
-            }
-        }
-
-        // HandleServerRpcAsync - 6 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync6<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6);
-            }
-        }
-
-        // HandleServerRpcAsync - 7 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync7<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-            }
-        }
-
-        // HandleServerRpcAsync - 8 parameters
-        private async Task<TResult> HandleServerRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
-        {
-            if (GONetMain.IsServer)
-            {
-                if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
-                {
-                    var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                    SetCurrentRpcContext(context);
-                    try
-                    {
-                        return await dispatcher.DispatchAsync8<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-                    }
-                    finally
-                    {
-                        SetCurrentRpcContext(null);
-                    }
-                }
-                GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-            else
-            {
-                return await SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata.IsReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-            }
-        }
-
-        private async Task<TResult> SendRpcAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable)
+        // SendRpcToDirectRemotesAsync - 0 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable)
         {
             var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
+            long correlationId = GUID.Generate().AsInt64();
 
             var tcs = new TaskCompletionSource<TResult>();
             RegisterPendingResponse(correlationId, tcs);
 
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            SendRpcToDirectRemotes(instance, methodName, isReliable, correlationId);
 
             return await tcs.Task;
         }
 
-        // SendRpcAsync - 1 parameter
-        private async Task<TResult> SendRpcAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1)
+        // SendRpcToDirectRemotesAsync - 1 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1)
         {
             var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
+            long correlationId = GUID.Generate().AsInt64();
             var tcs = new TaskCompletionSource<TResult>();
             RegisterPendingResponse(correlationId, tcs);
 
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, correlationId);
+
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 2 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 3 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 4 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 5 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 6 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 7 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotesAsync - 8 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private async Task<TResult> SendRpcToDirectRemotesAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            var rpcId = GetRpcId(instance.GetType(), methodName);
+            long correlationId = GUID.Generate().AsInt64();
+            var tcs = new TaskCompletionSource<TResult>();
+            RegisterPendingResponse(correlationId, tcs);
+            // Call the void version with correlation ID
+            SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, correlationId);
+            return await tcs.Task;
+        }
+
+        // SendRpcToDirectRemotes - 0 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, long correlationId = 0)
+        {
+            var rpcEvent = RpcEvent.Borrow();
+            rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+            rpcEvent.CorrelationId = correlationId;
+
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            // Note: Publish auto-returns the event and data, so no manual cleanup needed
+        }
+
+        // SendRpcToDirectRemotes - 1 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, long correlationId = 0)
+        {
+            // Serialize the argument
             var data = new RpcData1<T1> { Arg1 = arg1 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 2 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2)
+        // SendRpcToDirectRemotes - 2 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 3 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3)
+        // SendRpcToDirectRemotes - 3 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 4 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        // SendRpcToDirectRemotes - 4 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 5 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        // SendRpcToDirectRemotes - 5 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 6 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        // SendRpcToDirectRemotes - 6 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 7 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        // SendRpcToDirectRemotes - 7 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
-            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
-
-            return await tcs.Task;
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
         }
 
-        // SendRpcAsync - 8 parameters
-        private async Task<TResult> SendRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        // SendRpcToDirectRemotes - 8 parameters
+        /// <summary>
+        /// on the server, this will send to ALL clients
+        /// on a client, this will send to JUST the server
+        /// </summary>
+        private void SendRpcToDirectRemotes<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, long correlationId = 0)
         {
-            var rpcId = GetRpcId(instance.GetType(), methodName);
-            var correlationId = GUID.Generate().AsInt64();
-            var tcs = new TaskCompletionSource<TResult>();
-            RegisterPendingResponse(correlationId, tcs);
-
+            // Serialize the arguments
             var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
             int bytesUsed;
             bool needsReturn;
             byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+            SendRpcToDirectRemotesWithData(instance, methodName, isReliable, correlationId, serialized);
+        }
 
+        private void SendRpcToDirectRemotesWithData(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, long correlationId, byte[] dataSerialized)
+        {
             var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.RpcId = rpcId;
+            rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.CorrelationId = correlationId;
-            rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            rpcEvent.Data = dataSerialized;
 
-            return await tcs.Task;
+            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            // Note: Publish auto-returns the event and data, so no manual cleanup needed
         }
 
         private readonly Dictionary<Type, IRpcDispatcher> rpcDispatchers = new Dictionary<Type, IRpcDispatcher>();
