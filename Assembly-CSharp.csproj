@@ -66,6 +66,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\BitConverter.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Client.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetSampleChatSystem.cs" />
     <Compile Include="Assets\GONet\Sample\SimpleCameraMovement.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONet.cs" />
     <Compile Include="Assets\Amazon\Scripts\Credentials.cs" />

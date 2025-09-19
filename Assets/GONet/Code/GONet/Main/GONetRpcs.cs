@@ -49,8 +49,106 @@ namespace GONet
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
     /// <summary>
-    /// Anyone (i.e., server or client) to 1+ specific target client/authority.
+    /// Marks a method as a Target RPC that can be called from client or server to route messages to specific recipients.
+    /// Target RPCs support validation, message transformation, and optional delivery confirmation.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Basic Usage:</b></para>
+    /// <code>
+    /// [TargetRpc(RpcTarget.Owner)]
+    /// void NotifyOwner(string message) { }
+    /// 
+    /// [TargetRpc(RpcTarget.All)]
+    /// void BroadcastToAll(string message) { }
+    /// </code>
+    /// 
+    /// <para><b>Property-based Targeting:</b></para>
+    /// <para>Target specific authorities using a property value:</para>
+    /// <code>
+    /// public ushort TargetPlayerId { get; set; }
+    /// 
+    /// [TargetRpc(nameof(TargetPlayerId))]
+    /// void SendToSpecificPlayer(string message) { }
+    /// </code>
+    /// 
+    /// <para><b>Multiple Targets:</b></para>
+    /// <code>
+    /// public List&lt;ushort&gt; TeamMembers { get; set; }
+    /// 
+    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true)]
+    /// void SendToTeam(string message) { }
+    /// </code>
+    /// 
+    /// <para><b>Validation Methods:</b></para>
+    /// <para>Add server-side validation to filter recipients and optionally transform messages:</para>
+    /// <code>
+    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true, validationMethod: nameof(ValidateTeamMessage))]
+    /// void SendToTeam(string message) { }
+    /// 
+    /// // Validation method signatures:
+    /// 
+    /// // Option 1: Simple bool validator (single target)
+    /// private bool ValidateTeamMessage(ushort sourceAuthority, ushort targetAuthority)
+    /// {
+    ///     return IsTeamMember(targetAuthority);
+    /// }
+    /// 
+    /// // Option 2: Full validation with filtering and transformation
+    /// private RpcValidationResult ValidateTeamMessage(ushort sourceAuthority, ushort[] targets, int count, byte[] messageData)
+    /// {
+    ///     // Filter targets
+    ///     var allowed = targets.Where(t => IsTeamMember(t)).ToArray();
+    ///     
+    ///     // Optionally modify message
+    ///     var modifiedData = TransformMessage(messageData);
+    ///     
+    ///     return new RpcValidationResult
+    ///     {
+    ///         AllowedTargets = allowed,
+    ///         AllowedCount = allowed.Length,
+    ///         DeniedTargets = targets.Except(allowed).ToArray(),
+    ///         DeniedCount = targets.Length - allowed.Length,
+    ///         DenialReason = "Target is not a team member",
+    ///         ModifiedData = modifiedData  // Optional
+    ///     };
+    /// }
+    /// </code>
+    /// 
+    /// <para><b>Delivery Confirmation:</b></para>
+    /// <para>Get confirmation of who received the RPC by using Task&lt;RpcDeliveryReport&gt; return type:</para>
+    /// <code>
+    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true, validationMethod: nameof(ValidateTeam))]
+    /// async Task&lt;RpcDeliveryReport&gt; SendToTeamConfirmed(string message)
+    /// {
+    ///     DisplayMessage(message);
+    ///     return await Task.CompletedTask; // Framework handles the actual report
+    /// }
+    /// 
+    /// // Usage:
+    /// var report = await SendToTeamConfirmed("Hello team!");
+    /// if (report.FailedDelivery?.Length > 0)
+    /// {
+    ///     Debug.Log($"Failed to deliver to: {string.Join(", ", report.FailedDelivery)}");
+    ///     Debug.Log($"Reason: {report.FailureReason}");
+    ///     
+    ///     // Optionally get full validation details
+    ///     if (report.ValidationReportId != 0)
+    ///     {
+    ///         var fullReport = await GetFullRpcValidationReport(report.ValidationReportId);
+    ///     }
+    /// }
+    /// </code>
+    /// 
+    /// <para><b>Parameter-based Targeting:</b></para>
+    /// <para>Pass target as first parameter instead of using property:</para>
+    /// <code>
+    /// [TargetRpc(RpcTarget.SpecificAuthority)]
+    /// void SendToPlayer(ushort targetPlayerId, string message) { }
+    /// 
+    /// [TargetRpc(RpcTarget.MultipleAuthorities)]
+    /// void SendToPlayers(List&lt;ushort&gt; targetPlayerIds, string message) { }
+    /// </code>
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class TargetRpcAttribute : GONetRpcAttribute
     {
@@ -317,6 +415,56 @@ namespace GONet
             IsFromMe = true;
             IsReliable = isReliable;
             GONetParticipantId = gonetParticipantId;
+        }
+    }
+
+    internal interface IResponseHandler
+    {
+        void HandleResponse(RpcResponseEvent response);
+    }
+
+    internal class DeliveryReportHandler : IResponseHandler
+    {
+        private readonly TaskCompletionSource<RpcDeliveryReport> tcs;
+
+        public DeliveryReportHandler(TaskCompletionSource<RpcDeliveryReport> tcs)
+        {
+            this.tcs = tcs;
+        }
+
+        public void HandleResponse(RpcResponseEvent response)
+        {
+            // This shouldn't be used for delivery reports
+            // They come through RpcDeliveryReportEvent instead
+            tcs.TrySetException(new Exception("Unexpected response type for delivery report"));
+        }
+
+        public void HandleDeliveryReport(RpcDeliveryReportEvent evt)
+        {
+            tcs.TrySetResult(evt.Report);
+        }
+    }
+
+    internal class ResponseHandler<T> : IResponseHandler
+    {
+        private readonly TaskCompletionSource<T> tcs;
+
+        public ResponseHandler(TaskCompletionSource<T> tcs)
+        {
+            this.tcs = tcs;
+        }
+
+        public void HandleResponse(RpcResponseEvent response)
+        {
+            if (response.Success && response.Data != null)
+            {
+                var result = SerializationUtils.DeserializeFromBytes<T>(response.Data);
+                tcs.TrySetResult(result);
+            }
+            else
+            {
+                tcs.TrySetException(new Exception($"RPC failed: {response.ErrorMessage ?? "Unknown error"}"));
+            }
         }
     }
 

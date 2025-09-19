@@ -1406,8 +1406,8 @@ namespace GONet.Generation
                 var errors = new List<string>();
                 if (!typeof(GONetParticipantCompanionBehaviour).IsAssignableFrom(componentType))
                 {
-                    errors.Add($"ERROR: Class '{componentType.Name}' has RPC methods but doesn't extend GONetParticipantCompanionBehaviour");
-                    errors.Add($"  FIX: public class {componentType.Name} : GONetParticipantCompanionBehaviour");
+                    errors.Add($"ERROR: Class '{componentType.FullName}' has RPC methods but doesn't extend GONetParticipantCompanionBehaviour");
+                    errors.Add($"  FIX: public class {componentType.FullName} : GONetParticipantCompanionBehaviour");
                 }
 
                 foreach (var method in rpcMethods)
@@ -1655,7 +1655,7 @@ namespace GONet.Generation
 
             // Use appropriate class name based on declaring type
             string methodClassName = declaringType == typeof(GONetParticipantCompanionBehaviour) ?
-                "GONetParticipantCompanionBehaviour" : declaringType.Name;
+                "GONetParticipantCompanionBehaviour" : declaringType.FullName;
 
             sb.AppendLine($"            {{ nameof({methodClassName}.{method.Name}), new RpcMetadata {{ ");
             sb.AppendLine($"                Type = {rpcType}, ");
@@ -1718,10 +1718,8 @@ namespace GONet.Generation
 
             if (hasValidation)
             {
-                sb.AppendLine("                if (SingleTargetValidators.Count > 0)");
-                sb.AppendLine($"                    GONetMain.EventBus.RegisterSingleTargetValidators(typeof({className}), SingleTargetValidators);");
-                sb.AppendLine("                if (MultiTargetValidators.Count > 0)");
-                sb.AppendLine($"                    GONetMain.EventBus.RegisterMultiTargetValidators(typeof({className}), MultiTargetValidators);");
+                sb.AppendLine("                if (EnhancedValidators.Count > 0)");
+                sb.AppendLine($"                    GONetMain.EventBus.RegisterEnhancedValidators(typeof({className}), EnhancedValidators);");
             }
 
             sb.AppendLine("                RegisterRpcHandlers();");
@@ -1747,8 +1745,8 @@ namespace GONet.Generation
                         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                     if (property != null && property.PropertyType == typeof(ushort))
                     {
-                        sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
-                        sb.AppendLine($"              (obj) => (({componentType.Name})obj).{targetAttr.TargetPropertyName} }},");
+                        sb.AppendLine($"            {{ nameof({componentType.FullName}.{method.Name}), ");
+                        sb.AppendLine($"              (obj) => (({componentType.FullName})obj).{targetAttr.TargetPropertyName} }},");
                     }
                 }
             }
@@ -1772,10 +1770,10 @@ namespace GONet.Generation
                     {
                         if (property.PropertyType == typeof(List<ushort>))
                         {
-                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"            {{ nameof({componentType.FullName}.{method.Name}), ");
                             sb.AppendLine($"              (obj, buffer) => ");
                             sb.AppendLine($"              {{");
-                            sb.AppendLine($"                  var list = (({componentType.Name})obj).{targetAttr.TargetPropertyName};");
+                            sb.AppendLine($"                  var list = (({componentType.FullName})obj).{targetAttr.TargetPropertyName};");
                             sb.AppendLine($"                  if (list == null) return 0;");
                             sb.AppendLine($"                  int count = Math.Min(list.Count, buffer.Length);");
                             sb.AppendLine($"                  for (int i = 0; i < count; i++) buffer[i] = list[i];");
@@ -1784,10 +1782,10 @@ namespace GONet.Generation
                         }
                         else if (property.PropertyType == typeof(ushort[]))
                         {
-                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"            {{ nameof({componentType.FullName}.{method.Name}), ");
                             sb.AppendLine($"              (obj, buffer) => ");
                             sb.AppendLine($"              {{");
-                            sb.AppendLine($"                  var array = (({componentType.Name})obj).{targetAttr.TargetPropertyName};");
+                            sb.AppendLine($"                  var array = (({componentType.FullName})obj).{targetAttr.TargetPropertyName};");
                             sb.AppendLine($"                  if (array == null) return 0;");
                             sb.AppendLine($"                  int count = Math.Min(array.Length, buffer.Length);");
                             sb.AppendLine($"                  Array.Copy(array, buffer, count);");
@@ -1839,20 +1837,20 @@ namespace GONet.Generation
                         if (returnType == typeof(RpcValidationResult))
                         {
                             // Full validation with result
-                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"            {{ nameof({componentType.FullName}.{method.Name}), ");
                             sb.AppendLine($"              (obj, source, targets, count, data) => ");
                             sb.AppendLine($"              {{");
-                            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+                            sb.AppendLine($"                  var instance = ({componentType.FullName})obj;");
                             sb.AppendLine($"                  return instance.{targetAttr.ValidationMethodName}(source, targets, count, data);");
                             sb.AppendLine($"              }} }},");
                         }
                         else if (returnType == typeof(bool))
                         {
                             // Simple bool validator - adapt to RpcValidationResult
-                            sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), ");
+                            sb.AppendLine($"            {{ nameof({componentType.FullName}.{method.Name}), ");
                             sb.AppendLine($"              (obj, source, targets, count, data) => ");
                             sb.AppendLine($"              {{");
-                            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+                            sb.AppendLine($"                  var instance = ({componentType.FullName})obj;");
                             sb.AppendLine($"                  if (count == 1 && instance.{targetAttr.ValidationMethodName}(source, targets[0]))");
                             sb.AppendLine($"                      return RpcValidationResult.AllowAll(targets, count);");
                             sb.AppendLine($"                  return RpcValidationResult.DenyAll(\"Validation failed\");");
@@ -1898,11 +1896,39 @@ namespace GONet.Generation
                 {
                     // Property-based targeting
                     sb.AppendLine($"                // Check target from property: {targetAttr.TargetPropertyName}");
-                    sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
-                    sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
-                    sb.AppendLine("                {");
-                    sb.AppendLine("                    return; // Not the target, don't execute");
-                    sb.AppendLine("                }");
+
+                    if (targetAttr.IsMultipleTargets)
+                    {
+                        // Property is a list or array - check if we're in it
+                        var property = method.DeclaringType.GetProperty(targetAttr.TargetPropertyName,
+                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+                        if (property?.PropertyType == typeof(List<ushort>))
+                        {
+                            sb.AppendLine($"                var targetList = instance.{targetAttr.TargetPropertyName};");
+                            sb.AppendLine("                if (targetList == null || !targetList.Contains(GONetMain.MyAuthorityId))");
+                            sb.AppendLine("                {");
+                            sb.AppendLine("                    return; // Not in target list, don't execute");
+                            sb.AppendLine("                }");
+                        }
+                        else if (property?.PropertyType == typeof(ushort[]))
+                        {
+                            sb.AppendLine($"                var targetArray = instance.{targetAttr.TargetPropertyName};");
+                            sb.AppendLine("                if (targetArray == null || !System.Linq.Enumerable.Contains(targetArray, GONetMain.MyAuthorityId))");
+                            sb.AppendLine("                {");
+                            sb.AppendLine("                    return; // Not in target array, don't execute");
+                            sb.AppendLine("                }");
+                        }
+                    }
+                    else
+                    {
+                        // Single target property
+                        sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
+                        sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
+                        sb.AppendLine("                {");
+                        sb.AppendLine("                    return; // Not the target, don't execute");
+                        sb.AppendLine("                }");
+                    }
                 }
                 else
                 {
@@ -2025,20 +2051,20 @@ namespace GONet.Generation
 
         private static string GetParameterDataStructName(MethodInfo method)
         {
-            return $"{method.DeclaringType.Name}_{method.Name}_RpcData";
+            return $"{method.DeclaringType.FullName}_{method.Name}_RpcData";
         }
 
         private static string GetFriendlyTypeName(Type type)
         {
             if (type.IsGenericType)
             {
-                string genericTypeName = type.GetGenericTypeDefinition().Name;
+                string genericTypeName = type.GetGenericTypeDefinition().FullName;
                 genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
                 string genericArgs = string.Join(", ", type.GetGenericArguments().Select(GetFriendlyTypeName));
-                return $"{genericTypeName}<{genericArgs}>";
+                return $"{genericTypeName}<{genericArgs}>".Replace('+', '.');
             }
 
-            return type.Name;
+            return type.FullName.Replace('+', '.');
         }
 
         private static void GenerateDispatcherMethods(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
@@ -2073,7 +2099,7 @@ namespace GONet.Generation
 
             if (methodsByParamCount.ContainsKey(paramCount))
             {
-                sb.AppendLine($"            var typed = ({componentType.Name})instance;");
+                sb.AppendLine($"            var typed = ({componentType.FullName})instance;");
                 sb.AppendLine("            switch (methodName)");
                 sb.AppendLine("            {");
 
@@ -2082,7 +2108,7 @@ namespace GONet.Generation
                     var parameters = method.GetParameters();
                     sb.AppendLine($"                case {method.Name.ToUpper()}:");
 
-                    var args = string.Join(", ", parameters.Select((p, i) => $"({p.ParameterType.Name})(object)arg{i + 1}"));
+                    var args = string.Join(", ", parameters.Select((p, i) => $"({GetFriendlyTypeName(p.ParameterType)})(object)arg{i + 1}"));
                     if (method.ReturnType == typeof(void))
                     {
                         sb.AppendLine($"                    typed.{method.Name}({args});");
@@ -2125,7 +2151,7 @@ namespace GONet.Generation
 
                 if (asyncMethods.Any())
                 {
-                    sb.AppendLine($"            var typed = ({componentType.Name})instance;");
+                    sb.AppendLine($"            var typed = ({componentType.FullName})instance;");
                     sb.AppendLine("            switch (methodName)");
                     sb.AppendLine("            {");
 
@@ -2135,7 +2161,7 @@ namespace GONet.Generation
                         sb.AppendLine($"                case {method.Name.ToUpper()}:");
 
                         var args = parameters.Length > 0 ?
-                            string.Join(", ", parameters.Select((p, i) => $"({p.ParameterType.Name})(object)arg{i + 1}")) :
+                            string.Join(", ", parameters.Select((p, i) => $"({GetFriendlyTypeName(p.ParameterType)})(object)arg{i + 1}")) :
                             "";
 
                         // Double cast through object to handle the generic return
@@ -2163,7 +2189,7 @@ namespace GONet.Generation
         private static void ValidateRpcMethod(MethodInfo method, List<string> errors, bool isOnGONetGlobal, bool isOnGONetLocal)
         {
             var attr = method.GetCustomAttribute<GONetRpcAttribute>();
-            string methodId = $"{method.DeclaringType.Name}.{method.Name}()";
+            string methodId = $"{method.DeclaringType.FullName}.{method.Name}()";
 
             // Return type validation
             Type returnType = method.ReturnType;
@@ -2177,7 +2203,7 @@ namespace GONet.Generation
                 if (!isVoid && !isTask && !isGenericTask)
                 {
                     errors.Add($"ERROR: {methodId} - ServerRpc must return void, Task, or Task<T>");
-                    errors.Add($"  Current: {returnType.Name}");
+                    errors.Add($"  Current: {returnType.FullName}");
                     errors.Add($"  FIX: Change to one of:");
                     errors.Add($"    - void {method.Name}(...) for fire-and-forget");
                     errors.Add($"    - async Task {method.Name}(...) for async without return");
@@ -2186,11 +2212,22 @@ namespace GONet.Generation
             }
             else if (attr is ClientRpcAttribute || attr is TargetRpcAttribute)
             {
-                if (!isVoid && !isTask)  // Allow Task for async TargetRpc
+                // Check for allowed return types
+                bool isValidReturn = isVoid || isTask;
+
+                // TargetRpc can also return Task<RpcDeliveryReport> for delivery confirmation
+                if (attr is TargetRpcAttribute && returnType.IsGenericType &&
+                    returnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                    returnType.GetGenericArguments()[0] == typeof(RpcDeliveryReport))
                 {
-                    errors.Add($"ERROR: {methodId} - {attr.GetType().Name} must return void or Task");
-                    errors.Add($"  Current: {returnType.Name}");
-                    errors.Add($"  FIX: Change to 'void {method.Name}(...)' or 'async Task {method.Name}(...)'");
+                    isValidReturn = true;
+                }
+
+                if (!isValidReturn)
+                {
+                    errors.Add($"ERROR: {methodId} - {attr.GetType().FullName} must return void, Task, or Task<RpcDeliveryReport> (TargetRpc only)");
+                    errors.Add($"  Current: {returnType.FullName}");
+                    errors.Add($"  FIX: Change return type appropriately");
                 }
             }
 
@@ -2201,7 +2238,7 @@ namespace GONet.Generation
                 if (!hasAsyncModifier)
                 {
                     errors.Add($"WARNING: {methodId} returns Task but missing 'async' modifier");
-                    errors.Add($"  FIX: Add 'async' keyword: async {returnType.Name} {method.Name}(...)");
+                    errors.Add($"  FIX: Add 'async' keyword: async {returnType.FullName} {method.Name}(...)");
                 }
             }
 
@@ -2214,9 +2251,9 @@ namespace GONet.Generation
 
                 if (!IsMemoryPackable(param.ParameterType))
                 {
-                    errors.Add($"ERROR: {methodId} parameter '{param.Name}' type '{param.ParameterType.Name}' not serializable");
-                    errors.Add($"  FIX: Add [MemoryPackable] attribute to '{param.ParameterType.Name}'");
-                    errors.Add($"  FIX: Make the class/struct partial: 'public partial class {param.ParameterType.Name}'");
+                    errors.Add($"ERROR: {methodId} parameter '{param.Name}' type '{param.ParameterType.FullName}' not serializable");
+                    errors.Add($"  FIX: Add [MemoryPackable] attribute to '{param.ParameterType.FullName}'");
+                    errors.Add($"  FIX: Make the class/struct partial: 'public partial class {param.ParameterType.FullName}'");
                 }
 
                 if (param.IsOut || param.ParameterType.IsByRef)
