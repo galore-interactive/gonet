@@ -378,12 +378,29 @@ namespace GONet
             pool.Return(evt);
         }
     }
-    
+
     #endregion
 
     /// <summary>
-    /// Context information provided to RPC methods when they include this as a parameter.
+    /// Context information available to RPC methods through GONetEventBus.CurrentRpcContext.
+    /// Contains information about the RPC caller, reliability, and correlation.
     /// </summary>
+    /// <remarks>
+    /// Access this in your RPC method like:
+    /// <code>
+    /// [ServerRpc]
+    /// void MyMethod()
+    /// {
+    ///     var context = GONetEventBus.CurrentRpcContext;
+    ///     if (context.HasValue)
+    ///     {
+    ///         var callerAuthority = context.Value.SourceAuthorityId;
+    ///         // Use context information
+    ///     }
+    /// }
+    /// </code>
+    /// Note: GONetRpcContext should NOT be included as an RPC method parameter!
+    /// </remarks>
     public struct GONetRpcContext
     {
         public readonly GONetEventEnvelope Envelope;

@@ -76,7 +76,17 @@ namespace GONet
         /// It could be from a remote machine (i.e., <see cref="IsSourceRemote"/> will be true) or from this local machine (i.e., <see cref="IsFromMe"/> will be true).
         /// </summary>
         public override ushort SourceAuthorityId { get; set; }
-        public override ushort TargetClientAuthorityId { get; internal set; }
+        private ushort _targetClientAuthorityId;
+        public override ushort TargetClientAuthorityId 
+        {
+            get => _targetClientAuthorityId;
+            internal set
+            {
+                var before = _targetClientAuthorityId;
+                _targetClientAuthorityId = value;
+                //GONetLog.Debug($"[SNAFUERY] _targetClientAuthorityId: {_targetClientAuthorityId}, before: {before}");
+            }
+        }
         public override bool IsReliable { get; protected set; }
 
         /// <summary>
@@ -101,15 +111,16 @@ namespace GONet
             set => EventUntyped = eventTyped = value;
         }
 
-        internal static GONetEventEnvelope<T> Borrow(T eventTyped, ushort sourceAuthorityId, GONetParticipant gonetParticipant)
+        internal static GONetEventEnvelope<T> Borrow(T eventTyped, ushort sourceAuthorityId, GONetParticipant gonetParticipant, 
+            ushort targetClientAuthorityId = GONetMain.OwnerAuthorityId_Unset, bool isReliable = true)
         {
             var envelope = pool.Borrow();
 
             envelope.Event = eventTyped;
             envelope.SourceAuthorityId = sourceAuthorityId;
             envelope.GONetParticipant = gonetParticipant;
-            envelope.IsReliable = true;
-            envelope.TargetClientAuthorityId = GONetMain.OwnerAuthorityId_Unset;
+            envelope.IsReliable = isReliable;
+            envelope.TargetClientAuthorityId = targetClientAuthorityId;
 
             return envelope;
         }
@@ -487,6 +498,8 @@ namespace GONet
 
         // For tracking pending delivery reports
         private readonly Dictionary<long, TaskCompletionSource<RpcDeliveryReport>> pendingDeliveryReports = new();
+        private readonly Dictionary<uint, Type> componentTypeByRpcId = new();
+
 
         // Registration method for enhanced validators
         public void RegisterEnhancedValidators(Type type, Dictionary<string, Func<object, ushort, ushort[], int, byte[], RpcValidationResult>> validators)
@@ -506,20 +519,20 @@ namespace GONet
         }
 
         // Handle incoming delivery reports
-        private void HandleDeliveryReport(GONetEventEnvelope<RpcDeliveryReportEvent> envelope)
+        private void Client_HandleDeliveryReport(GONetEventEnvelope<RpcDeliveryReportEvent> envelope)
         {
-            var evt = envelope.Event;
+            RpcDeliveryReportEvent reportEvent = envelope.Event;
 
             // Check both places for the correlation
-            if (pendingDeliveryReports.TryGetValue(evt.CorrelationId, out var tcs))
+            if (pendingDeliveryReports.TryGetValue(reportEvent.CorrelationId, out var tcs))
             {
-                tcs.TrySetResult(evt.Report);
-                pendingDeliveryReports.Remove(evt.CorrelationId);
+                tcs.TrySetResult(reportEvent.Report);
+                pendingDeliveryReports.Remove(reportEvent.CorrelationId);
             }
-            else if (pendingResponses.TryRemove(evt.CorrelationId, out var handler) &&
+            else if (pendingResponses.TryRemove(reportEvent.CorrelationId, out var handler) &&
                      handler is DeliveryReportHandler reportHandler)
             {
-                reportHandler.HandleDeliveryReport(evt);
+                reportHandler.HandleDeliveryReport(reportEvent);
             }
         }
 
@@ -764,9 +777,10 @@ namespace GONet
 
         private readonly Dictionary<uint, string> methodNameByRpcId = new();
 
-        public void RegisterRpcIdMapping(uint rpcId, string methodName)
+        public void RegisterRpcIdMapping(uint rpcId, string methodName, Type componentType)
         {
             methodNameByRpcId[rpcId] = methodName;
+            componentTypeByRpcId[rpcId] = componentType;
         }
 
         private string GetMethodNameFromRpcId(uint rpcId)
@@ -776,10 +790,23 @@ namespace GONet
 
         internal void InitializeRpcSystem()
         {
-            Subscribe<RpcEvent>(HandleIncomingRpc);
-            Subscribe<RpcResponseEvent>(HandleRpcResponse);
-            Subscribe<RoutedRpcEvent>(HandleRoutedRpcFromClient);
-            Subscribe<RpcDeliveryReportEvent>(HandleDeliveryReport);
+            Subscribe<RpcEvent>(HandleRpcForMe, (envelope) =>
+                envelope.TargetClientAuthorityId == GONetMain.MyAuthorityId ||
+                envelope.TargetClientAuthorityId == GONetMain.OwnerAuthorityId_Unset
+            );
+            
+            Subscribe<RpcResponseEvent>(HandleRpcResponseForMe, (envelope) =>
+                envelope.TargetClientAuthorityId == GONetMain.MyAuthorityId ||
+                envelope.TargetClientAuthorityId == GONetMain.OwnerAuthorityId_Unset
+            );
+
+            Subscribe<RoutedRpcEvent>(Server_HandleRoutedRpcFromClient, (e) => 
+                e.IsSourceRemote && 
+                e.SourceAuthorityId != GONetMain.OwnerAuthorityId_Server);
+            
+            Subscribe<RpcDeliveryReportEvent>(Client_HandleDeliveryReport, (e) => 
+                e.IsSourceRemote &&
+                e.SourceAuthorityId == GONetMain.OwnerAuthorityId_Server);
         }
 
         internal void RegisterRpcHandler(uint rpcId, Func<GONetEventEnvelope<RpcEvent>, Task> handler)
@@ -787,7 +814,7 @@ namespace GONet
             rpcHandlers[rpcId] = handler;
         }
 
-        private async void HandleIncomingRpc(GONetEventEnvelope<RpcEvent> envelope)
+        private async void HandleRpcForMe(GONetEventEnvelope<RpcEvent> envelope)
         {
             var rpcEvent = envelope.Event;
 
@@ -827,14 +854,8 @@ namespace GONet
             }
         }
 
-        private void HandleRpcResponse(GONetEventEnvelope<RpcResponseEvent> envelope)
+        private void HandleRpcResponseForMe(GONetEventEnvelope<RpcResponseEvent> envelope)
         {
-            // Don't process responses we generated for others
-            if (envelope.TargetClientAuthorityId != GONetMain.MyAuthorityId && envelope.TargetClientAuthorityId != GONetMain.OwnerAuthorityId_Unset)
-            {
-                return;
-            }
-
             var response = envelope.Event;
 
             // Find the pending request
@@ -889,33 +910,29 @@ namespace GONet
             }
         }
 
-        private void HandleRoutedRpcFromClient(GONetEventEnvelope<RoutedRpcEvent> envelope)
+        private void Server_HandleRoutedRpcFromClient(GONetEventEnvelope<RoutedRpcEvent> envelope)
         {
-            if (!GONetMain.IsServer) return;
-
             var evt = envelope.Event;
             var sourceAuthority = envelope.SourceAuthorityId;
+
+            // Use RpcId to find the exact component type and method
+            var methodName = GetMethodNameFromRpcId(evt.RpcId);
+            if (methodName == null) return;
+
+            // Find which component type this RpcId belongs to
+            Type componentType = componentTypeByRpcId[evt.RpcId];
+            if (componentType == null) return;
 
             // Find the instance
             var gnp = GONetMain.GetGONetParticipantById(evt.GONetId);
             if (gnp == null) return;
 
-            // Find the component with the RPC
-            GONetParticipantCompanionBehaviour component = null;
-            foreach (var comp in gnp.GetComponents<GONetParticipantCompanionBehaviour>())
-            {
-                if (rpcMetadataByType.ContainsKey(comp.GetType()))
-                {
-                    component = comp;
-                    break;
-                }
-            }
+            // Get the specific component
+            var component = gnp.GetComponent(componentType) as GONetParticipantCompanionBehaviour;
             if (component == null) return;
 
-            var methodName = GetMethodNameFromRpcId(evt.RpcId);
-            if (methodName == null) return;
-
-            if (!rpcMetadataByType.TryGetValue(component.GetType(), out var metadata) ||
+            // Now get the metadata for this specific component and method
+            if (!rpcMetadataByType.TryGetValue(componentType, out var metadata) ||
                 !metadata.TryGetValue(methodName, out var rpcMeta)) return;
 
             // Validate and route
@@ -928,17 +945,17 @@ namespace GONet
                 // Route to validated targets
                 for (int i = 0; i < validCount; i++)
                 {
-                    if (targetBuffer[i] != sourceAuthority) // Don't send back to sender
-                    {
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = evt.RpcId;
-                        rpcEvent.GONetId = evt.GONetId;
-                        rpcEvent.Data = evt.Data;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = evt.RpcId;
+                    rpcEvent.GONetId = evt.GONetId;
+                    rpcEvent.Data = evt.Data;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    rpcEvent.IsSingularRecipientOnly = true;
                         
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: rpcMeta.IsReliable);
-                    }
+                    Publish(
+                        rpcEvent, 
+                        targetClientAuthorityId: targetBuffer[i], 
+                        shouldPublishReliably: rpcMeta.IsReliable);
                 }
             }
             finally
@@ -4092,20 +4109,39 @@ namespace GONet
             }
         }
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private (bool flowControl, TResult value) CallRpcInternalAsync_PreValidation<TResult>(GONetParticipantCompanionBehaviour instance, string methodName, out RpcMetadata metadata)
+        {
+            metadata = default;
+
+            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out metadata))
+            {
+                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
+                return (flowControl: false, value: default(TResult));
+            }
+
+            // Allow ServerRpc and TargetRpc with delivery reports
+            bool isValidAsync = metadata.Type == RpcType.ServerRpc ||
+                                (metadata.Type == RpcType.TargetRpc && metadata.ExpectsDeliveryReport);
+
+            if (!isValidAsync)
+            {
+                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods or TargetRpc methods that return Task<RpcDeliveryReport>. {methodName} is a {metadata.Type}");
+                return (flowControl: false, value: default(TResult));
+            }
+
+            return (flowControl: true, value: default);
+        }
+
         // 0 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult>(GONetParticipantCompanionBehaviour instance, string methodName)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
-                !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
+                return value;
             }
 
             return await HandleRpcAsync<TResult>(instance, methodName, metadata);
@@ -4114,17 +4150,11 @@ namespace GONet
         // 1 parameter
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) ||
-                !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
-            }
-
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
+                return value;
             }
 
             return await HandleRpcAsync<TResult, T1>(instance, methodName, metadata, arg1);
@@ -4133,112 +4163,91 @@ namespace GONet
         // CallRpcInternalAsync - 2 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2>(instance, methodName, metadata, arg1, arg2);
         }
 
         // CallRpcInternalAsync - 3 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3>(instance, methodName, metadata, arg1, arg2, arg3);
         }
 
         // CallRpcInternalAsync - 4 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3, T4>(instance, methodName, metadata, arg1, arg2, arg3, arg4);
         }
 
         // CallRpcInternalAsync - 5 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5);
         }
 
         // CallRpcInternalAsync - 6 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6);
         }
 
         // CallRpcInternalAsync - 7 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         }
 
         // CallRpcInternalAsync - 8 parameters
         internal async Task<TResult> CallRpcInternalAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
         {
-            if (!rpcMetadata.TryGetValue(instance.GetType(), out var typeMetadata) || !typeMetadata.TryGetValue(methodName, out var metadata))
+            RpcMetadata metadata;
+            (bool flowControl, TResult value) = CallRpcInternalAsync_PreValidation<TResult>(instance, methodName, out metadata);
+            if (!flowControl)
             {
-                GONetLog.Warning($"No RPC metadata found for {instance.GetType().Name}.{methodName}");
-                return default(TResult);
+                return value;
             }
-            if (metadata.Type != RpcType.ServerRpc)
-            {
-                GONetLog.Warning($"CallRpcAsync can only be used with ServerRpc methods. {methodName} is a {metadata.Type}");
-                return default(TResult);
-            }
+
             return await HandleRpcAsync<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, metadata, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         }
 
@@ -5113,7 +5122,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5171,7 +5180,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5229,7 +5238,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5287,7 +5296,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5345,7 +5354,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5403,7 +5412,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5461,7 +5470,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5522,7 +5531,7 @@ namespace GONet
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                    return (TResult)(object)SendToValidatedClientsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -5532,8 +5541,11 @@ namespace GONet
             }
         }
 
-        // Reusable method to handle server-side logic
-        private RpcDeliveryReport SendToValidatedClientsWithDataDoReporting(
+        /// <summary>
+        /// Reusable method to handle server-side logi
+        /// NOTE: <paramref name="targetBuffer"/> MIGHT include the server itself as a target!
+        /// </summary>
+        private RpcDeliveryReport Server_SendToValidatedTargetsWithDataDoReporting(
             GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, 
             ushort[] targetBuffer, int targetCount,
             byte[] serialized, int bytesUsed, bool needsReturn)
@@ -5557,31 +5569,66 @@ namespace GONet
                 reportId = StoreValidationReport(validationResult);
             }
 
-            // Use modified data if provided
-            byte[] dataToSend = validationResult.ModifiedData ?? serialized;
-
-            // Route to allowed targets
-            if (validationResult.AllowedCount > 0)
+            try
             {
+                // 1. Check if server is a target and execute ONCE locally
+                bool serverIsTarget = false;
+                int serverTargetIndex = -1;
                 for (int i = 0; i < validationResult.AllowedCount; i++)
                 {
-                    // Copy data for each target since Publish auto-returns
-                    byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                    Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+                    if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                    {
+                        serverIsTarget = true;
+                        serverTargetIndex = i;
+                        break;
+                    }
+                }
+
+                // Use the validated/modified data if available
+                byte[] dataToUse = validationResult.ModifiedData ?? serialized;
+
+                if (serverIsTarget)
+                {
+                    // Execute locally ONCE
                     var rpcEvent = RpcEvent.Borrow();
                     rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
                     rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                    rpcEvent.Data = serializedCopy;
+                    rpcEvent.Data = dataToUse;
                     rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    rpcEvent.IsSingularRecipientOnly = true;
-                    Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i],
-                        shouldPublishReliably: metadata.IsReliable);
+
+                    // Publish with self as target - this executes local handlers
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+
+                    // Remove server from targets array so we don't send to it again
+                    validationResult.AllowedTargets[serverTargetIndex] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                }
+
+                // 2. Send directly to remote clients WITHOUT triggering local handlers
+                if (validationResult.AllowedCount > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = dataToUse;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    // Send to all remote targets efficiently
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        validationResult.AllowedTargets,
+                        validationResult.AllowedCount,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return(); // Return event to pool manually since not being auto self returned like if sent through Publish (like above)
                 }
             }
-
-            if (needsReturn)
+            finally
             {
-                SerializationUtils.ReturnByteArray(serialized);
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
             }
 
             // Create delivery report
@@ -6176,6 +6223,8 @@ namespace GONet
                     GONetEventEnvelope<IGONetEvent> genericEnvelope = genericEnvelopes_publishCallDepthIndex[genericEnvelope_publishCallDepth];
                     genericEnvelope.Init(@event, sourceAuthorityId, targetClientAuthorityId, shouldPublishReliably);
 
+                    //GONetLog.Debug($"[SNAFUERY] targetClientAuthorityId: {targetClientAuthorityId}, genericEnvelope.TargetClientAuthorityId: {genericEnvelope.TargetClientAuthorityId}");
+
                     for (int i = 0; i < handlerCount; ++i)
                     {
                         EventHandlerAndFilterer handlerForType = handlersForType[i];
@@ -6442,12 +6491,17 @@ namespace GONet
 
             public void Handle(GONetEventEnvelope eventEnvelope)
             {
-                // GONetLog.Debug("DREETS  pre borrow...eventEnvelope.EventUntyped.type: " + eventEnvelope.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
+                //GONetLog.Debug("DREETS  pre borrow...eventEnvelope.EventUntyped.type: " + eventEnvelope.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
 
-                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
-                envelopeTyped.TargetClientAuthorityId = eventEnvelope.TargetClientAuthorityId;
-
-                // GONetLog.Debug("DREETS  POST borrow..envelopeTyped.EventUntyped.type: " + envelopeTyped.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow(
+                    (T)eventEnvelope.EventUntyped, 
+                    eventEnvelope.SourceAuthorityId, 
+                    eventEnvelope.GONetParticipant,
+                    targetClientAuthorityId: eventEnvelope.TargetClientAuthorityId);
+                
+                //GONetLog.Debug($"[SNAFUERY] eventEnvelope.TargetClientAuthorityId: {eventEnvelope.TargetClientAuthorityId}, envelopeTyped.TargetClientAuthorityId: {envelopeTyped.TargetClientAuthorityId}");
+                
+                //GONetLog.Debug("DREETS  POST borrow..envelopeTyped.EventUntyped.type: " + envelopeTyped.EventUntyped.GetType().FullName + " T: " + typeof(T).FullName);
                 wrappedHandler(envelopeTyped);
 
                 GONetEventEnvelope<T>.Return(envelopeTyped);
@@ -6468,7 +6522,11 @@ namespace GONet
 
             public bool Filter(GONetEventEnvelope<IGONetEvent> eventEnvelope)
             {
-                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow((T)eventEnvelope.EventUntyped, eventEnvelope.SourceAuthorityId, eventEnvelope.GONetParticipant);
+                GONetEventEnvelope<T> envelopeTyped = GONetEventEnvelope<T>.Borrow(
+                    (T)eventEnvelope.EventUntyped, 
+                    eventEnvelope.SourceAuthorityId, 
+                    eventEnvelope.GONetParticipant,
+                    targetClientAuthorityId: eventEnvelope.TargetClientAuthorityId);
 
                 bool filterResult = wrappedFilter(envelopeTyped);
 

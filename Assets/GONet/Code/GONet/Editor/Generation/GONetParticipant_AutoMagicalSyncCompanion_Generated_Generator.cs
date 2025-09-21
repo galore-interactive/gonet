@@ -1412,7 +1412,7 @@ namespace GONet.Generation
 
                 foreach (var method in rpcMethods)
                 {
-                    ValidateRpcMethod(method, errors, false, false); // Context validation happens at runtime
+                    ValidateRpcMethod(componentType, method, errors, false, false); // Context validation happens at runtime
                 }
 
                 if (errors.Any())
@@ -1685,7 +1685,7 @@ namespace GONet.Generation
                 foreach (var method in baseRpcMethods)
                 {
                     uint rpcId = GONetEventBus.GetRpcId(typeof(GONetParticipantCompanionBehaviour), method.Name);
-                    sb.AppendLine($"                GONetMain.EventBus.RegisterRpcIdMapping(0x{rpcId:X8}, nameof(GONetParticipantCompanionBehaviour.{method.Name}));");
+                    sb.AppendLine($"                GONetMain.EventBus.RegisterRpcIdMapping(0x{rpcId:X8}, nameof(GONetParticipantCompanionBehaviour.{method.Name}), typeof({className}));");
                 }
             }
 
@@ -1693,7 +1693,7 @@ namespace GONet.Generation
             foreach (var method in derivedRpcMethods)
             {
                 uint rpcId = GONetEventBus.GetRpcId(componentType, method.Name);
-                sb.AppendLine($"                GONetMain.EventBus.RegisterRpcIdMapping(0x{rpcId:X8}, nameof({className}.{method.Name}));");
+                sb.AppendLine($"                GONetMain.EventBus.RegisterRpcIdMapping(0x{rpcId:X8}, nameof({className}.{method.Name}), typeof({className}));");
             }
 
             sb.AppendLine($"                GONetMain.EventBus.RegisterRpcDispatcher(typeof({className}), new {className}_RpcDispatcher());");
@@ -1890,88 +1890,8 @@ namespace GONet.Generation
             // Add target checking for TargetRpc
             if (isTargetRpc)
             {
-                sb.AppendLine("                // Check if we should execute this TargetRpc");
-
-                if (!string.IsNullOrEmpty(targetAttr.TargetPropertyName))
-                {
-                    // Property-based targeting
-                    sb.AppendLine($"                // Check target from property: {targetAttr.TargetPropertyName}");
-
-                    if (targetAttr.IsMultipleTargets)
-                    {
-                        // Property is a list or array - check if we're in it
-                        var property = method.DeclaringType.GetProperty(targetAttr.TargetPropertyName,
-                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                        if (property?.PropertyType == typeof(List<ushort>))
-                        {
-                            sb.AppendLine($"                var targetList = instance.{targetAttr.TargetPropertyName};");
-                            sb.AppendLine("                if (targetList == null || !targetList.Contains(GONetMain.MyAuthorityId))");
-                            sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // Not in target list, don't execute");
-                            sb.AppendLine("                }");
-                        }
-                        else if (property?.PropertyType == typeof(ushort[]))
-                        {
-                            sb.AppendLine($"                var targetArray = instance.{targetAttr.TargetPropertyName};");
-                            sb.AppendLine("                if (targetArray == null || !System.Linq.Enumerable.Contains(targetArray, GONetMain.MyAuthorityId))");
-                            sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // Not in target array, don't execute");
-                            sb.AppendLine("                }");
-                        }
-                    }
-                    else
-                    {
-                        // Single target property
-                        sb.AppendLine($"                ushort targetAuthority = instance.{targetAttr.TargetPropertyName};");
-                        sb.AppendLine("                if (targetAuthority != GONetMain.MyAuthorityId)");
-                        sb.AppendLine("                {");
-                        sb.AppendLine("                    return; // Not the target, don't execute");
-                        sb.AppendLine("                }");
-                    }
-                }
-                else
-                {
-                    // Enum-based targeting
-                    switch (targetAttr.Target)
-                    {
-                        case RpcTarget.Owner:
-                            sb.AppendLine("                // Check if we're the owner");
-                            sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
-                            sb.AppendLine("                if (gnp.OwnerAuthorityId != GONetMain.MyAuthorityId)");
-                            sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // Not the owner, don't execute");
-                            sb.AppendLine("                }");
-                            break;
-
-                        case RpcTarget.Others:
-                            sb.AppendLine("                // Check if we're NOT the owner");
-                            sb.AppendLine("                var gnp = instance.GetComponent<GONetParticipant>();");
-                            sb.AppendLine("                if (gnp.OwnerAuthorityId == GONetMain.MyAuthorityId)");
-                            sb.AppendLine("                {");
-                            sb.AppendLine("                    return; // We're the owner, don't execute");
-                            sb.AppendLine("                }");
-                            break;
-
-                        case RpcTarget.All:
-                            // Execute for everyone, no check needed
-                            break;
-
-                        case RpcTarget.SpecificAuthority:
-                            // First parameter should be the target
-                            if (hasParameters && parameters[0].ParameterType == typeof(ushort))
-                            {
-                                sb.AppendLine("                // Check target from first parameter");
-                                sb.AppendLine("                var args = SerializationUtils.DeserializeFromBytes<" + GetParameterDataStructName(method) + ">(rpcEvent.Data);");
-                                sb.AppendLine($"                if (args.{parameters[0].Name} != GONetMain.MyAuthorityId)");
-                                sb.AppendLine("                {");
-                                sb.AppendLine("                    return; // Not the target, don't execute");
-                                sb.AppendLine("                }");
-                                hasParameters = false; // We already deserialized
-                            }
-                            break;
-                    }
-                }
+                sb.AppendLine("                // NO more route VALIDATION HERE - if we received it, we're a valid target!");
+                sb.AppendLine("                // The server already validated during routing");
                 sb.AppendLine();
             }
 
@@ -2186,7 +2106,7 @@ namespace GONet.Generation
             sb.AppendLine();
         }
 
-        private static void ValidateRpcMethod(MethodInfo method, List<string> errors, bool isOnGONetGlobal, bool isOnGONetLocal)
+        private static void ValidateRpcMethod(Type componentType, MethodInfo method, List<string> errors, bool isOnGONetGlobal, bool isOnGONetLocal)
         {
             var attr = method.GetCustomAttribute<GONetRpcAttribute>();
             string methodId = $"{method.DeclaringType.FullName}.{method.Name}()";
@@ -2245,9 +2165,14 @@ namespace GONet.Generation
             // Parameter validation
             foreach (var param in method.GetParameters())
             {
-                // Skip GONetRpcContext - it's special
+                // GONetRpcContext must not be a parameter anymore
                 if (param.ParameterType == typeof(GONetRpcContext))
+                {
+                    errors.Add($"ERROR: {methodId} - GONetRpcContext cannot be a method parameter");
+                    errors.Add($"  FIX: Remove the GONetRpcContext parameter and access it via GONetEventBus.CurrentRpcContext instead:");
+                    errors.Add($"  var context = GONetEventBus.CurrentRpcContext;");
                     continue;
+                }
 
                 if (!IsMemoryPackable(param.ParameterType))
                 {
@@ -2282,6 +2207,22 @@ namespace GONet.Generation
                     errors.Add($"ERROR: {methodId} targets 'Owner' but is on GONetGlobal");
                     errors.Add($"  GONetGlobal doesn't have an individual owner");
                     errors.Add($"  FIX: Use RpcTarget.All or move this RPC to GONetLocal/instance");
+                }
+
+                if (!string.IsNullOrEmpty(targetRpc.TargetPropertyName))
+                {
+                    var property = componentType.GetProperty(targetRpc.TargetPropertyName);
+                    bool isListOrArray = property?.PropertyType == typeof(List<ushort>) ||
+                                        property?.PropertyType == typeof(ushort[]);
+
+                    if (isListOrArray && !targetRpc.IsMultipleTargets)
+                    {
+                        errors.Add($"ERROR: {methodId} - TargetPropertyName '{targetRpc.TargetPropertyName}' is a collection but isMultipleTargets is false");
+                    }
+                    else if (!isListOrArray && targetRpc.IsMultipleTargets)
+                    {
+                        errors.Add($"ERROR: {methodId} - TargetPropertyName '{targetRpc.TargetPropertyName}' is not a collection but isMultipleTargets is true");
+                    }
                 }
             }
         }
