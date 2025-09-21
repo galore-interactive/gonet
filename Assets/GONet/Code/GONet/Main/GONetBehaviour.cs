@@ -25,6 +25,8 @@ namespace GONet
     /// </summary>
     public abstract class GONetBehaviour : MonoBehaviour
     {
+        private const float SEMI_ARBITRAY_WAIT_BEFORE_INFORMING_CLINET_VS_SERVER_STATUS_KNOWN_SECONDS = 0.1f;
+
         [Tooltip("GONet will send a 'tick' at each of the unique synchronization schedules as defined in various profiles (i.e., GONet => GONet Editor Support => Create New Sync Settings Profile) used when syncing values.")]
         [SerializeField] private bool isTickReceiver;
         public bool IsTickReceiver
@@ -115,7 +117,11 @@ namespace GONet
                 }
             }
 
-            yield return new WaitForSecondsRealtime(0.1f); // TODO this magic number to wait is bogus and not sure fire....we need to wait only the exact amount of "time" required and no more/no less
+            yield return new WaitForSecondsRealtime(SEMI_ARBITRAY_WAIT_BEFORE_INFORMING_CLINET_VS_SERVER_STATUS_KNOWN_SECONDS); // TODO this magic number to wait is bogus and not sure fire....we need to wait only the exact amount of "time" required and no more/no less
+            // Option B: still not sure fire...need to dig in more to know the exact moment thsi is safe and exact thing that happens if not wait!! Share in docs to users!!
+            //yield return null;
+            //yield return new WaitForEndOfFrame();
+            
             OnGONetClientVsServerStatusKnown(GONetMain.IsClient, GONetMain.IsServer, GONetMain.MyAuthorityId);
         }
 
@@ -125,6 +131,16 @@ namespace GONet
         }
 
         /// <summary>
+        /// <para>
+        /// IMPORTANT: When this gets called, the <see cref="GONet.GONetLocal"/> for this machine and the <see cref="GONet.GONetGlobal"/> 
+        ///            for all machines has already been initialized, and the following methods have been called prior to this one
+        ///            on those GoNet participants' instances of this behavior on them:
+        ///            ---<see cref="OnGONetParticipantStarted(GONetParticipant)"/>
+        ///            ---<see cref="OnGONetParticipantEnabled(GONetParticipant)"/>
+        ///            
+        ///            It is guaranteed to execute at least <see cref="SEMI_ARBITRAY_WAIT_BEFORE_INFORMING_CLINET_VS_SERVER_STATUS_KNOWN_SECONDS"/> 
+        ///            seconds after those above mentioned methods!
+        /// </para>     
         /// <para>When this is called, GONet knows whether or not this machine is going to be a GONet client or server.  So any action that must know that first is now OK to execute.</para>
         /// <para>Futhermore, GONet has also assigned an authority id for this machine (i.e., <see cref="GONetMain.MyAuthorityId"/> is set) and that is important as well before doing certain things like instantiating/spawning prefabs with <see cref="GONetParticipant"/> attached.</para>
         /// <para>So, please after this is called, feel free to instantiate/spawn networked GameObjects (i.e., with <see cref="GONetParticipant"/>) into the scene.</para>

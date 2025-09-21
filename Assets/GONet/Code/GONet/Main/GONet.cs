@@ -981,6 +981,15 @@ namespace GONet
                 return;
             }
 
+            // Check for self-targeting early - don't relay to ourselves
+            if (eventEnvelope.TargetClientAuthorityId != OwnerAuthorityId_Unset &&
+                eventEnvelope.TargetClientAuthorityId == MyAuthorityId)
+            {
+                // This event is targeted at ourselves - local handlers have already been processed
+                // in GONetEventBus.Publish(), so we don't need to relay it anywhere
+                return;
+            }
+
             byte[] bytes = default;
             int returnBytesUsedCount = default;
             bool doesNeedToReturn = default;
@@ -1030,6 +1039,65 @@ namespace GONet
             if (doesNeedToReturn)
             {
                 //Return borrowed bytes to memory pool
+                SerializationUtils.ReturnByteArray(bytes);
+            }
+        }
+
+        /// <summary>
+        /// Sends an event to specific remote connections without triggering local handlers.
+        /// This is used when we need to send the same event to multiple specific targets efficiently.
+        /// </summary>
+        internal static void Server_SendEventToSpecificRemoteConnections(IGONetEvent @event, ushort[] targetAuthorityIds, int targetCount, bool isReliable)
+        {
+            if (!IsServer || targetCount == 0)
+            {
+                return; // Only server can route to specific targets
+            }
+
+            // Serialize the event once
+            byte[] bytes = default;
+            int returnBytesUsedCount = default;
+            bool doesNeedToReturn = default;
+
+            try
+            {
+                bytes = SerializationUtils.SerializeToBytes(@event, out returnBytesUsedCount, out doesNeedToReturn);
+            }
+            catch (Exception e)
+            {
+                GONetLog.Error($"Failed to serialize event for multi-target send: {e}");
+                return;
+            }
+
+            // Determine channel based on reliability
+            GONetChannelId channelId = isReliable ? GONetChannel.EventSingles_Reliable : GONetChannel.EventSingles_Unreliable;
+
+            // Send to each target
+            for (int i = 0; i < targetCount; i++)
+            {
+                ushort targetAuthorityId = targetAuthorityIds[i];
+
+                // Skip if targeting self (shouldn't happen but safety check)
+                if (targetAuthorityId == MyAuthorityId)
+                {
+                    GONetLog.Warning($"SendEventToSpecificRemoteConnections called with self as target, skipping");
+                    continue;
+                }
+
+                // Get the remote client
+                if (gonetServer.TryGetRemoteClientByAuthorityId(targetAuthorityId, out GONetRemoteClient remoteClient))
+                {
+                    SendBytesToRemoteConnection(remoteClient.ConnectionToClient, bytes, returnBytesUsedCount, channelId);
+                }
+                else
+                {
+                    GONetLog.Warning($"Target authority {targetAuthorityId} not found in remote clients");
+                }
+            }
+
+            // Return borrowed bytes
+            if (doesNeedToReturn)
+            {
                 SerializationUtils.ReturnByteArray(bytes);
             }
         }
