@@ -1863,8 +1863,20 @@ namespace GONet.Generation
                     case 4:
                         GenerateFourParamValidator(sb, componentType, method, targetAttr, rpcParams);
                         break;
+                    case 5:
+                        GenerateFiveParamValidator(sb, componentType, method, targetAttr, rpcParams);
+                        break;
+                    case 6:
+                        GenerateSixParamValidator(sb, componentType, method, targetAttr, rpcParams);
+                        break;
+                    case 7:
+                        GenerateSevenParamValidator(sb, componentType, method, targetAttr, rpcParams);
+                        break;
+                    case 8:
+                        GenerateEightParamValidator(sb, componentType, method, targetAttr, rpcParams);
+                        break;
                     default:
-                        throw new InvalidOperationException($"Validation methods with {paramCount} parameters are not currently supported. Maximum is 4 parameters.");
+                        throw new InvalidOperationException($"Validation methods with {paramCount} parameters are not currently supported. Maximum is 8 parameters.");
                 }
 
                 sb.AppendLine("            },");
@@ -2070,6 +2082,210 @@ namespace GONet.Generation
         }
 
         private static void GenerateFourParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr, ParameterInfo[] parameters)
+        {
+            string dataTypeName = GetParameterDataStructName(method);
+
+            sb.AppendLine($"              (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)((obj, source, targets, count, data) =>");
+            sb.AppendLine($"              {{");
+            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+            sb.AppendLine($"                  var result = RpcValidationResult.CreatePreAllocated(count);");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  var validationContext = new RpcValidationContext");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      SourceAuthorityId = source,");
+            sb.AppendLine($"                      TargetAuthorityIds = targets,");
+            sb.AppendLine($"                      TargetCount = count,");
+            sb.AppendLine($"                      PreAllocatedResult = result");
+            sb.AppendLine($"                  }};");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  try");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.SetValidationContext(validationContext);");
+            sb.AppendLine($"                      var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                      var {param.Name} = args.{param.Name};");
+            }
+
+            var refParams = string.Join(", ", parameters.Select(p => $"ref {p.Name}"));
+            sb.AppendLine($"                      result = instance.{targetAttr.ValidationMethodName}({refParams});");
+            sb.AppendLine($"                      ");
+            sb.AppendLine($"                      if (result.WasModified)");
+            sb.AppendLine($"                      {{");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                          args.{param.Name} = {param.Name};");
+            }
+
+            sb.AppendLine($"                          int bytesUsed;");
+            sb.AppendLine($"                          bool needsReturn;");
+            sb.AppendLine($"                          result.ModifiedData = SerializationUtils.SerializeToBytes(args, out bytesUsed, out needsReturn);");
+            sb.AppendLine($"                      }}");
+            sb.AppendLine($"                      return result;");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"                  finally");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.ClearValidationContext();");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"              }})");
+        }
+
+        private static void GenerateFiveParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr, ParameterInfo[] parameters)
+        {
+            string dataTypeName = GetParameterDataStructName(method);
+
+            sb.AppendLine($"              (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)((obj, source, targets, count, data) =>");
+            sb.AppendLine($"              {{");
+            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+            sb.AppendLine($"                  var result = RpcValidationResult.CreatePreAllocated(count);");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  var validationContext = new RpcValidationContext");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      SourceAuthorityId = source,");
+            sb.AppendLine($"                      TargetAuthorityIds = targets,");
+            sb.AppendLine($"                      TargetCount = count,");
+            sb.AppendLine($"                      PreAllocatedResult = result");
+            sb.AppendLine($"                  }};");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  try");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.SetValidationContext(validationContext);");
+            sb.AppendLine($"                      var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                      var {param.Name} = args.{param.Name};");
+            }
+
+            var refParams = string.Join(", ", parameters.Select(p => $"ref {p.Name}"));
+            sb.AppendLine($"                      result = instance.{targetAttr.ValidationMethodName}({refParams});");
+            sb.AppendLine($"                      ");
+            sb.AppendLine($"                      if (result.WasModified)");
+            sb.AppendLine($"                      {{");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                          args.{param.Name} = {param.Name};");
+            }
+
+            sb.AppendLine($"                          int bytesUsed;");
+            sb.AppendLine($"                          bool needsReturn;");
+            sb.AppendLine($"                          result.ModifiedData = SerializationUtils.SerializeToBytes(args, out bytesUsed, out needsReturn);");
+            sb.AppendLine($"                      }}");
+            sb.AppendLine($"                      return result;");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"                  finally");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.ClearValidationContext();");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"              }})");
+        }
+
+        private static void GenerateSixParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr, ParameterInfo[] parameters)
+        {
+            string dataTypeName = GetParameterDataStructName(method);
+
+            sb.AppendLine($"              (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)((obj, source, targets, count, data) =>");
+            sb.AppendLine($"              {{");
+            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+            sb.AppendLine($"                  var result = RpcValidationResult.CreatePreAllocated(count);");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  var validationContext = new RpcValidationContext");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      SourceAuthorityId = source,");
+            sb.AppendLine($"                      TargetAuthorityIds = targets,");
+            sb.AppendLine($"                      TargetCount = count,");
+            sb.AppendLine($"                      PreAllocatedResult = result");
+            sb.AppendLine($"                  }};");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  try");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.SetValidationContext(validationContext);");
+            sb.AppendLine($"                      var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                      var {param.Name} = args.{param.Name};");
+            }
+
+            var refParams = string.Join(", ", parameters.Select(p => $"ref {p.Name}"));
+            sb.AppendLine($"                      result = instance.{targetAttr.ValidationMethodName}({refParams});");
+            sb.AppendLine($"                      ");
+            sb.AppendLine($"                      if (result.WasModified)");
+            sb.AppendLine($"                      {{");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                          args.{param.Name} = {param.Name};");
+            }
+
+            sb.AppendLine($"                          int bytesUsed;");
+            sb.AppendLine($"                          bool needsReturn;");
+            sb.AppendLine($"                          result.ModifiedData = SerializationUtils.SerializeToBytes(args, out bytesUsed, out needsReturn);");
+            sb.AppendLine($"                      }}");
+            sb.AppendLine($"                      return result;");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"                  finally");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.ClearValidationContext();");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"              }})");
+        }
+
+        private static void GenerateSevenParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr, ParameterInfo[] parameters)
+        {
+            string dataTypeName = GetParameterDataStructName(method);
+
+            sb.AppendLine($"              (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)((obj, source, targets, count, data) =>");
+            sb.AppendLine($"              {{");
+            sb.AppendLine($"                  var instance = ({componentType.Name})obj;");
+            sb.AppendLine($"                  var result = RpcValidationResult.CreatePreAllocated(count);");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  var validationContext = new RpcValidationContext");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      SourceAuthorityId = source,");
+            sb.AppendLine($"                      TargetAuthorityIds = targets,");
+            sb.AppendLine($"                      TargetCount = count,");
+            sb.AppendLine($"                      PreAllocatedResult = result");
+            sb.AppendLine($"                  }};");
+            sb.AppendLine($"                  ");
+            sb.AppendLine($"                  try");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.SetValidationContext(validationContext);");
+            sb.AppendLine($"                      var args = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                      var {param.Name} = args.{param.Name};");
+            }
+
+            var refParams = string.Join(", ", parameters.Select(p => $"ref {p.Name}"));
+            sb.AppendLine($"                      result = instance.{targetAttr.ValidationMethodName}({refParams});");
+            sb.AppendLine($"                      ");
+            sb.AppendLine($"                      if (result.WasModified)");
+            sb.AppendLine($"                      {{");
+
+            foreach (var param in parameters)
+            {
+                sb.AppendLine($"                          args.{param.Name} = {param.Name};");
+            }
+
+            sb.AppendLine($"                          int bytesUsed;");
+            sb.AppendLine($"                          bool needsReturn;");
+            sb.AppendLine($"                          result.ModifiedData = SerializationUtils.SerializeToBytes(args, out bytesUsed, out needsReturn);");
+            sb.AppendLine($"                      }}");
+            sb.AppendLine($"                      return result;");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"                  finally");
+            sb.AppendLine($"                  {{");
+            sb.AppendLine($"                      GONetMain.EventBus.ClearValidationContext();");
+            sb.AppendLine($"                  }}");
+            sb.AppendLine($"              }})");
+        }
+
+        private static void GenerateEightParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr, ParameterInfo[] parameters)
         {
             string dataTypeName = GetParameterDataStructName(method);
 

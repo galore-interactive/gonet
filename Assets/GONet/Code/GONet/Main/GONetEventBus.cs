@@ -521,11 +521,15 @@ namespace GONet
                     case 2:
                     case 3:
                     case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
                         var validatorN = (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)validatorObj;
                         return validatorN(instance, sourceAuthority, targets, targetCount, data);
 
                     default:
-                        throw new InvalidOperationException($"Validator with {paramCount} parameters is not supported");
+                        throw new InvalidOperationException($"Validator with {paramCount} parameters is not supported. Maximum is 8 parameters.");
                 }
             }
             catch (Exception ex)
