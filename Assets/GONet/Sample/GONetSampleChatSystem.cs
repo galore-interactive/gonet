@@ -104,7 +104,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         // Now we have a valid GONetId and OwnerAuthorityId
         localAuthorityId = GONetMain.MyAuthorityId;
-        localDisplayName = GONetMain.IsServer ? "Server" : $"Player_{localAuthorityId}";
+        localDisplayName = (GONetMain.IsServer || IsServerAuthorityId(localAuthorityId)) ? "Server" : $"Player_{localAuthorityId}";
 
         // Don't add ourselves here - let OnGONetParticipantEnabled handle it
 
@@ -134,13 +134,13 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             if (participants.Any(p => p.AuthorityId == authorityId))
                 return;
 
-            string displayName = authorityId == 0 ? "Server" : $"Player_{authorityId}";
+            string displayName = IsServerAuthorityId(authorityId) ? "Server" : $"Player_{authorityId}";
 
             var newParticipant = new ChatParticipant
             {
                 AuthorityId = authorityId,
                 DisplayName = displayName,
-                IsServer = authorityId == 0,
+                IsServer = IsServerAuthorityId(authorityId),
                 Status = ConnectionStatus.Connected
             };
 
@@ -531,12 +531,12 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         // Ensure we have the requesting client in our list
         if (!participants.Any(p => p.AuthorityId == requestingAuthority))
         {
-            string displayName = requestingAuthority == 0 ? "Server" : $"Player_{requestingAuthority}";
+            string displayName = IsServerAuthorityId(requestingAuthority) ? "Server" : $"Player_{requestingAuthority}";
             participants.Add(new ChatParticipant
             {
                 AuthorityId = requestingAuthority,
                 DisplayName = displayName,
-                IsServer = requestingAuthority == 0,
+                IsServer = IsServerAuthorityId(requestingAuthority),
                 Status = ConnectionStatus.Connected
             });
 
@@ -877,8 +877,19 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         allMessages.Clear();
     }
 
+    private bool IsServerAuthorityId(ushort authorityId)
+    {
+        // Use GONet's server authority ID constant
+        return authorityId == GONetMain.OwnerAuthorityId_Server;
+    }
+
     private string GetParticipantName(ushort authorityId)
     {
+        if (IsServerAuthorityId(authorityId))
+        {
+            return "Server";
+        }
+
         var participant = participants.FirstOrDefault(p => p.AuthorityId == authorityId);
         return string.IsNullOrEmpty(participant.DisplayName) ? $"Player_{authorityId}" : participant.DisplayName;
     }
