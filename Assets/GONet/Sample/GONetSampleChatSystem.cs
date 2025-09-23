@@ -620,17 +620,17 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     // Unified message sending using TargetRpc for all message types
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
-    internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType)
+    internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId)
     {
         // Get context - this should always be available in an RPC
         GONetRpcContext context = GONetEventBus.GetCurrentRpcContext();
 
-        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Received SendMessage RPC from {context.SourceAuthorityId}");
+        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Received SendMessage RPC from {context.SourceAuthorityId}, originally from user {fromUserId}");
 
         var message = new ChatMessage
         {
-            SenderId = context.SourceAuthorityId,
-            SenderName = GetParticipantName(context.SourceAuthorityId),
+            SenderId = fromUserId, // Use the explicit fromUserId instead of context.SourceAuthorityId
+            SenderName = GetParticipantName(fromUserId),
             Content = content,
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             Type = messageType,
@@ -708,7 +708,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     }
 
     // Server-side validation for all messages
-    internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType)
+    internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId)
     {
         // Get the pre-allocated validation result from the context
         var validationContext = GONetMain.EventBus.GetValidationContext();
@@ -813,11 +813,12 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Sending message to {CurrentMessageTargets.Count} targets: {string.Join(", ", CurrentMessageTargets)}");
 
         // Send using unified message system
-        CallRpcAsync<RpcDeliveryReport, string, string, ChatType>(
+        CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort>(
             nameof(SendMessage),
             finalContent,
             activeChannel,
-            currentChatMode)
+            currentChatMode,
+            localAuthorityId)
             .ContinueWith(task =>
             {
                 if (task.Result.FailedDelivery?.Length > 0)
