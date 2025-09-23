@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
+using System.Runtime.CompilerServices;
 
 /// <summary>
 /// A comprehensive chat system for GONet that supports channels, direct messages, 
@@ -465,7 +467,16 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         GUILayout.BeginHorizontal();
 
-        currentInputText = GUILayout.TextField(currentInputText, GUILayout.Height(25));
+        // Use TextArea for multi-line support and give it most of the available width
+        currentInputText = GUILayout.TextArea(currentInputText,
+            GUILayout.MinHeight(25),
+            GUILayout.MaxHeight(100),
+            GUILayout.ExpandWidth(true),
+            GUILayout.MinWidth(200));
+
+        // Keep the Send button at fixed width and height, aligned to bottom of text area
+        GUILayout.BeginVertical();
+        GUILayout.FlexibleSpace(); // Push button to bottom
 
         if (GUILayout.Button("Send", GUILayout.Width(60), GUILayout.Height(25)) ||
             (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return && !string.IsNullOrEmpty(currentInputText)))
@@ -473,6 +484,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             SendCurrentMessage();
         }
 
+        GUILayout.EndVertical();
         GUILayout.EndHorizontal();
     }
 
@@ -746,11 +758,12 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             result.DenialReason = "Some recipients are not connected";
         }
 
-        // Filter profanity from the message
+        // Filter profanity from the message - try web API with short timeouts, then fall back
         try
         {
             string originalContent = content;
-            string filteredContent = FilterProfanity(content);
+            // Use web API filtering with aggressive timeouts (max 2 seconds total)
+            string filteredContent = FilterProfanityWithShortTimeout(content);
 
             if (filteredContent != originalContent)
             {
@@ -780,7 +793,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         if (string.IsNullOrEmpty(currentInputText))
             return;
 
-        // Filter profanity locally if server
+        // Filter profanity locally if server (client-side preview only - real filtering happens server-side)
         string finalContent = GONetMain.IsServer ? FilterProfanity(currentInputText) : currentInputText;
 
         // Set up targets based on mode
@@ -897,7 +910,25 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
     }
 
-    private string FilterProfanity(string input)
+    private async Task<string> FilterProfanityAsync(string input)
+    {
+        if (!GONetMain.IsServer)
+            return input;
+
+        // Try web API first, then fall back to local filtering
+        string filtered = await TryWebProfanityFilter(input);
+        if (filtered != null)
+        {
+            Debug.Log($"[Server] Used web API profanity filter");
+            return filtered;
+        }
+
+        // Fallback to local profanity filtering
+        Debug.Log($"[Server] Falling back to local profanity filter");
+        return FilterProfanityLocal(input);
+    }
+
+    private string FilterProfanityLocal(string input)
     {
         if (!GONetMain.IsServer)
             return input;
@@ -910,6 +941,241 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
 
         return filtered;
+    }
+
+    private async Task<string> TryWebProfanityFilter(string input)
+    {
+        try
+        {
+            // First try PurgoMalum API (free, established service)
+            string result = await TryPurgoMalumFilter(input);
+            if (result != null) return result;
+
+            // If PurgoMalum fails, try profanity.dev as backup
+            result = await TryProfanityDevFilter(input);
+            if (result != null) return result;
+
+            return null; // All web APIs failed
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] Web profanity filter failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<string> TryPurgoMalumFilter(string input)
+    {
+        try
+        {
+            string url = $"https://www.purgomalum.com/service/plain?text={UnityWebRequest.EscapeURL(input)}";
+
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = 1; // 1 second timeout
+                await request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    return request.downloadHandler.text;
+                }
+                else
+                {
+                    Debug.LogWarning($"[Server] PurgoMalum API failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] PurgoMalum API exception: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<string> TryProfanityDevFilter(string input)
+    {
+        try
+        {
+            string jsonPayload = $"{{\"message\":\"{input.Replace("\"", "\\\"")}\"}}";
+
+            using (UnityWebRequest request = new UnityWebRequest("https://vector.profanity.dev", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 1; // 1 second timeout
+
+                await request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    // Parse JSON response - assuming it returns filtered text
+                    string response = request.downloadHandler.text;
+                    // Simple JSON parsing for now - in production you'd want proper JSON parsing
+                    if (response.Contains("\""))
+                    {
+                        var start = response.IndexOf("\"") + 1;
+                        var end = response.LastIndexOf("\"");
+                        if (end > start)
+                        {
+                            return response.Substring(start, end - start);
+                        }
+                    }
+                    return input; // If we can't parse response, return original (assume clean)
+                }
+                else
+                {
+                    Debug.LogWarning($"[Server] Profanity.dev API failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] Profanity.dev API exception: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Synchronous wrapper for backwards compatibility
+    private string FilterProfanity(string input)
+    {
+        // For synchronous calls, use local filtering only
+        return FilterProfanityLocal(input);
+    }
+
+    // Synchronous web API filtering with aggressive timeouts (max 2 seconds total)
+    private string FilterProfanityWithShortTimeout(string input)
+    {
+        if (!GONetMain.IsServer)
+            return input;
+
+        // Try PurgoMalum first with synchronous approach
+        try
+        {
+            string result = TryPurgoMalumSync(input);
+            if (result != null)
+            {
+                Debug.Log($"[Server] Used PurgoMalum API for profanity filtering");
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] PurgoMalum sync failed: {ex.Message}");
+        }
+
+        // Try profanity.dev as backup
+        try
+        {
+            string result = TryProfanityDevSync(input);
+            if (result != null)
+            {
+                Debug.Log($"[Server] Used Profanity.dev API for profanity filtering");
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] Profanity.dev sync failed: {ex.Message}");
+        }
+
+        // Fall back to local filtering
+        Debug.Log($"[Server] Web APIs failed, using local profanity filter");
+        return FilterProfanityLocal(input);
+    }
+
+    private string TryPurgoMalumSync(string input)
+    {
+        try
+        {
+            string url = $"https://www.purgomalum.com/service/plain?text={UnityWebRequest.EscapeURL(input)}";
+
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = 1; // 1 second timeout
+
+                // Use synchronous approach - start the request and poll until done or timeout
+                var operation = request.SendWebRequest();
+
+                float startTime = Time.realtimeSinceStartup;
+                while (!operation.isDone && (Time.realtimeSinceStartup - startTime) < 1.0f)
+                {
+                    // Busy wait with small delay to avoid spinning
+                    System.Threading.Thread.Sleep(10);
+                }
+
+                if (operation.isDone && request.result == UnityWebRequest.Result.Success)
+                {
+                    return request.downloadHandler.text;
+                }
+                else
+                {
+                    Debug.LogWarning($"[Server] PurgoMalum sync request failed or timed out");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] PurgoMalum sync exception: {ex.Message}");
+            return null;
+        }
+    }
+
+    private string TryProfanityDevSync(string input)
+    {
+        try
+        {
+            string jsonPayload = $"{{\"message\":\"{input.Replace("\"", "\\\"")}\"}}";
+
+            using (UnityWebRequest request = new UnityWebRequest("https://vector.profanity.dev", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 1; // 1 second timeout
+
+                // Use synchronous approach - start the request and poll until done or timeout
+                var operation = request.SendWebRequest();
+
+                float startTime = Time.realtimeSinceStartup;
+                while (!operation.isDone && (Time.realtimeSinceStartup - startTime) < 1.0f)
+                {
+                    // Busy wait with small delay to avoid spinning
+                    System.Threading.Thread.Sleep(10);
+                }
+
+                if (operation.isDone && request.result == UnityWebRequest.Result.Success)
+                {
+                    // Parse JSON response - simple parsing for now
+                    string response = request.downloadHandler.text;
+                    if (response.Contains("\""))
+                    {
+                        var start = response.IndexOf("\"") + 1;
+                        var end = response.LastIndexOf("\"");
+                        if (end > start)
+                        {
+                            return response.Substring(start, end - start);
+                        }
+                    }
+                    return input; // If we can't parse response, return original (assume clean)
+                }
+                else
+                {
+                    Debug.LogWarning($"[Server] Profanity.dev sync request failed or timed out");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Server] Profanity.dev sync exception: {ex.Message}");
+            return null;
+        }
     }
 
     #endregion
@@ -926,6 +1192,17 @@ public partial struct ChatMessage
     public GONetSampleChatSystem.ChatType Type { get; set; }
     public string ChannelName { get; set; }
     public ushort[] Recipients { get; set; }
+}
+
+// Extension methods for async UnityWebRequest
+public static class UnityWebRequestExtensions
+{
+    public static TaskAwaiter<UnityWebRequest> GetAwaiter(this UnityWebRequestAsyncOperation asyncOp)
+    {
+        var tcs = new TaskCompletionSource<UnityWebRequest>();
+        asyncOp.completed += operation => tcs.SetResult(asyncOp.webRequest);
+        return tcs.Task.GetAwaiter();
+    }
 }
 
 [MemoryPackable]
