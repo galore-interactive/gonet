@@ -16,6 +16,7 @@
 using GONet.Utils;
 using MemoryPack;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace GONet
@@ -213,29 +214,133 @@ namespace GONet
 
     public struct RpcValidationResult
     {
-        public ushort[] AllowedTargets;
-        public int AllowedCount;
-        public ushort[] DeniedTargets;
-        public int DeniedCount;
-        public string DenialReason;
-        public byte[] ModifiedData;  // Optional modified message
+        /// <summary>
+        /// Parallel array to ValidationContext.TargetAuthorities.
+        /// Array indicating which targets are allowed (true) or denied (false).
+        /// This array is pre-allocated by the framework to match TargetCount.
+        /// </summary>
+        public bool[] AllowedTargets { get; internal set; }
 
-        public static RpcValidationResult AllowAll(ushort[] targets, int count)
+        /// <summary>
+        /// Number of valid targets in the AllowedTargets array
+        /// </summary>
+        public int TargetCount { get; internal set; }
+
+        /// <summary>
+        /// Optional reason for any denials
+        /// </summary>
+        public string DenialReason { get; set; }
+
+        /// <summary>
+        /// Whether the validator modified any parameters
+        /// </summary>
+        public bool WasModified { get; set; }
+
+        // Internal field for framework use only
+        internal byte[] ModifiedData { get; set; }
+
+
+        // Internal factory for framework use
+        internal static RpcValidationResult CreatePreAllocated(int targetCount)
         {
             return new RpcValidationResult
             {
-                AllowedTargets = targets,
-                AllowedCount = count
+                AllowedTargets = RpcValidationArrayPool.BorrowAllowedTargets(),
+                TargetCount = targetCount
             };
         }
 
-        public static RpcValidationResult DenyAll(string reason)
+        /// <summary>
+        /// Sets all targets as allowed
+        /// </summary>
+        public void AllowAll()
         {
-            return new RpcValidationResult
+            for (int i = 0; i < TargetCount; i++)
+                AllowedTargets[i] = true;
+            DenialReason = null;
+        }
+
+        /// <summary>
+        /// Sets all targets as denied
+        /// </summary>
+        public void DenyAll()
+        {
+            for (int i = 0; i < TargetCount; i++)
+                AllowedTargets[i] = false;
+        }
+
+        /// <summary>
+        /// Sets all targets as denied with a reason
+        /// </summary>
+        public void DenyAll(string reason)
+        {
+            DenyAll();
+            DenialReason = reason;
+        }
+
+        /// <summary>
+        /// Helper to allow specific targets by index
+        /// </summary>
+        public void AllowTarget(int index)
+        {
+            if (index >= 0 && index < TargetCount)
+                AllowedTargets[index] = true;
+        }
+
+        /// <summary>
+        /// Helper to deny specific targets by index
+        /// </summary>
+        public void DenyTarget(int index, string reason = null)
+        {
+            if (index >= 0 && index < TargetCount)
             {
-                AllowedCount = 0,
-                DenialReason = reason
-            };
+                AllowedTargets[index] = false;
+                if (!string.IsNullOrEmpty(reason))
+                    DenialReason = reason;
+            }
+        }
+
+        /// <summary>
+        /// Converts bool array results to allowed targets list for delivery reports
+        /// </summary>
+        internal ushort[] GetAllowedTargetsList(ushort[] sourceTargets)
+        {
+            var allowedList = new List<ushort>();
+            for (int i = 0; i < TargetCount && i < sourceTargets.Length; i++)
+            {
+                if (AllowedTargets[i])
+                    allowedList.Add(sourceTargets[i]);
+            }
+            return allowedList.ToArray();
+        }
+
+        /// <summary>
+        /// Converts bool array results to denied targets list for delivery reports
+        /// </summary>
+        internal ushort[] GetDeniedTargetsList(ushort[] sourceTargets)
+        {
+            var deniedList = new List<ushort>();
+            for (int i = 0; i < TargetCount && i < sourceTargets.Length; i++)
+            {
+                if (!AllowedTargets[i])
+                    deniedList.Add(sourceTargets[i]);
+            }
+            return deniedList.ToArray();
+        }
+    }
+
+    internal static class RpcValidationArrayPool
+    {
+        private static readonly ArrayPool<bool> boolArrayPool = new(10, 2, GONetEventBus.MAX_RPC_TARGETS, GONetEventBus.MAX_RPC_TARGETS);
+
+        internal static bool[] BorrowAllowedTargets()
+        {
+            return boolArrayPool.Borrow();
+        }
+
+        internal static void ReturnAllowedTargets(bool[] array)
+        {
+            boolArrayPool.Return(array);
         }
     }
 
@@ -411,6 +516,7 @@ namespace GONet
         public readonly bool IsFromMe;
         public readonly bool IsReliable;
         public readonly uint GONetParticipantId;
+        public RpcValidationContext ValidationContext { get; internal set; }
 
         // Constructor from envelope (for real RPC calls)
         internal GONetRpcContext(GONetEventEnvelope envelope)
@@ -421,6 +527,7 @@ namespace GONet
             IsFromMe = envelope.IsFromMe;
             IsReliable = envelope.IsReliable;
             GONetParticipantId = envelope.GONetParticipant?.GONetId ?? 0;
+            ValidationContext = default;
         }
 
         // Constructor for local execution (no envelope)
@@ -432,6 +539,28 @@ namespace GONet
             IsFromMe = true;
             IsReliable = isReliable;
             GONetParticipantId = gonetParticipantId;
+            ValidationContext = default;
+        }
+    }
+
+    /// <summary>
+    /// Context available during RPC validation containing source and target information.
+    /// Access via GONetEventBus.CurrentRpcContext.Value.ValidationContext
+    /// </summary>
+    public struct RpcValidationContext
+    {
+        public ushort SourceAuthorityId { get; set; }
+        public ushort[] TargetAuthorityIds { get; set; }
+        public int TargetCount { get; set; }
+        internal RpcValidationResult PreAllocatedResult { get; set; } // Internal only
+
+        /// <summary>
+        /// Gets the pre-allocated validation result for modification.
+        /// The bool array is already sized to TargetCount.
+        /// </summary>
+        public RpcValidationResult GetValidationResult()
+        {
+            return PreAllocatedResult;
         }
     }
 

@@ -1,12 +1,12 @@
-﻿using System;
+﻿using GONet;
+using MemoryPack;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
-using GONet;
-using MemoryPack;
 
 /// <summary>
 /// A comprehensive chat system for GONet that supports channels, direct messages, 
@@ -49,7 +49,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     // Chat State
     private List<ChatParticipant> participants = new List<ChatParticipant>();
     private List<ChatChannel> channels = new List<ChatChannel>();
-    private List<ChatMessage> currentMessages = new List<ChatMessage>();
+    private List<ChatMessage> allMessages = new List<ChatMessage>(); // Store ALL messages
     private HashSet<ushort> selectedParticipants = new HashSet<ushort>();
     private string activeChannel = "general";
     private ChatType currentChatMode = ChatType.Channel;
@@ -96,12 +96,18 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         });
     }
 
-    // Track our identity but DON'T add to participants yet
-    public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
+    public override void OnGONetParticipantStarted()
     {
-        base.OnGONetClientVsServerStatusKnown(isClient, isServer, myAuthorityId);
+        base.OnGONetParticipantStarted();
 
-        if (isClient)
+        // Now we have a valid GONetId and OwnerAuthorityId
+        localAuthorityId = GONetMain.MyAuthorityId;
+        localDisplayName = GONetMain.IsServer ? "Server" : $"Player_{localAuthorityId}";
+
+        // Don't add ourselves here - let OnGONetParticipantEnabled handle it
+
+        // If client, request current state from server after a short delay
+        if (!GONetMain.IsServer)
         {
             StartCoroutine(RequestStateAfterDelay());
         }
@@ -113,60 +119,49 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         CallRpc(nameof(RequestCurrentState));
     }
 
-    // ALL participants get added here, including ourselves
     public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
     {
         base.OnGONetParticipantEnabled(gonetParticipant);
 
-        if (!gonetParticipant.TryGetComponent(out GONetLocal gonetLocal))
-            return;
-
-        ushort authorityId = gonetLocal.OwnerAuthorityId;
-        if  (gonetParticipant.IsMine)
+        // Check if this participant has a GONetLocal component (represents a player)
+        if (gonetParticipant.TryGetComponent(out GONetLocal gonetLocal))
         {
-            localAuthorityId = gonetLocal.OwnerAuthorityId;
-        }
+            ushort authorityId = gonetLocal.OwnerAuthorityId;
 
-        if (authorityId == GONetMain.OwnerAuthorityId_Unset)
-        {
-            Debug.LogError($"[GONetChatSystem] OnGONetParticipantEnabled with unset authority!");
-            return;
-        }
+            // Skip if already tracked
+            if (participants.Any(p => p.AuthorityId == authorityId))
+                return;
 
-        if (participants.Any(p => p.AuthorityId == authorityId))
-            return;
+            string displayName = authorityId == 0 ? "Server" : $"Player_{authorityId}";
 
-        // Determine display name based on whether this participant is the server
-        bool isThisParticipantServer = (GONetMain.IsServer && authorityId == localAuthorityId);
-        string displayName = isThisParticipantServer ? "Server" : $"Player_{authorityId}";
-
-        var newParticipant = new ChatParticipant
-        {
-            AuthorityId = authorityId,
-            DisplayName = displayName,
-            IsServer = isThisParticipantServer,
-            Status = ConnectionStatus.Connected
-        };
-
-        participants.Add(newParticipant);
-
-        // Show join message (skip for ourselves on initial load)
-        if (authorityId != localAuthorityId)
-        {
-            var sysMsg = new ChatMessage
+            var newParticipant = new ChatParticipant
             {
-                Type = ChatType.System,
-                Content = $"{displayName} joined",
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                AuthorityId = authorityId,
+                DisplayName = displayName,
+                IsServer = authorityId == 0,
+                Status = ConnectionStatus.Connected
             };
-            currentMessages.Add(sysMsg);
-            TrimMessageHistory();
-        }
 
-        // Server broadcasts the updated list to all clients
-        if (GONetMain.IsServer)
-        {
-            CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
+            participants.Add(newParticipant);
+
+            // Show join message (skip for ourselves)
+            if (authorityId != localAuthorityId)
+            {
+                var sysMsg = new ChatMessage
+                {
+                    Type = ChatType.System,
+                    Content = $"{displayName} joined",
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
+                allMessages.Add(sysMsg);
+                TrimMessageHistory();
+            }
+
+            // Server broadcasts the updated list to all clients
+            if (GONetMain.IsServer)
+            {
+                CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
+            }
         }
     }
 
@@ -191,7 +186,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                     Content = $"{participant.DisplayName} disconnected",
                     Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 };
-                currentMessages.Add(sysMsg);
+                allMessages.Add(sysMsg);
                 TrimMessageHistory();
 
                 if (GONetMain.IsServer)
@@ -385,12 +380,58 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUI.skin.box, GUILayout.Height(300));
 
-        foreach (var message in currentMessages)
+        // Filter messages based on current view mode
+        var messagesToDisplay = GetFilteredMessages();
+
+        foreach (var message in messagesToDisplay)
         {
             DrawMessage(message);
         }
 
         GUILayout.EndScrollView();
+    }
+
+    private List<ChatMessage> GetFilteredMessages()
+    {
+        var filtered = new List<ChatMessage>();
+
+        switch (currentChatMode)
+        {
+            case ChatType.Channel:
+                // Show all messages for the active channel
+                filtered = allMessages.Where(m =>
+                    (m.Type == ChatType.Channel && m.ChannelName == activeChannel) ||
+                    m.Type == ChatType.System).ToList();
+                break;
+
+            case ChatType.DirectMessage:
+                // Show messages between us and the selected participant
+                if (selectedParticipants.Count > 0)
+                {
+                    var otherPartyId = selectedParticipants.First();
+                    filtered = allMessages.Where(m =>
+                        m.Type == ChatType.DirectMessage &&
+                        ((m.SenderId == localAuthorityId && m.Recipients.Contains(otherPartyId)) ||
+                         (m.SenderId == otherPartyId && m.Recipients.Contains(localAuthorityId)))).ToList();
+                }
+                break;
+
+            case ChatType.GroupMessage:
+                // Show messages for this specific group combination
+                if (selectedParticipants.Count > 1)
+                {
+                    var groupMembers = new HashSet<ushort>(selectedParticipants);
+                    groupMembers.Add(localAuthorityId);
+
+                    filtered = allMessages.Where(m =>
+                        m.Type == ChatType.GroupMessage &&
+                        m.Recipients != null &&
+                        new HashSet<ushort>(m.Recipients).SetEquals(groupMembers)).ToList();
+                }
+                break;
+        }
+
+        return filtered;
     }
 
     private void DrawMessage(ChatMessage message)
@@ -473,9 +514,26 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     internal void RequestCurrentState()
     {
         GONetRpcContext rpcContext = GONetEventBus.GetCurrentRpcContext();
+        ushort requestingAuthority = rpcContext.SourceAuthorityId;
+
+        // Ensure we have the requesting client in our list
+        if (!participants.Any(p => p.AuthorityId == requestingAuthority))
+        {
+            string displayName = requestingAuthority == 0 ? "Server" : $"Player_{requestingAuthority}";
+            participants.Add(new ChatParticipant
+            {
+                AuthorityId = requestingAuthority,
+                DisplayName = displayName,
+                IsServer = requestingAuthority == 0,
+                Status = ConnectionStatus.Connected
+            });
+
+            // Broadcast the updated list to ALL clients
+            CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
+        }
 
         // Send current state to the requesting client only
-        CurrentSingleTarget = rpcContext.SourceAuthorityId;
+        CurrentSingleTarget = requestingAuthority;
         CallRpc(nameof(ReceiveCurrentState), participants.ToArray(), channels.ToArray());
     }
 
@@ -552,7 +610,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             Content = $"Channel '{channel.Name}' created",
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
-        currentMessages.Add(sysMsg);
+        allMessages.Add(sysMsg);
         TrimMessageHistory();
     }
 
@@ -564,17 +622,15 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType)
     {
-        // Get context
-        var context = GONetEventBus.CurrentRpcContext;
-        if (!context.HasValue)
-        {
-            return new RpcDeliveryReport { FailureReason = "No RPC context" };
-        }
+        // Get context - this should always be available in an RPC
+        GONetRpcContext context = GONetEventBus.GetCurrentRpcContext();
+
+        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Received SendMessage RPC from {context.SourceAuthorityId}");
 
         var message = new ChatMessage
         {
-            SenderId = context.Value.SourceAuthorityId,
-            SenderName = GetParticipantName(context.Value.SourceAuthorityId),
+            SenderId = context.SourceAuthorityId,
+            SenderName = GetParticipantName(context.SourceAuthorityId),
             Content = content,
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             Type = messageType,
@@ -587,10 +643,37 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         return default;
     }
 
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY))]
+    internal async Task<RpcDeliveryReport> SendMessage_TEST()
+    {
+        return default;
+    }
+
+    internal RpcValidationResult ValidateMessage_TEST_EMPTY()
+    {
+        // Get the pre-allocated validation result and allow all targets
+        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
+        var result = validationContext.GetValidationResult();
+        result.AllowAll();
+        return result;
+    }
+
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY_VOID))]
+    internal void SendMessage_TEST_VOID()
+    {
+    }
+
+    internal RpcValidationResult ValidateMessage_TEST_EMPTY_VOID()
+    {
+        // Get the pre-allocated validation result and allow all targets
+        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
+        var result = validationContext.GetValidationResult();
+        result.AllowAll();
+        return result;
+    }
+
     void OnReceiveMessage(ChatMessage message)
     {
-        GONetLog.Debug($"[{(GONetMain.IsServer ? "Server" : "Client")}] OnReceiveMessage called - From: {message.SenderId}, Type: {message.Type}, ShouldDisplay will be calculated...");
-
         // Determine if we should display this message based on current view
         bool shouldDisplay = false;
 
@@ -619,53 +702,73 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         if (shouldDisplay)
         {
-            GONetLog.Debug($"[{(GONetMain.IsServer ? "Server" : "Client")}] Adding message to display - From: {message.SenderName} ({message.SenderId}), Type: {message.Type}, Channel: {message.ChannelName}, Content: {message.Content}");
-            currentMessages.Add(message);
+            allMessages.Add(message);
             TrimMessageHistory();
         }
     }
 
     // Server-side validation for all messages
-    internal RpcValidationResult ValidateMessage(ushort sourceAuthority, ushort[] targets, int count, byte[] messageData)
+    internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType)
     {
-        // Only validate if we're the server
-        if (!GONetMain.IsServer)
+        // Get the pre-allocated validation result from the context
+        var validationContext = GONetMain.EventBus.GetValidationContext();
+        if (!validationContext.HasValue)
         {
-            return RpcValidationResult.AllowAll(targets, count);
+            // Fallback if no validation context (shouldn't happen in normal flow)
+            var resultAllow = RpcValidationResult.CreatePreAllocated(1);
+            resultAllow.AllowAll();
+            return resultAllow;
         }
 
-        // Validate targets are connected
-        var validTargets = new List<ushort>();
-        var deniedTargets = new List<ushort>();
+        var result = validationContext.Value.GetValidationResult();
 
-        foreach (var target in targets.Take(count))
+        // Check which targets are connected and set the bool array accordingly
+        bool hasAnyDenied = false;
+        var targetAuthorityIds = validationContext.Value.TargetAuthorityIds;
+
+        for (int i = 0; i < validationContext.Value.TargetCount; i++)
         {
+            ushort target = targetAuthorityIds[i];
             if (participants.Any(p => p.AuthorityId == target && p.Status == ConnectionStatus.Connected))
             {
-                validTargets.Add(target);
+                result.AllowedTargets[i] = true;
             }
             else
             {
-                deniedTargets.Add(target);
+                result.AllowedTargets[i] = false;
+                hasAnyDenied = true;
             }
         }
 
-        // Here you could also deserialize messageData to filter profanity
-        // For now, we'll just validate targets
-
-        if (deniedTargets.Count > 0)
+        // Set denial reason if any targets were denied
+        if (hasAnyDenied)
         {
-            return new RpcValidationResult
-            {
-                AllowedTargets = validTargets.ToArray(),
-                AllowedCount = validTargets.Count,
-                DeniedTargets = deniedTargets.ToArray(),
-                DeniedCount = deniedTargets.Count,
-                DenialReason = "Some recipients are not connected"
-            };
+            result.DenialReason = "Some recipients are not connected";
         }
 
-        return RpcValidationResult.AllowAll(targets, count);
+        // Filter profanity from the message
+        try
+        {
+            string originalContent = content;
+            string filteredContent = FilterProfanity(content);
+
+            if (filteredContent != originalContent)
+            {
+                // Message was modified, need to serialize the modified data
+                content = filteredContent;
+                result.WasModified = true;
+
+                // Note: In a real implementation, you would need to serialize the modified
+                // RPC data structure with the filtered content and set result.ModifiedData
+                // This requires knowing the exact RPC data structure format
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to filter message content: {ex.Message}");
+        }
+
+        return result;
     }
 
     #endregion
@@ -681,23 +784,33 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         string finalContent = GONetMain.IsServer ? FilterProfanity(currentInputText) : currentInputText;
 
         // Set up targets based on mode
+        HashSet<ushort> uniqueTargets = new HashSet<ushort>(); // Use HashSet to prevent duplicates
+
         switch (currentChatMode)
         {
             case ChatType.Channel:
                 // For channels, target all participants
-                CurrentMessageTargets = participants.Select(p => p.AuthorityId).ToList();
+                foreach (var p in participants)
+                {
+                    uniqueTargets.Add(p.AuthorityId);
+                }
                 break;
 
             case ChatType.DirectMessage:
             case ChatType.GroupMessage:
                 // For DM/Group, use selected participants plus ourselves
-                CurrentMessageTargets = selectedParticipants.ToList();
-                if (!CurrentMessageTargets.Contains(localAuthorityId))
+                foreach (var target in selectedParticipants)
                 {
-                    CurrentMessageTargets.Add(localAuthorityId);
+                    uniqueTargets.Add(target);
                 }
+                uniqueTargets.Add(localAuthorityId); // Add ourselves
                 break;
         }
+
+        CurrentMessageTargets = uniqueTargets.ToList();
+
+        // Debug logging to help diagnose the issue
+        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Sending message to {CurrentMessageTargets.Count} targets: {string.Join(", ", CurrentMessageTargets)}");
 
         // Send using unified message system
         CallRpcAsync<RpcDeliveryReport, string, string, ChatType>(
@@ -711,6 +824,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 {
                     Debug.LogWarning($"Failed to deliver to some recipients: {task.Result.FailureReason}");
                 }
+
+                Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Message delivery report - Delivered to: {string.Join(", ", task.Result.DeliveredTo ?? new ushort[0])}");
             });
 
         currentInputText = "";
@@ -745,7 +860,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         // In a real implementation, you'd filter messages based on current view
         // For now, we'll just clear for demonstration
-        currentMessages.Clear();
+        allMessages.Clear();
     }
 
     private string GetParticipantName(ushort authorityId)
@@ -774,10 +889,10 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     private void TrimMessageHistory()
     {
-        // Keep only last 100 messages
-        if (currentMessages.Count > 100)
+        // Keep only last 500 messages total (increased for persistence)
+        if (allMessages.Count > 500)
         {
-            currentMessages.RemoveRange(0, currentMessages.Count - 100);
+            allMessages.RemoveRange(0, allMessages.Count - 500);
         }
     }
 
