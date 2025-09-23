@@ -478,6 +478,67 @@ namespace GONet
             currentRpcContext = context;
         }
 
+        private RpcValidationContext currentValidationContext;
+
+        /// <summary>
+        /// Sets the validation context for the current thread. Used internally by validation framework.
+        /// </summary>
+        internal void SetValidationContext(RpcValidationContext context)
+        {
+            currentValidationContext = context;
+        }
+
+        /// <summary>
+        /// Clears the validation context for the current thread. Used internally by validation framework.
+        /// </summary>
+        internal void ClearValidationContext()
+        {
+            currentValidationContext = default;
+        }
+
+        /// <summary>
+        /// Gets the current validation context. Only valid during RPC validation.
+        /// </summary>
+        internal RpcValidationContext? GetValidationContext()
+        {
+            return currentValidationContext.TargetAuthorityIds != null ? currentValidationContext : null;
+        }
+
+        /// <summary>
+        /// Invokes a validator delegate based on its parameter count
+        /// </summary>
+        private RpcValidationResult InvokeValidator(object validatorObj, int paramCount, object instance, ushort sourceAuthority, ushort[] targets, int targetCount, byte[] data)
+        {
+            try
+            {
+                switch (paramCount)
+                {
+                    case 0:
+                        var validator0 = (Func<object, ushort, ushort[], int, RpcValidationResult>)validatorObj;
+                        return validator0(instance, sourceAuthority, targets, targetCount);
+
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                        var validatorN = (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)validatorObj;
+                        return validatorN(instance, sourceAuthority, targets, targetCount, data);
+
+                    default:
+                        throw new InvalidOperationException($"Validator with {paramCount} parameters is not supported");
+                }
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"Error invoking validator: {ex}");
+                // Return default allow-all result on error
+                var result = RpcValidationResult.CreatePreAllocated(targetCount);
+                result.AllowAll();
+                return result;
+            }
+        }
+
+
         private readonly Dictionary<Type, Dictionary<string, Func<object, ushort[], int>>> multiTargetBufferAccessorsByType = new();
         private readonly Dictionary<Type, Dictionary<string, Func<object, ushort, ushort[], int, int>>> spanValidatorsByType = new();
         private readonly Dictionary<Type, Dictionary<string, RpcMetadata>> rpcMetadata = new();
@@ -486,7 +547,7 @@ namespace GONet
         /// </summary>
         private Dictionary<Type, Dictionary<string, RpcMetadata>> rpcMetadataByType => rpcMetadata;
         private readonly ArrayPool<ushort> targetAuthorityArrayPool = new(10, 5, 16, 128);
-        private const int MAX_RPC_TARGETS = 64;
+        internal const int MAX_RPC_TARGETS = 64;
 
         private readonly Dictionary<ulong, RpcValidationResult> storedValidationReports = new();
         private readonly Queue<(ulong id, long timestamp)> validationReportQueue = new();
@@ -494,7 +555,8 @@ namespace GONet
         private const int MAX_STORED_REPORTS = 1000;
         private const long REPORT_RETENTION_TICKS = 60 * 60; // 1 minute at 60 ticks/sec
 
-        private readonly Dictionary<Type, Dictionary<string, Func<object, ushort, ushort[], int, byte[], RpcValidationResult>>> enhancedValidatorsByType = new();
+        private readonly Dictionary<Type, Dictionary<string, object>> enhancedValidatorsByType = new();
+        private readonly Dictionary<Type, Dictionary<string, int>> validatorParameterCounts = new();
 
         // For tracking pending delivery reports
         private readonly Dictionary<long, TaskCompletionSource<RpcDeliveryReport>> pendingDeliveryReports = new();
@@ -502,9 +564,10 @@ namespace GONet
 
 
         // Registration method for enhanced validators
-        public void RegisterEnhancedValidators(Type type, Dictionary<string, Func<object, ushort, ushort[], int, byte[], RpcValidationResult>> validators)
+        public void RegisterEnhancedValidators(Type type, Dictionary<string, object> validators, Dictionary<string, int> parameterCounts)
         {
             enhancedValidatorsByType[type] = validators;
+            validatorParameterCounts[type] = parameterCounts;
         }
 
         // Send delivery report back to caller
@@ -935,27 +998,58 @@ namespace GONet
             if (!rpcMetadataByType.TryGetValue(componentType, out var metadata) ||
                 !metadata.TryGetValue(methodName, out var rpcMeta)) return;
 
-            // Validate and route
+            // Validate and route using enhanced validation system
             var targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
             try
             {
                 Array.Copy(evt.TargetAuthorities, targetBuffer, evt.TargetCount);
-                int validCount = ValidateTargetsInPlace(component, methodName, sourceAuthority, targetBuffer, evt.TargetCount, rpcMeta);
+
+                // Use enhanced validation system for profanity filtering and other validation
+                RpcValidationResult validationResult;
+                if (enhancedValidatorsByType.TryGetValue(componentType, out var validators) &&
+                    validators.TryGetValue(methodName, out var validatorObj) &&
+                    validatorParameterCounts.TryGetValue(componentType, out var paramCounts) &&
+                    paramCounts.TryGetValue(methodName, out var paramCount))
+                {
+                    // Invoke enhanced validator (with profanity filtering)
+                    validationResult = InvokeValidator(validatorObj, paramCount, component, sourceAuthority, targetBuffer, evt.TargetCount, evt.Data);
+                }
+                else
+                {
+                    // Fallback to basic connection validation
+                    validationResult = RpcValidationResult.CreatePreAllocated(evt.TargetCount);
+                    for (int i = 0; i < evt.TargetCount; i++)
+                    {
+                        validationResult.AllowedTargets[i] = (targetBuffer[i] == GONetMain.MyAuthorityId || IsValidConnectedClient(targetBuffer[i]));
+                    }
+                }
+
+                // Use modified data if validation changed the content
+                byte[] dataToUse = validationResult.ModifiedData ?? evt.Data;
 
                 // Route to validated targets
-                for (int i = 0; i < validCount; i++)
+                for (int i = 0; i < validationResult.TargetCount; i++)
                 {
-                    var rpcEvent = RpcEvent.Borrow();
-                    rpcEvent.RpcId = evt.RpcId;
-                    rpcEvent.GONetId = evt.GONetId;
-                    rpcEvent.Data = evt.Data;
-                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    rpcEvent.IsSingularRecipientOnly = true;
-                        
-                    Publish(
-                        rpcEvent, 
-                        targetClientAuthorityId: targetBuffer[i], 
-                        shouldPublishReliably: rpcMeta.IsReliable);
+                    if (validationResult.AllowedTargets[i])
+                    {
+                        var rpcEvent = RpcEvent.Borrow();
+                        rpcEvent.RpcId = evt.RpcId;
+                        rpcEvent.GONetId = evt.GONetId;
+                        rpcEvent.Data = dataToUse;
+                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        rpcEvent.IsSingularRecipientOnly = true;
+
+                        Publish(
+                            rpcEvent,
+                            targetClientAuthorityId: targetBuffer[i],
+                            shouldPublishReliably: rpcMeta.IsReliable);
+                    }
+                }
+
+                // Return validation result arrays to pool
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
                 }
             }
             finally
@@ -1570,50 +1664,8 @@ namespace GONet
 
         private RpcValidationResult Server_DefaultValidation(ushort[] targetBuffer, int targetCount)
         {
-            RpcValidationResult result = new();
-
-            // Rent arrays from pool for building allowed/denied lists
-            ushort[] allowedBuffer = targetAuthorityArrayPool.Borrow(targetCount);
-            ushort[] deniedBuffer = targetAuthorityArrayPool.Borrow(targetCount);
-            int allowedCount = 0;
-            int deniedCount = 0;
-
-            try
-            {
-                for (int i = 0; i < targetCount; i++)
-                {
-                    ushort targetAuthorityId = targetBuffer[i];
-                    if (targetAuthorityId == GONetMain.MyAuthorityId || IsValidConnectedClient(targetAuthorityId))
-                    {
-                        allowedBuffer[allowedCount++] = targetAuthorityId;
-                    }
-                    else
-                    {
-                        deniedBuffer[deniedCount++] = targetAuthorityId;
-                    }
-                }
-
-                // Copy to result - only copy what we actually used
-                result.AllowedTargets = new ushort[allowedCount];
-                if (allowedCount > 0)
-                    Array.Copy(allowedBuffer, result.AllowedTargets, allowedCount);
-
-                result.AllowedCount = allowedCount;
-
-                if (deniedCount > 0)
-                {
-                    result.DeniedTargets = new ushort[deniedCount];
-                    Array.Copy(deniedBuffer, result.DeniedTargets, deniedCount);
-                    result.DeniedCount = deniedCount;
-                    result.DenialReason = "Target(s) not connected";
-                }
-            }
-            finally
-            {
-                targetAuthorityArrayPool.Return(allowedBuffer);
-                targetAuthorityArrayPool.Return(deniedBuffer);
-            }
-
+            var result = RpcValidationResult.CreatePreAllocated(targetCount);
+            result.AllowAll(); // Default allows all targets
             return result;
         }
 
@@ -1740,9 +1792,11 @@ namespace GONet
                     // Enhanced validation (no data to pass for 0-param)
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
                     }
                     else
                     {
@@ -1752,7 +1806,8 @@ namespace GONet
 
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -1762,19 +1817,16 @@ namespace GONet
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
 
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
 
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
@@ -1782,13 +1834,11 @@ namespace GONet
 
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
                             break;
                         }
                     }
@@ -1799,16 +1849,16 @@ namespace GONet
                     }
 
                     // Send to allowed targets (no data for 0-param)
-                    if (validationResult.AllowedCount > 0)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        for (int i = 0; i < validationResult.AllowedCount; i++)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
                             var rpcEvent = RpcEvent.Borrow();
                             rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
                             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
                             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                             rpcEvent.IsSingularRecipientOnly = true;
-                            Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                            Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                         }
                     }
                 }
@@ -1987,9 +2037,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -1999,7 +2051,8 @@ namespace GONet
 
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -2009,19 +2062,16 @@ namespace GONet
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
 
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
 
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
@@ -2032,13 +2082,12 @@ namespace GONet
 
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -2049,7 +2098,7 @@ namespace GONet
                     }
 
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -2060,7 +2109,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
 
                     if (needsReturn)
@@ -2233,9 +2282,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -2244,7 +2295,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -2252,18 +2304,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -2271,13 +2321,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -2286,7 +2335,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -2296,7 +2345,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -2468,9 +2517,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -2479,7 +2530,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -2487,18 +2539,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -2506,13 +2556,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -2521,7 +2570,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -2531,7 +2580,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -2703,9 +2752,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -2714,7 +2765,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -2722,18 +2774,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -2741,13 +2791,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -2756,7 +2805,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -2766,7 +2815,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -2938,9 +2987,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -2949,7 +3000,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -2957,18 +3009,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -2976,13 +3026,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -2991,7 +3040,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -3001,7 +3050,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -3173,9 +3222,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -3184,7 +3235,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -3192,18 +3244,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3211,13 +3261,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -3226,7 +3275,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -3236,7 +3285,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -3408,9 +3457,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -3419,7 +3470,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -3427,18 +3479,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3446,13 +3496,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -3461,7 +3510,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -3471,7 +3520,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -3643,9 +3692,11 @@ namespace GONet
                     // Enhanced validation
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serializedOriginal);
                     }
                     else
                     {
@@ -3654,7 +3705,8 @@ namespace GONet
                     }
                     // Store the full report if there was validation
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
@@ -3662,18 +3714,16 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                         var report = new RpcDeliveryReport
                         {
-                            DeliveredTo = new ushort[validationResult.AllowedCount],
-                            FailedDelivery = new ushort[validationResult.DeniedCount],
+                            DeliveredTo = allowedTargets,
+                            FailedDelivery = deniedTargets,
                             FailureReason = validationResult.DenialReason,
                             WasModified = validationResult.ModifiedData != null,
                             ValidationReportId = reportId
                         };
-                        if (validationResult.AllowedCount > 0)
-                            Array.Copy(validationResult.AllowedTargets, report.DeliveredTo, validationResult.AllowedCount);
-                        if (validationResult.DeniedCount > 0)
-                            Array.Copy(validationResult.DeniedTargets, report.FailedDelivery, validationResult.DeniedCount);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3681,13 +3731,12 @@ namespace GONet
                     byte[] dataToSend = validationResult.ModifiedData ?? serializedOriginal;
                     // Execute locally if server is a target
                     bool serverIsTarget = false;
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
                             serverIsTarget = true;
-                            // Remove from list
-                            validationResult.AllowedTargets[i] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                            // Don't need to remove from bool array, just skip it later
                             break;
                         }
                     }
@@ -3696,7 +3745,7 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
                     }
                     // Send to allowed targets
-                    for (int i = 0; i < validationResult.AllowedCount; i++)
+                    for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                         Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
@@ -3706,7 +3755,7 @@ namespace GONet
                         rpcEvent.Data = serializedCopy;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i], shouldPublishReliably: metadata.IsReliable);
+                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                     }
                     if (needsReturn)
                     {
@@ -5020,9 +5069,11 @@ namespace GONet
                     // Validate targets
                     RpcValidationResult validationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                        validators.TryGetValue(methodName, out var validator))
+                        validators.TryGetValue(methodName, out var validatorObj) &&
+                        validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                        paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
+                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
                     }
                     else
                     {
@@ -5031,15 +5082,16 @@ namespace GONet
 
                     // Store validation report if significant
                     ulong reportId = 0;
-                    if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
                     {
                         reportId = StoreValidationReport(validationResult);
                     }
 
                     // Route to allowed targets
-                    if (validationResult.AllowedCount > 0)
+                    if (validationResult.TargetCount > 0)
                     {
-                        for (int i = 0; i < validationResult.AllowedCount; i++)
+                        for (int i = 0; i < validationResult.TargetCount; i++)
                         {
                             var rpcEvent = RpcEvent.Borrow();
                             rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
@@ -5047,16 +5099,18 @@ namespace GONet
                             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                             rpcEvent.IsSingularRecipientOnly = true;
 
-                            Publish(rpcEvent, targetClientAuthorityId: validationResult.AllowedTargets[i],
+                            Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i],
                                 shouldPublishReliably: metadata.IsReliable);
                         }
                     }
 
                     // Create delivery report
+                    var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+
                     var deliveryReport = new RpcDeliveryReport
                     {
-                        DeliveredTo = validationResult.AllowedTargets ?? Array.Empty<ushort>(),
-                        FailedDelivery = validationResult.DeniedTargets ?? Array.Empty<ushort>(),
+                        DeliveredTo = allowedTargets,
+                        FailedDelivery = deniedTargets,
                         FailureReason = validationResult.DenialReason,
                         WasModified = validationResult.ModifiedData != null,
                         ValidationReportId = reportId
@@ -5545,47 +5599,59 @@ namespace GONet
         /// Reusable method to handle server-side logi
         /// NOTE: <paramref name="targetBuffer"/> MIGHT include the server itself as a target!
         /// </summary>
+        /// <summary>
+        /// Reusable method to handle server-side logic
+        /// NOTE: <paramref name="targetBuffer"/> MIGHT include the server itself as a target!
+        /// </summary>
         private RpcDeliveryReport Server_SendToValidatedTargetsWithDataDoReporting(
-            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata, 
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
             ushort[] targetBuffer, int targetCount,
             byte[] serialized, int bytesUsed, bool needsReturn)
         {
-            // Validate targets
+            // Validate targets using parameter-specific delegates
             RpcValidationResult validationResult;
             if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
-                validators.TryGetValue(methodName, out var validator))
+                validators.TryGetValue(methodName, out var validatorObj) &&
+                validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                paramCounts.TryGetValue(methodName, out var paramCount))
             {
-                validationResult = validator(instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
+                // Invoke validator based on parameter count
+                validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
             }
             else
             {
-                validationResult = Server_DefaultValidation(targetBuffer, targetCount);
+                // Default validation - allow all
+                validationResult = RpcValidationResult.CreatePreAllocated(targetCount);
+                validationResult.AllowAll();
+            }
+
+            // Convert bool array to allowed/denied lists
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
             }
 
             // Store validation report if significant
             ulong reportId = 0;
-            if (validationResult.DeniedCount > 0 || validationResult.ModifiedData != null)
+            if (deniedList.Count > 0 || validationResult.ModifiedData != null)
             {
+                // Store the full validation result for later retrieval
                 reportId = StoreValidationReport(validationResult);
             }
 
             try
             {
-                // 1. Check if server is a target and execute ONCE locally
-                bool serverIsTarget = false;
-                int serverTargetIndex = -1;
-                for (int i = 0; i < validationResult.AllowedCount; i++)
-                {
-                    if (validationResult.AllowedTargets[i] == GONetMain.MyAuthorityId)
-                    {
-                        serverIsTarget = true;
-                        serverTargetIndex = i;
-                        break;
-                    }
-                }
-
                 // Use the validated/modified data if available
                 byte[] dataToUse = validationResult.ModifiedData ?? serialized;
+
+                // 1. Check if server is a target and execute ONCE locally
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
 
                 if (serverIsTarget)
                 {
@@ -5599,12 +5665,12 @@ namespace GONet
                     // Publish with self as target - this executes local handlers
                     Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
 
-                    // Remove server from targets array so we don't send to it again
-                    validationResult.AllowedTargets[serverTargetIndex] = validationResult.AllowedTargets[--validationResult.AllowedCount];
+                    // Remove server from allowed list for remote sending
+                    allowedList.Remove(GONetMain.MyAuthorityId);
                 }
 
                 // 2. Send directly to remote clients WITHOUT triggering local handlers
-                if (validationResult.AllowedCount > 0)
+                if (allowedList.Count > 0)
                 {
                     var remoteEvent = RpcEvent.Borrow();
                     remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
@@ -5614,13 +5680,14 @@ namespace GONet
                     remoteEvent.IsSingularRecipientOnly = true;
 
                     // Send to all remote targets efficiently
+                    var allowedArray = allowedList.ToArray();
                     GONetMain.Server_SendEventToSpecificRemoteConnections(
                         remoteEvent,
-                        validationResult.AllowedTargets,
-                        validationResult.AllowedCount,
+                        allowedArray,
+                        allowedArray.Length,
                         metadata.IsReliable);
 
-                    remoteEvent.Return(); // Return event to pool manually since not being auto self returned like if sent through Publish (like above)
+                    remoteEvent.Return(); // Return event to pool manually
                 }
             }
             finally
@@ -5629,19 +5696,23 @@ namespace GONet
                 {
                     SerializationUtils.ReturnByteArray(serialized);
                 }
+
+                // Return the bool array to the pool
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
             }
 
             // Create delivery report
-            var deliveryReport = new RpcDeliveryReport
+            return new RpcDeliveryReport
             {
-                DeliveredTo = validationResult.AllowedTargets ?? Array.Empty<ushort>(),
-                FailedDelivery = validationResult.DeniedTargets ?? Array.Empty<ushort>(),
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
                 FailureReason = validationResult.DenialReason,
                 WasModified = validationResult.ModifiedData != null,
                 ValidationReportId = reportId
             };
-
-            return deliveryReport;
         }
 
         // Reusable method to handle client-side logic
