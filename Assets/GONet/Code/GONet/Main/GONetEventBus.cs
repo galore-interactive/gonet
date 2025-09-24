@@ -478,7 +478,12 @@ namespace GONet
             currentRpcContext = context;
         }
 
-        private RpcValidationContext currentValidationContext;
+        /// <summary>
+        /// Thread-static validation context. Each thread processing RPCs has its own validation context
+        /// to avoid conflicts when multiple RPCs are validated simultaneously.
+        /// </summary>
+        [ThreadStatic]
+        private static RpcValidationContext currentValidationContext;
 
         /// <summary>
         /// Sets the validation context for the current thread. Used internally by validation framework.
@@ -498,6 +503,7 @@ namespace GONet
 
         /// <summary>
         /// Gets the current validation context. Only valid during RPC validation.
+        /// Thread-safe access to the current thread's validation context.
         /// </summary>
         internal RpcValidationContext? GetValidationContext()
         {
@@ -505,37 +511,152 @@ namespace GONet
         }
 
         /// <summary>
-        /// Invokes a validator delegate based on its parameter count
+        /// Attempts to get a cached validation result for read-only scenarios.
+        /// Only caches results that don't modify data and have simple authority-based validation.
         /// </summary>
+        /// <param name="cacheKey">Unique key identifying this validation scenario</param>
+        /// <param name="targetCount">Number of targets being validated</param>
+        /// <param name="cachedResult">The cached result if found and valid</param>
+        /// <returns>True if a valid cached result was found</returns>
+        private bool TryGetCachedValidationResult(string cacheKey, int targetCount, out RpcValidationResult cachedResult)
+        {
+            cachedResult = default;
+
+            if (validationResultCache.TryGetValue(cacheKey, out var cached) && cached.IsValid)
+            {
+                // Create a new result using the cached data
+                cachedResult = RpcValidationResult.CreatePreAllocated(targetCount);
+
+                // Copy cached results
+                for (int i = 0; i < Math.Min(targetCount, cached.AllowedTargets.Length); i++)
+                {
+                    cachedResult.AllowedTargets[i] = cached.AllowedTargets[i];
+                }
+
+                cachedResult.DenialReason = cached.DenialReason;
+                cachedResult.WasModified = cached.WasModified;
+
+                return true;
+            }
+
+            // Cleanup cache periodically
+            PerformCacheCleanupIfNeeded();
+            return false;
+        }
+
+        /// <summary>
+        /// Caches a validation result for future reuse (only for read-only, non-modifying validations)
+        /// </summary>
+        /// <param name="cacheKey">Unique key for this validation scenario</param>
+        /// <param name="result">The validation result to cache</param>
+        private void CacheValidationResult(string cacheKey, RpcValidationResult result)
+        {
+            // Only cache non-modifying results to avoid stale data issues
+            if (result.WasModified) return;
+
+            // Don't cache if we're at capacity
+            if (validationResultCache.Count >= MAX_CACHED_RESULTS) return;
+
+            var cached = new CachedValidationResult
+            {
+                AllowedTargets = new bool[result.TargetCount],
+                DenialReason = result.DenialReason,
+                WasModified = result.WasModified,
+                CachedAtTicks = DateTime.UtcNow.Ticks
+            };
+
+            // Copy the results
+            for (int i = 0; i < result.TargetCount; i++)
+            {
+                cached.AllowedTargets[i] = result.AllowedTargets[i];
+            }
+
+            validationResultCache.TryAdd(cacheKey, cached);
+        }
+
+        /// <summary>
+        /// Removes expired entries from the validation result cache
+        /// </summary>
+        private void PerformCacheCleanupIfNeeded()
+        {
+            long currentTicks = DateTime.UtcNow.Ticks;
+            if (currentTicks - lastCacheCleanup < CACHE_CLEANUP_INTERVAL_TICKS) return;
+
+            lock (cacheCleanupLock)
+            {
+                // Double-check after acquiring lock
+                if (currentTicks - lastCacheCleanup < CACHE_CLEANUP_INTERVAL_TICKS) return;
+
+                var expiredKeys = new List<string>();
+                foreach (var kvp in validationResultCache)
+                {
+                    if (!kvp.Value.IsValid)
+                        expiredKeys.Add(kvp.Key);
+                }
+
+                foreach (var key in expiredKeys)
+                {
+                    validationResultCache.TryRemove(key, out _);
+                }
+
+                lastCacheCleanup = currentTicks;
+            }
+        }
+
+        /// <summary>
+        /// Invokes a validator delegate based on its parameter count.
+        /// Uses caching to eliminate reflection overhead for repeated calls.
+        /// </summary>
+        /// <param name="validatorObj">The validator delegate object</param>
+        /// <param name="paramCount">Number of parameters the RPC method has</param>
+        /// <param name="instance">The component instance to validate on</param>
+        /// <param name="sourceAuthority">Authority ID of the RPC sender</param>
+        /// <param name="targets">Array of target authority IDs</param>
+        /// <param name="targetCount">Number of valid targets in the array</param>
+        /// <param name="data">Serialized RPC parameter data (null for 0-param methods)</param>
+        /// <returns>Validation result indicating which targets are allowed/denied</returns>
         private RpcValidationResult InvokeValidator(object validatorObj, int paramCount, object instance, ushort sourceAuthority, ushort[] targets, int targetCount, byte[] data)
         {
             try
             {
-                switch (paramCount)
+                // Create cache key for this validator
+                string cacheKey = $"{instance.GetType().Name}_{validatorObj.GetHashCode()}";
+
+                // Try to get compiled validator from cache
+                var compiledValidator = compiledValidatorCache.GetOrAdd(cacheKey, key =>
                 {
-                    case 0:
-                        var validator0 = (Func<object, ushort, ushort[], int, RpcValidationResult>)validatorObj;
-                        return validator0(instance, sourceAuthority, targets, targetCount);
+                    var compiled = new CompiledValidator { ParameterCount = paramCount };
 
-                    case 1:
-                    case 2:
-                    case 3:
-                    case 4:
-                    case 5:
-                    case 6:
-                    case 7:
-                    case 8:
-                        var validatorN = (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)validatorObj;
-                        return validatorN(instance, sourceAuthority, targets, targetCount, data);
-
-                    default:
+                    if (paramCount == 0)
+                    {
+                        compiled.Validator0Param = (Func<object, ushort, ushort[], int, RpcValidationResult>)validatorObj;
+                    }
+                    else if (paramCount <= 8)
+                    {
+                        compiled.ValidatorNParam = (Func<object, ushort, ushort[], int, byte[], RpcValidationResult>)validatorObj;
+                    }
+                    else
+                    {
                         throw new InvalidOperationException($"Validator with {paramCount} parameters is not supported. Maximum is 8 parameters.");
+                    }
+
+                    return compiled;
+                });
+
+                // Use cached compiled validator for fast invocation
+                if (compiledValidator.ParameterCount == 0)
+                {
+                    return compiledValidator.Validator0Param(instance, sourceAuthority, targets, targetCount);
+                }
+                else
+                {
+                    return compiledValidator.ValidatorNParam(instance, sourceAuthority, targets, targetCount, data);
                 }
             }
             catch (Exception ex)
             {
-                GONetLog.Error($"Error invoking validator: {ex}");
-                // Return default allow-all result on error
+                GONetLog.Error($"Error invoking validator for {instance.GetType().Name}: {ex}");
+                // Return default allow-all result on error to maintain RPC functionality
                 var result = RpcValidationResult.CreatePreAllocated(targetCount);
                 result.AllowAll();
                 return result;
@@ -559,19 +680,62 @@ namespace GONet
         private const int MAX_STORED_REPORTS = 1000;
         private const long REPORT_RETENTION_TICKS = 60 * 60; // 1 minute at 60 ticks/sec
 
-        private readonly Dictionary<Type, Dictionary<string, object>> enhancedValidatorsByType = new();
-        private readonly Dictionary<Type, Dictionary<string, int>> validatorParameterCounts = new();
+        // Thread-safe concurrent collections for validation data accessed from multiple threads during RPC processing
+        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, object>> enhancedValidatorsByType = new();
+        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, int>> validatorParameterCounts = new();
+
+        // Performance optimization: Cache compiled validators to eliminate reflection overhead
+        private readonly ConcurrentDictionary<string, CompiledValidator> compiledValidatorCache = new();
+
+        // Result caching for read-only validation scenarios (e.g., authority checks)
+        private readonly ConcurrentDictionary<string, CachedValidationResult> validationResultCache = new();
+        private readonly object cacheCleanupLock = new object();
+        private long lastCacheCleanup = 0;
+        private const long CACHE_CLEANUP_INTERVAL_TICKS = 30 * TimeSpan.TicksPerSecond; // 30 seconds in DateTime.Ticks (100ns units)
+        private const int MAX_CACHED_RESULTS = 1000;
+
+        /// <summary>
+        /// Cached validator information for fast lookup without reflection
+        /// </summary>
+        private struct CompiledValidator
+        {
+            public Func<object, ushort, ushort[], int, RpcValidationResult> Validator0Param;
+            public Func<object, ushort, ushort[], int, byte[], RpcValidationResult> ValidatorNParam;
+            public int ParameterCount;
+        }
+
+        /// <summary>
+        /// Cached validation result for repeated scenarios with identical parameters
+        /// </summary>
+        private struct CachedValidationResult
+        {
+            public bool[] AllowedTargets;
+            public string DenialReason;
+            public bool WasModified;
+            public long CachedAtTicks;
+            public bool IsValid => (DateTime.UtcNow.Ticks - CachedAtTicks) < CACHE_CLEANUP_INTERVAL_TICKS;
+        }
 
         // For tracking pending delivery reports
         private readonly Dictionary<long, TaskCompletionSource<RpcDeliveryReport>> pendingDeliveryReports = new();
         private readonly Dictionary<uint, Type> componentTypeByRpcId = new();
 
 
-        // Registration method for enhanced validators
+        /// <summary>
+        /// Registers enhanced validation delegates for a component type.
+        /// Thread-safe registration of parameter-specific validators.
+        /// </summary>
+        /// <param name="type">Component type to register validators for</param>
+        /// <param name="validators">Dictionary of method name to validator delegate</param>
+        /// <param name="parameterCounts">Dictionary of method name to parameter count</param>
         public void RegisterEnhancedValidators(Type type, Dictionary<string, object> validators, Dictionary<string, int> parameterCounts)
         {
-            enhancedValidatorsByType[type] = validators;
-            validatorParameterCounts[type] = parameterCounts;
+            // Convert to concurrent dictionaries for thread-safe access during RPC processing
+            var concurrentValidators = new ConcurrentDictionary<string, object>(validators);
+            var concurrentParamCounts = new ConcurrentDictionary<string, int>(parameterCounts);
+
+            enhancedValidatorsByType.AddOrUpdate(type, concurrentValidators, (key, existing) => concurrentValidators);
+            validatorParameterCounts.AddOrUpdate(type, concurrentParamCounts, (key, existing) => concurrentParamCounts);
         }
 
         // Send delivery report back to caller

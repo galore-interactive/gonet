@@ -21,31 +21,136 @@ using System.Threading.Tasks;
 
 namespace GONet
 {
+    /// <summary>
+    /// Base class for all GONet RPC attributes. Provides common configuration options for RPC behavior.
+    /// </summary>
+    /// <remarks>
+    /// This abstract class defines the fundamental properties that control how RPCs are transmitted and processed:
+    /// <list type="bullet">
+    /// <item><description><b>IsMineRequired</b>: Whether the RPC can only be called on objects owned by the caller</description></item>
+    /// <item><description><b>IsReliable</b>: Whether the RPC uses reliable UDP transmission (guaranteed delivery)</description></item>
+    /// <item><description><b>IsPersistent</b>: Whether the RPC is stored and sent to late-joining clients</description></item>
+    /// </list>
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public abstract class GONetRpcAttribute : Attribute
     {
+        /// <summary>
+        /// Gets or sets whether this RPC can only be called on objects owned by the caller.
+        /// When true, prevents clients from calling RPCs on objects they don't own.
+        /// Default: false (allows calls on any object)
+        /// </summary>
         public bool IsMineRequired { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets whether this RPC uses reliable UDP transmission.
+        /// Reliable RPCs are guaranteed to arrive but may have higher latency.
+        /// Default: true (reliable transmission)
+        /// </summary>
         public bool IsReliable { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets whether this RPC is stored and automatically sent to late-joining clients.
+        /// Useful for state-setting RPCs that new players need to receive.
+        /// Default: false (not persistent)
+        /// </summary>
         public bool IsPersistent { get; set; } = false;
     }
 
     /// <summary>
-    /// Client to server RPC with possible relay to other clients as well.
+    /// Marks a method as a Server RPC that can be called by clients to execute on the server.
+    /// Optionally supports relaying the call to other clients after server processing.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Basic Server RPC (Client → Server only):</b></para>
+    /// <code>
+    /// [ServerRpc]
+    /// void RequestPickupItem(int itemId)
+    /// {
+    ///     // This runs on the server when called by a client
+    ///     if (CanPickupItem(itemId))
+    ///     {
+    ///         GiveItemToPlayer(itemId);
+    ///     }
+    /// }
+    /// </code>
+    ///
+    /// <para><b>Server RPC with Relay (Client → Server → All Clients):</b></para>
+    /// <code>
+    /// [ServerRpc(Relay = RelayMode.All)]
+    /// void BroadcastPlayerAction(string action)
+    /// {
+    ///     // Server validates, then relays to all clients
+    ///     if (IsValidAction(action))
+    ///     {
+    ///         // This will be sent to all clients after server processing
+    ///     }
+    /// }
+    /// </code>
+    ///
+    /// <para><b>Security Note:</b></para>
+    /// <para>ServerRpcs have <c>IsMineRequired = true</c> by default for security.
+    /// Clients can only call ServerRpcs on objects they own unless explicitly disabled.</para>
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ServerRpcAttribute : GONetRpcAttribute
     {
+        /// <summary>
+        /// Gets or sets whether the server should relay this RPC to other clients after processing.
+        /// Default: RelayMode.None (server only, no relay to clients)
+        /// </summary>
         public RelayMode Relay { get; set; } = RelayMode.None;
 
+        /// <summary>
+        /// Initializes a new ServerRpcAttribute with secure defaults.
+        /// Sets IsMineRequired = true to prevent unauthorized access to other players' objects.
+        /// </summary>
         public ServerRpcAttribute()
         {
-            IsMineRequired = true; // Safe default
+            IsMineRequired = true; // Safe default - clients can only call on objects they own
         }
     }
 
     /// <summary>
-    /// Server to all clients RPC
+    /// Marks a method as a Client RPC that can be called by the server to execute on all connected clients.
+    /// Client RPCs are typically used to update client state, play effects, or synchronize game events.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Basic Client RPC Usage:</b></para>
+    /// <code>
+    /// [ClientRpc]
+    /// void ShowExplosionEffect(Vector3 position, float radius)
+    /// {
+    ///     // This runs on all clients when called by the server
+    ///     PlayExplosionAnimation(position, radius);
+    ///     PlayExplosionSound(position);
+    /// }
+    ///
+    /// // Call from server code:
+    /// CallRpc(nameof(ShowExplosionEffect), explosionPos, blastRadius);
+    /// </code>
+    ///
+    /// <para><b>State Synchronization Example:</b></para>
+    /// <code>
+    /// [ClientRpc]
+    /// void UpdatePlayerHealth(int newHealth, int maxHealth)
+    /// {
+    ///     // Update UI on all clients
+    ///     healthBar.SetValue(newHealth, maxHealth);
+    ///
+    ///     if (newHealth &lt;= 0)
+    ///         ShowDeathEffect();
+    /// }
+    /// </code>
+    ///
+    /// <para><b>Key Characteristics:</b></para>
+    /// <list type="bullet">
+    /// <item><description>Only the server can call Client RPCs</description></item>
+    /// <item><description>Sent to all connected clients automatically</description></item>
+    /// <item><description>Ideal for visual effects, UI updates, and state synchronization</description></item>
+    /// <item><description>Uses reliable transmission by default (IsReliable = true)</description></item>
+    /// </list>
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
@@ -202,22 +307,75 @@ namespace GONet
         public bool ExpectsDeliveryReport { get; set; }
     }
 
+    /// <summary>
+    /// Contains delivery status information for TargetRpc calls with async return types.
+    /// Provides detailed feedback about which recipients received the RPC and any failures that occurred.
+    /// </summary>
+    /// <remarks>
+    /// This structure is returned when calling TargetRpc methods with Task&lt;RpcDeliveryReport&gt; return type:
+    /// <code>
+    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true)]
+    /// async Task&lt;RpcDeliveryReport&gt; SendToTeam(string message)
+    /// {
+    ///     DisplayMessage(message);
+    ///     return default; // Framework populates the actual report
+    /// }
+    ///
+    /// // Usage:
+    /// var report = await SendToTeam("Hello!");
+    /// if (report.FailedDelivery?.Length > 0)
+    /// {
+    ///     Debug.LogWarning($"Failed to deliver to {report.FailedDelivery.Length} recipients");
+    ///     Debug.LogWarning($"Reason: {report.FailureReason}");
+    /// }
+    /// </code>
+    /// </remarks>
     [MemoryPackable]
     public partial struct RpcDeliveryReport
     {
+        /// <summary>
+        /// Array of authority IDs that successfully received the RPC.
+        /// Null if no recipients or if delivery tracking was not requested.
+        /// </summary>
         public ushort[] DeliveredTo { get; set; }
+
+        /// <summary>
+        /// Array of authority IDs that failed to receive the RPC.
+        /// Common causes include disconnected clients, validation failures, or network issues.
+        /// </summary>
         public ushort[] FailedDelivery { get; set; }
+
+        /// <summary>
+        /// Human-readable description of why delivery failed for some recipients.
+        /// Examples: "Target disconnected", "Validation denied", "Network timeout"
+        /// </summary>
         public string FailureReason { get; set; }
-        public bool WasModified { get; set; } // was the message modified before delivery
-        public ulong ValidationReportId { get; set; }  // for retrieving full details, if applicable
+
+        /// <summary>
+        /// Indicates whether the RPC data was modified by validation before delivery.
+        /// True when validation methods modify ref parameters (e.g., content filtering).
+        /// </summary>
+        public bool WasModified { get; set; }
+
+        /// <summary>
+        /// Unique identifier for retrieving detailed validation report if available.
+        /// Can be used with GetFullRpcValidationReport() for debugging complex validation scenarios.
+        /// Zero if no detailed report is available.
+        /// </summary>
+        public ulong ValidationReportId { get; set; }
     }
 
-    public struct RpcValidationResult
+    /// <summary>
+    /// Represents the result of RPC validation, including which targets are allowed/denied.
+    /// Implements IDisposable to properly return pooled arrays to avoid memory leaks.
+    /// </summary>
+    public struct RpcValidationResult : IDisposable
     {
         /// <summary>
         /// Parallel array to ValidationContext.TargetAuthorities.
         /// Array indicating which targets are allowed (true) or denied (false).
         /// This array is pre-allocated by the framework to match TargetCount.
+        /// IMPORTANT: This array is pooled and will be automatically returned when disposed.
         /// </summary>
         public bool[] AllowedTargets { get; internal set; }
 
@@ -227,34 +385,87 @@ namespace GONet
         public int TargetCount { get; internal set; }
 
         /// <summary>
-        /// Optional reason for any denials
+        /// Optional reason for any denials. Used for logging and delivery reports.
         /// </summary>
         public string DenialReason { get; set; }
 
         /// <summary>
-        /// Whether the validator modified any parameters
+        /// Whether the validator modified any parameters.
+        /// When true, the framework will use ModifiedData for the RPC call.
         /// </summary>
         public bool WasModified { get; set; }
 
-        // Internal field for framework use only
+        /// <summary>
+        /// Internal field for framework use only - contains serialized modified parameters
+        /// </summary>
         internal byte[] ModifiedData { get; set; }
 
+        /// <summary>
+        /// Internal flag to track disposal state and prevent double-disposal
+        /// </summary>
+        private bool _disposed;
 
-        // Internal factory for framework use
+
+        /// <summary>
+        /// Internal factory method for creating pre-allocated validation results.
+        /// Used by the GONet framework to create validation results with pooled arrays.
+        /// </summary>
+        /// <param name="targetCount">Number of targets to validate (must be positive and within limits)</param>
+        /// <returns>A new RpcValidationResult with pre-allocated arrays</returns>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown if targetCount is invalid</exception>
         internal static RpcValidationResult CreatePreAllocated(int targetCount)
         {
+            if (targetCount < 0)
+                throw new ArgumentOutOfRangeException(nameof(targetCount), "Target count cannot be negative.");
+            if (targetCount > GONetEventBus.MAX_RPC_TARGETS)
+                throw new ArgumentOutOfRangeException(nameof(targetCount), $"Target count {targetCount} exceeds maximum allowed ({GONetEventBus.MAX_RPC_TARGETS}).");
+
+            var allowedTargets = RpcValidationArrayPool.BorrowAllowedTargets();
+            if (allowedTargets == null)
+            {
+                throw new InvalidOperationException("Failed to borrow array from pool. Array pool may be exhausted.");
+            }
+
+            // Clear the array to ensure clean state
+            for (int i = 0; i < Math.Min(targetCount, allowedTargets.Length); i++)
+            {
+                allowedTargets[i] = false;
+            }
+
             return new RpcValidationResult
             {
-                AllowedTargets = RpcValidationArrayPool.BorrowAllowedTargets(),
-                TargetCount = targetCount
+                AllowedTargets = allowedTargets,
+                TargetCount = targetCount,
+                _disposed = false
             };
+        }
+
+        /// <summary>
+        /// Disposes the validation result, returning pooled arrays to prevent memory leaks.
+        /// This is automatically called by the framework after validation processing.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed && AllowedTargets != null)
+            {
+                RpcValidationArrayPool.ReturnAllowedTargets(AllowedTargets);
+                AllowedTargets = null;
+                _disposed = true;
+            }
         }
 
         /// <summary>
         /// Sets all targets as allowed
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Thrown if the validation result has been disposed</exception>
+        /// <exception cref="InvalidOperationException">Thrown if AllowedTargets array is null or invalid</exception>
         public void AllowAll()
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(RpcValidationResult));
+            if (AllowedTargets == null) throw new InvalidOperationException("AllowedTargets array is null. Validation result may not be properly initialized.");
+            if (TargetCount < 0 || TargetCount > AllowedTargets.Length)
+                throw new InvalidOperationException($"Invalid TargetCount {TargetCount}. Must be between 0 and {AllowedTargets?.Length ?? 0}.");
+
             for (int i = 0; i < TargetCount; i++)
                 AllowedTargets[i] = true;
             DenialReason = null;
@@ -263,8 +474,15 @@ namespace GONet
         /// <summary>
         /// Sets all targets as denied
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Thrown if the validation result has been disposed</exception>
+        /// <exception cref="InvalidOperationException">Thrown if AllowedTargets array is null or invalid</exception>
         public void DenyAll()
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(RpcValidationResult));
+            if (AllowedTargets == null) throw new InvalidOperationException("AllowedTargets array is null. Validation result may not be properly initialized.");
+            if (TargetCount < 0 || TargetCount > AllowedTargets.Length)
+                throw new InvalidOperationException($"Invalid TargetCount {TargetCount}. Must be between 0 and {AllowedTargets?.Length ?? 0}.");
+
             for (int i = 0; i < TargetCount; i++)
                 AllowedTargets[i] = false;
         }
@@ -272,8 +490,11 @@ namespace GONet
         /// <summary>
         /// Sets all targets as denied with a reason
         /// </summary>
+        /// <param name="reason">Reason for denial, used in logging and delivery reports</param>
         public void DenyAll(string reason)
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(RpcValidationResult));
+
             DenyAll();
             DenialReason = reason;
         }
@@ -281,23 +502,38 @@ namespace GONet
         /// <summary>
         /// Helper to allow specific targets by index
         /// </summary>
+        /// <param name="index">Index in the TargetAuthorities array to allow</param>
+        /// <exception cref="ObjectDisposedException">Thrown if the validation result has been disposed</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown if index is out of valid range</exception>
+        /// <exception cref="InvalidOperationException">Thrown if AllowedTargets array is null</exception>
         public void AllowTarget(int index)
         {
-            if (index >= 0 && index < TargetCount)
-                AllowedTargets[index] = true;
+            if (_disposed) throw new ObjectDisposedException(nameof(RpcValidationResult));
+            if (AllowedTargets == null) throw new InvalidOperationException("AllowedTargets array is null. Validation result may not be properly initialized.");
+            if (index < 0 || index >= TargetCount)
+                throw new ArgumentOutOfRangeException(nameof(index), $"Index {index} is out of range. Valid range is 0 to {TargetCount - 1}.");
+
+            AllowedTargets[index] = true;
         }
 
         /// <summary>
         /// Helper to deny specific targets by index
         /// </summary>
+        /// <param name="index">Index in the TargetAuthorities array to deny</param>
+        /// <param name="reason">Optional reason for denial</param>
+        /// <exception cref="ObjectDisposedException">Thrown if the validation result has been disposed</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown if index is out of valid range</exception>
+        /// <exception cref="InvalidOperationException">Thrown if AllowedTargets array is null</exception>
         public void DenyTarget(int index, string reason = null)
         {
-            if (index >= 0 && index < TargetCount)
-            {
-                AllowedTargets[index] = false;
-                if (!string.IsNullOrEmpty(reason))
-                    DenialReason = reason;
-            }
+            if (_disposed) throw new ObjectDisposedException(nameof(RpcValidationResult));
+            if (AllowedTargets == null) throw new InvalidOperationException("AllowedTargets array is null. Validation result may not be properly initialized.");
+            if (index < 0 || index >= TargetCount)
+                throw new ArgumentOutOfRangeException(nameof(index), $"Index {index} is out of range. Valid range is 0 to {TargetCount - 1}.");
+
+            AllowedTargets[index] = false;
+            if (!string.IsNullOrEmpty(reason))
+                DenialReason = reason;
         }
 
         /// <summary>
@@ -329,15 +565,34 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// Internal array pool for RPC validation bool arrays to reduce garbage collection.
+    /// Automatically manages allocation and deallocation of bool arrays used in validation results.
+    /// </summary>
     internal static class RpcValidationArrayPool
     {
+        /// <summary>
+        /// Pool of bool arrays sized for maximum RPC targets.
+        /// Configured with reasonable defaults for typical RPC validation scenarios.
+        /// </summary>
         private static readonly ArrayPool<bool> boolArrayPool = new(10, 2, GONetEventBus.MAX_RPC_TARGETS, GONetEventBus.MAX_RPC_TARGETS);
 
+        /// <summary>
+        /// Borrows a bool array from the pool for use in RpcValidationResult.
+        /// The array is automatically cleared and ready for use.
+        /// IMPORTANT: Always return the array via ReturnAllowedTargets when done.
+        /// </summary>
+        /// <returns>A clean bool array sized for maximum RPC targets</returns>
         internal static bool[] BorrowAllowedTargets()
         {
             return boolArrayPool.Borrow();
         }
 
+        /// <summary>
+        /// Returns a bool array to the pool for reuse.
+        /// Called automatically by RpcValidationResult.Dispose().
+        /// </summary>
+        /// <param name="array">The array to return to the pool</param>
         internal static void ReturnAllowedTargets(bool[] array)
         {
             boolArrayPool.Return(array);
@@ -544,20 +799,78 @@ namespace GONet
     }
 
     /// <summary>
-    /// Context available during RPC validation containing source and target information.
-    /// Access via GONetEventBus.CurrentRpcContext.Value.ValidationContext
+    /// Context information available during RPC validation, providing access to source and target authority data.
+    /// This struct is populated by the GONet framework before calling validation methods.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Usage in Validation Methods:</b></para>
+    /// <code>
+    /// internal RpcValidationResult ValidateMessage(ref string content, ref string channel)
+    /// {
+    ///     var context = GONetMain.EventBus.GetValidationContext().Value;
+    ///     var result = context.GetValidationResult();
+    ///
+    ///     // Check if sender is authorized for this channel
+    ///     if (!IsAuthorizedForChannel(context.SourceAuthorityId, channel))
+    ///     {
+    ///         result.DenyAll("Not authorized for channel");
+    ///         return result;
+    ///     }
+    ///
+    ///     // Filter recipients based on permissions
+    ///     for (int i = 0; i &lt; context.TargetCount; i++)
+    ///     {
+    ///         ushort targetId = context.TargetAuthorityIds[i];
+    ///         result.AllowedTargets[i] = CanReceiveMessage(targetId, content);
+    ///     }
+    ///
+    ///     return result;
+    /// }
+    /// </code>
+    /// </remarks>
     public struct RpcValidationContext
     {
+        /// <summary>
+        /// Authority ID of the client/server that initiated the RPC call.
+        /// For client-to-server RPCs, this is the originating client's authority ID.
+        /// For server-to-client RPCs, this is the server's authority ID.
+        /// </summary>
         public ushort SourceAuthorityId { get; set; }
+
+        /// <summary>
+        /// Array of target authority IDs that the RPC is being sent to.
+        /// The length of this array may be larger than TargetCount; only the first TargetCount elements are valid.
+        /// Use in conjunction with TargetCount to determine valid recipients.
+        /// </summary>
         public ushort[] TargetAuthorityIds { get; set; }
+
+        /// <summary>
+        /// Number of valid targets in the TargetAuthorityIds array.
+        /// Always use this value instead of TargetAuthorityIds.Length for iteration.
+        /// </summary>
         public int TargetCount { get; set; }
-        internal RpcValidationResult PreAllocatedResult { get; set; } // Internal only
+
+        /// <summary>
+        /// Internal pre-allocated validation result. Use GetValidationResult() to access.
+        /// </summary>
+        internal RpcValidationResult PreAllocatedResult { get; set; }
 
         /// <summary>
         /// Gets the pre-allocated validation result for modification.
-        /// The bool array is already sized to TargetCount.
+        /// The AllowedTargets bool array is already sized to TargetCount and initialized to false.
+        /// Modify this result to control which targets should receive the RPC.
         /// </summary>
+        /// <returns>RpcValidationResult with a pre-allocated bool array ready for modification</returns>
+        /// <example>
+        /// <code>
+        /// var result = context.GetValidationResult();
+        /// result.AllowAll(); // Allow all targets
+        /// // OR
+        /// result.AllowTarget(0); // Allow only first target
+        /// result.DenyTarget(1, "Not authorized"); // Deny second target with reason
+        /// return result;
+        /// </code>
+        /// </example>
         public RpcValidationResult GetValidationResult()
         {
             return PreAllocatedResult;
