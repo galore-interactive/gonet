@@ -11,9 +11,28 @@ using UnityEngine.Networking;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// A comprehensive chat system for GONet that supports channels, direct messages, 
-/// and group conversations with server-side profanity filtering and validation.
-/// Designed to be placed on the GONet Global GameObject and tracks GONetLocal objects.
+/// A comprehensive chat system for GONet that demonstrates advanced RPC features including
+/// TargetRpc with validation, server-side message filtering, and multi-parameter async RPCs.
+///
+/// This sample showcases the new GONet RPC validation system with:
+/// - Custom validation methods that can modify message content before delivery
+/// - Server-side profanity filtering with web API integration and local fallback
+/// - TargetRpc routing to specific clients or groups with delivery reports
+/// - Multi-parameter RPC support (up to 8 parameters) for complex data transfer
+/// - Async RPC patterns with proper error handling and timeouts
+///
+/// Usage:
+/// 1. Place this component on a GameObject with a GONetParticipant
+/// 2. The system automatically tracks GONetLocal objects as chat participants
+/// 3. Use channels for public chat, or select participants for direct/group messages
+/// 4. Server automatically validates and filters all messages before delivery
+///
+/// Key RPC Examples:
+/// - [TargetRpc] with validation: SendMessage() shows parameter validation and content filtering
+/// - [ServerRpc] for state requests: RequestCurrentState() demonstrates server authority
+/// - [ClientRpc] for broadcasts: BroadcastParticipantUpdate() shows multi-client updates
+///
+/// This serves as a production-ready reference implementation for GONet's RPC system.
 /// </summary>
 [RequireComponent(typeof(GONetParticipant))]
 public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
@@ -522,6 +541,19 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     #region RPCs - State Synchronization
 
+    /// <summary>
+    /// Demonstrates ServerRpc usage for client-initiated state synchronization requests.
+    /// This pattern is common for late-joining clients or state recovery scenarios.
+    ///
+    /// ServerRpc Features Demonstrated:
+    /// - IsMineRequired = false allows any client to call this RPC
+    /// - Server authority validation using GONetRpcContext
+    /// - Conditional participant list updates based on server state
+    /// - Targeted response using TargetRpc for efficient state delivery
+    ///
+    /// This pattern ensures new clients receive current state without flooding
+    /// all clients with unnecessary updates, demonstrating efficient state management.
+    /// </summary>
     [ServerRpc(IsMineRequired = false)]
     internal void RequestCurrentState()
     {
@@ -567,6 +599,19 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         channels = allChannels.ToList();
     }
 
+    /// <summary>
+    /// Demonstrates ClientRpc usage for server-to-all-clients broadcasting.
+    /// This is the most efficient way to update all connected clients simultaneously.
+    ///
+    /// ClientRpc Features Demonstrated:
+    /// - Automatic delivery to all connected clients
+    /// - Complex data structure serialization (ChatParticipant array)
+    /// - State reconciliation on client side
+    /// - Preservation of local client state during updates
+    ///
+    /// This pattern is ideal for authoritative updates where the server
+    /// maintains the canonical state and all clients need to synchronize.
+    /// </summary>
     [ClientRpc]
     internal void BroadcastParticipantUpdate(ChatParticipant[] allParticipants)
     {
@@ -630,7 +675,30 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     #region RPCs - Unified Messaging
 
-    // Unified message sending using TargetRpc for all message types
+    /// <summary>
+    /// Demonstrates advanced TargetRpc usage with custom validation and async delivery reports.
+    /// This method showcases GONet's new RPC validation system with server-side content filtering.
+    ///
+    /// Key Features Demonstrated:
+    /// - TargetRpc with dynamic target list (CurrentMessageTargets property)
+    /// - Custom validation method (ValidateMessage) that can modify content before delivery
+    /// - Multi-parameter RPC (4 parameters) showing complex data transfer
+    /// - Async RPC with delivery reports for handling failed deliveries
+    /// - Server-side profanity filtering with web API integration
+    ///
+    /// The validation method can:
+    /// - Allow/deny specific targets based on connection status
+    /// - Modify message content (profanity filtering) before delivery
+    /// - Provide detailed denial reasons for debugging
+    ///
+    /// This pattern is ideal for chat systems, notifications, or any scenario requiring
+    /// validated content delivery to specific clients.
+    /// </summary>
+    /// <param name="content">The message content to send (may be modified by validation)</param>
+    /// <param name="channelName">Target channel name for routing</param>
+    /// <param name="messageType">Type of message (Channel, DirectMessage, GroupMessage)</param>
+    /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
+    /// <returns>Delivery report indicating successful/failed deliveries</returns>
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId)
     {
@@ -719,7 +787,32 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
     }
 
-    // Server-side validation for all messages
+    /// <summary>
+    /// Custom RPC validation method demonstrating GONet's new validation system capabilities.
+    /// This method shows how to implement server-side validation with content modification.
+    ///
+    /// Validation Features Demonstrated:
+    /// - Target authorization based on connection status
+    /// - Content modification (profanity filtering) with ref parameters
+    /// - Integration with web APIs for enhanced filtering
+    /// - Memory-efficient bool array results using ArrayPool
+    /// - Comprehensive error handling and fallback mechanisms
+    ///
+    /// The validation method receives ref parameters allowing modification of RPC data
+    /// before delivery. This enables server-side filtering, data sanitization, or
+    /// parameter transformation while maintaining type safety.
+    ///
+    /// Performance Notes:
+    /// - Uses ArrayPool for memory efficiency with large target lists
+    /// - Implements aggressive timeouts (1-2 seconds) for web API calls
+    /// - Falls back to local filtering if web APIs are unavailable
+    /// - Validation context provides pre-allocated result structures
+    /// </summary>
+    /// <param name="content">Message content (can be modified for filtering)</param>
+    /// <param name="channelName">Channel name (can be validated/modified)</param>
+    /// <param name="messageType">Message type (can be validated/modified)</param>
+    /// <param name="fromUserId">Sender ID (can be validated/modified)</param>
+    /// <returns>Validation result with allowed targets and optional modifications</returns>
     internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId)
     {
         // Get the pre-allocated validation result from the context
@@ -825,7 +918,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         // Debug logging to help diagnose the issue
         Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Sending message to {CurrentMessageTargets.Count} targets: {string.Join(", ", CurrentMessageTargets)}");
 
-        // Send using unified message system
+        // Example of async RPC calling with delivery report handling
+        // This demonstrates the new CallRpcAsync<TReturn, T1, T2, T3, T4> pattern for complex RPCs
         CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort>(
             nameof(SendMessage),
             finalContent,
@@ -834,11 +928,13 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             localAuthorityId)
             .ContinueWith(task =>
             {
+                // Handle delivery failures gracefully - common in networked environments
                 if (task.Result.FailedDelivery?.Length > 0)
                 {
                     Debug.LogWarning($"Failed to deliver to some recipients: {task.Result.FailureReason}");
                 }
 
+                // Log successful deliveries for debugging and analytics
                 Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Message delivery report - Delivered to: {string.Join(", ", task.Result.DeliveredTo ?? new ushort[0])}");
             });
 
@@ -1192,7 +1288,19 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     #endregion
 }
 
-// Data structures need to be at namespace level for MemoryPack
+/// <summary>
+/// Data structures for the chat system demonstrating GONet RPC serialization best practices.
+/// These structures showcase MemoryPack serialization for efficient network transfer.
+///
+/// Key Design Patterns:
+/// - Structs for value semantics and performance
+/// - MemoryPackable attribute for zero-allocation serialization
+/// - Partial classes for source generator compatibility
+/// - Namespace-level definitions for proper accessibility
+/// - Minimal data footprint for network efficiency
+///
+/// These patterns ensure optimal performance for frequently transmitted RPC data.
+/// </summary>
 [MemoryPackable]
 public partial struct ChatMessage
 {
