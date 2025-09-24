@@ -143,12 +143,24 @@ namespace GONet
     /// }
     /// </code>
     ///
+    /// <para><b>Persistent Client RPCs for Late-Joining Clients:</b></para>
+    /// <code>
+    /// [ClientRpc(IsPersistent = true)]
+    /// void UpdateGameState(GameState newState)
+    /// {
+    ///     // This RPC is stored and automatically sent to late-joining clients
+    ///     currentGameState = newState;
+    ///     RefreshUI();
+    /// }
+    /// </code>
+    ///
     /// <para><b>Key Characteristics:</b></para>
     /// <list type="bullet">
     /// <item><description>Only the server can call Client RPCs</description></item>
     /// <item><description>Sent to all connected clients automatically</description></item>
     /// <item><description>Ideal for visual effects, UI updates, and state synchronization</description></item>
     /// <item><description>Uses reliable transmission by default (IsReliable = true)</description></item>
+    /// <item><description>Set IsPersistent = true to automatically deliver to late-joining clients</description></item>
     /// </list>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
@@ -250,10 +262,37 @@ namespace GONet
     /// <code>
     /// [TargetRpc(RpcTarget.SpecificAuthority)]
     /// void SendToPlayer(ushort targetPlayerId, string message) { }
-    /// 
+    ///
     /// [TargetRpc(RpcTarget.MultipleAuthorities)]
     /// void SendToPlayers(List&lt;ushort&gt; targetPlayerIds, string message) { }
     /// </code>
+    ///
+    /// <para><b>Persistent Target RPCs - ⚠️ IMPORTANT LIMITATIONS:</b></para>
+    /// <para>Persistent TargetRPCs store original recipient authority IDs. Late-joining clients may not receive them if their ID wasn't in the original target list.</para>
+    /// <code>
+    /// // ✅ GOOD - All clients receive persistent state
+    /// [TargetRpc(RpcTarget.All, IsPersistent = true)]
+    /// void AnnounceGamePhaseChange(GamePhase newPhase)
+    /// {
+    ///     // Late-joiners will receive this persistent state update
+    ///     currentGamePhase = newPhase;
+    /// }
+    ///
+    /// // ❌ PROBLEMATIC - Late-joiners may be excluded
+    /// [TargetRpc(nameof(ActivePlayerIds), isMultipleTargets: true, IsPersistent = true)]
+    /// void SendRoundResults(ScoreData scores)
+    /// {
+    ///     // Late-joiners won't be in the original ActivePlayerIds list!
+    /// }
+    ///
+    /// // ⚠️ USE WITH CAUTION - Depends on property logic
+    /// [TargetRpc(nameof(TeamLeaderId), IsPersistent = true)]
+    /// void NotifyTeamLeader(string message)
+    /// {
+    ///     // Only works if TeamLeaderId property includes late-joiners appropriately
+    /// }
+    /// </code>
+    /// <para><b>Recommendation:</b> For persistent TargetRPCs, prefer RpcTarget.All or ensure your targeting logic accounts for late-joining clients.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class TargetRpcAttribute : GONetRpcAttribute
@@ -300,6 +339,7 @@ namespace GONet
         public RpcType Type { get; set; }
         public bool IsReliable { get; set; }
         public bool IsMineRequired { get; set; }
+        public bool IsPersistent { get; set; } // Whether RPC should persist for late-joining clients
         public RpcTarget Target { get; set; } // For TargetRpc
         public string TargetPropertyName { get; set; } // For TargetRpc
         public bool IsMultipleTargets { get; set; } // For TargetRpc
@@ -601,6 +641,37 @@ namespace GONet
 
     #region event Support
 
+    // ========================================
+    // RPC EVENT ARCHITECTURE DOCUMENTATION
+    // ========================================
+    //
+    // GONet implements a dual-architecture RPC event system to handle both transient and persistent RPCs:
+    //
+    // TRANSIENT EVENTS (IsPersistent = false):
+    // - RpcEvent: Standard RPCs, implements ITransientEvent + ISelfReturnEvent
+    // - RoutedRpcEvent: TargetRPC routing, implements ITransientEvent + ISelfReturnEvent
+    // - Uses object pooling for high-performance, low-GC operation
+    // - Events are processed immediately and returned to pool
+    // - Not stored for late-joining clients
+    //
+    // PERSISTENT EVENTS (IsPersistent = true):
+    // - PersistentRpcEvent: Persistent RPCs, implements IPersistentEvent ONLY
+    // - PersistentRoutedRpcEvent: Persistent TargetRPC routing, implements IPersistentEvent ONLY
+    // - INTENTIONALLY does NOT use pooling to prevent data corruption
+    // - Events are stored by reference for late-joining clients
+    // - Data integrity prioritized over memory efficiency
+    // - ⚠️ TARGET RPC LIMITATION: Late-joining clients may not receive TargetRPCs if their
+    //   authority ID wasn't in the original TargetAuthorities[] array when the RPC was sent
+    //
+    // CRITICAL DESIGN CONSTRAINT:
+    // Persistent events must NOT implement ISelfReturnEvent because GONet stores direct
+    // references to these events for late-joining client delivery. If pooled, the Return()
+    // method would clear event data, corrupting the information sent to new clients.
+    //
+    // This architecture ensures reliable RPC persistence while maintaining performance
+    // for standard transient RPC operations.
+    // ========================================
+
     [MemoryPackable]
     public partial class RpcEvent : ITransientEvent, ISelfReturnEvent
     {
@@ -737,6 +808,109 @@ namespace GONet
             evt.CorrelationId = 0;
             pool.Return(evt);
         }
+    }
+
+    /// <summary>
+    /// Persistent version of RpcEvent that gets stored and sent to late-joining clients.
+    /// Used for ClientRpc calls with IsPersistent = true.
+    ///
+    /// IMPORTANT: This class does NOT implement ISelfReturnEvent (no object pooling) to ensure
+    /// data integrity when stored for late-joining clients. Like other persistent events in GONet
+    /// (InstantiateGONetParticipantEvent, etc.), these events are stored indefinitely and cannot
+    /// be returned to pools where their data might be corrupted.
+    ///
+    /// This design trades memory efficiency for data safety - persistent RPCs are typically
+    /// infrequent (setup/configuration) where the safety benefit outweighs pooling performance.
+    /// </summary>
+    [MemoryPackable]
+    public partial class PersistentRpcEvent : IPersistentEvent
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+        public uint RpcId { get; set; }
+        public uint GONetId { get; set; }
+        public byte[] Data { get; set; }
+        public long CorrelationId { get; set; }
+        public bool IsSingularRecipientOnly { get; set; }
+
+        /// <summary>
+        /// Original target specification for validation when sending to late-joining clients
+        /// </summary>
+        public RpcTarget OriginalTarget { get; set; } = RpcTarget.All;
+
+        /// <summary>
+        /// Source authority that originally sent this RPC
+        /// </summary>
+        public ushort SourceAuthorityId { get; set; }
+    }
+
+    /// <summary>
+    /// Represents a persistent RPC event that targets specific authorities.
+    /// Used when TargetRpc calls are marked as persistent (IsPersistent = true) to ensure
+    /// late-joining clients receive targeted messages appropriately.
+    ///
+    /// ⚠️  CRITICAL LIMITATION FOR LATE-JOINING CLIENTS:
+    /// Persistent TargetRPCs store the exact authority IDs that were valid when originally sent.
+    /// Late-joining clients will receive the persistent event, but their authority ID won't be
+    /// in the original TargetAuthorities[] array, so they may not process the RPC.
+    ///
+    /// RECOMMENDED PATTERNS FOR PERSISTENT TARGET RPCS:
+    /// ✅ Use RpcTarget.All for truly persistent state that all clients need
+    /// ✅ Use property-based targeting where the property naturally includes late-joiners
+    /// ❌ Avoid parameter-based specific authority targeting with persistence
+    /// ❌ Avoid targeting lists that exclude future clients
+    ///
+    /// EXAMPLE - GOOD (All clients should know about team changes):
+    /// [TargetRpc(RpcTarget.All, IsPersistent = true)]
+    /// void AnnounceTeamFormation(string teamName) { }
+    ///
+    /// EXAMPLE - PROBLEMATIC (Late-joiners won't be in original team member list):
+    /// [TargetRpc(nameof(TeamMemberIds), isMultipleTargets: true, IsPersistent = true)]
+    /// void SendTeamStrategy(string strategy) { } // Late-joiners excluded!
+    ///
+    /// IMPORTANT: This class intentionally does NOT implement ISelfReturnEvent or use pooling.
+    ///
+    /// GONet's persistence mechanism stores references to persistent events for late-joining
+    /// clients (see OnPersistentEvent_KeepTrack in GONet.cs). If these events were pooled
+    /// and returned after execution, their data would be cleared/corrupted when sent to
+    /// late-joining clients, causing critical data integrity issues.
+    ///
+    /// This design choice prioritizes data safety over memory efficiency. When creating
+    /// persistent RPCs, the cost of allocating new objects is acceptable given the relative
+    /// infrequency of persistent RPC usage compared to standard transient RPCs.
+    ///
+    /// For performance-critical scenarios, consider:
+    /// - Using transient RPCs where persistence is not required
+    /// - Limiting the frequency of persistent RPC calls
+    /// - Implementing custom cleanup logic if memory usage becomes problematic
+    ///
+    /// This pattern aligns with other persistent events in GONet (e.g., InstantiateGONetParticipantEvent)
+    /// which also avoid pooling to maintain data integrity.
+    /// </summary>
+    [MemoryPackable]
+    public partial class PersistentRoutedRpcEvent : IPersistentEvent
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+        public uint RpcId { get; set; }
+        public uint GONetId { get; set; }
+        public ushort[] TargetAuthorities { get; set; } = new ushort[64];
+        public int TargetCount { get; set; }
+        public byte[] Data { get; set; }
+        public long CorrelationId { get; set; }
+
+        /// <summary>
+        /// Original target specification for validation when sending to late-joining clients
+        /// </summary>
+        public RpcTarget OriginalTarget { get; set; }
+
+        /// <summary>
+        /// Source authority that originally sent this RPC
+        /// </summary>
+        public ushort SourceAuthorityId { get; set; }
+
+        /// <summary>
+        /// Property name used for original targeting (for property-based TargetRpc)
+        /// </summary>
+        public string TargetPropertyName { get; set; }
     }
 
     #endregion

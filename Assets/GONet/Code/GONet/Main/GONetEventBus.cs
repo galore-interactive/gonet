@@ -182,6 +182,237 @@ namespace GONet
     {
         public static readonly GONetEventBus Instance = new GONetEventBus();
 
+        #region Deferred RPC Processing - High Performance Object Pooled System
+
+        /// <summary>
+        /// Pooled structure for deferred RPC information to avoid allocations
+        /// </summary>
+        private sealed class DeferredRpcInfo : ISelfReturnEvent
+        {
+            public RpcEvent RpcEvent;
+            public PersistentRpcEvent PersistentRpcEvent;
+            public uint SourceAuthorityId;
+            public uint TargetClientAuthorityId;
+            public float DeferredAtTime;
+            public int RetryCount;
+            public bool IsPersistent;
+            public GONetParticipant SourceGONetParticipant;
+
+            private static readonly ConcurrentBag<DeferredRpcInfo> pool = new ConcurrentBag<DeferredRpcInfo>();
+            private static readonly object poolLock = new object();
+
+            public static DeferredRpcInfo Borrow()
+            {
+                if (pool.TryTake(out var item))
+                {
+                    return item;
+                }
+                return new DeferredRpcInfo();
+            }
+
+            public void Return()
+            {
+                // Clear references to prevent memory leaks
+                RpcEvent = null;
+                PersistentRpcEvent = null;
+                SourceGONetParticipant = null;
+                DeferredAtTime = 0;
+                RetryCount = 0;
+                IsPersistent = false;
+                SourceAuthorityId = 0;
+                TargetClientAuthorityId = 0;
+
+                pool.Add(this);
+            }
+        }
+
+        // High-performance collections for deferred RPC tracking
+        private static readonly List<DeferredRpcInfo> deferredRpcs = new List<DeferredRpcInfo>(32);
+        private static readonly Dictionary<uint, List<DeferredRpcInfo>> deferredRpcsByGoNetId = new Dictionary<uint, List<DeferredRpcInfo>>(16);
+
+        // Configuration constants
+        private const float RPC_DEFER_TIMEOUT = 1.0f; // 1 second timeout
+        private const int MAX_RETRY_COUNT = 60; // ~60 frames at 60fps = 1 second
+
+        // Performance tracking
+        private static int totalDeferredRpcs = 0;
+        private static int successfulDeferredRpcs = 0;
+        private static int timedOutDeferredRpcs = 0;
+
+        /// <summary>
+        /// Defers an RPC for later processing when the target GONetParticipant is not yet available
+        /// High-performance method using object pooling
+        /// </summary>
+        private static void DeferRpcForLater(RpcEvent rpcEvent, uint sourceAuthorityId, uint targetClientAuthorityId, GONetParticipant sourceGONetParticipant, bool isPersistent = false, PersistentRpcEvent persistentRpcEvent = null)
+        {
+            var deferredInfo = DeferredRpcInfo.Borrow();
+            deferredInfo.RpcEvent = rpcEvent;
+            deferredInfo.PersistentRpcEvent = persistentRpcEvent;
+            deferredInfo.SourceAuthorityId = sourceAuthorityId;
+            deferredInfo.TargetClientAuthorityId = targetClientAuthorityId;
+            deferredInfo.DeferredAtTime = UnityEngine.Time.time;
+            deferredInfo.RetryCount = 0;
+            deferredInfo.IsPersistent = isPersistent;
+            deferredInfo.SourceGONetParticipant = sourceGONetParticipant;
+
+            uint targetGoNetId = isPersistent ? persistentRpcEvent.GONetId : rpcEvent.GONetId;
+
+            deferredRpcs.Add(deferredInfo);
+
+            // Index by GONet ID for faster lookup and immediate processing when participant becomes available
+            if (!deferredRpcsByGoNetId.ContainsKey(targetGoNetId))
+            {
+                deferredRpcsByGoNetId[targetGoNetId] = new List<DeferredRpcInfo>(4); // Pre-allocate small capacity
+            }
+            deferredRpcsByGoNetId[targetGoNetId].Add(deferredInfo);
+
+            totalDeferredRpcs++;
+            GONetLog.Debug($"Deferred RPC {(isPersistent ? "(persistent)" : "")} 0x{(isPersistent ? persistentRpcEvent.RpcId : rpcEvent.RpcId):X8} for GONet ID {targetGoNetId} - participant not found yet (total deferred: {deferredRpcs.Count})");
+        }
+
+        /// <summary>
+        /// High-performance deferred RPC processing - called from Unity main thread
+        /// Processes all deferred RPCs and retries or times them out as needed
+        /// </summary>
+        public static void ProcessDeferredRpcs()
+        {
+            if (deferredRpcs.Count == 0) return;
+
+            float currentTime = UnityEngine.Time.time;
+
+            // Process deferred RPCs in reverse order for efficient removal
+            for (int i = deferredRpcs.Count - 1; i >= 0; i--)
+            {
+                var deferred = deferredRpcs[i];
+                uint targetGoNetId = deferred.IsPersistent ? deferred.PersistentRpcEvent.GONetId : deferred.RpcEvent.GONetId;
+
+                // Check timeout first for early exit
+                if (currentTime - deferred.DeferredAtTime > RPC_DEFER_TIMEOUT)
+                {
+                    GONetLog.Warning($"RPC {(deferred.IsPersistent ? "(persistent)" : "")} 0x{(deferred.IsPersistent ? deferred.PersistentRpcEvent.RpcId : deferred.RpcEvent.RpcId):X8} for GONet ID {targetGoNetId} timed out after {RPC_DEFER_TIMEOUT}s");
+                    timedOutDeferredRpcs++;
+                    RemoveDeferredRpc(i, deferred, targetGoNetId);
+                    continue;
+                }
+
+                // Check if GONetParticipant is now available
+                var gnp = GONetMain.GetGONetParticipantById(targetGoNetId);
+                if (gnp != null)
+                {
+                    GONetLog.Debug($"GONet ID {targetGoNetId} now available - processing deferred RPC {(deferred.IsPersistent ? "(persistent)" : "")} 0x{(deferred.IsPersistent ? deferred.PersistentRpcEvent.RpcId : deferred.RpcEvent.RpcId):X8}");
+
+                    // Process the RPC now - create new envelope and process immediately
+                    successfulDeferredRpcs++;
+                    if (deferred.IsPersistent)
+                    {
+                        var envelope = GONetEventEnvelope<PersistentRpcEvent>.Borrow(deferred.PersistentRpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                        envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+
+                        // Process immediately on main thread to maintain order
+                        Instance.HandlePersistentRpcForMe_Immediate(envelope);
+                    }
+                    else
+                    {
+                        var envelope = GONetEventEnvelope<RpcEvent>.Borrow(deferred.RpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                        envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+
+                        // Process immediately on main thread to maintain order
+                        Instance.HandleRpcForMe_Immediate(envelope);
+                    }
+
+                    RemoveDeferredRpc(i, deferred, targetGoNetId);
+                }
+                else
+                {
+                    // Increment retry count
+                    deferred.RetryCount++;
+
+                    if (deferred.RetryCount > MAX_RETRY_COUNT)
+                    {
+                        GONetLog.Warning($"RPC {(deferred.IsPersistent ? "(persistent)" : "")} 0x{(deferred.IsPersistent ? deferred.PersistentRpcEvent.RpcId : deferred.RpcEvent.RpcId):X8} for GONet ID {targetGoNetId} exceeded max retries ({MAX_RETRY_COUNT})");
+                        timedOutDeferredRpcs++;
+                        RemoveDeferredRpc(i, deferred, targetGoNetId);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// High-performance removal of deferred RPC with proper cleanup and pooling
+        /// </summary>
+        private static void RemoveDeferredRpc(int index, DeferredRpcInfo deferred, uint targetGoNetId)
+        {
+            deferredRpcs.RemoveAt(index);
+
+            // Remove from lookup dictionary
+            if (deferredRpcsByGoNetId.TryGetValue(targetGoNetId, out var list))
+            {
+                list.Remove(deferred);
+                if (list.Count == 0)
+                {
+                    deferredRpcsByGoNetId.Remove(targetGoNetId);
+                }
+            }
+
+            // Return to object pool
+            deferred.Return();
+        }
+
+        /// <summary>
+        /// Called when a new GONetParticipant is registered to immediately process any deferred RPCs
+        /// This provides the fastest path to processing once the participant becomes available
+        /// </summary>
+        public static void OnGONetParticipantRegistered(uint gonetId)
+        {
+            if (deferredRpcsByGoNetId.TryGetValue(gonetId, out var deferredList))
+            {
+                GONetLog.Debug($"GONet ID {gonetId} registered - immediately processing {deferredList.Count} deferred RPCs");
+
+                // Process all deferred RPCs for this ID immediately
+                var gnp = GONetMain.GetGONetParticipantById(gonetId);
+                if (gnp != null)
+                {
+                    // Create copy of list since we'll be modifying the original
+                    var listCopy = new List<DeferredRpcInfo>(deferredList);
+
+                    foreach (var deferred in listCopy)
+                    {
+                        successfulDeferredRpcs++;
+                        if (deferred.IsPersistent)
+                        {
+                            var envelope = GONetEventEnvelope<PersistentRpcEvent>.Borrow(deferred.PersistentRpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                            Instance.HandlePersistentRpcForMe_Immediate(envelope);
+                        }
+                        else
+                        {
+                            var envelope = GONetEventEnvelope<RpcEvent>.Borrow(deferred.RpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                            Instance.HandleRpcForMe_Immediate(envelope);
+                        }
+                    }
+
+                    // Clear all deferred RPCs for this GONet ID
+                    foreach (var deferred in listCopy)
+                    {
+                        deferredRpcs.Remove(deferred);
+                        deferred.Return();
+                    }
+                    deferredRpcsByGoNetId.Remove(gonetId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Debug information about deferred RPC system performance
+        /// </summary>
+        public static string GetDeferredRpcStats()
+        {
+            return $"Deferred RPCs - Total: {totalDeferredRpcs}, Successful: {successfulDeferredRpcs}, Timed Out: {timedOutDeferredRpcs}, Currently Pending: {deferredRpcs.Count}";
+        }
+
+        #endregion
+
         public delegate void HandleEventDelegate<T>(GONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
         public delegate bool EventFilterDelegate<T>(GONetEventEnvelope<T> eventEnvelope) where T : IGONetEvent;
 
@@ -1021,23 +1252,34 @@ namespace GONet
 
         internal void InitializeRpcSystem()
         {
+            // Transient RPC events
             Subscribe<RpcEvent>(HandleRpcForMe, (envelope) =>
                 envelope.TargetClientAuthorityId == GONetMain.MyAuthorityId ||
                 envelope.TargetClientAuthorityId == GONetMain.OwnerAuthorityId_Unset
             );
-            
+
             Subscribe<RpcResponseEvent>(HandleRpcResponseForMe, (envelope) =>
                 envelope.TargetClientAuthorityId == GONetMain.MyAuthorityId ||
                 envelope.TargetClientAuthorityId == GONetMain.OwnerAuthorityId_Unset
             );
 
-            Subscribe<RoutedRpcEvent>(Server_HandleRoutedRpcFromClient, (e) => 
-                e.IsSourceRemote && 
+            Subscribe<RoutedRpcEvent>(Server_HandleRoutedRpcFromClient, (e) =>
+                e.IsSourceRemote &&
                 e.SourceAuthorityId != GONetMain.OwnerAuthorityId_Server);
-            
-            Subscribe<RpcDeliveryReportEvent>(Client_HandleDeliveryReport, (e) => 
+
+            Subscribe<RpcDeliveryReportEvent>(Client_HandleDeliveryReport, (e) =>
                 e.IsSourceRemote &&
                 e.SourceAuthorityId == GONetMain.OwnerAuthorityId_Server);
+
+            // Persistent RPC events - handle exactly like transient but these persist for late-joiners
+            Subscribe<PersistentRpcEvent>(HandlePersistentRpcForMe, (envelope) =>
+                envelope.TargetClientAuthorityId == GONetMain.MyAuthorityId ||
+                envelope.TargetClientAuthorityId == GONetMain.OwnerAuthorityId_Unset
+            );
+
+            Subscribe<PersistentRoutedRpcEvent>(Server_HandlePersistentRoutedRpcFromClient, (e) =>
+                e.IsSourceRemote &&
+                e.SourceAuthorityId != GONetMain.OwnerAuthorityId_Server);
         }
 
         internal void RegisterRpcHandler(uint rpcId, Func<GONetEventEnvelope<RpcEvent>, Task> handler)
@@ -1048,6 +1290,18 @@ namespace GONet
         private async void HandleRpcForMe(GONetEventEnvelope<RpcEvent> envelope)
         {
             var rpcEvent = envelope.Event;
+
+            // Check if GONetParticipant exists - if not, defer processing
+            var targetParticipant = GONetMain.GetGONetParticipantById(rpcEvent.GONetId);
+            bool participantExists = targetParticipant != null;
+
+            if (!participantExists)
+            {
+                // Defer processing until GONetParticipant becomes available
+                DeferRpcForLater(rpcEvent, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: false);
+                return;
+            }
 
             if (!rpcHandlers.TryGetValue(rpcEvent.RpcId, out var handler))
             {
@@ -1083,6 +1337,15 @@ namespace GONet
                 // Clear context after execution
                 currentRpcContext = null;
             }
+        }
+
+        /// <summary>
+        /// Immediate synchronous version of HandleRpcForMe for deferred processing
+        /// Processes RPCs immediately on main thread to maintain timing and order
+        /// </summary>
+        private void HandleRpcForMe_Immediate(GONetEventEnvelope<RpcEvent> envelope)
+        {
+            HandleRpcForMe(envelope);
         }
 
         private void HandleRpcResponseForMe(GONetEventEnvelope<RpcResponseEvent> envelope)
@@ -1156,7 +1419,22 @@ namespace GONet
 
             // Find the instance
             var gnp = GONetMain.GetGONetParticipantById(evt.GONetId);
-            if (gnp == null) return;
+            if (gnp == null)
+            {
+                // Convert RoutedRpcEvent to RpcEvent for deferred processing
+                var rpcEvent = RpcEvent.Borrow();
+                rpcEvent.RpcId = evt.RpcId;
+                rpcEvent.GONetId = evt.GONetId;
+                rpcEvent.Data = evt.Data;
+                rpcEvent.OccurredAtElapsedTicks = evt.OccurredAtElapsedTicks;
+                rpcEvent.CorrelationId = evt.CorrelationId;
+                // Note: RoutedRpcEvent doesn't have IsSingularRecipientOnly property
+
+                // Defer processing until GONetParticipant becomes available
+                DeferRpcForLater(rpcEvent, sourceAuthority, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: false);
+                return;
+            }
 
             // Get the specific component
             var component = gnp.GetComponent(componentType) as GONetParticipantCompanionBehaviour;
@@ -1205,6 +1483,197 @@ namespace GONet
                         rpcEvent.GONetId = evt.GONetId;
                         rpcEvent.Data = dataToUse;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        rpcEvent.IsSingularRecipientOnly = true;
+
+                        Publish(
+                            rpcEvent,
+                            targetClientAuthorityId: targetBuffer[i],
+                            shouldPublishReliably: rpcMeta.IsReliable);
+                    }
+                }
+
+                // Return validation result arrays to pool
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+            finally
+            {
+                targetAuthorityArrayPool.Return(targetBuffer);
+            }
+        }
+
+        /// <summary>
+        /// Handles persistent RPC events - identical logic to HandleRpcForMe but for persistent events.
+        /// These events are processed when they arrive from late-joining client delivery.
+        /// </summary>
+        private async void HandlePersistentRpcForMe(GONetEventEnvelope<PersistentRpcEvent> envelope)
+        {
+            var rpcEvent = envelope.Event;
+
+            // Check if GONetParticipant exists - if not, defer processing
+            var targetParticipant = GONetMain.GetGONetParticipantById(rpcEvent.GONetId);
+            bool participantExists = targetParticipant != null;
+
+            GONetLog.Debug($"This just in: persistent RPC ID: 0x{rpcEvent.RpcId:X8}, for gonetId: {rpcEvent.GONetId}, exists yet? {participantExists}");
+
+            if (!participantExists)
+            {
+                // Defer processing until GONetParticipant becomes available
+                DeferRpcForLater(null, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: true, persistentRpcEvent: rpcEvent);
+                return;
+            }
+
+            if (!rpcHandlers.TryGetValue(rpcEvent.RpcId, out var handler))
+            {
+                GONetLog.Warning($"No handler registered for persistent RPC ID: 0x{rpcEvent.RpcId:X8}");
+                return;
+            }
+
+            // Set context for this RPC execution - convert to standard RpcEvent envelope format
+            var transientEvent = RpcEvent.Borrow();
+            transientEvent.RpcId = rpcEvent.RpcId;
+            transientEvent.GONetId = rpcEvent.GONetId;
+            transientEvent.Data = rpcEvent.Data;
+            transientEvent.OccurredAtElapsedTicks = rpcEvent.OccurredAtElapsedTicks;
+            transientEvent.CorrelationId = rpcEvent.CorrelationId;
+            transientEvent.IsSingularRecipientOnly = rpcEvent.IsSingularRecipientOnly;
+
+            var transientEnvelope = GONetEventEnvelope<RpcEvent>.Borrow(transientEvent, envelope.SourceAuthorityId, envelope.GONetParticipant, rpcEvent.SourceAuthorityId);
+            currentRpcContext = new GONetRpcContext(transientEnvelope);
+
+            try
+            {
+                await handler(transientEnvelope);
+                // The handler will send response if needed
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"Error executing persistent RPC handler for ID 0x{rpcEvent.RpcId:X8}: {ex.Message}");
+
+                // Note: Persistent RPCs typically don't have responses since they're replayed events
+                // But we'll handle it just in case
+                if (rpcEvent.CorrelationId != 0)
+                {
+                    var errorResponse = RpcResponseEvent.Borrow();
+                    errorResponse.CorrelationId = rpcEvent.CorrelationId;
+                    errorResponse.Success = false;
+                    errorResponse.ErrorMessage = ex.Message;
+                    errorResponse.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(errorResponse,
+                        targetClientAuthorityId: rpcEvent.SourceAuthorityId,
+                        shouldPublishReliably: true);
+                }
+            }
+            finally
+            {
+                currentRpcContext = null;
+                transientEvent.Return();
+                GONetEventEnvelope<RpcEvent>.Return(transientEnvelope);
+            }
+        }
+
+        /// <summary>
+        /// Immediate synchronous version of HandlePersistentRpcForMe for deferred processing
+        /// Processes persistent RPCs immediately on main thread to maintain timing and order
+        /// </summary>
+        private void HandlePersistentRpcForMe_Immediate(GONetEventEnvelope<PersistentRpcEvent> envelope)
+        {
+            HandlePersistentRpcForMe(envelope);
+        }
+
+        /// <summary>
+        /// Handles persistent routed RPC events - identical logic to Server_HandleRoutedRpcFromClient but for persistent events.
+        /// These events are processed when they arrive from late-joining client delivery.
+        /// </summary>
+        private void Server_HandlePersistentRoutedRpcFromClient(GONetEventEnvelope<PersistentRoutedRpcEvent> envelope)
+        {
+            var evt = envelope.Event;
+            var sourceAuthority = envelope.SourceAuthorityId;
+
+            // Use RpcId to find the exact component type and method
+            var methodName = GetMethodNameFromRpcId(evt.RpcId);
+            if (methodName == null) return;
+
+            // Find which component type this RpcId belongs to
+            Type componentType = componentTypeByRpcId[evt.RpcId];
+            if (componentType == null) return;
+
+            // Find the instance
+            var gnp = GONetMain.GetGONetParticipantById(evt.GONetId);
+            if (gnp == null)
+            {
+                // Convert PersistentRoutedRpcEvent to PersistentRpcEvent for deferred processing
+                var persistentRpcEvent = new PersistentRpcEvent();
+                persistentRpcEvent.RpcId = evt.RpcId;
+                persistentRpcEvent.GONetId = evt.GONetId;
+                persistentRpcEvent.Data = evt.Data;
+                persistentRpcEvent.OccurredAtElapsedTicks = evt.OccurredAtElapsedTicks;
+                persistentRpcEvent.CorrelationId = evt.CorrelationId;
+                // Note: PersistentRoutedRpcEvent doesn't have IsSingularRecipientOnly property
+
+                // Defer processing until GONetParticipant becomes available
+                DeferRpcForLater(null, sourceAuthority, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: true, persistentRpcEvent: persistentRpcEvent);
+                return;
+            }
+
+            // Get the specific component
+            var component = gnp.GetComponent(componentType) as GONetParticipantCompanionBehaviour;
+            if (component == null) return;
+
+            // Now get the metadata for this specific component and method
+            if (!rpcMetadataByType.TryGetValue(componentType, out var metadata) ||
+                !metadata.TryGetValue(methodName, out var rpcMeta)) return;
+
+            // For persistent events, we need to re-evaluate targeting for the current client state
+            // The stored TargetAuthorities may not include late-joining clients
+            var targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
+            try
+            {
+                // Copy original targets for reference
+                Array.Copy(evt.TargetAuthorities, targetBuffer, evt.TargetCount);
+
+                // NOTE: For persistent TargetRPCs, the original target list may exclude late-joining clients
+                // This is a fundamental limitation that should be documented and handled at the design level
+                // For now, we process with the original targets as stored
+
+                // Use enhanced validation system for profanity filtering and other validation
+                RpcValidationResult validationResult;
+                if (enhancedValidatorsByType.TryGetValue(componentType, out var validators) &&
+                    validators.TryGetValue(methodName, out var validatorObj) &&
+                    validatorParameterCounts.TryGetValue(componentType, out var paramCounts) &&
+                    paramCounts.TryGetValue(methodName, out var paramCount))
+                {
+                    // Invoke enhanced validator (with profanity filtering)
+                    validationResult = InvokeValidator(validatorObj, paramCount, component, sourceAuthority, targetBuffer, evt.TargetCount, evt.Data);
+                }
+                else
+                {
+                    // Default validation - allow all original targets
+                    validationResult = RpcValidationResult.CreatePreAllocated(evt.TargetCount);
+
+                    for (int i = 0; i < evt.TargetCount; i++)
+                    {
+                        validationResult.AllowedTargets[i] = true;
+                    }
+                }
+
+                // Send to validated targets using transient events (persistent replay doesn't need to persist again)
+                byte[] dataToUse = validationResult.ModifiedData ?? evt.Data;
+
+                for (int i = 0; i < evt.TargetCount; i++)
+                {
+                    if (i < validationResult.AllowedTargets.Length && validationResult.AllowedTargets[i])
+                    {
+                        var rpcEvent = RpcEvent.Borrow();
+                        rpcEvent.RpcId = evt.RpcId;
+                        rpcEvent.GONetId = evt.GONetId;
+                        rpcEvent.Data = dataToUse;
+                        rpcEvent.OccurredAtElapsedTicks = evt.OccurredAtElapsedTicks; // Use original timestamp
                         rpcEvent.IsSingularRecipientOnly = true;
 
                         Publish(
@@ -1495,14 +1964,29 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1530,19 +2014,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData1<T1> { Arg1 = arg1 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1570,19 +2070,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1610,19 +2126,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1650,19 +2182,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1690,19 +2238,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1730,19 +2294,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1770,19 +2350,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1810,19 +2406,35 @@ namespace GONet
                     }
                 }
 
-                // Then broadcast to all clients
+                // Then broadcast to all clients - use persistent or transient event based on metadata
                 var rpcId = GetRpcId(instance.GetType(), methodName);
                 var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
                 int bytesUsed;
                 bool needsReturn;
                 byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.RpcId = rpcId;
-                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                rpcEvent.Data = serialized;
-                Publish(rpcEvent, shouldPublishReliably: metadata.IsReliable);
+                if (IsSuitableForPersistence(metadata))
+                {
+                    var persistentEvent = new PersistentRpcEvent();
+                    persistentEvent.RpcId = rpcId;
+                    persistentEvent.GONetId = instance.GONetParticipant.GONetId;
+                    persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    persistentEvent.Data = serialized;
+                    persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                    persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
+                }
+                else
+                {
+                    var transientEvent = RpcEvent.Borrow();
+                    transientEvent.RpcId = rpcId;
+                    transientEvent.GONetId = instance.GONetParticipant.GONetId;
+                    transientEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    transientEvent.Data = serialized;
+
+                    Publish(transientEvent, shouldPublishReliably: metadata.IsReliable);
+                }
             }
             else
             {
@@ -1933,14 +2545,31 @@ namespace GONet
                 // Client sends to server for routing
                 if (GONetMain.IsClient && !GONetMain.IsServer)
                 {
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
 
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
 
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -2021,12 +2650,26 @@ namespace GONet
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
-                            var rpcEvent = RpcEvent.Borrow();
-                            rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                            rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                            rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                            rpcEvent.IsSingularRecipientOnly = true;
-                            Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
                         }
                     }
                 }
@@ -2171,15 +2814,33 @@ namespace GONet
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
 
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
 
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
 
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
@@ -2268,16 +2929,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
 
                     if (needsReturn)
@@ -2505,15 +3184,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -2655,14 +3353,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -2740,15 +3456,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -2890,14 +3625,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -2975,15 +3728,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -3125,14 +3897,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -3210,15 +4000,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -3360,14 +4169,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -3445,15 +4272,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -3595,14 +4441,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -3680,15 +4544,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -3830,14 +4713,32 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    var routedRpc = RoutedRpcEvent.Borrow();
-                    routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
-                    routedRpc.GONetId = instance.GONetParticipant.GONetId;
-                    routedRpc.TargetCount = targetCount;
-                    Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
-                    routedRpc.Data = serialized;
-                    routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+
+                    if (IsSuitableForPersistence(metadata))
+                    {
+                        var persistentRoutedRpc = new PersistentRoutedRpcEvent();
+                        persistentRoutedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        persistentRoutedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
+                        persistentRoutedRpc.Data = serialized;
+                        persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
+                        persistentRoutedRpc.OriginalTarget = metadata.Target;
+                        persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+                        Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
+                    else
+                    {
+                        var routedRpc = RoutedRpcEvent.Borrow();
+                        routedRpc.RpcId = GetRpcId(instance.GetType(), methodName);
+                        routedRpc.GONetId = instance.GONetParticipant.GONetId;
+                        routedRpc.TargetCount = targetCount;
+                        Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
+                        routedRpc.Data = serialized;
+                        routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
+                    }
                     // Execute locally if we're a target
                     for (int i = 0; i < targetCount; i++)
                     {
@@ -3915,15 +4816,34 @@ namespace GONet
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
-                        byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
-                        Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
-                        var rpcEvent = RpcEvent.Borrow();
-                        rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
-                        rpcEvent.GONetId = instance.GONetParticipant.GONetId;
-                        rpcEvent.Data = serializedCopy;
-                        rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                        rpcEvent.IsSingularRecipientOnly = true;
-                        Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                        if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
+                        {
+                            byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
+                            Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
+
+                            if (IsSuitableForPersistence(metadata))
+                            {
+                                var persistentRpcEvent = new PersistentRpcEvent();
+                                persistentRpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                persistentRpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                persistentRpcEvent.Data = serializedCopy;
+                                persistentRpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                persistentRpcEvent.IsSingularRecipientOnly = true;
+                                persistentRpcEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
+                                persistentRpcEvent.OriginalTarget = metadata.Target;
+                                Publish(persistentRpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                            else
+                            {
+                                var rpcEvent = RpcEvent.Borrow();
+                                rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                                rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                                rpcEvent.Data = serializedCopy;
+                                rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                                rpcEvent.IsSingularRecipientOnly = true;
+                                Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
+                            }
+                        }
                     }
                     if (needsReturn)
                     {
@@ -6689,6 +7609,107 @@ namespace GONet
             }
             return interfaces;
         }
+
+        #region RPC Persistence Support
+
+        /// <summary>
+        /// Determines if an RPC is suitable for persistence based on its metadata and targeting.
+        /// Only certain combinations of RPC types and targets should persist for late-joining clients.
+        /// </summary>
+        private static bool IsSuitableForPersistence(RpcMetadata metadata)
+        {
+            if (!metadata.IsPersistent) return false;
+
+            switch (metadata.Type)
+            {
+                case RpcType.ServerRpc:
+                    // Server RPCs don't need persistence - server is always present
+                    return false;
+
+                case RpcType.ClientRpc:
+                    // Client RPCs are always suitable - they go to all clients
+                    return true;
+
+                case RpcType.TargetRpc:
+                    // Only certain TargetRpc configurations are suitable for persistence
+                    return IsTargetRpcSuitableForPersistence(metadata);
+
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Determines if a TargetRpc is suitable for persistence based on its targeting configuration.
+        /// </summary>
+        private static bool IsTargetRpcSuitableForPersistence(RpcMetadata metadata)
+        {
+            switch (metadata.Target)
+            {
+                case RpcTarget.All:
+                case RpcTarget.Others:
+                    // These targets are suitable - they represent categories, not individuals
+                    return true;
+
+                case RpcTarget.Owner:
+                    // Owner targeting can be suitable for some use cases
+                    // (e.g., setting initial state for object owners)
+                    return true;
+
+                case RpcTarget.SpecificAuthority:
+                case RpcTarget.MultipleAuthorities:
+                    // Individual authority targeting is not suitable for persistence
+                    // because those specific clients may no longer exist
+                    return false;
+
+                default:
+                    // Property-based targeting - validate the property name
+                    return IsPropertyTargetSuitableForPersistence(metadata.TargetPropertyName);
+            }
+        }
+
+        /// <summary>
+        /// Determines if a property-based target is suitable for persistence.
+        /// Static/category-based properties are suitable, individual ID properties are not.
+        /// </summary>
+        private static bool IsPropertyTargetSuitableForPersistence(string propertyName)
+        {
+            if (string.IsNullOrEmpty(propertyName)) return false;
+
+            // Convert to lowercase for case-insensitive comparison
+            string lowerName = propertyName.ToLowerInvariant();
+
+            // Category-based properties that are suitable for persistence
+            if (lowerName.Contains("team") ||
+                lowerName.Contains("group") ||
+                lowerName.Contains("channel") ||
+                lowerName.Contains("room") ||
+                lowerName.Contains("admin") ||
+                lowerName.Contains("moderator") ||
+                lowerName.Contains("guild") ||
+                lowerName.Contains("clan") ||
+                lowerName.Contains("faction"))
+            {
+                return true;
+            }
+
+            // Individual-based properties that are NOT suitable for persistence
+            if (lowerName.Contains("specific") ||
+                lowerName.Contains("current") ||
+                lowerName.Contains("target") ||
+                lowerName.Contains("selected") ||
+                lowerName.EndsWith("id") ||
+                lowerName.EndsWith("ids"))
+            {
+                return false;
+            }
+
+            // Default to allowing property-based targeting for persistence
+            // (conservative approach - better to persist unnecessarily than miss important state)
+            return true;
+        }
+
+        #endregion
 
         public class EventHandlerAndFilterer
         {

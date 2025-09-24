@@ -714,6 +714,9 @@ namespace GONet
             {
                 gonetParticipantByGONetIdAtInstantiationMap[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
                 gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant;
+
+                // Notify deferred RPC system that this participant is now available
+                GONetEventBus.OnGONetParticipantRegistered(gonetId_new);
             }
             else
             {
@@ -730,6 +733,9 @@ namespace GONet
 
                     gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                     gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
+
+                    // Notify deferred RPC system that this participant is now available
+                    GONetEventBus.OnGONetParticipantRegistered(gonetId_new);
                 }
             }
         }
@@ -781,6 +787,9 @@ namespace GONet
                 if (gonetParticipant.GONetId == gonetParticipant.GONetIdAtInstantiation)
                 {
                     gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
+
+                    // Notify deferred RPC system that this participant is now available
+                    GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
                 }
                 else
                 {
@@ -797,6 +806,9 @@ namespace GONet
 
                         gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                         gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
+
+                        // Notify deferred RPC system that this participant is now available
+                        GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
                     }
                 }
             }
@@ -951,20 +963,18 @@ namespace GONet
         {
             GONetLog.Debug("******received persistent events bundle from remote source");
 
-            { // TODO why not just publish each one of these so all the handlers kick in and process??????   otherwise, we are left with this piecemeal processing below....error prone and problematic for sure!
-                foreach (var item in eventEnvelope.Event.PersistentEvents)
-                {
-                    persistentEventsThisSession.AddLast(item);
+            foreach (var item in eventEnvelope.Event.PersistentEvents)
+            {
+                //GONetLog.Debug($"\t-persistent event in bundle, type: {item.GetType().FullName}");
+                persistentEventsThisSession.AddLast(item);
 
-                    if (item is InstantiateGONetParticipantEvent)
-                    {
-                        Instantiate_Remote((InstantiateGONetParticipantEvent)item);
-                    }
-                    else if (item is ValueMonitoringSupport_NewBaselineEvent)
-                    {
-                        ApplyNewBaselineValue_Remote((ValueMonitoringSupport_NewBaselineEvent)item);
-                    }
-                }
+                // Publish the persistent event to the event bus so all registered handlers can process it
+                // This replaces the old piecemeal approach and ensures extensibility for new persistent event types
+                EventBus.Publish(
+                    item,
+                    remoteSourceAuthorityId: eventEnvelope.SourceAuthorityId, 
+                    targetClientAuthorityId: MyAuthorityId, // this is required to ensure my handlers are invoked and that is it
+                    shouldPublishReliably: true); // probably redundant as none of this should go back over the wire at all
             }
         }
 
@@ -1157,8 +1167,8 @@ namespace GONet
         {
             ////GONetLog.Debug("DREETS pork");
 
-            //const string IR = "pub/sub Instantiate REMOTE about to process...";
-            //GONetLog.Debug(IR);
+            const string IR = "pub/sub Instantiate REMOTE about to process...";
+            GONetLog.Debug(IR + $" gonetId: {eventEnvelope.Event.GONetId}");
 
             GONetParticipant instance = Instantiate_Remote(eventEnvelope.Event);
 
@@ -3020,7 +3030,7 @@ namespace GONet
         {
             IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
             EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
-            //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
+            GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
         }
 
         static bool isCurrentlyProcessingInstantiateGNPEvent;
@@ -3714,6 +3724,9 @@ namespace GONet
                 if (gonetParticipant.GONetId != GONetParticipant.GONetId_Unset) // FYI, the normal case is that at this point, GONetId will be 0/unset, because this is happening as a result of Instantiate being called in which case the actual GONetId assignment will not occur until just AFTER OnEnable is finished!
                 {
                     gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // be doubly sure we have this (the case where it would not already is if gnp was started-disabled-enabled
+
+                    // Notify deferred RPC system that this participant is now available
+                    GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
                 }
 
                 uint gonetIdThatIsGoingToBePopulated = isCurrentlyProcessingInstantiateGNPEvent ? currentlyProcessingInstantiateGNPEvent.GONetId : gonetParticipant.GONetId;

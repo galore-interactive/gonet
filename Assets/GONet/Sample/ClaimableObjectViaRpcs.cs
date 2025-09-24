@@ -17,10 +17,11 @@ using UnityEngine;
 /// 1. Task<T> Returns: RequestClaim() returns detailed result data that clients use
 /// 2. Task<bool> Returns: RequestRelease() returns success/failure that clients check
 /// 3. Void RPCs: NotifyAttemptedClaimWhileOwned() for fire-and-forget notifications
-/// 4. ClientRpc: BroadcastClaimChanged() for server-to-all-clients notifications
+/// 4. Persistent ClientRpc: BroadcastClaimChanged(IsPersistent = true) automatically informs late-joining clients
 /// 5. TargetRpc with SpecificAuthority: NotifyClaimerOfAttemptedTheft() uses a property name
 ///    to dynamically target the RPC to whoever has claimed the object
 /// 6. RPC Context: Access via GONetEventBus.GetCurrentRpcContext() during RPC execution
+/// 7. Persistent RPC State: Eliminates need for manual GetStatus() calls - state is automatic!
 /// 
 /// HOW TO CALL RPCs:
 /// - Use CallRpc(nameof(MethodName), args...) for fire-and-forget calls
@@ -278,6 +279,12 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     /// TargetRpc sent only to the player who has claimed this object when someone else tries to steal it.
     /// Uses the ClaimedByAuthorityId property to determine the target recipient.
     /// This provides direct feedback to the claiming player that someone attempted to "steal" their object.
+    ///
+    /// NOTE: This TargetRpc is NOT persistent because:
+    /// 1. Theft attempt notifications are transient events that don't need to persist
+    /// 2. If it were persistent, late-joining clients might not receive it properly
+    ///    since their authority ID wouldn't be in ClaimedByAuthorityId when the theft occurred
+    /// 3. Late-joiners don't need to know about historical theft attempts
     /// </summary>
     [TargetRpc(nameof(ClaimedByAuthorityId))]
     internal void NotifyClaimerOfAttemptedTheft(ushort attemptingAuthorityId)
@@ -299,7 +306,12 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         // AudioManager.PlaySound("theft_attempt_warning");
     }
 
-    [ClientRpc]
+    /// <summary>
+    /// Persistent ClientRpc that informs all clients about claim state changes.
+    /// Uses ClientRpc (not TargetRpc) to ensure late-joining clients receive this state.
+    /// This is the recommended pattern for persistent state that all clients need.
+    /// </summary>
+    [ClientRpc(IsPersistent = true)]
     internal void BroadcastClaimChanged(ushort authorityId, bool wasClaimed)
     {
         if (wasClaimed)
@@ -320,16 +332,14 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         UpdateVisualState();
     }
 
-    [ServerRpc(IsMineRequired = false)]
-    internal async Task<ClaimStatus> GetStatus()
-    {
-        return new ClaimStatus
-        {
-            IsAvailable = ClaimedByAuthorityId == GONetMain.OwnerAuthorityId_Unset,
-            CurrentOwnerAuthorityId = ClaimedByAuthorityId,
-            TotalClaims = TotalClaimCount
-        };
-    }
+    /// <summary>
+    /// NOTE: GetStatus() method removed!
+    /// With persistent RPCs (IsPersistent = true), late-joining clients automatically receive:
+    /// - BroadcastClaimChanged: Current claim status and owner
+    /// - Initial object state via GONetAutoMagicalSync properties
+    ///
+    /// This eliminates the need for manual status requests.
+    /// </summary>
 
     void UpdateVisualState()
     {
@@ -428,10 +438,4 @@ public partial struct ClaimResult
     public bool IsSpecialClaim;
 }
 
-[MemoryPackable]
-public partial struct ClaimStatus
-{
-    public bool IsAvailable;
-    public ushort CurrentOwnerAuthorityId;
-    public int TotalClaims;
-}
+// ClaimStatus struct removed - no longer needed with persistent RPCs

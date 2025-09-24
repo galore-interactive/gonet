@@ -316,6 +316,9 @@ namespace GONet
         private void Update()
         {
             GONetMain.Update(this);
+
+            // Process deferred RPCs - handle cases where GONetParticipants weren't available during initial processing
+            GONetEventBus.ProcessDeferredRpcs();
         }
 
         private void OnApplicationQuit()

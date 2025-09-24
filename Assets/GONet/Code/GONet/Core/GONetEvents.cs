@@ -34,7 +34,10 @@ namespace GONet
     }
 
     /// <summary>
-    /// Implement this to this indicates the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
+    /// Implement this to indicate the information herein is only relevant while it is happening and while subscribers are notified and NOT to be passed along to newly connecting clients and can safely be skipped over during replay skip-ahead or fast-forward.
+    ///
+    /// POOLING COMPATIBILITY: Events implementing ITransientEvent are typically compatible with object pooling via ISelfReturnEvent,
+    /// as they are processed immediately and not stored for future use. This allows for efficient memory reuse patterns.
     /// </summary>
     public partial interface ITransientEvent : IGONetEvent
     {
@@ -51,7 +54,22 @@ namespace GONet
     }
 
     /// <summary>
-    /// Implement this for persistent events..opposite of extending <see cref="ITransientEvent"/> (see the comments there for more).
+    /// Implement this to indicate the information herein should be stored and sent to newly connecting clients.
+    /// These events are kept in GONet's persistentEventsThisSession collection for late-joining client delivery.
+    ///
+    /// CRITICAL: Events implementing IPersistentEvent should NOT also implement ISelfReturnEvent.
+    ///
+    /// POOLING INCOMPATIBILITY: Persistent events are stored by reference in GONet's persistence system
+    /// (see OnPersistentEvent_KeepTrack in GONet.cs). If these events were pooled and returned after execution,
+    /// their data would be cleared/corrupted when sent to late-joining clients, causing critical data integrity issues.
+    ///
+    /// DESIGN DECISION: GONet prioritizes data safety over memory efficiency for persistent events.
+    /// The cost of allocating new objects is acceptable given:
+    /// - Persistent events are used less frequently than transient events
+    /// - Data integrity is more critical than micro-optimizations for these events
+    /// - The pattern aligns with existing GONet persistent events (e.g., InstantiateGONetParticipantEvent)
+    ///
+    /// For performance-critical scenarios, consider using transient events where persistence is not required.
     /// </summary>
     public partial interface IPersistentEvent : IGONetEvent { }
 
@@ -623,6 +641,19 @@ namespace GONet
     /// <summary>
     /// Once this event is sent through <see cref="GONetEventBus.Publish{T}(T, uint?)"/>, it will automatically have <see cref="Return"/> called on it.
     /// At time of writing, this is to support (automatic) object pool usage for better memory/garbage/GC performance.
+    ///
+    /// IMPORTANT COMPATIBILITY CONSTRAINT: Events implementing ISelfReturnEvent should NOT also implement IPersistentEvent.
+    ///
+    /// REASON: GONet's persistence system stores direct references to persistent events for late-joining clients.
+    /// If a persistent event also implemented ISelfReturnEvent, its Return() method would clear the event data
+    /// after processing, corrupting the data when it's later sent to new clients.
+    ///
+    /// DESIGN PATTERN:
+    /// - Transient events (ITransientEvent) + ISelfReturnEvent = SAFE (immediate processing, pooling enabled)
+    /// - Persistent events (IPersistentEvent) + NO pooling = SAFE (stored references, data preserved)
+    /// - Persistent events + ISelfReturnEvent = DANGEROUS (data corruption for late-joining clients)
+    ///
+    /// This constraint ensures data integrity in GONet's event persistence mechanism.
     /// </summary>
     public interface ISelfReturnEvent
     {
