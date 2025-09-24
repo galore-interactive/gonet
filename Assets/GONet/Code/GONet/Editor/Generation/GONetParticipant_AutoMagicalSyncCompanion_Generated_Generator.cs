@@ -1661,6 +1661,7 @@ namespace GONet.Generation
             sb.AppendLine($"                Type = {rpcType}, ");
             sb.AppendLine($"                IsReliable = {attr.IsReliable.ToString().ToLower()}, ");
             sb.AppendLine($"                IsMineRequired = {attr.IsMineRequired.ToString().ToLower()}, ");
+            sb.AppendLine($"                IsPersistent = {attr.IsPersistent.ToString().ToLower()}, ");
             sb.AppendLine($"                Target = {target}, ");
             sb.AppendLine($"                TargetPropertyName = {targetPropertyName},");
             sb.AppendLine($"                IsMultipleTargets = {isMultipleTargets},");

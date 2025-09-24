@@ -29,8 +29,13 @@ using System.Runtime.CompilerServices;
 ///
 /// Key RPC Examples:
 /// - [TargetRpc] with validation: SendMessage() shows parameter validation and content filtering
-/// - [ServerRpc] for state requests: RequestCurrentState() demonstrates server authority
+/// - [ServerRpc] for registration: RegisterParticipant() demonstrates server authority
 /// - [ClientRpc] for broadcasts: BroadcastParticipantUpdate() shows multi-client updates
+///
+/// Persistent RPC Strategy (Late-Joining Client Support):
+/// ✅ Channel creation: [ClientRpc(IsPersistent = true)] - All clients need channel info
+/// ✅ Participant updates: [ClientRpc(IsPersistent = true)] - All clients need participant list
+/// ❌ Chat messages: [TargetRpc] (NOT persistent) - Transient content, history handled locally
 ///
 /// This serves as a production-ready reference implementation for GONet's RPC system.
 /// </summary>
@@ -127,17 +132,18 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         // Don't add ourselves here - let OnGONetParticipantEnabled handle it
 
-        // If client, request current state from server after a short delay
+        // If client, register with server after a short delay
+        // Note: Persistent RPCs will automatically provide current state
         if (!GONetMain.IsServer)
         {
-            StartCoroutine(RequestStateAfterDelay());
+            StartCoroutine(RegisterAfterDelay());
         }
     }
 
-    private IEnumerator RequestStateAfterDelay()
+    private IEnumerator RegisterAfterDelay()
     {
         yield return new WaitForSeconds(0.5f); // Give time for all participants to be detected
-        CallRpc(nameof(RequestCurrentState));
+        CallRpc(nameof(RegisterParticipant));
     }
 
     public override void OnGONetParticipantEnabled(GONetParticipant gonetParticipant)
@@ -542,20 +548,18 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     #region RPCs - State Synchronization
 
     /// <summary>
-    /// Demonstrates ServerRpc usage for client-initiated state synchronization requests.
-    /// This pattern is common for late-joining clients or state recovery scenarios.
+    /// Registers a newly connected client in the participant list.
     ///
-    /// ServerRpc Features Demonstrated:
-    /// - IsMineRequired = false allows any client to call this RPC
-    /// - Server authority validation using GONetRpcContext
-    /// - Conditional participant list updates based on server state
-    /// - Targeted response using TargetRpc for efficient state delivery
+    /// NOTE: With persistent RPCs (IsPersistent = true), state synchronization is now
+    /// automatic! Late-joining clients receive:
+    /// - BroadcastParticipantUpdate: Current participant list
+    /// - OnChannelCreated: All existing channels
+    /// - Previous chat messages with persistent delivery
     ///
-    /// This pattern ensures new clients receive current state without flooding
-    /// all clients with unnecessary updates, demonstrating efficient state management.
+    /// This RPC now only handles participant registration, making the system more efficient.
     /// </summary>
     [ServerRpc(IsMineRequired = false)]
-    internal void RequestCurrentState()
+    internal void RegisterParticipant()
     {
         GONetRpcContext rpcContext = GONetEventBus.GetCurrentRpcContext();
         ushort requestingAuthority = rpcContext.SourceAuthorityId;
@@ -572,32 +576,11 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 Status = ConnectionStatus.Connected
             });
 
-            // Broadcast the updated list to ALL clients
+            // This will now be persistent and automatically sent to late-joining clients
             CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
         }
-
-        // Send current state to the requesting client only
-        CurrentSingleTarget = requestingAuthority;
-        CallRpc(nameof(ReceiveCurrentState), participants.ToArray(), channels.ToArray());
     }
 
-    [TargetRpc(nameof(CurrentSingleTarget), isMultipleTargets: false)]
-    internal void ReceiveCurrentState(ChatParticipant[] allParticipants, ChatChannel[] allChannels)
-    {
-        // Update our local state with server's state
-        // Keep ourselves in the list but update everyone else
-        var ourself = participants.FirstOrDefault(p => p.AuthorityId == localAuthorityId);
-
-        participants = allParticipants.ToList();
-
-        // Make sure we're in the list (in case server doesn't have us yet)
-        if (!participants.Any(p => p.AuthorityId == localAuthorityId) && ourself.AuthorityId != 0)
-        {
-            participants.Add(ourself);
-        }
-
-        channels = allChannels.ToList();
-    }
 
     /// <summary>
     /// Demonstrates ClientRpc usage for server-to-all-clients broadcasting.
@@ -612,7 +595,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// This pattern is ideal for authoritative updates where the server
     /// maintains the canonical state and all clients need to synchronize.
     /// </summary>
-    [ClientRpc]
+    [ClientRpc(IsPersistent = true)]
     internal void BroadcastParticipantUpdate(ChatParticipant[] allParticipants)
     {
         // Server is broadcasting the authoritative participant list
@@ -653,7 +636,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         CallRpc(nameof(OnChannelCreated), newChannel);
     }
 
-    [ClientRpc]
+    [ClientRpc(IsPersistent = true)]
     internal void OnChannelCreated(ChatChannel channel)
     {
         if (!channels.Any(c => c.Name == channel.Name))
@@ -678,6 +661,12 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <summary>
     /// Demonstrates advanced TargetRpc usage with custom validation and async delivery reports.
     /// This method showcases GONet's new RPC validation system with server-side content filtering.
+    ///
+    /// IMPORTANT: This TargetRpc is intentionally NOT persistent because:
+    /// 1. Chat messages are transient - late-joining clients don't need old messages
+    /// 2. TargetRpc with specific authority lists wouldn't work for late-joiners anyway
+    /// 3. Message history is handled locally with TrimMessageHistory()
+    /// 4. Only structural state (channels, participants) uses persistent RPCs
     ///
     /// Key Features Demonstrated:
     /// - TargetRpc with dynamic target list (CurrentMessageTargets property)
