@@ -81,8 +81,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     private ChatType currentChatMode = ChatType.Channel;
 
     // UI Configuration
-    private Rect windowRect = new Rect(10, 10, 400, 500);
-    private Rect collapsedRect = new Rect(10, 10, 200, 30);
+    private Rect windowRect = new Rect(10, Screen.height - 510, 400, 500);
+    private Rect collapsedRect = new Rect(10, Screen.height - 70, 100, 60);
 
     // Profanity Filter (Server-side)
     private static readonly Dictionary<string, string> profanityReplacements = new Dictionary<string, string>
@@ -298,7 +298,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             bool isActive = currentChatMode == ChatType.Channel && activeChannel == channel.Name;
             GUI.backgroundColor = isActive ? Color.cyan : Color.white;
 
-            if (GUILayout.Button($"# {channel.Name}", GUILayout.Height(20)))
+            if (GUILayout.Button($"# {channel.Name}", GUILayout.Height(20), GUILayout.MaxWidth(115)))
             {
                 SwitchToChannel(channel.Name);
             }
@@ -306,7 +306,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         GUI.backgroundColor = Color.white;
 
-        if (GUILayout.Button("+ New Channel", GUILayout.Height(20)))
+        if (GUILayout.Button("+ New Channel", GUILayout.Height(20), GUILayout.MaxWidth(115)))
         {
             showNewChannelDialog = true;
         }
@@ -694,8 +694,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         // Get context - this should always be available in an RPC
         GONetRpcContext context = GONetEventBus.GetCurrentRpcContext();
 
-        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Received SendMessage RPC from {context.SourceAuthorityId}, originally from user {fromUserId}");
-
         var message = new ChatMessage
         {
             SenderId = fromUserId, // Use the explicit fromUserId instead of context.SourceAuthorityId
@@ -743,37 +741,9 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     void OnReceiveMessage(ChatMessage message)
     {
-        // Determine if we should display this message based on current view
-        bool shouldDisplay = false;
-
-        switch (message.Type)
-        {
-            case ChatType.Channel:
-                shouldDisplay = (currentChatMode == ChatType.Channel && activeChannel == message.ChannelName);
-                break;
-
-            case ChatType.DirectMessage:
-                if (currentChatMode == ChatType.DirectMessage)
-                {
-                    shouldDisplay = selectedParticipants.Contains(message.SenderId) ||
-                                  message.SenderId == localAuthorityId;
-                }
-                break;
-
-            case ChatType.GroupMessage:
-                if (currentChatMode == ChatType.GroupMessage)
-                {
-                    shouldDisplay = message.Recipients.Any(r => selectedParticipants.Contains(r)) ||
-                                  message.SenderId == localAuthorityId;
-                }
-                break;
-        }
-
-        if (shouldDisplay)
-        {
-            allMessages.Add(message);
-            TrimMessageHistory();
-        }
+        // Store ALL messages regardless of current view - filtering happens during display
+        allMessages.Add(message);
+        TrimMessageHistory();
     }
 
     /// <summary>
@@ -860,7 +830,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
         catch (Exception ex)
         {
-            Debug.LogError($"Failed to filter message content: {ex.Message}");
+            GONetLog.Error($"Failed to filter message content: {ex.Message}");
         }
 
         return result;
@@ -904,9 +874,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         CurrentMessageTargets = uniqueTargets.ToList();
 
-        // Debug logging to help diagnose the issue
-        Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Sending message to {CurrentMessageTargets.Count} targets: {string.Join(", ", CurrentMessageTargets)}");
-
         // Example of async RPC calling with delivery report handling
         // This demonstrates the new CallRpcAsync<TReturn, T1, T2, T3, T4> pattern for complex RPCs
         CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort>(
@@ -920,11 +887,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 // Handle delivery failures gracefully - common in networked environments
                 if (task.Result.FailedDelivery?.Length > 0)
                 {
-                    Debug.LogWarning($"Failed to deliver to some recipients: {task.Result.FailureReason}");
+                    GONetLog.Warning($"Failed to deliver to some recipients: {task.Result.FailureReason}");
                 }
-
-                // Log successful deliveries for debugging and analytics
-                Debug.Log($"[{(GONetMain.IsServer ? "Server" : "Client")}] Message delivery report - Delivered to: {string.Join(", ", task.Result.DeliveredTo ?? new ushort[0])}");
             });
 
         currentInputText = "";
@@ -957,9 +921,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     private void RefreshCurrentMessages()
     {
-        // In a real implementation, you'd filter messages based on current view
-        // For now, we'll just clear for demonstration
-        allMessages.Clear();
+        // Messages are filtered dynamically in GetFilteredMessages() during display
+        // No need to clear or modify allMessages here - we want to preserve all history
     }
 
     private bool IsServerAuthorityId(ushort authorityId)
@@ -1006,24 +969,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
     }
 
-    private async Task<string> FilterProfanityAsync(string input)
-    {
-        if (!GONetMain.IsServer)
-            return input;
-
-        // Try web API first, then fall back to local filtering
-        string filtered = await TryWebProfanityFilter(input);
-        if (filtered != null)
-        {
-            Debug.Log($"[Server] Used web API profanity filter");
-            return filtered;
-        }
-
-        // Fallback to local profanity filtering
-        Debug.Log($"[Server] Falling back to local profanity filter");
-        return FilterProfanityLocal(input);
-    }
-
     private string FilterProfanityLocal(string input)
     {
         if (!GONetMain.IsServer)
@@ -1037,102 +982,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
 
         return filtered;
-    }
-
-    private async Task<string> TryWebProfanityFilter(string input)
-    {
-        try
-        {
-            // First try PurgoMalum API (free, established service)
-            string result = await TryPurgoMalumFilter(input);
-            if (result != null) return result;
-
-            // If PurgoMalum fails, try profanity.dev as backup
-            result = await TryProfanityDevFilter(input);
-            if (result != null) return result;
-
-            return null; // All web APIs failed
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[Server] Web profanity filter failed: {ex.Message}");
-            return null;
-        }
-    }
-
-    private async Task<string> TryPurgoMalumFilter(string input)
-    {
-        try
-        {
-            string url = $"https://www.purgomalum.com/service/plain?text={UnityWebRequest.EscapeURL(input)}";
-
-            using (UnityWebRequest request = UnityWebRequest.Get(url))
-            {
-                request.timeout = 1; // 1 second timeout
-                await request.SendWebRequest();
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    return request.downloadHandler.text;
-                }
-                else
-                {
-                    Debug.LogWarning($"[Server] PurgoMalum API failed: {request.error}");
-                    return null;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[Server] PurgoMalum API exception: {ex.Message}");
-            return null;
-        }
-    }
-
-    private async Task<string> TryProfanityDevFilter(string input)
-    {
-        try
-        {
-            string jsonPayload = $"{{\"message\":\"{input.Replace("\"", "\\\"")}\"}}";
-
-            using (UnityWebRequest request = new UnityWebRequest("https://vector.profanity.dev", "POST"))
-            {
-                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
-                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
-                request.timeout = 1; // 1 second timeout
-
-                await request.SendWebRequest();
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    // Parse JSON response - assuming it returns filtered text
-                    string response = request.downloadHandler.text;
-                    // Simple JSON parsing for now - in production you'd want proper JSON parsing
-                    if (response.Contains("\""))
-                    {
-                        var start = response.IndexOf("\"") + 1;
-                        var end = response.LastIndexOf("\"");
-                        if (end > start)
-                        {
-                            return response.Substring(start, end - start);
-                        }
-                    }
-                    return input; // If we can't parse response, return original (assume clean)
-                }
-                else
-                {
-                    Debug.LogWarning($"[Server] Profanity.dev API failed: {request.error}");
-                    return null;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[Server] Profanity.dev API exception: {ex.Message}");
-            return null;
-        }
     }
 
     // Synchronous wrapper for backwards compatibility
@@ -1154,13 +1003,12 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             string result = TryPurgoMalumSync(input);
             if (result != null)
             {
-                Debug.Log($"[Server] Used PurgoMalum API for profanity filtering");
                 return result;
             }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[Server] PurgoMalum sync failed: {ex.Message}");
+            GONetLog.Warning($"[Server] PurgoMalum sync failed: {ex.Message}");
         }
 
         // Try profanity.dev as backup
@@ -1169,17 +1017,15 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             string result = TryProfanityDevSync(input);
             if (result != null)
             {
-                Debug.Log($"[Server] Used Profanity.dev API for profanity filtering");
                 return result;
             }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[Server] Profanity.dev sync failed: {ex.Message}");
+            GONetLog.Warning($"[Server] Profanity.dev sync failed: {ex.Message}");
         }
 
         // Fall back to local filtering
-        Debug.Log($"[Server] Web APIs failed, using local profanity filter");
         return FilterProfanityLocal(input);
     }
 
@@ -1209,14 +1055,14 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"[Server] PurgoMalum sync request failed or timed out");
+                    GONetLog.Warning($"[Server] PurgoMalum sync request failed or timed out");
                     return null;
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[Server] PurgoMalum sync exception: {ex.Message}");
+            GONetLog.Warning($"[Server] PurgoMalum sync exception: {ex.Message}");
             return null;
         }
     }
@@ -1262,14 +1108,14 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"[Server] Profanity.dev sync request failed or timed out");
+                    GONetLog.Warning($"[Server] Profanity.dev sync request failed or timed out");
                     return null;
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[Server] Profanity.dev sync exception: {ex.Message}");
+            GONetLog.Warning($"[Server] Profanity.dev sync exception: {ex.Message}");
             return null;
         }
     }
