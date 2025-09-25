@@ -716,9 +716,10 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="channelName">Target channel name for routing</param>
     /// <param name="messageType">Type of message (Channel, DirectMessage, GroupMessage)</param>
     /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
+    /// <param name="recipients">Array of recipient authority IDs for proper message filtering</param>
     /// <returns>Delivery report indicating successful/failed deliveries</returns>
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
-    internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId)
+    internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
         // Get context - this should always be available in an RPC
         GONetRpcContext context = GONetEventBus.GetCurrentRpcContext();
@@ -731,7 +732,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             Type = messageType,
             ChannelName = channelName,
-            Recipients = CurrentMessageTargets.ToArray()
+            Recipients = recipients // Use the passed recipients array instead of CurrentMessageTargets
         };
 
         OnReceiveMessage(message);
@@ -773,6 +774,38 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         // Store ALL messages regardless of current view - filtering happens during display
         allMessages.Add(message);
         TrimMessageHistory();
+
+        // Auto-switch to direct message mode when receiving a DM
+        if (message.Type == ChatType.DirectMessage && message.SenderId != localAuthorityId)
+        {
+            // Automatically select the sender and switch to DM mode
+            selectedParticipants.Clear();
+            selectedParticipants.Add(message.SenderId);
+            currentChatMode = ChatType.DirectMessage;
+
+            // This ensures the UI immediately shows the DM conversation
+            RefreshCurrentMessages();
+        }
+        // Auto-switch to group message mode when receiving a group message
+        else if (message.Type == ChatType.GroupMessage && message.SenderId != localAuthorityId)
+        {
+            // Automatically select all participants in the group (excluding ourselves)
+            selectedParticipants.Clear();
+            if (message.Recipients != null)
+            {
+                foreach (ushort recipientId in message.Recipients)
+                {
+                    if (recipientId != localAuthorityId)
+                    {
+                        selectedParticipants.Add(recipientId);
+                    }
+                }
+            }
+            currentChatMode = ChatType.GroupMessage;
+
+            // This ensures the UI immediately shows the group conversation
+            RefreshCurrentMessages();
+        }
     }
 
     /// <summary>
@@ -800,8 +833,9 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="channelName">Channel name (can be validated/modified)</param>
     /// <param name="messageType">Message type (can be validated/modified)</param>
     /// <param name="fromUserId">Sender ID (can be validated/modified)</param>
+    /// <param name="recipients">Recipients array (can be validated/modified)</param>
     /// <returns>Validation result with allowed targets and optional modifications</returns>
-    internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId)
+    internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId, ref ushort[] recipients)
     {
         // Get the pre-allocated validation result from the context
         var validationContext = GONetMain.EventBus.GetValidationContext();
@@ -904,13 +938,14 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         CurrentMessageTargets = uniqueTargets.ToList();
 
         // Example of async RPC calling with delivery report handling
-        // This demonstrates the new CallRpcAsync<TReturn, T1, T2, T3, T4> pattern for complex RPCs
-        CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort>(
+        // This demonstrates the new CallRpcAsync<TReturn, T1, T2, T3, T4, T5> pattern for complex RPCs
+        CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort, ushort[]>(
             nameof(SendMessage),
             finalContent,
             activeChannel,
             currentChatMode,
-            localAuthorityId)
+            localAuthorityId,
+            uniqueTargets.ToArray()) // Pass the actual recipients array
             .ContinueWith(task =>
             {
                 // Handle delivery failures gracefully - common in networked environments
