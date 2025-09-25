@@ -61,6 +61,7 @@
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetEventBus_Rpc.cs" />
     <Compile Include="Assets\GONet\Sample\GONetMouseEventRelay.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\NumericValueChangeSnapshot.cs" />
