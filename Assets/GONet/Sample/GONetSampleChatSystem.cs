@@ -370,12 +370,23 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         GUILayout.EndScrollView();
 
-        // Group message button
+        // Direct/Group message button
         if (selectedParticipants.Count > 0)
         {
-            if (GUILayout.Button($"Message Selected ({selectedParticipants.Count})"))
+            string buttonText = selectedParticipants.Count == 1 ?
+                $"Direct Message ({selectedParticipants.Count})" :
+                $"Group Message ({selectedParticipants.Count})";
+
+            if (GUILayout.Button(buttonText))
             {
-                StartGroupMessage();
+                if (selectedParticipants.Count == 1)
+                {
+                    StartDirectMessage(selectedParticipants.First());
+                }
+                else
+                {
+                    StartGroupMessage();
+                }
             }
         }
     }
@@ -392,14 +403,32 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 break;
             case ChatType.DirectMessage:
                 var dmTarget = participants.FirstOrDefault(p => selectedParticipants.Contains(p.AuthorityId));
-                headerText = $"DM: {dmTarget.DisplayName}";
+                headerText = $"💬 DM: {dmTarget.DisplayName}";
                 break;
             case ChatType.GroupMessage:
-                headerText = $"Group ({selectedParticipants.Count} members)";
+                var groupNames = participants.Where(p => selectedParticipants.Contains(p.AuthorityId))
+                                           .Select(p => p.DisplayName)
+                                           .Take(3); // Show up to 3 names
+                string nameList = string.Join(", ", groupNames);
+                if (selectedParticipants.Count > 3)
+                {
+                    nameList += $" +{selectedParticipants.Count - 3} more";
+                }
+                headerText = $"👥 Group: {nameList}";
                 break;
         }
 
         GUILayout.Label(headerText);
+
+        // Add "Back to Channels" button when in DM or Group mode
+        if (currentChatMode != ChatType.Channel)
+        {
+            if (GUILayout.Button("← Back", GUILayout.Width(60)))
+            {
+                SwitchToChannel(activeChannel); // Return to current active channel
+            }
+        }
+
         GUILayout.EndHorizontal();
     }
 
@@ -898,7 +927,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         activeChannel = channelName;
         currentChatMode = ChatType.Channel;
-        selectedParticipants.Clear();
+        selectedParticipants.Clear(); // Clear any selected participants when returning to channel view
         RefreshCurrentMessages();
     }
 
@@ -912,11 +941,9 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     private void StartGroupMessage()
     {
-        if (selectedParticipants.Count > 1)
-        {
-            currentChatMode = ChatType.GroupMessage;
-            RefreshCurrentMessages();
-        }
+        // This should only be called for 2+ participants
+        currentChatMode = ChatType.GroupMessage;
+        RefreshCurrentMessages();
     }
 
     private void RefreshCurrentMessages()
