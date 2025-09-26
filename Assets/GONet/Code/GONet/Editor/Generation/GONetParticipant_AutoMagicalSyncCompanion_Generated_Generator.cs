@@ -15,6 +15,7 @@
 
 using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
+using GONet.Generation;
 using GONet.PluginAPI;
 using GONet.Utils;
 using MemoryPack;
@@ -1072,7 +1073,9 @@ namespace GONet.Generation
         /// <returns></returns>
         internal static List<GONetParticipant> GatherGONetParticipantsInAllResourcesFolders()
         {
-            // Find all 'Resources' folders under 'Assets'
+            List<GONetParticipant> gonetParticipantsInPrefabs = new List<GONetParticipant>();
+
+            // 1. Find all 'Resources' folders under 'Assets'
             string[] resourcesFolderGUIDs = AssetDatabase.FindAssets("Resources t:folder", new[] { "Assets" });
 
             List<string> resourcesFolders = new List<string>();
@@ -1087,8 +1090,6 @@ namespace GONet.Generation
                     resourcesFolders.Add(path);
                 }
             }
-
-            List<GONetParticipant> gonetParticipantsInPrefabs = new List<GONetParticipant>();
 
             foreach (string resourcesFolder in resourcesFolders)
             {
@@ -1108,11 +1109,73 @@ namespace GONet.Generation
                         if (gnps.Length > 0)
                         {
                             gonetParticipantsInPrefabs.AddRange(gnps);
-                            Debug.Log($"Found {gnps.Length} GONetParticipant(s) in prefab: {assetPath}");
+                            Debug.Log($"Found {gnps.Length} GONetParticipant(s) in Resources prefab: {assetPath}");
                         }
                     }
                 }
             }
+
+#if ADDRESSABLES_AVAILABLE
+            // 2. Find all addressable GONetParticipant prefabs
+            var addressableSettings = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+            if (addressableSettings != null)
+            {
+                foreach (var group in addressableSettings.groups)
+                {
+                    if (group == null) continue;
+
+                    foreach (var entry in group.entries)
+                    {
+                        if (entry == null || string.IsNullOrEmpty(entry.address)) continue;
+
+                        // Load the asset to check if it contains a GONetParticipant
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (string.IsNullOrEmpty(assetPath)) continue;
+
+                        // Check if it's a prefab file
+                        if (assetPath.EndsWith(".prefab", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                            if (prefab != null)
+                            {
+                                // Get all GONetParticipant components in the prefab's hierarchy
+                                GONetParticipant[] gnps = prefab.GetComponentsInChildren<GONetParticipant>(includeInactive: true);
+
+                                if (gnps.Length > 0)
+                                {
+                                    gonetParticipantsInPrefabs.AddRange(gnps);
+                                    Debug.Log($"Found {gnps.Length} GONetParticipant(s) in addressable prefab: {assetPath} (address: {entry.address})");
+                                }
+                            }
+                        }
+                        // Check if it's a folder - scan for prefabs inside
+                        else if (AssetDatabase.IsValidFolder(assetPath))
+                        {
+                            string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { assetPath });
+
+                            foreach (string prefabGuid in prefabGuids)
+                            {
+                                string prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+                                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                                if (prefab != null)
+                                {
+                                    // Get all GONetParticipant components in the prefab's hierarchy
+                                    GONetParticipant[] gnps = prefab.GetComponentsInChildren<GONetParticipant>(includeInactive: true);
+
+                                    if (gnps.Length > 0)
+                                    {
+                                        string prefabFileName = System.IO.Path.GetFileName(prefabPath);
+                                        string addressableKey = string.Concat(entry.address, "/", prefabFileName);
+                                        gonetParticipantsInPrefabs.AddRange(gnps);
+                                        Debug.Log($"Found {gnps.Length} GONetParticipant(s) in addressable folder prefab: {prefabPath} (address: {addressableKey})");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+#endif
 
             return gonetParticipantsInPrefabs;
         }
@@ -1125,7 +1188,7 @@ namespace GONet.Generation
         }
 
         private static void CreateAllPossibleUniqueSnapsAndGNPsFromResources(
-            List<GONetParticipant> gnpsInProjectResources, 
+            List<GONetParticipant> gnpsInProjectResources,
             out List<SnapGnpAssignment> createdInProjectResourcesAssetsUniqueAssignments)
         {
             createdInProjectResourcesAssetsUniqueAssignments = new();
@@ -1136,7 +1199,52 @@ namespace GONet.Generation
                 bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
                 if (isProjectAsset)
                 {
-                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath); // Default fallback
+
+#if ADDRESSABLES_AVAILABLE
+                    // Check if this is an addressable asset and use the appropriate prefix
+                    var addressableSettings = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+                    bool isAddressable = false;
+                    string addressableKey = null;
+
+                    if (addressableSettings != null)
+                    {
+                        string guid = AssetDatabase.AssetPathToGUID(projectPath);
+                        var entry = addressableSettings.FindAssetEntry(guid);
+                        if (entry != null && !string.IsNullOrEmpty(entry.address))
+                        {
+                            isAddressable = true;
+                            addressableKey = entry.address;
+                            currentLocation = string.Concat(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX, entry.address);
+                        }
+                        else
+                        {
+                            // Check if this prefab is in an addressable folder
+                            foreach (var group in addressableSettings.groups)
+                            {
+                                if (group == null) continue;
+
+                                foreach (var groupEntry in group.entries)
+                                {
+                                    if (groupEntry == null || string.IsNullOrEmpty(groupEntry.address)) continue;
+
+                                    string entryPath = AssetDatabase.GUIDToAssetPath(groupEntry.guid);
+                                    if (AssetDatabase.IsValidFolder(entryPath) && projectPath.StartsWith(entryPath + "/"))
+                                    {
+                                        // This prefab is inside an addressable folder
+                                        string prefabFileName = System.IO.Path.GetFileName(projectPath);
+                                        addressableKey = string.Concat(groupEntry.address, "/", prefabFileName);
+                                        isAddressable = true;
+                                        currentLocation = string.Concat(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX, addressableKey);
+                                        break;
+                                    }
+                                }
+                                if (isAddressable) break;
+                            }
+                        }
+                    }
+#endif
+
                     GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap = new(gnp);
                     // TODO? possibleInSceneUniqueSnaps.Add(assignedSnap);
                     createdInProjectResourcesAssetsUniqueAssignments.Add(new()
@@ -1145,6 +1253,18 @@ namespace GONet.Generation
                         assignedSnap = assignedSnap,
                         gnp = gnp,
                     });
+
+#if ADDRESSABLES_AVAILABLE
+                    // Update the GONetParticipant's design time metadata if it's addressable
+                    if (isAddressable && addressableKey != null)
+                    {
+                        var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gnp);
+                        designTimeMetadata.LoadType = Generation.ResourceLoadType.Addressables;
+                        designTimeMetadata.AddressableKey = addressableKey;
+                        designTimeMetadata.UnityGuid = AssetDatabase.AssetPathToGUID(projectPath);
+                        GONetLog.Debug($"CreateAllPossibleUniqueSnapsAndGNPsFromResources: Set addressable metadata for '{gnp.name}' with key: '{addressableKey}'");
+                    }
+#endif
                 }
                 else
                 {
