@@ -665,7 +665,16 @@ namespace GONet.Editor
                     }
 #endif
 
-                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    // Use resources:// prefix for assets in Resources folders, project:// for others
+                    string currentLocation;
+                    if (projectPath.Contains("/Resources/"))
+                    {
+                        currentLocation = string.Concat(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX, projectPath);
+                    }
+                    else
+                    {
+                        currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    }
 
                     // this seems unnecessary and problematic for project assets:
                     EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
@@ -795,9 +804,7 @@ namespace GONet.Editor
                 var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
                 if (addressableSettings == null)
                 {
-                    // No addressables configured, ensure metadata reflects Resources load type
-                    designTimeMetadata.LoadType = ResourceLoadType.Resources;
-                    designTimeMetadata.AddressableKey = string.Empty;
+                    // No addressables configured - LoadType and AddressableKey are now computed from location prefix
                     return;
                 }
 
@@ -806,25 +813,19 @@ namespace GONet.Editor
 
                 if (entry != null && !string.IsNullOrEmpty(entry.address))
                 {
-                    // Asset is addressable
-                    designTimeMetadata.LoadType = ResourceLoadType.Addressables;
-                    designTimeMetadata.AddressableKey = entry.address;
+                    // Asset is addressable - LoadType and AddressableKey are now computed from location prefix
                     GONetLog.Debug($"GONetParticipant '{gonetParticipant.name}' detected as addressable with key: '{entry.address}'");
                 }
                 else
                 {
-                    // Asset is not addressable, use Resources
-                    designTimeMetadata.LoadType = ResourceLoadType.Resources;
-                    designTimeMetadata.AddressableKey = string.Empty;
+                    // Asset is not addressable - LoadType and AddressableKey are now computed from location prefix
                 }
             }
             catch (System.Exception ex)
             {
                 GONetLog.Warning($"Failed to check addressables status for '{assetPath}': {ex.Message}");
 
-                // Fallback to Resources on error
-                designTimeMetadata.LoadType = ResourceLoadType.Resources;
-                designTimeMetadata.AddressableKey = string.Empty;
+                // Fallback to Resources on error - LoadType and AddressableKey are now computed from location prefix
             }
         }
 
@@ -878,8 +879,6 @@ namespace GONet.Editor
                             if (designTimeMetadata != null)
                             {
                                 designTimeMetadata.Location = addressableLocation;
-                                designTimeMetadata.LoadType = ResourceLoadType.Addressables;
-                                designTimeMetadata.AddressableKey = entry.address;
                                 designTimeMetadata.UnityGuid = entry.guid;
 
                                 // Ensure it's in the persistence system
@@ -908,8 +907,6 @@ namespace GONet.Editor
                                 if (designTimeMetadata != null)
                                 {
                                     designTimeMetadata.Location = addressableLocation;
-                                    designTimeMetadata.LoadType = ResourceLoadType.Addressables;
-                                    designTimeMetadata.AddressableKey = addressableKey;
                                     designTimeMetadata.UnityGuid = prefabGuid;
 
                                     // Ensure it's in the persistence system
@@ -935,9 +932,7 @@ namespace GONet.Editor
         /// </summary>
         private static void UpdateAddressablesMetadata(GONetParticipant gonetParticipant, string assetPath)
         {
-            var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
-            designTimeMetadata.LoadType = ResourceLoadType.Resources;
-            designTimeMetadata.AddressableKey = string.Empty;
+            // LoadType and AddressableKey are now computed from location prefix - no need to set them
         }
 #endif
 

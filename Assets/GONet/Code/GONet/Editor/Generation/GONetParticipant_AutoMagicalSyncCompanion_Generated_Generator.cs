@@ -1199,7 +1199,16 @@ namespace GONet.Generation
                 bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
                 if (isProjectAsset)
                 {
-                    string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath); // Default fallback
+                    // Use resources:// prefix for assets in Resources folders, project:// for others
+                    string currentLocation;
+                    if (projectPath.Contains("/Resources/"))
+                    {
+                        currentLocation = string.Concat(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX, projectPath);
+                    }
+                    else
+                    {
+                        currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
+                    }
 
 #if ADDRESSABLES_AVAILABLE
                     // Check if this is an addressable asset and use the appropriate prefix
@@ -1259,8 +1268,6 @@ namespace GONet.Generation
                     if (isAddressable && addressableKey != null)
                     {
                         var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gnp);
-                        designTimeMetadata.LoadType = Generation.ResourceLoadType.Addressables;
-                        designTimeMetadata.AddressableKey = addressableKey;
                         designTimeMetadata.UnityGuid = AssetDatabase.AssetPathToGUID(projectPath);
                         GONetLog.Debug($"CreateAllPossibleUniqueSnapsAndGNPsFromResources: Set addressable metadata for '{gnp.name}' with key: '{addressableKey}'");
                     }
