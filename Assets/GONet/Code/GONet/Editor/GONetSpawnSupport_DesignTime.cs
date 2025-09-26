@@ -24,6 +24,11 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#if ADDRESSABLES_AVAILABLE
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
+#endif
+
 namespace GONet.Editor
 {
     /// <summary>
@@ -449,14 +454,14 @@ namespace GONet.Editor
                 AddIfAppropriate(projectGnps, gonetParticipant);
             }
 
-            // Collect the paths for each GONetParticipant
+            // Collect the design time locations for each GONetParticipant (includes addressables paths)
             HashSet<string> allPathsToGnpsInProject = new();
             foreach (var gonetParticipant in projectGnps)
             {
-                string fullPath = DesignTimeMetadata.GetFullPath(gonetParticipant);
-                if (!string.IsNullOrEmpty(fullPath))
+                string designTimeLocation = gonetParticipant.DesignTimeLocation;
+                if (!string.IsNullOrEmpty(designTimeLocation))
                 {
-                    allPathsToGnpsInProject.Add(fullPath);
+                    allPathsToGnpsInProject.Add(designTimeLocation);
                 }
             }
             
@@ -625,6 +630,7 @@ namespace GONet.Editor
         {
             // clear it now as it will be built back up below
             RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX);
+            RemoveFromPersistence_WherePrefixMatches(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX);
 
             // IMPORTANT: have to load them all up for else the following call will not "find" them all and only the ones that happened to be loaded already would be found/processed
             Resources.LoadAll<GONetParticipant>(string.Empty);
@@ -638,6 +644,9 @@ namespace GONet.Editor
             {
                 OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(gonetParticipant);
             }
+
+            // Scan for addressable GONetParticipant prefabs
+            EnsureDesignTimeLocationsCurrent_AddressablesOnly();
         }
 
         internal static void OnProjectChanged_EnsureDesignTimeLocationsCurrent_ProjectOnly_Single(GONetParticipant gonetParticipant)
@@ -648,10 +657,21 @@ namespace GONet.Editor
                 bool isProjectAsset = !string.IsNullOrWhiteSpace(projectPath);
                 if (isProjectAsset)
                 {
+#if ADDRESSABLES_AVAILABLE
+                    // Check if this is an addressable asset first
+                    if (IsAddressableAsset(projectPath))
+                    {
+                        return; // Don't create project:// entry for addressable assets
+                    }
+#endif
+
                     string currentLocation = string.Concat(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, projectPath);
 
-                    // this seems unnecessary and problematic for project assets: 
+                    // this seems unnecessary and problematic for project assets:
                     EnsureDesignTimeLocationCurrent(gonetParticipant, currentLocation); // have to do proper unity serialization stuff for this to stick!
+
+                    // Check and update addressables information
+                    UpdateAddressablesMetadata(gonetParticipant, projectPath);
 
                     //gonetParticipant.DesignTimeLocation = currentLocation; // so, set it  directly and it seems to stick/save/persist just fine
                 }
@@ -761,6 +781,165 @@ namespace GONet.Editor
 
             OverwritePersistenceWith(all);
         }
+
+#if ADDRESSABLES_AVAILABLE
+        /// <summary>
+        /// Updates the DesignTimeMetadata for a GONetParticipant with addressables information if available.
+        /// </summary>
+        private static void UpdateAddressablesMetadata(GONetParticipant gonetParticipant, string assetPath)
+        {
+            var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
+
+            try
+            {
+                var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
+                if (addressableSettings == null)
+                {
+                    // No addressables configured, ensure metadata reflects Resources load type
+                    designTimeMetadata.LoadType = ResourceLoadType.Resources;
+                    designTimeMetadata.AddressableKey = string.Empty;
+                    return;
+                }
+
+                string guid = AssetDatabase.AssetPathToGUID(assetPath);
+                var entry = addressableSettings.FindAssetEntry(guid);
+
+                if (entry != null && !string.IsNullOrEmpty(entry.address))
+                {
+                    // Asset is addressable
+                    designTimeMetadata.LoadType = ResourceLoadType.Addressables;
+                    designTimeMetadata.AddressableKey = entry.address;
+                    GONetLog.Debug($"GONetParticipant '{gonetParticipant.name}' detected as addressable with key: '{entry.address}'");
+                }
+                else
+                {
+                    // Asset is not addressable, use Resources
+                    designTimeMetadata.LoadType = ResourceLoadType.Resources;
+                    designTimeMetadata.AddressableKey = string.Empty;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Failed to check addressables status for '{assetPath}': {ex.Message}");
+
+                // Fallback to Resources on error
+                designTimeMetadata.LoadType = ResourceLoadType.Resources;
+                designTimeMetadata.AddressableKey = string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Checks if the given asset path is configured as an addressable asset
+        /// </summary>
+        private static bool IsAddressableAsset(string assetPath)
+        {
+            var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
+            if (addressableSettings == null) return false;
+
+            string guid = AssetDatabase.AssetPathToGUID(assetPath);
+            var entry = addressableSettings.FindAssetEntry(guid);
+            return entry != null && !string.IsNullOrEmpty(entry.address);
+        }
+
+        /// <summary>
+        /// Scans for addressable GONetParticipant prefabs and creates metadata entries with ADDRESSABLES_HIERARCHY_PREFIX
+        /// </summary>
+        internal static void EnsureDesignTimeLocationsCurrent_AddressablesOnly()
+        {
+            var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
+            if (addressableSettings == null)
+            {
+                return;
+            }
+
+            foreach (var group in addressableSettings.groups)
+            {
+                if (group == null) continue;
+
+                foreach (var entry in group.entries)
+                {
+                    if (entry == null || string.IsNullOrEmpty(entry.address)) continue;
+
+                    // Load the asset to check if it contains a GONetParticipant
+                    string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                    if (string.IsNullOrEmpty(assetPath)) continue;
+
+                    // Check if it's a prefab file
+                    if (assetPath.EndsWith(".prefab", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        GONetParticipant prefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(assetPath);
+                        if (prefab != null)
+                        {
+                            // Found an addressable GONetParticipant prefab
+                            string addressableLocation = string.Concat(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX, entry.address);
+
+                            // Create or update design time metadata
+                            var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(prefab);
+                            if (designTimeMetadata != null)
+                            {
+                                designTimeMetadata.Location = addressableLocation;
+                                designTimeMetadata.LoadType = ResourceLoadType.Addressables;
+                                designTimeMetadata.AddressableKey = entry.address;
+                                designTimeMetadata.UnityGuid = entry.guid;
+
+                                // Ensure it's in the persistence system
+                                EnsureExistsInPersistence_WithTheseValues(addressableLocation);
+                            }
+                        }
+                    }
+                    // Check if it's a folder - scan for prefabs inside
+                    else if (AssetDatabase.IsValidFolder(assetPath))
+                    {
+                        string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { assetPath });
+
+                        foreach (string prefabGuid in prefabGuids)
+                        {
+                            string prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+                            GONetParticipant prefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(prefabPath);
+                            if (prefab != null)
+                            {
+                                // For folders, use the prefab name as the addressable key
+                                string prefabName = System.IO.Path.GetFileNameWithoutExtension(prefabPath);
+                                string addressableKey = string.Concat(entry.address, "/", prefabName);
+                                string addressableLocation = string.Concat(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX, addressableKey);
+
+                                // Create or update design time metadata
+                                var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(prefab);
+                                if (designTimeMetadata != null)
+                                {
+                                    designTimeMetadata.Location = addressableLocation;
+                                    designTimeMetadata.LoadType = ResourceLoadType.Addressables;
+                                    designTimeMetadata.AddressableKey = addressableKey;
+                                    designTimeMetadata.UnityGuid = prefabGuid;
+
+                                    // Ensure it's in the persistence system
+                                    EnsureExistsInPersistence_WithTheseValues(addressableLocation);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+#else
+        /// <summary>
+        /// Fallback when Addressables is not available - no addressables scanning needed.
+        /// </summary>
+        internal static void EnsureDesignTimeLocationsCurrent_AddressablesOnly()
+        {
+            // No addressables support, nothing to scan
+        }
+
+        /// <summary>
+        /// Fallback when Addressables is not available - ensures metadata uses Resources load type.
+        /// </summary>
+        private static void UpdateAddressablesMetadata(GONetParticipant gonetParticipant, string assetPath)
+        {
+            var designTimeMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(gonetParticipant);
+            designTimeMetadata.LoadType = ResourceLoadType.Resources;
+            designTimeMetadata.AddressableKey = string.Empty;
+        }
+#endif
 
         /// <summary>
         /// Do all proper unity serialization stuff or else a change will NOT stick/save/persist.

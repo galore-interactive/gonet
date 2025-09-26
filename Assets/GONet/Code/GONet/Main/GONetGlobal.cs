@@ -134,7 +134,9 @@ namespace GONet
 
             base.Awake(); // YUK: code smell...having to break OO protocol here and call base here as it needs to come AFTER the init stuff is done in GONetMain.InitOnUnityMainThread() and unity main thread identified or exceptions will be thrown in base.Awake() when subscribing
 
-            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeMetadata(this);
+            // IMPORTANT: Cache design time metadata BEFORE any other initialization
+            // This ensures metadata is available when GONetParticipants start their Awake() calls
+            StartCoroutine(CacheDesignTimeMetadata_ThenContinueInit());
 
             enabledGONetParticipants.Clear();
 
@@ -256,9 +258,11 @@ namespace GONet
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
 
-                //GONetLog.Debug($"dreetsi scene loaded...processing gnps to know which are spawned/not....is cached? {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}");
+                GONetLog.Debug($"OnSceneLoaded: '{sceneLoaded.name}' with {sceneObjects.Length} root objects");
 
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
+
+                GONetLog.Debug($"Found {gonetParticipantsInLevel.Count} GONetParticipants in scene. Names: {string.Join(", ", gonetParticipantsInLevel.ConvertAll(gnp => gnp.name))}");
 
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
@@ -324,6 +328,21 @@ namespace GONet
         private void OnApplicationQuit()
         {
             GONetMain.Shutdown();
+        }
+
+        private System.Collections.IEnumerator CacheDesignTimeMetadata_ThenContinueInit()
+        {
+            // Start the caching process and wait for it to complete
+            bool cachingComplete = false;
+            GONetSpawnSupport_Runtime.CacheAllProjectDesignTimeMetadata(this, () => cachingComplete = true);
+
+            // Wait until caching is actually complete
+            while (!cachingComplete)
+            {
+                yield return null;
+            }
+
+            GONetLog.Debug("GONetGlobal: Design time metadata caching completed - ready for scene processing");
         }
     }
 }
