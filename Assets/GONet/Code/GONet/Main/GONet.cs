@@ -3778,9 +3778,12 @@ namespace GONet
 
         private static void InitDesignTimeMetadata_IfNeeded(GONetParticipant gonetParticipant)
         {
+            GONetLog.Debug($"InitDesignTimeMetadata_IfNeeded: Called for '{gonetParticipant.gameObject.name}', IsDesignTimeMetadataInitd: {gonetParticipant.IsDesignTimeMetadataInitd}, UnityGuid: '{gonetParticipant.UnityGuid}'");
+
             if (!gonetParticipant.IsDesignTimeMetadataInitd)
             {
                 string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
+                GONetLog.Debug($"InitDesignTimeMetadata_IfNeeded: Calling InitDesignTimeMetadata for '{gonetParticipant.gameObject.name}' with path: {fullUniquePath}, UnityGuid: '{gonetParticipant.UnityGuid}'");
                 GONetSpawnSupport_Runtime.InitDesignTimeMetadata(fullUniquePath, gonetParticipant);
             }
         }

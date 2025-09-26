@@ -107,7 +107,7 @@ namespace GONet.Generation
             return metadata;
         }
 
-        public static implicit operator string(DesignTimeMetadata metadata) => metadata.Location;
+        public static implicit operator string(DesignTimeMetadata metadata) => metadata?.Location ?? string.Empty;
 
         public static string GetFullUniquePathInScene(GONetParticipant gnpInScene)
         {

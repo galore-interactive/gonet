@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Compilation;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -27,6 +28,7 @@ using UnityEngine.SceneManagement;
 #if ADDRESSABLES_AVAILABLE
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.AddressableAssets.Build;
 #endif
 
 namespace GONet.Editor
@@ -124,6 +126,11 @@ namespace GONet.Editor
             EditorApplication.hierarchyChanged += OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly;
             EditorApplication.projectChanged += OnProjectChanged_TakeNoteOfAnyGONetChanges_ProjectOnly;
 
+#if ADDRESSABLES_AVAILABLE
+            // Hook into Addressables build completion events for more robust change detection
+            RegisterAddressableBuildCallbacks();
+#endif
+
             GONetParticipant.OnDestroyCalled += GONetParticipant_OnDestroyCalled;
             GONetParticipant.OnAwakeEditor += GONetParticipant_OnAwakeEditor;
 
@@ -151,11 +158,76 @@ namespace GONet.Editor
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
+        /// <summary>
+        /// Performs immediate addressables change detection before play mode transition.
+        /// This ensures any pending addressables changes are detected and recorded
+        /// before the dirty file existence check occurs.
+        /// </summary>
+#if ADDRESSABLES_AVAILABLE
+        private static void CheckForAddressablesChangesBeforePlayMode()
+        {
+            try
+            {
+                // Get current addressables GONetParticipants
+                var currentAddressableGNPs = GatherAddressableGONetParticipants();
+
+                // Get last build metadata for addressables prefabs
+                var lastBuildMetadata = GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence()
+                    .Where(m => m.Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                    .ToList();
+
+                // Convert current addressables to location format for comparison
+                var currentAddressableLocations = new HashSet<string>();
+                foreach (var gnp in currentAddressableGNPs)
+                {
+                    string assetPath = AssetDatabase.GetAssetPath(gnp);
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        string location = $"{GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX}{assetPath}";
+                        currentAddressableLocations.Add(location);
+                    }
+                }
+
+                // Check for new addressable prefabs
+                foreach (var currentLocation in currentAddressableLocations)
+                {
+                    if (!lastBuildMetadata.Any(m => m.Location == currentLocation))
+                    {
+                        string dirtyReason = $"GONetParticipant at {currentLocation} was added or modified after the last build.";
+                        AddGONetDesignTimeDirtyReason(dirtyReason);
+                        GONetLog.Debug($"Pre-play mode detection: {dirtyReason}");
+                    }
+                }
+
+                // Check for removed addressable prefabs
+                foreach (var lastBuildMeta in lastBuildMetadata)
+                {
+                    if (!currentAddressableLocations.Contains(lastBuildMeta.Location))
+                    {
+                        string dirtyReason = $"GONetParticipant prefab removed from addressables: {lastBuildMeta.Location}";
+                        AddGONetDesignTimeDirtyReason(dirtyReason);
+                        GONetLog.Debug($"Pre-play mode detection: {dirtyReason}");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error in pre-play mode addressables check: {ex.Message}");
+            }
+        }
+#endif
+
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
             // Check when Unity is about to enter play mode (ExitingEditMode)
             if (state == PlayModeStateChange.ExitingEditMode)
             {
+                // IMPORTANT: Check for addressables changes BEFORE checking for dirty file existence
+                // This ensures addressables changes are detected and recorded before the play mode warning check
+#if ADDRESSABLES_AVAILABLE
+                CheckForAddressablesChangesBeforePlayMode();
+#endif
+
                 bool didPreventEnteringPlaymode = false;
                 string filePath = GetDesignTimeDirtyReasonsFilePath();
                 AddDirtyReasonIfScenesInBuildDiffer(filePath);
@@ -309,6 +381,11 @@ namespace GONet.Editor
         {
             string filePath = GetDesignTimeDirtyReasonsFilePath();
             File.Delete(filePath);
+
+#if ADDRESSABLES_AVAILABLE
+            // Also clear addressables session tracking when builds succeed
+            ClearAddressablesSessionTracking();
+#endif
         }
 
         private static string GetDesignTimeDirtyReasonsFilePath()
@@ -401,6 +478,16 @@ namespace GONet.Editor
 
                 // Append to the file, creating it if it doesn't exist
                 File.AppendAllText(filePath, logEntry);
+
+                // Force immediate disk flush to prevent race conditions with play mode transition
+                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    fs.Flush(true); // Force OS to flush to disk
+                }
+
+                // Additional safety: Brief pause to ensure file system operations complete
+                // before any potential play mode transition that might check for file existence
+                System.Threading.Thread.Sleep(10);
 
                 // Optionally, log confirmation to Unity console
                 GONetLog.Debug($"Logged design-time dirty reason: {dirtyReason}");
@@ -511,8 +598,93 @@ namespace GONet.Editor
             return false;
         }
 
+        /// <summary>
+        /// Scene-specific version that only compares against objects from the same scenes being scanned.
+        /// This prevents false positives when scanning only currently loaded scenes.
+        /// </summary>
+        private static void ProcessAnyDesignTimeDirty_IfAppropriate_SceneSpecific(HashSet<string> fullPathsToDesignTimeGnps, HashSet<string> sceneNames)
+        {
+            // Skip change detection only if we're actively building
+            // During builds, metadata caching may not be complete, leading to false positives
+            if (BuildPipeline.isBuildingPlayer)
+            {
+                GONetLog.Debug($"Skipping design-time dirty detection during build: isBuildingPlayer={BuildPipeline.isBuildingPlayer}");
+                return;
+            }
+
+            // Skip if we have zero current paths but metadata caching isn't complete yet
+            // This prevents false "everything was removed" during editor startup/domain reload
+            if (fullPathsToDesignTimeGnps.Count == 0 && !GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+            {
+                GONetLog.Debug($"Skipping design-time dirty detection: Found 0 current paths but metadata caching isn't complete yet");
+                return;
+            }
+
+            // compare this list and the current metadata associated with all these gnps to that stored in the last build's metadata..if different TAKE NOTE and refer to this when entering play mode and show warning!
+            IEnumerable<DesignTimeMetadata> designTimeMetadatasFromLastBuild =
+                GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
+
+            // Filter to only include scene paths from the specific scenes we're scanning
+            HashSet<string> pathsFromLastBuildInTheseScenes = new HashSet<string>();
+            foreach (var metadata in designTimeMetadatasFromLastBuild)
+            {
+                if (metadata.Location.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX))
+                {
+                    // Extract scene name from path like "scene://SceneName/GameObject/Path"
+                    string locationAfterPrefix = metadata.Location.Substring(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX.Length);
+                    int firstSlashIndex = locationAfterPrefix.IndexOf('/');
+                    if (firstSlashIndex > 0)
+                    {
+                        string sceneNameFromPath = locationAfterPrefix.Substring(0, firstSlashIndex);
+                        if (sceneNames.Contains(sceneNameFromPath))
+                        {
+                            pathsFromLastBuildInTheseScenes.Add(metadata.Location);
+                        }
+                    }
+                }
+            }
+
+            GONetLog.Debug($"Filtered last build paths to {pathsFromLastBuildInTheseScenes.Count} paths from scenes: {string.Join(", ", sceneNames)}");
+
+            // Compare the current GNP paths to the previous build's metadata (only from the same scenes)
+            foreach (var currentPath in fullPathsToDesignTimeGnps)
+            {
+                if (!pathsFromLastBuildInTheseScenes.Contains(currentPath))
+                {
+                    AddGONetDesignTimeDirtyReason($"GONetParticipant at {currentPath} was added or modified after the last build.");
+                }
+            }
+
+            // Check for prefabs that were removed from the current scanning (only within the same scenes)
+            foreach (var lastBuildPath in pathsFromLastBuildInTheseScenes)
+            {
+                if (!fullPathsToDesignTimeGnps.Contains(lastBuildPath))
+                {
+                    GONetLog.Debug($"Confirmed removal for scene path {lastBuildPath}");
+                    AddGONetDesignTimeDirtyReason($"GONetParticipant prefab removed from scene: {lastBuildPath}");
+                }
+            }
+        }
+
         private static void ProcessAnyDesignTimeDirty_IfAppropriate(HashSet<string> fullPathsToDesignTimeGnps)
         {
+            // Skip change detection only if we're actively building
+            // During builds, metadata caching may not be complete, leading to false positives
+            if (BuildPipeline.isBuildingPlayer)
+            {
+                GONetLog.Debug($"Skipping design-time dirty detection during build: isBuildingPlayer={BuildPipeline.isBuildingPlayer}");
+                return;
+            }
+
+            // Skip if we have zero current paths but metadata caching isn't complete yet
+            // This prevents false "everything was removed" during editor startup/domain reload
+            // Note: During normal addressables operations, we now wait for caching to complete before calling this method
+            if (fullPathsToDesignTimeGnps.Count == 0 && !GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+            {
+                GONetLog.Debug($"Skipping design-time dirty detection: Found 0 current paths but metadata caching isn't complete yet");
+                return;
+            }
+
             // compare this list and the current metadata associated with all these gnps to that stored in the last build's metadata..if different TAKE NOTE and refer to this when entering play mode and show warning!
             IEnumerable<DesignTimeMetadata> designTimeMetadatasFromLastBuild =
                 GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
@@ -544,6 +716,99 @@ namespace GONet.Editor
                     AddGONetDesignTimeDirtyReason($"GONetParticipant at {currentPath} was added or modified after the last build.");
                 }
             }
+
+            // Determine what type of scan this is based on the current paths
+            bool isSceneScan = fullPathsToDesignTimeGnps.Any(p => p.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX));
+            bool isProjectScan = fullPathsToDesignTimeGnps.Any(p =>
+                p.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
+                p.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) ||
+                p.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX));
+
+            // Check for prefabs that were removed from the current scanning (only within the same category)
+            foreach (var lastBuildPath in pathsFromLastBuild)
+            {
+                // Skip checking removals for categories not being scanned in this pass
+                bool isLastBuildScene = lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX);
+                bool isLastBuildProject = lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
+                                         lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) ||
+                                         lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX);
+
+                // Only check for removals within the same scan type
+                if ((isSceneScan && !isLastBuildScene) || (isProjectScan && !isLastBuildProject))
+                {
+                    continue; // Skip this path - wrong category for this scan
+                }
+
+                bool foundInCurrent = fullPathsToDesignTimeGnps.Contains(lastBuildPath);
+
+                // Check for backwards compatibility when checking removals too
+                if (!foundInCurrent && lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                {
+                    // Try to find equivalent project:// path in current scan
+                    string equivalentProjectPath = lastBuildPath.Replace(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX, GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX);
+                    foundInCurrent = fullPathsToDesignTimeGnps.Contains(equivalentProjectPath);
+                }
+                else if (!foundInCurrent && lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                {
+                    // Try to find equivalent resources:// path in current scan
+                    string equivalentResourcesPath = lastBuildPath.Replace(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX);
+                    foundInCurrent = fullPathsToDesignTimeGnps.Contains(equivalentResourcesPath);
+                }
+
+                if (!foundInCurrent)
+                {
+                    // Additional safeguard: For non-scene prefabs, check if this is a false positive by verifying
+                    // the asset actually no longer exists in the project/addressables
+                    if (!lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX))
+                    {
+                        // Extract the asset path from the prefixed path
+                        string assetPath = "";
+                        if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                        {
+                            assetPath = lastBuildPath.Substring(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX.Length);
+                        }
+                        else if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                        {
+                            assetPath = lastBuildPath.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length);
+                        }
+                        else if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                        {
+                            assetPath = lastBuildPath.Substring(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX.Length);
+                        }
+
+                        // If we extracted an asset path, verify the asset doesn't actually still exist
+                        if (!string.IsNullOrEmpty(assetPath))
+                        {
+                            // Check if the asset still exists and has a GONetParticipant
+                            GONetParticipant stillExists = AssetDatabase.LoadAssetAtPath<GONetParticipant>(assetPath);
+                            if (stillExists != null)
+                            {
+                                GONetLog.Debug($"Skipping false positive removal for prefixed path {lastBuildPath}: asset still exists at {assetPath}");
+                                continue; // Skip this false positive
+                            }
+                        }
+                    }
+
+                    // Determine the type of removal based on the prefix
+                    string removalType = "project resources";
+                    if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                    {
+                        removalType = "addressables";
+                    }
+                    else if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
+                             lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                    {
+                        removalType = "project resources";
+                    }
+                    else if (lastBuildPath.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX))
+                    {
+                        removalType = "scene";
+                    }
+
+                    GONetLog.Debug($"Confirmed removal for prefixed path {lastBuildPath}: type={removalType}");
+                    AddGONetDesignTimeDirtyReason($"GONetParticipant prefab removed from {removalType}: {lastBuildPath}");
+                }
+            }
         }
 
         private static void OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly()
@@ -565,12 +830,13 @@ namespace GONet.Editor
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode &&
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount; // IMPORTANT: this is how we know it "just" changed from play to edit mode...otherwise we could never run the logic we want after exiting the play mode and we start messing around with the hierarchy
 
-            if (!Application.isPlaying && 
+            if (!Application.isPlaying &&
                 !isHierarchyChangingDueToExitingPlayModeInEditor && // it would not be design time if we are playing (in editor) now would it?
                 !IsCompiling &&
                 !IsInitialEditorLoad)
             {
                 HashSet<string> pathsToGnpsInScene = new();
+                HashSet<string> loadedSceneNames = new(); // Track which scenes we're scanning
                 int count = SceneManager.loadedSceneCount;
                 for (int i = 0; i < count; ++i)
                 { //
@@ -579,6 +845,8 @@ namespace GONet.Editor
 
                     const string SLASHY_LITTLE_WALLACE_PREVENTS_DELETING_SIMILARLY_NAMED_SCENES = "/";
                     string scenePrefix = string.Concat(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX, loadedScene.name, SLASHY_LITTLE_WALLACE_PREVENTS_DELETING_SIMILARLY_NAMED_SCENES);
+
+                    loadedSceneNames.Add(loadedScene.name); // Track this scene name
 
                     foreach (var rootGO in loadedScene.GetRootGameObjects())
                     {
@@ -591,8 +859,8 @@ namespace GONet.Editor
                     }
                 }
 
-                GONetLog.Debug($"Here are all {pathsToGnpsInScene.Count} scene GNPs:\n{string.Join("\n", pathsToGnpsInScene)}");
-                ProcessAnyDesignTimeDirty_IfAppropriate(pathsToGnpsInScene);
+                GONetLog.Debug($"Here are all {pathsToGnpsInScene.Count} scene GNPs in loaded scenes ({string.Join(", ", loadedSceneNames)}):\n{string.Join("\n", pathsToGnpsInScene)}");
+                ProcessAnyDesignTimeDirty_IfAppropriate_SceneSpecific(pathsToGnpsInScene, loadedSceneNames);
                 HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate();
             }
 
@@ -623,31 +891,51 @@ namespace GONet.Editor
 
                 // TODO FIXME doing this every time the hiearchy changes is crazy....mainy due to high processing time....need to attempt to move this entire method logic to be called in the other option: AssetPostprocessor.OnPostprocessAllAssets, where we hope we can more narrowly focus in on the specific data that is changing instead of searching the entire project essentially!
                 //   --- UPDATE to above TODO FIXME: there is an implementation of this inside AssetPostprocessor/Magoo.OnPostprocessAllAssets (find OnPostprocessAllAssets_TakeNoteOfAnyGONetChanges), so this here can/should probably be removed as redundant and this is less performant for sure.
-                List<GONetParticipant> gnpsInProjectResources = 
+                List<GONetParticipant> gnpsInProjectResources =
                     GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GatherGONetParticipantsInAllResourcesFolders();
-                
-                HashSet<string> gnpsInProjectResources_paths = new(gnpsInProjectResources.Select(g => AssetDatabase.GetAssetPath(g)));
+
+                // Also gather addressable GONetParticipants for comprehensive change detection
+                List<GONetParticipant> gnpsInAddressables = GatherAddressableGONetParticipants();
+
+                // Combine both resources and addressables paths for comprehensive comparison
+                HashSet<string> allGnpPaths = new();
+                allGnpPaths.UnionWith(gnpsInProjectResources.Select(g => AssetDatabase.GetAssetPath(g)));
+                allGnpPaths.UnionWith(gnpsInAddressables.Select(g => AssetDatabase.GetAssetPath(g)));
+
+                // Debug logging to understand the comparison issue
+                GONetLog.Debug($"Last build paths ({gnpPrefabAssetPaths_lastBuild.Count()}): {string.Join(", ", gnpPrefabAssetPaths_lastBuild.Take(10))}");
+                GONetLog.Debug($"Current paths ({allGnpPaths.Count}): {string.Join(", ", allGnpPaths.Take(10))}");
 
                 {// Check for GNP deletes: was previously in gnpPrefabAssetPaths_lastBuild, but NOT in the updated list of gnp prefabs
                  // Check for GNP deletes: previously in gnpPrefabAssetPaths_lastBuild, but NOT in currentGnpAssetPaths
                     IEnumerable<string> deletedGnpPaths = gnpPrefabAssetPaths_lastBuild
-                        .Where(path => !gnpsInProjectResources_paths.Contains(path));
+                        .Where(path => !allGnpPaths.Contains(path));
 
                     foreach (string deletedPath in deletedGnpPaths)
                     {
-                        // Check if this was an addressable asset to provide the correct message
-                        bool isAddressableAsset = false;
-#if ADDRESSABLES_AVAILABLE
-                        isAddressableAsset = IsAddressableAsset(deletedPath);
-#endif
-                        string messageType = isAddressableAsset ? "addressable" : "project resources";
+                        // Safeguard: Check if this is a false positive - if the asset still exists in either collection,
+                        // then it wasn't actually deleted, likely due to timing issues during addressables modifications
+                        bool stillExistsInResources = gnpsInProjectResources.Any(g => AssetDatabase.GetAssetPath(g) == deletedPath);
+                        bool stillExistsInAddressables = gnpsInAddressables.Any(g => AssetDatabase.GetAssetPath(g) == deletedPath);
+
+                        if (stillExistsInResources || stillExistsInAddressables)
+                        {
+                            GONetLog.Debug($"Skipping false positive deletion for {deletedPath}: stillInResources={stillExistsInResources}, stillInAddressables={stillExistsInAddressables}");
+                            continue; // Skip this false positive
+                        }
+
+                        // Check if this was an addressable asset in the last build to provide the correct message
+                        bool wasAddressableAsset = WasAddressableInLastBuild(deletedPath, designTimeLocations_gonetParticipants_lastBuild);
+                        string messageType = wasAddressableAsset ? "addressable" : "project resources";
+
+                        GONetLog.Debug($"Confirmed deletion for {deletedPath}: wasAddressable={wasAddressableAsset}");
                         AddGONetDesignTimeDirtyReason($"GONetParticipant prefab deleted from {messageType}: {deletedPath}");
                     }
                 }
 
                 {// Check for GNP adds: was previously NOT in gnpPrefabAssetPaths_lastBuild, but is now in the updated list of gnp prefabs
                  // Check for GNP adds: previously NOT in gnpPrefabAssetPaths_lastBuild, but is now in currentGnpAssetPaths
-                    IEnumerable<string> addedGnpPaths = gnpsInProjectResources_paths
+                    IEnumerable<string> addedGnpPaths = allGnpPaths
                         .Where(path => !gnpPrefabAssetPaths_lastBuild.Contains(path));
 
                     foreach (string addedPath in addedGnpPaths)
@@ -874,6 +1162,200 @@ namespace GONet.Editor
 
         private const string SESSION_STATE_ADDRESSABLES_CACHE_KEY = "GONet.AddressableAssetPaths";
 
+#if ADDRESSABLES_AVAILABLE
+        /// <summary>
+        /// Registers callbacks for Addressables build events and group modifications
+        /// </summary>
+        private static void RegisterAddressableBuildCallbacks()
+        {
+            var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
+            if (addressableSettings != null)
+            {
+                // Hook into build completion events
+                addressableSettings.OnDataBuilderComplete += OnAddressablesBuildComplete;
+
+                // Hook into group/entry modification events
+                AddressableAssetSettings.OnModificationGlobal += OnAddressablesModification;
+            }
+        }
+
+        /// <summary>
+        /// Called when an Addressables build completes
+        /// </summary>
+        private static void OnAddressablesBuildComplete(AddressableAssetSettings settings,
+                                                       IDataBuilder builder,
+                                                       IDataBuilderResult result)
+        {
+            UnityEngine.Debug.Log("GONet: Addressables build completed, checking for GONetParticipant changes");
+
+            // Force update of the cache after addressables build
+            UpdateAddressableAssetPathsCache();
+
+            // Delay change detection to ensure addressables system is fully updated
+            EditorApplication.delayCall += () => {
+                EditorApplication.delayCall += () => {
+                    GONetLog.Debug("Running addressables build change detection");
+
+                    // Note: If metadata isn't cached, the detection will use false positive protection
+
+                    OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly();
+                };
+            };
+        }
+
+        /// <summary>
+        /// Called when Addressables groups or entries are modified
+        /// </summary>
+        private static void OnAddressablesModification(AddressableAssetSettings settings,
+                                                       AddressableAssetSettings.ModificationEvent eventType,
+                                                       object eventData)
+        {
+            // Only care about entry-related modifications that might affect GONet prefabs
+            if (eventType == AddressableAssetSettings.ModificationEvent.EntryAdded ||
+                eventType == AddressableAssetSettings.ModificationEvent.EntryRemoved ||
+                eventType == AddressableAssetSettings.ModificationEvent.EntryModified)
+            {
+                UnityEngine.Debug.Log($"GONet: Addressables modification detected ({eventType}), checking for GONet changes");
+                UpdateAddressableAssetPathsCache();
+
+                // Use direct detection approach that doesn't depend on metadata caching
+                // Execute immediately to ensure dirty flag is set before any potential play mode transition
+                ProcessAddressablesModificationDirect(eventType, eventData);
+            }
+        }
+
+        /// <summary>
+        /// Directly processes addressables modifications for GONetParticipant prefabs without depending on metadata caching
+        /// </summary>
+        private static void ProcessAddressablesModificationDirect(AddressableAssetSettings.ModificationEvent eventType, object eventData)
+        {
+            try
+            {
+                // Extract the asset path from the modification event
+                string assetPath = null;
+                string address = null;
+
+                if (eventData is AddressableAssetEntry entry)
+                {
+                    assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                    address = entry.address;
+                }
+
+                if (string.IsNullOrEmpty(assetPath))
+                {
+                    GONetLog.Debug($"Could not extract asset path from addressables modification event");
+                    return;
+                }
+
+                // Check if this asset is a GONetParticipant prefab
+                if (!assetPath.EndsWith(".prefab", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return; // Not a prefab, ignore
+                }
+
+                GONetParticipant gnp = AssetDatabase.LoadAssetAtPath<GONetParticipant>(assetPath);
+                if (gnp == null)
+                {
+                    return; // Not a GONetParticipant prefab, ignore
+                }
+
+                // Now we know this is a GONetParticipant prefab that was modified in addressables
+                // Determine the change type and record it if not already recorded this session
+                string changeType = eventType switch
+                {
+                    AddressableAssetSettings.ModificationEvent.EntryAdded => "added",
+                    AddressableAssetSettings.ModificationEvent.EntryRemoved => "removed",
+                    AddressableAssetSettings.ModificationEvent.EntryModified => "modified",
+                    _ => "changed"
+                };
+
+                // Check for session deduplication - prevent recording same change multiple times
+                if (WasChangeAlreadyRecordedThisSession(assetPath, changeType))
+                {
+                    GONetLog.Debug($"Skipping duplicate addressables change in session: {changeType} {assetPath}");
+                    return;
+                }
+
+                // Record the change using our holistic dual persistence system
+                RecordAddressablesChange(assetPath, changeType);
+                GONetLog.Debug($"Direct addressables change detected and recorded: {changeType} {assetPath}");
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error processing addressables modification: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Records addressables changes using dual persistence: SessionState (session) + File (cross-session)
+        /// Integrates with GONet's existing dirty reason system for consistent behavior
+        /// </summary>
+        private static void RecordAddressablesChange(string assetPath, string changeType)
+        {
+            // Create the dirty reason message using GONet's standard format
+            string actionText = changeType switch
+            {
+                "added" => "added to",
+                "removed" => "removed from",
+                "modified" => "modified in",
+                _ => "changed in"
+            };
+
+            // Use the standard format consistent with other detection systems
+            string locationPrefix = "addressables://";
+            string dirtyReason = $"GONetParticipant at {locationPrefix}{assetPath} was added or modified after the last build.";
+
+            // Use GONet's existing file persistence system - this handles:
+            // - File creation/management
+            // - Timestamp formatting
+            // - Duplicate detection
+            // - Cross-session persistence
+            AddGONetDesignTimeDirtyReason(dirtyReason);
+
+            // ALSO store in SessionState for this-session deduplication and fast access
+            // This prevents us from detecting the same change multiple times within a session
+            const string ADDRESSABLES_SESSION_KEY = "GONet.AddressablesSession";
+            string sessionKey = $"{changeType}:{assetPath}";
+
+            string existingSession = SessionState.GetString(ADDRESSABLES_SESSION_KEY, "");
+            if (string.IsNullOrEmpty(existingSession))
+            {
+                SessionState.SetString(ADDRESSABLES_SESSION_KEY, sessionKey);
+            }
+            else if (!existingSession.Contains(sessionKey))
+            {
+                SessionState.SetString(ADDRESSABLES_SESSION_KEY, $"{existingSession};{sessionKey}");
+            }
+
+            GONetLog.Debug($"Recorded addressables change: {dirtyReason}");
+        }
+
+        /// <summary>
+        /// Checks if this addressables change was already recorded in this session
+        /// Prevents duplicate detection within the same editor session
+        /// </summary>
+        private static bool WasChangeAlreadyRecordedThisSession(string assetPath, string changeType)
+        {
+            const string ADDRESSABLES_SESSION_KEY = "GONet.AddressablesSession";
+            string sessionData = SessionState.GetString(ADDRESSABLES_SESSION_KEY, "");
+            string changeKey = $"{changeType}:{assetPath}";
+
+            return !string.IsNullOrEmpty(sessionData) && sessionData.Contains(changeKey);
+        }
+
+        /// <summary>
+        /// Clears session-specific addressables tracking
+        /// Called after successful builds to reset session state
+        /// Note: File persistence is handled by GONet's existing build completion system
+        /// </summary>
+        private static void ClearAddressablesSessionTracking()
+        {
+            const string ADDRESSABLES_SESSION_KEY = "GONet.AddressablesSession";
+            SessionState.EraseString(ADDRESSABLES_SESSION_KEY);
+            GONetLog.Debug("Cleared addressables session tracking");
+        }
+#endif
+
         /// <summary>
         /// Updates the cache of addressable asset paths using Unity's SessionState for domain-reload safety
         /// </summary>
@@ -933,6 +1415,16 @@ namespace GONet.Editor
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Checks if the given asset path was an addressable in the last build based on stored metadata
+        /// </summary>
+        private static bool WasAddressableInLastBuild(string assetPath, IEnumerable<DesignTimeMetadata> lastBuildMetadata)
+        {
+            return lastBuildMetadata.Any(x =>
+                x.Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX) &&
+                x.Location.Substring(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX.Length) == assetPath);
         }
 
         /// <summary>
@@ -1027,6 +1519,63 @@ namespace GONet.Editor
                 }
             }
         }
+
+        /// <summary>
+        /// Gathers all GONetParticipant prefabs that are currently marked as addressable assets.
+        /// This is used for change detection to identify when prefabs are added/removed from addressables.
+        /// </summary>
+        /// <returns>List of GONetParticipant components from addressable prefabs</returns>
+        internal static List<GONetParticipant> GatherAddressableGONetParticipants()
+        {
+            List<GONetParticipant> addressableGNPs = new List<GONetParticipant>();
+
+            var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
+            if (addressableSettings == null)
+            {
+                return addressableGNPs;
+            }
+
+            foreach (var group in addressableSettings.groups)
+            {
+                if (group == null) continue;
+
+                foreach (var entry in group.entries)
+                {
+                    if (entry == null || string.IsNullOrEmpty(entry.address)) continue;
+
+                    // Load the asset to check if it contains a GONetParticipant
+                    string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                    if (string.IsNullOrEmpty(assetPath)) continue;
+
+                    // Check if it's a prefab file
+                    if (assetPath.EndsWith(".prefab", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        GONetParticipant prefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(assetPath);
+                        if (prefab != null)
+                        {
+                            addressableGNPs.Add(prefab);
+                        }
+                    }
+                    // Check if it's a folder - scan for prefabs inside
+                    else if (AssetDatabase.IsValidFolder(assetPath))
+                    {
+                        string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { assetPath });
+
+                        foreach (string prefabGuid in prefabGuids)
+                        {
+                            string prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+                            GONetParticipant prefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(prefabPath);
+                            if (prefab != null)
+                            {
+                                addressableGNPs.Add(prefab);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return addressableGNPs;
+        }
 #else
         /// <summary>
         /// Fallback when Addressables is not available - no addressables scanning needed.
@@ -1034,6 +1583,15 @@ namespace GONet.Editor
         internal static void EnsureDesignTimeLocationsCurrent_AddressablesOnly()
         {
             // No addressables support, nothing to scan
+        }
+
+        /// <summary>
+        /// Fallback when Addressables is not available - returns empty list of addressable GONetParticipants.
+        /// </summary>
+        /// <returns>Empty list since addressables is not available</returns>
+        internal static List<GONetParticipant> GatherAddressableGONetParticipants()
+        {
+            return new List<GONetParticipant>();
         }
 
         /// <summary>

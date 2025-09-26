@@ -6,6 +6,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "addressables://Assets/GONet/Sample/Projectile/EmptyGNP.prefab",
+            "unityGuid": "54854bab74f58534ea37d6193fb44f78",
+            "codeGenerationId": 1
+        },
+        {
             "location": "resources://Assets/GONet/Resources/GONet/GONet_GlobalContext.prefab",
             "unityGuid": "56c1b12035c5c034f81a7b4c212a379e",
             "codeGenerationId": 1
@@ -86,7 +91,7 @@
             "codeGenerationId": 4
         },
         {
-            "location": "scene://ProjectileTest/Empty",
+            "location": "scene://ProjectileTest/empty777",
             "unityGuid": "",
             "codeGenerationId": 1
         },

@@ -202,6 +202,8 @@ namespace GONet
 
             foreach (DesignTimeMetadata designTimeMetadata in allProjectDesignTimeMetadata)
             {
+                // GONetLog.Debug($"CacheAllDesignTimeMetadata: Processing metadata - Location: {designTimeMetadata?.Location ?? "NULL"}, IsNull: {designTimeMetadata == null}");
+
                 if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX) || designTimeMetadata.Location.StartsWith(RESOURCES_HIERARCHY_PREFIX))
                 {
                     // Handle both project:// and resources:// prefixes for backwards compatibility
@@ -699,23 +701,40 @@ namespace GONet
                 if (callDepth > 1) return;
 
                 DesignTimeMetadata metadata = default;
-                if (!string.IsNullOrWhiteSpace(gONetParticipant.UnityGuid)) //(gONetParticipant.WasInstantiated)
-                {
-                    // NOTE: inside here this GNP could either appear in the scene or have been spawned, but since it has a UnityGuid, we know it is a prefab
 
+                // First try to get metadata by scene path (works for scene objects)
+                metadata = GetDesignTimeMetadata(fullPathInScene, canBypassDepthCheck: true);
+                GONetLog.Debug($"InitDesignTimeMetadata: Scene path lookup for '{gONetParticipant.gameObject.name}' at '{fullPathInScene}' returned: {(metadata != default ? metadata.Location : "NULL")}");
+
+                // If not found by scene path (empty location means it wasn't found) and object has UnityGuid, try prefab metadata lookup (for instantiated objects)
+                if (string.IsNullOrEmpty(metadata.Location) && !string.IsNullOrWhiteSpace(gONetParticipant.UnityGuid))
+                {
+                    GONetLog.Debug($"InitDesignTimeMetadata: Scene lookup failed for '{gONetParticipant.gameObject.name}', trying UnityGuid lookup: {gONetParticipant.UnityGuid}");
+
+                    GONetLog.Debug($"InitDesignTimeMetadata: Searching for UnityGuid '{gONetParticipant.UnityGuid}' in designTimeMetadataLookup...");
                     if (!designTimeMetadataLookup.TryGetValueByUnityGuid(gONetParticipant.UnityGuid, out metadata))
                     {
+                        GONetLog.Debug($"InitDesignTimeMetadata: TryGetValueByUnityGuid failed, trying designTimeMetadataToProjectTemplate...");
                         metadata = designTimeMetadataToProjectTemplate.Keys.FirstOrDefault(x => x.UnityGuid == gONetParticipant.UnityGuid);
                         if (metadata == default)
                         {
-                            GONetLog.Error($"dreetsi  snafooery");
+                            // Let's debug what UnityGuids are actually available
+                            var availableGuids = designTimeMetadataToProjectTemplate.Keys.Where(x => !string.IsNullOrEmpty(x.UnityGuid)).Select(x => x.UnityGuid).ToArray();
+                            GONetLog.Error($"Could not find design time metadata for GONetParticipant with UnityGuid: {gONetParticipant.UnityGuid}, GameObject: {gONetParticipant.gameObject.name}, Scene path: {fullPathInScene}. Available UnityGuids: [{string.Join(", ", availableGuids)}]");
+                        }
+                        else
+                        {
+                            GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via designTimeMetadataToProjectTemplate for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
                         }
                     }
+                    else
+                    {
+                        GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via TryGetValueByUnityGuid for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
+                    }
                 }
-                else
-                {
-                    metadata = GetDesignTimeMetadata(fullPathInScene, canBypassDepthCheck: true);
-                }
+
+                GONetLog.Debug($"InitDesignTimeMetadata: Final metadata for '{gONetParticipant.gameObject.name}': {(metadata != default ? $"Location={metadata.Location}, CodeGenId={metadata.CodeGenerationId}" : "NULL")}");
+
                 designTimeMetadataLookup.Set(gONetParticipant, metadata);
 
                 gONetParticipant.IsDesignTimeMetadataInitd = true;
@@ -786,7 +805,7 @@ namespace GONet
         private static readonly Dictionary<GONetParticipant, DesignTimeMetadata> designTimeMetadataByGNP = new(256);
         private static readonly Dictionary<string, DesignTimeMetadata> designTimeMetadataByLocation = new(256);
 
-        public int Count => designTimeMetadataByGNP.Count;
+        public int Count => designTimeMetadataByGNP.Count + designTimeMetadataByLocation.Count;
 
         public void Clear()
         {
@@ -798,7 +817,8 @@ namespace GONet
         {
             if ((object)keyGNP == null || (object)value == default)
             {
-                throw new ArgumentException($"BLASTPHEAMOUSE!  1: {((object)keyGNP == null)}, 2: {((object)value == default)}");
+                string gnpInfo = keyGNP != null ? $"GameObject: {keyGNP.gameObject.name}, UnityGuid: {keyGNP.UnityGuid}" : "null";
+                throw new ArgumentException($"BLASTPHEAMOUSE! GONetParticipant: {gnpInfo}, metadata is null: {(object)value == default}");
             }
 
             designTimeMetadataByGNP[keyGNP] = value;
@@ -816,10 +836,12 @@ namespace GONet
         {
             if (string.IsNullOrWhiteSpace(keyLocation) || (object)value == default)
             {
-                throw new ArgumentException("TON CLEETLE");
+                string locationInfo = string.IsNullOrWhiteSpace(keyLocation) ? "empty/null" : keyLocation;
+                throw new ArgumentException($"TON CLEETLE! Location: '{locationInfo}', metadata is null: {(object)value == default}");
             }
 
             designTimeMetadataByLocation[keyLocation] = value;
+            // GONetLog.Debug($"DesignTimeMetadataLookup.Set: Cached metadata for location: {keyLocation}");
         }
 
         public void ChangeLocation(string previousLocation, string newLocation, DesignTimeMetadata value)
