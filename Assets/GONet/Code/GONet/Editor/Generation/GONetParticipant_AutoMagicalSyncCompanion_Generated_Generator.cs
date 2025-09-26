@@ -232,7 +232,12 @@ namespace GONet.Generation
         {
             IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants =
                 GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
-            IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants.Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)).Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
+            // Get paths from design-time metadata for both project:// and resources:// prefixes (for backwards compatibility)
+            IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants
+                .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) || x.Location.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                .Select(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)
+                    ? x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length)
+                    : x.Location.Substring(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX.Length));
 
             if (importedAssets != null) foreach (string importedAsset in importedAssets)
             {
@@ -298,10 +303,13 @@ namespace GONet.Generation
             IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
                 GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
 
+            // Get paths from last build for both project:// and resources:// prefixes (for backwards compatibility)
             HashSet<string> gnpPrefabAssetPaths_lastBuild =
                 designTimeLocations_gonetParticipants_lastBuild
-                    .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
-                    .Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length))
+                    .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) || x.Location.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                    .Select(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)
+                        ? x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length)
+                        : x.Location.Substring(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX.Length))
                     .ToHashSet();
 
             // Determine if the modified prefab path was in the last build's data
@@ -404,7 +412,12 @@ namespace GONet.Generation
             }
 
             { // after that, we need to see about do things to ensure ALL prefabs get generated when stuff (e.g., C# files) change that possibly have some changes to sync stuffs
-                IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants.Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)).Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
+                // Get paths from design-time metadata for both project:// and resources:// prefixes (for backwards compatibility)
+            IEnumerable<string> gnpPrefabAssetPaths = designTimeLocations_gonetParticipants
+                .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) || x.Location.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                .Select(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX)
+                    ? x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length)
+                    : x.Location.Substring(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX.Length));
                 foreach (string gnpPrefabAssetPath in gnpPrefabAssetPaths)
                 {
                     existingGONetParticipantAssetPaths.Add(gnpPrefabAssetPath);
@@ -1144,7 +1157,8 @@ namespace GONet.Generation
                                 if (gnps.Length > 0)
                                 {
                                     gonetParticipantsInPrefabs.AddRange(gnps);
-                                    Debug.Log($"Found {gnps.Length} GONetParticipant(s) in addressable prefab: {assetPath} (address: {entry.address})");
+                                    string guid = AssetDatabase.AssetPathToGUID(assetPath);
+                                    Debug.Log($"Found {gnps.Length} GONetParticipant(s) in addressable prefab: {assetPath} (address: {entry.address}) (guid: {guid}) (entry.guid: {entry.guid})");
                                 }
                             }
                         }

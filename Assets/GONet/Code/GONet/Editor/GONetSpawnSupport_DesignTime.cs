@@ -523,7 +523,23 @@ namespace GONet.Editor
             // Compare the current GNP paths to the previous build's metadata
             foreach (var currentPath in fullPathsToDesignTimeGnps)
             {
-                if (!pathsFromLastBuild.Contains(currentPath))
+                bool foundMatch = pathsFromLastBuild.Contains(currentPath);
+
+                // Check for backwards compatibility: resources:// vs project:// prefixes should be treated as equivalent
+                if (!foundMatch && currentPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                {
+                    // Try to find equivalent project:// path from last build
+                    string equivalentProjectPath = currentPath.Replace(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX, GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX);
+                    foundMatch = pathsFromLastBuild.Contains(equivalentProjectPath);
+                }
+                else if (!foundMatch && currentPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                {
+                    // Try to find equivalent resources:// path from last build (edge case)
+                    string equivalentResourcesPath = currentPath.Replace(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX, GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX);
+                    foundMatch = pathsFromLastBuild.Contains(equivalentResourcesPath);
+                }
+
+                if (!foundMatch)
                 {
                     AddGONetDesignTimeDirtyReason($"GONetParticipant at {currentPath} was added or modified after the last build.");
                 }
@@ -582,13 +598,28 @@ namespace GONet.Editor
 
             static void HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate()
             {
+                // Update the addressable asset paths cache before processing changes
+                UpdateAddressableAssetPathsCache();
+
                 IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
                     GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
                 
-                IEnumerable<string> gnpPrefabAssetPaths_lastBuild = 
+                // Get paths from last build for project://, resources://, and addressables:// prefixes
+                IEnumerable<string> gnpPrefabAssetPaths_lastBuild =
                     designTimeLocations_gonetParticipants_lastBuild
-                        .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
-                        .Select(x => x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length));
+                        .Where(x => x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) ||
+                                   x.Location.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
+                                   x.Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                        .Select(x => {
+                            if (x.Location.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX))
+                                return x.Location.Substring(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX.Length);
+                            else if (x.Location.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX))
+                                return x.Location.Substring(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX.Length);
+                            else if (x.Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                                return x.Location.Substring(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX.Length);
+                            else
+                                return x.Location; // Fallback for unknown prefixes
+                        });
 
                 // TODO FIXME doing this every time the hiearchy changes is crazy....mainy due to high processing time....need to attempt to move this entire method logic to be called in the other option: AssetPostprocessor.OnPostprocessAllAssets, where we hope we can more narrowly focus in on the specific data that is changing instead of searching the entire project essentially!
                 //   --- UPDATE to above TODO FIXME: there is an implementation of this inside AssetPostprocessor/Magoo.OnPostprocessAllAssets (find OnPostprocessAllAssets_TakeNoteOfAnyGONetChanges), so this here can/should probably be removed as redundant and this is less performant for sure.
@@ -604,7 +635,13 @@ namespace GONet.Editor
 
                     foreach (string deletedPath in deletedGnpPaths)
                     {
-                        AddGONetDesignTimeDirtyReason($"GONetParticipant prefab deleted from project resources: {deletedPath}");
+                        // Check if this was an addressable asset to provide the correct message
+                        bool isAddressableAsset = false;
+#if ADDRESSABLES_AVAILABLE
+                        isAddressableAsset = IsAddressableAsset(deletedPath);
+#endif
+                        string messageType = isAddressableAsset ? "addressable" : "project resources";
+                        AddGONetDesignTimeDirtyReason($"GONetParticipant prefab deleted from {messageType}: {deletedPath}");
                     }
                 }
 
@@ -615,7 +652,13 @@ namespace GONet.Editor
 
                     foreach (string addedPath in addedGnpPaths)
                     {
-                        AddGONetDesignTimeDirtyReason($"GONetParticipant prefab added to project resources: {addedPath}");
+                        // Check if this is an addressable asset to provide the correct message
+                        bool isAddressableAsset = false;
+#if ADDRESSABLES_AVAILABLE
+                        isAddressableAsset = IsAddressableAsset(addedPath);
+#endif
+                        string messageType = isAddressableAsset ? "addressable" : "project resources";
+                        AddGONetDesignTimeDirtyReason($"GONetParticipant prefab added to {messageType}: {addedPath}");
                     }
                 }
             }
@@ -829,17 +872,83 @@ namespace GONet.Editor
             }
         }
 
+        private const string SESSION_STATE_ADDRESSABLES_CACHE_KEY = "GONet.AddressableAssetPaths";
+
+        /// <summary>
+        /// Updates the cache of addressable asset paths using Unity's SessionState for domain-reload safety
+        /// </summary>
+        private static void UpdateAddressableAssetPathsCache()
+        {
+            var cachedPaths = new List<string>();
+
+            var allGNPs = GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GatherGONetParticipantsInAllResourcesFolders();
+            foreach (var gnp in allGNPs)
+            {
+                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(gnp);
+                if (!string.IsNullOrEmpty(assetPath) && !assetPath.Contains("/Resources/"))
+                {
+                    // This must be an addressable since it's not in Resources but was found by the gather method
+                    cachedPaths.Add(assetPath);
+                }
+            }
+
+            // Store in SessionState using JSON serialization for the list
+            string json = JsonUtility.ToJson(new SerializableStringList { items = cachedPaths.ToArray() });
+            SessionState.SetString(SESSION_STATE_ADDRESSABLES_CACHE_KEY, json);
+
+            // UnityEngine.Debug.Log($"UpdateAddressableAssetPathsCache: Cached {cachedPaths.Count} addressable asset paths in SessionState");
+        }
+
+        [System.Serializable]
+        private class SerializableStringList
+        {
+            public string[] items;
+        }
+
+        /// <summary>
+        /// Gets the cached addressable asset paths from Unity's SessionState
+        /// </summary>
+        private static HashSet<string> GetCachedAddressableAssetPaths()
+        {
+            var result = new HashSet<string>();
+
+            string json = SessionState.GetString(SESSION_STATE_ADDRESSABLES_CACHE_KEY, "");
+            if (!string.IsNullOrEmpty(json))
+            {
+                try
+                {
+                    var data = JsonUtility.FromJson<SerializableStringList>(json);
+                    if (data?.items != null)
+                    {
+                        foreach (var item in data.items)
+                        {
+                            result.Add(item);
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    UnityEngine.Debug.LogWarning($"Failed to deserialize addressable cache from SessionState: {ex.Message}");
+                }
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Checks if the given asset path is configured as an addressable asset
         /// </summary>
         private static bool IsAddressableAsset(string assetPath)
         {
-            var addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
-            if (addressableSettings == null) return false;
+            // Check if the asset is not in a Resources folder (which would make it Resources-based)
+            if (assetPath.Contains("/Resources/"))
+            {
+                return false;
+            }
 
-            string guid = AssetDatabase.AssetPathToGUID(assetPath);
-            var entry = addressableSettings.FindAssetEntry(guid);
-            return entry != null && !string.IsNullOrEmpty(entry.address);
+            // Check the SessionState cache that gets populated when GatherGONetParticipantsInAllResourcesFolders runs
+            var cachedPaths = GetCachedAddressableAssetPaths();
+            return cachedPaths.Contains(assetPath);
         }
 
         /// <summary>
