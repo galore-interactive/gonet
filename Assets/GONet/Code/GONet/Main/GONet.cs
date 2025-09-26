@@ -3061,7 +3061,10 @@ namespace GONet
             // Copy design time metadata from template to spawned instance (for addressables support)
             // This is optional - if template doesn't have metadata, the system will work as before
             GONetLog.Debug($"Instantiate_Remote: Template '{template.name}' before GetDesignTimeMetadata lookup");
-            DesignTimeMetadata templateMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(template);
+
+            // IMPORTANT: Get metadata by location from the instantiation event, not from the template instance
+            // The template instance (especially for addressables) may not have the same metadata as the original cached version
+            DesignTimeMetadata templateMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(instantiateEvent.DesignTimeLocation);
 
             if (templateMetadata != null)
             {
