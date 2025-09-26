@@ -6,6 +6,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "addressables://Assets/GONet/Sample/Projectile/empty777.prefab",
+            "unityGuid": "7940d4494038e1b4a92eb5769cb729ee",
+            "codeGenerationId": 1
+        },
+        {
             "location": "addressables://Assets/GONet/Sample/Projectile/EmptyGNP.prefab",
             "unityGuid": "54854bab74f58534ea37d6193fb44f78",
             "codeGenerationId": 1
@@ -89,11 +94,6 @@
             "location": "scene://JustAnotherScene/NADA/GameObject (3)",
             "unityGuid": "",
             "codeGenerationId": 4
-        },
-        {
-            "location": "scene://ProjectileTest/empty777",
-            "unityGuid": "",
-            "codeGenerationId": 1
         },
         {
             "location": "scene://ProjectileTest/GONet_GlobalContext",

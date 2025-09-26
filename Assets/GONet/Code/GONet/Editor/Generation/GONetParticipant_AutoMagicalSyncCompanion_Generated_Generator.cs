@@ -318,11 +318,11 @@ namespace GONet.Generation
 
             if (!wasInLastBuild && hasGONetParticipant)
             {
-                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"killo GONetParticipant added to prefab: {importedAssetPath}");
+                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"GONetParticipant added to prefab: {importedAssetPath}");
             }
             else if (wasInLastBuild && !hasGONetParticipant)
             {
-                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"killo GONetParticipant removed from prefab: {importedAssetPath}");
+                GONetSpawnSupport_DesignTime.AddGONetDesignTimeDirtyReason($"GONetParticipant removed from prefab: {importedAssetPath}");
             }
         }
 
