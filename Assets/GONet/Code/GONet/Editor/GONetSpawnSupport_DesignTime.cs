@@ -133,6 +133,9 @@ namespace GONet.Editor
 
             GONetParticipant.OnDestroyCalled += GONetParticipant_OnDestroyCalled;
             GONetParticipant.OnAwakeEditor += GONetParticipant_OnAwakeEditor;
+            GONetParticipant.OnEnableEditor += GONetParticipant_OnEnableEditor;
+            GONetParticipant.OnDisableEditor += GONetParticipant_OnDisableEditor;
+            GONetParticipant.OnValidateEditor += GONetParticipant_OnValidateEditor;
 
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
@@ -634,6 +637,213 @@ namespace GONet.Editor
                 string dirtyReason = $"GONetParticipant was removed from GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 AddGONetDesignTimeDirtyReason(dirtyReason);
             }
+        }
+
+        private static void GONetParticipant_OnEnableEditor(GONetParticipant gonetParticipant)
+        {
+            string goName = gonetParticipant?.gameObject?.name ?? "null";
+            UnityEngine.Debug.Log($"GONet: OnEnableEditor called for GameObject '{goName}'");
+
+            bool isHappeningDueToChangingPlayModeOrInitialOpenInEditor =
+                (!GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount ||
+                 Time.frameCount == 0);
+
+            UnityEngine.Debug.Log($"GONet: OnEnableEditor - isHappeningDueToChangingPlayModeOrInitialOpenInEditor: {isHappeningDueToChangingPlayModeOrInitialOpenInEditor}");
+
+            bool isTargetedDesignTimeOnlyAction =
+                !EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToChangingPlayModeOrInitialOpenInEditor &&
+                !EditorApplication.isUpdating && // handle scene loading or editor updates
+                !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
+                !IsQuitting;
+
+            UnityEngine.Debug.Log($"GONet: OnEnableEditor - isTargetedDesignTimeOnlyAction: {isTargetedDesignTimeOnlyAction}");
+            UnityEngine.Debug.Log($"GONet: OnEnableEditor - isPlaying: {EditorApplication.isPlaying}, isPlayingOrWillChangePlaymode: {EditorApplication.isPlayingOrWillChangePlaymode}, isUpdating: {EditorApplication.isUpdating}, isBatchMode: {Application.isBatchMode}, isQuitting: {IsQuitting}");
+
+            bool isInScene = IsInSceneIncludedInBuild(gonetParticipant);
+            bool hasProjectPath = DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject);
+            bool isInPrefabMode = IsInPrefabEditingMode(gonetParticipant);
+
+            UnityEngine.Debug.Log($"GONet: OnEnableEditor - isInScene: {isInScene}, hasProjectPath: {hasProjectPath}, isInPrefabMode: {isInPrefabMode}");
+
+            if (isTargetedDesignTimeOnlyAction &&
+                (isInScene || hasProjectPath || isInPrefabMode))
+            {
+                string dirtyReason = $"GONetParticipant was enabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                UnityEngine.Debug.Log($"GONet: OnEnableEditor - ADDING DIRTY REASON: {dirtyReason}");
+                AddGONetDesignTimeDirtyReason(dirtyReason);
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"GONet: OnEnableEditor - NOT adding dirty reason for '{goName}'");
+            }
+        }
+
+        private static void GONetParticipant_OnDisableEditor(GONetParticipant gonetParticipant)
+        {
+            string goName = gonetParticipant?.gameObject?.name ?? "null";
+            UnityEngine.Debug.Log($"GONet: OnDisableEditor called for GameObject '{goName}'");
+
+            bool isHappeningDueToChangingPlayModeOrInitialOpenInEditor =
+                (!GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount ||
+                 Time.frameCount == 0);
+
+            UnityEngine.Debug.Log($"GONet: OnDisableEditor - isHappeningDueToChangingPlayModeOrInitialOpenInEditor: {isHappeningDueToChangingPlayModeOrInitialOpenInEditor}");
+
+            bool isTargetedDesignTimeOnlyAction =
+                !EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToChangingPlayModeOrInitialOpenInEditor &&
+                !EditorApplication.isUpdating && // handle scene loading or editor updates
+                !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
+                !IsQuitting;
+
+            UnityEngine.Debug.Log($"GONet: OnDisableEditor - isTargetedDesignTimeOnlyAction: {isTargetedDesignTimeOnlyAction}");
+
+            bool isInScene = IsInSceneIncludedInBuild(gonetParticipant);
+            bool hasProjectPath = DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject);
+            bool isInPrefabMode = IsInPrefabEditingMode(gonetParticipant);
+
+            UnityEngine.Debug.Log($"GONet: OnDisableEditor - isInScene: {isInScene}, hasProjectPath: {hasProjectPath}, isInPrefabMode: {isInPrefabMode}");
+
+            if (isTargetedDesignTimeOnlyAction &&
+                (isInScene || hasProjectPath || isInPrefabMode))
+            {
+                string dirtyReason = $"GONetParticipant was disabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                UnityEngine.Debug.Log($"GONet: OnDisableEditor - ADDING DIRTY REASON: {dirtyReason}");
+                AddGONetDesignTimeDirtyReason(dirtyReason);
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"GONet: OnDisableEditor - NOT adding dirty reason for '{goName}'");
+            }
+        }
+
+        private static void GONetParticipant_OnValidateEditor(GONetParticipant gonetParticipant)
+        {
+            string goName = gonetParticipant?.gameObject?.name ?? "null";
+            UnityEngine.Debug.Log($"GONet: OnValidateEditor called for GameObject '{goName}'");
+
+            bool isHappeningDueToChangingPlayModeOrInitialOpenInEditor =
+                (!GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount ||
+                 Time.frameCount == 0);
+
+            UnityEngine.Debug.Log($"GONet: OnValidateEditor - isHappeningDueToChangingPlayModeOrInitialOpenInEditor: {isHappeningDueToChangingPlayModeOrInitialOpenInEditor}");
+
+            bool isTargetedDesignTimeOnlyAction =
+                !EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToChangingPlayModeOrInitialOpenInEditor &&
+                !EditorApplication.isUpdating && // handle scene loading or editor updates
+                !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
+                !IsQuitting;
+
+            UnityEngine.Debug.Log($"GONet: OnValidateEditor - isTargetedDesignTimeOnlyAction: {isTargetedDesignTimeOnlyAction}");
+
+            bool isInScene = IsInSceneIncludedInBuild(gonetParticipant);
+            bool hasProjectPath = DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject);
+            bool isInPrefabMode = IsInPrefabEditingMode(gonetParticipant);
+
+            UnityEngine.Debug.Log($"GONet: OnValidateEditor - isInScene: {isInScene}, hasProjectPath: {hasProjectPath}, isInPrefabMode: {isInPrefabMode}");
+
+            if (isTargetedDesignTimeOnlyAction &&
+                (isInScene || hasProjectPath || isInPrefabMode))
+            {
+                string dirtyReason = $"GONetParticipant properties changed on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                UnityEngine.Debug.Log($"GONet: OnValidateEditor - ADDING DIRTY REASON: {dirtyReason}");
+                AddGONetDesignTimeDirtyReason(dirtyReason);
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"GONet: OnValidateEditor - NOT adding dirty reason for '{goName}'");
+            }
+        }
+
+        /// <summary>
+        /// Detects if a GONetParticipant is being edited in any prefab editing context.
+        /// Handles both double-click prefab editing (prefab stage mode) and single-click prefab editing (inspector mode).
+        /// Uses Unity 2022.3+ PrefabStageUtility APIs for robust detection across all Unity versions.
+        /// </summary>
+        private static bool IsInPrefabEditingMode(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant?.gameObject == null)
+            {
+                UnityEngine.Debug.Log("GONet: IsInPrefabEditingMode - GameObject is null, returning false");
+                return false;
+            }
+
+            string goName = gonetParticipant.gameObject.name;
+            UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Checking GameObject '{goName}'");
+
+            // Method 1: Check if we're currently in a PrefabStage (double-click prefab editing)
+            var currentPrefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+            UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Current prefab stage: {(currentPrefabStage != null ? "Active" : "None")}");
+
+            if (currentPrefabStage != null && currentPrefabStage.stageHandle.IsValid())
+            {
+                UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Valid prefab stage found, checking if '{goName}' is part of contents");
+                // We're in prefab stage mode - check if this GameObject is part of the prefab being edited
+                if (currentPrefabStage.IsPartOfPrefabContents(gonetParticipant.gameObject))
+                {
+                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' IS part of prefab stage contents - DETECTED PREFAB STAGE MODE");
+                    return true; // Confirmed: editing in prefab stage mode
+                }
+                else
+                {
+                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' is NOT part of prefab stage contents");
+                }
+            }
+
+            // Method 2: Check if this is a prefab asset being edited directly (single-click inspector editing)
+            bool isPartOfAnyPrefab = UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gonetParticipant.gameObject);
+            UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - IsPartOfAnyPrefab: {isPartOfAnyPrefab}");
+
+            if (isPartOfAnyPrefab)
+            {
+                // Get the asset path - if this GameObject has a direct asset path, it's likely a prefab asset
+                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(gonetParticipant.gameObject);
+                UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Asset path: '{assetPath}'");
+
+                // Key insight: During single-click editing, AssetPath can be empty!
+                // We rely on AssetType and Scene info instead
+                var assetType = UnityEditor.PrefabUtility.GetPrefabAssetType(gonetParticipant.gameObject);
+                UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Asset type: {assetType}");
+
+                if (assetType == UnityEditor.PrefabAssetType.Regular || assetType == UnityEditor.PrefabAssetType.Variant)
+                {
+                    // Check scene info
+                    var scene = gonetParticipant.gameObject.scene;
+                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Scene name: '{scene.name}', path: '{scene.path}', isLoaded: {scene.isLoaded}");
+
+                    // Key check: prefab assets have empty scene path (whether AssetPath is empty or not)
+                    if (string.IsNullOrEmpty(gonetParticipant.gameObject.scene.path))
+                    {
+                        UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' IS a prefab asset being edited directly - DETECTED INSPECTOR MODE");
+                        return true; // Confirmed: editing prefab asset directly in inspector
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' has scene path, not direct asset editing");
+                    }
+                }
+                else
+                {
+                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Asset type is not Regular/Variant prefab");
+                }
+            }
+
+            UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' is NOT in prefab editing mode");
+            return false; // Not in any prefab editing mode
         }
 
         private static void OnProjectChanged_TakeNoteOfAnyGONetChanges_ProjectOnly()
