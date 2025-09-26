@@ -22,6 +22,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54854bab74f58534ea37d6193fb44f78
+    m_Address: Assets/GONet/Sample/Projectile/EmptyGNP.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7940d4494038e1b4a92eb5769cb729ee
+    m_Address: Assets/GONet/Sample/Projectile/empty777.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 67cf2d600f82390438ca512a0560197e, type: 2}
   m_SchemaSet:
