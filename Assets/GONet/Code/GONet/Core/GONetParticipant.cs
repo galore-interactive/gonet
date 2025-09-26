@@ -57,10 +57,23 @@ namespace GONet
         [SerializeField]
         internal string UnityGuid;
 
+        private GONetCodeGenerationId? cachedCodeGenerationId;
+
         public GONetCodeGenerationId CodeGenerationId
         {
-            get => GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId;
-            internal set => GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId = value;
+            get
+            {
+                if (!cachedCodeGenerationId.HasValue)
+                {
+                    cachedCodeGenerationId = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId;
+                }
+                return cachedCodeGenerationId.Value;
+            }
+            internal set
+            {
+                GONetSpawnSupport_Runtime.GetDesignTimeMetadata(this).CodeGenerationId = value;
+                cachedCodeGenerationId = value; // Update cache when value is set
+            }
         }
 
         [Serializable]

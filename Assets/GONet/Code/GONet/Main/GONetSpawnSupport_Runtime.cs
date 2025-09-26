@@ -672,7 +672,8 @@ namespace GONet
                 {
                     // Safely get name, handling destroyed objects during build process
                     string participantName = gONetParticipant ? gONetParticipant.name : "[destroyed]";
-                    GONetLog.Debug($"GetDesignTimeMetadata: Found cached metadata for GONetParticipant '{participantName}', Location: {value.Location}");
+                    // Commented out to reduce log spam - this is called frequently during sync processing
+                    // GONetLog.Debug($"GetDesignTimeMetadata: Found cached metadata for GONetParticipant '{participantName}', Location: {value.Location}");
                 }
                 return value;
             }
