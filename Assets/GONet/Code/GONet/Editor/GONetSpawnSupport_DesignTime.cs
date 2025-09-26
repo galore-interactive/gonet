@@ -121,6 +121,8 @@ namespace GONet.Editor
 
             GONetParticipant.OnDestroyCalled += GONetParticipant_OnDestroyCalled;
             GONetParticipant.OnAwakeEditor += GONetParticipant_OnAwakeEditor;
+            GONetParticipant.OnEnableEditor += GONetParticipant_OnEnableEditor;
+            GONetParticipant.OnDisableEditor += GONetParticipant_OnDisableEditor;
 
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
@@ -428,6 +430,56 @@ namespace GONet.Editor
             {
                 // if in here, we know this is a new GNP being added into scene in editor edit mode (i.e., design time add)
                 string dirtyReason = $"GONetParticipant was removed from GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                AddGONetDesignTimeDirtyReason(dirtyReason);
+            }
+        }
+
+        private static void GONetParticipant_OnEnableEditor(GONetParticipant gonetParticipant)
+        {
+            bool isHappeningDueToChangingPlayModeOrInitialOpenInEditor =
+                (!GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount ||
+                 Time.frameCount == 0);
+
+            bool isTargetedDesignTimeOnlyAction =
+                !EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToChangingPlayModeOrInitialOpenInEditor &&
+                !EditorApplication.isUpdating && // handle scene loading or editor updates
+                !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
+                !IsQuitting;
+
+            if (isTargetedDesignTimeOnlyAction &&
+                (IsInSceneIncludedInBuild(gonetParticipant) || DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject)))
+            {
+                string dirtyReason = $"GONetParticipant was enabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                AddGONetDesignTimeDirtyReason(dirtyReason);
+            }
+        }
+
+        private static void GONetParticipant_OnDisableEditor(GONetParticipant gonetParticipant)
+        {
+            bool isHappeningDueToChangingPlayModeOrInitialOpenInEditor =
+                (!GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange.HasValue ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.EnteredEditMode ||
+                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange == PlayModeStateChange.ExitingPlayMode) &&
+                (GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.LastPlayModeStateChange_frameCount == Time.frameCount ||
+                 Time.frameCount == 0);
+
+            bool isTargetedDesignTimeOnlyAction =
+                !EditorApplication.isPlaying &&
+                !EditorApplication.isPlayingOrWillChangePlaymode &&
+                !isHappeningDueToChangingPlayModeOrInitialOpenInEditor &&
+                !EditorApplication.isUpdating && // handle scene loading or editor updates
+                !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
+                !IsQuitting;
+
+            if (isTargetedDesignTimeOnlyAction &&
+                (IsInSceneIncludedInBuild(gonetParticipant) || DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject)))
+            {
+                string dirtyReason = $"GONetParticipant was disabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 AddGONetDesignTimeDirtyReason(dirtyReason);
             }
         }

@@ -523,6 +523,18 @@ namespace GONet
         /// NOTE: This will NOT be called when this was added to a GO on a prefab when in Prefab Preview (i.e., in-context editing) mode!
         /// </summary>
         public static event GNPDelegate OnAwakeEditor;
+
+        /// <summary>
+        /// Called when OnEnable is invoked in edit mode (design time).
+        /// Allows for detection of GONetParticipant enable/disable state changes during development.
+        /// </summary>
+        public static event GNPDelegate OnEnableEditor;
+
+        /// <summary>
+        /// Called when OnDisable is invoked in edit mode (design time).
+        /// Allows for detection of GONetParticipant enable/disable state changes during development.
+        /// </summary>
+        public static event GNPDelegate OnDisableEditor;
 #endif
 
         private void Awake()
@@ -564,6 +576,13 @@ namespace GONet
         private void OnEnable()
         {
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                OnEnableEditor?.Invoke(this);
+            }
+#endif
         }
 
         struct RigidBodySettings
@@ -660,6 +679,13 @@ namespace GONet
         private void OnDisable()
         {
             GONetMain.OnDisable_StopMonitoringForAutoMagicalNetworking(this);
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                OnDisableEditor?.Invoke(this);
+            }
+#endif
         }
 
         /// <summary>
