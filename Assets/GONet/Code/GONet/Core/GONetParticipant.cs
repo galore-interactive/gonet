@@ -466,20 +466,50 @@ namespace GONet
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (!EditorApplication.isPlaying && 
+            // Conservative logging to understand OnValidate context
+            UnityEngine.Debug.Log($"GONet: OnValidate called for GameObject '{gameObject?.name ?? "null"}'");
+            UnityEngine.Debug.Log($"GONet: OnValidate - isPlaying: {EditorApplication.isPlaying}, isPlayingOrWillChangePlaymode: {EditorApplication.isPlayingOrWillChangePlaymode}, isExitingPlayMode: {isExitingPlayMode}, isGenerating: {isGenerating}");
+
+            if (!EditorApplication.isPlaying &&
                 !EditorApplication.isPlayingOrWillChangePlaymode &&
                  !isExitingPlayMode &&
                  !isGenerating)
             {
-                // TODO maybe this should be used for property change identification!!!!!
-                //GONetLog.Debug($"GONetParticipant was added or changed on GameObject: {gameObject.name} (Design-time only).");
+                UnityEngine.Debug.Log($"GONet: OnValidate - passed guard conditions for '{gameObject?.name ?? "null"}'");
 
-                if (IsInPrefabPreviewMode())
+                // Check prefab context with detailed logging
+                bool isInPrefabPreview = IsInPrefabPreviewMode();
+                UnityEngine.Debug.Log($"GONet: OnValidate - IsInPrefabPreviewMode: {isInPrefabPreview}");
+
+                // Log scene information
+                var scene = gameObject?.scene;
+                if (scene.HasValue)
                 {
-                    //GONetLog.Debug($"GONetParticipant was validated on GameObject: {gameObject.name} (Design-time only).");
+                    UnityEngine.Debug.Log($"GONet: OnValidate - Scene name: '{scene.Value.name}', path: '{scene.Value.path}', isLoaded: {scene.Value.isLoaded}");
                 }
-            }
 
+                // Log prefab information
+                if (gameObject != null)
+                {
+                    bool isPartOfAnyPrefab = UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gameObject);
+                    var assetType = UnityEditor.PrefabUtility.GetPrefabAssetType(gameObject);
+                    string assetPath = UnityEditor.AssetDatabase.GetAssetPath(gameObject);
+
+                    UnityEngine.Debug.Log($"GONet: OnValidate - IsPartOfAnyPrefab: {isPartOfAnyPrefab}, AssetType: {assetType}, AssetPath: '{assetPath}'");
+                }
+
+                if (isInPrefabPreview)
+                {
+                    UnityEngine.Debug.Log($"GONet: OnValidate - In prefab preview mode for '{gameObject?.name ?? "null"}'");
+                }
+
+                // Trigger OnValidateEditor event for property change detection
+                OnValidateEditor?.Invoke(this);
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"GONet: OnValidate - skipped due to guard conditions for '{gameObject?.name ?? "null"}'");
+            }
 
             /* option used in editor namespace code only....here for reference
                          bool isHappeningDueToExitingPlayModeInEditor =
@@ -496,32 +526,32 @@ namespace GONet
             {
                 //GONetLog.Debug($"GONetParticipant was added or changed on GameObject: {gameObject.name} (Design-time only).");
             }
-*/
+            */
         }
 
         private bool IsInPrefabPreviewMode()
         {
             /* reference for troubleshooting
-            GameObject prefabSource = PrefabUtility.GetCorrespondingObjectFromSource(gameObject);
-            GameObject prefabRoot = PrefabUtility.GetNearestPrefabInstanceRoot(gameObject);
-            var magoo = PrefabUtility.GetOriginalSourceRootWhereGameObjectIsAdded(gameObject);
-            var slgo = PrefabUtility.GetOutermostPrefabInstanceRoot(gameObject);
-            var dickl = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-            var kk = PrefabUtility.GetPrefabAssetType(gameObject);
-            var jjjdfi = PrefabUtility.GetPrefabInstanceHandle(gameObject);
-            var iiiss = PrefabUtility.IsAnyPrefabInstanceRoot(gameObject);
-            var eee = PrefabUtility.IsOutermostPrefabInstanceRoot(gameObject);
-            var any = PrefabUtility.IsPartOfAnyPrefab(gameObject);
+            GameObject prefabSource = UnityEditor.PrefabUtility.GetCorrespondingObjectFromSource(gameObject);
+            GameObject prefabRoot = UnityEditor.PrefabUtility.GetNearestPrefabInstanceRoot(gameObject);
+            var magoo = UnityEditor.PrefabUtility.GetOriginalSourceRootWhereGameObjectIsAdded(gameObject);
+            var slgo = UnityEditor.PrefabUtility.GetOutermostPrefabInstanceRoot(gameObject);
+            var dickl = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+            var kk = UnityEditor.PrefabUtility.GetPrefabAssetType(gameObject);
+            var jjjdfi = UnityEditor.PrefabUtility.GetPrefabInstanceHandle(gameObject);
+            var iiiss = UnityEditor.PrefabUtility.IsAnyPrefabInstanceRoot(gameObject);
+            var eee = UnityEditor.PrefabUtility.IsOutermostPrefabInstanceRoot(gameObject);
+            var any = UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gameObject);
             */
 
             // Check if the object is part of any prefab
-            if (PrefabUtility.IsPartOfAnyPrefab(gameObject))
+            if (UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gameObject))
             {
                 // Check if the object is in an unloaded or temporary scene (scene path is null or empty)
                 if (!gameObject.scene.isLoaded && string.IsNullOrEmpty(gameObject.scene.path))
                 {
                     // Additional check: confirm that there's a valid asset path for the nearest instance root
-                    string assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+                    string assetPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
                     if (!string.IsNullOrEmpty(assetPath))
                     {
                         return true; // Confirmed to be in Prefab Preview Mode
@@ -531,12 +561,30 @@ namespace GONet
 
             return false; // Not in Prefab Preview Mode
         }
+#endif
 
         /// <summary>
         /// NOTE: This will NOT be called when this was added to a GO on a prefab when in Prefab Preview (i.e., in-context editing) mode!
         /// </summary>
         public static event GNPDelegate OnAwakeEditor;
-#endif
+
+        /// <summary>
+        /// Called when OnEnable is invoked in edit mode (design time).
+        /// Allows for detection of GONetParticipant enable/disable state changes during development.
+        /// </summary>
+        public static event GNPDelegate OnEnableEditor;
+
+        /// <summary>
+        /// Called when OnDisable is invoked in edit mode (design time).
+        /// Allows for detection of GONetParticipant enable/disable state changes during development.
+        /// </summary>
+        public static event GNPDelegate OnDisableEditor;
+
+        /// <summary>
+        /// Called when OnValidate is invoked in edit mode (design time).
+        /// Allows for detection of prefab asset property changes during Inspector editing.
+        /// </summary>
+        public static event GNPDelegate OnValidateEditor;
 
         private void Awake()
         {
@@ -577,6 +625,13 @@ namespace GONet
         private void OnEnable()
         {
             GONetMain.OnEnable_StartMonitoringForAutoMagicalNetworking(this);
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                OnEnableEditor?.Invoke(this);
+            }
+#endif
         }
 
         struct RigidBodySettings
@@ -673,6 +728,13 @@ namespace GONet
         private void OnDisable()
         {
             GONetMain.OnDisable_StopMonitoringForAutoMagicalNetworking(this);
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                OnDisableEditor?.Invoke(this);
+            }
+#endif
         }
 
         /// <summary>
