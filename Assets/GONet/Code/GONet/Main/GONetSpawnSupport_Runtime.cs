@@ -24,6 +24,11 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
+#if ADDRESSABLES_AVAILABLE
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+#endif
+
 namespace GONet
 {
     public static class GONetSpawnSupport_Runtime
@@ -35,12 +40,20 @@ namespace GONet
 
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
+        public const string ADDRESSABLES_HIERARCHY_PREFIX = "addressables://";
         public const string RESOURCES = "Resources/";
 
         private static readonly string[] ALL_END_OF_LINE_OPTIONS = new[] { "\r\n", "\r", "\n" };
 
         private static readonly Dictionary<DesignTimeMetadata, GONetParticipant> designTimeMetadataToProjectTemplate = new(100, new DesignTimeMetadataLocationComparer());
         private static readonly DesignTimeMetadataDictionary designTimeMetadataLookup = new();
+        private static bool isDesignTimeMetadataCachingComplete = false;
+        private static readonly List<GONetParticipant> deferredLookupQueue = new List<GONetParticipant>();
+
+#if ADDRESSABLES_AVAILABLE
+        private static readonly Dictionary<string, GONetParticipant> addressablePrefabCache = new Dictionary<string, GONetParticipant>(100);
+        private static readonly HashSet<string> loadingAddressableKeys = new HashSet<string>();
+#endif
         /// <summary>
         /// For the dictionary <see cref="designTimeMetadataToProjectTemplate"/>, this special comparer that only considers location is preferred over the <see cref="DesignTimeMetadata"/> 
         /// equals and gethashcode implementation details.
@@ -140,16 +153,16 @@ namespace GONet
 
         public static bool IsDesignTimeMetadataCached { get; private set; }
 
-        public static void CacheAllProjectDesignTimeMetadata(MonoBehaviour coroutineOwner)
+        public static void CacheAllProjectDesignTimeMetadata(MonoBehaviour coroutineOwner, System.Action onComplete = null)
         {
             //GONetLog.Debug("dreetsi cache begin");
             IsDesignTimeMetadataCached = false;
             coroutineOwner.StartCoroutine(
-                CacheAllProjectDesignTimeMetadata_Coroutine(CacheAllDesignTimeMetadata)
+                CacheAllProjectDesignTimeMetadata_Coroutine(CacheAllDesignTimeMetadata, onComplete)
             );
         }
 
-        private static IEnumerator CacheAllProjectDesignTimeMetadata_Coroutine(Action<IEnumerable<DesignTimeMetadata>> processResults)
+        private static IEnumerator CacheAllProjectDesignTimeMetadata_Coroutine(Action<IEnumerable<DesignTimeMetadata>> processResults, System.Action onComplete = null)
         {
             //GONetLog.Debug("dreetsi cache rotten");
 
@@ -165,7 +178,8 @@ namespace GONet
                     processResults(library.Entries);
                 });
             IsDesignTimeMetadataCached = true; // IMPORTANT: TODO FIXME this being in a coroutine is problematic because of what is waiting for this to be true...ought to block the main thread actually.....we should do this on another thread and block main thread until it this is true
-                
+            onComplete?.Invoke();
+
 #else
             //Debug.Log($"About to check out design time file at {fullPath}.  Does it exist? {File.Exists(fullPath)}");
             if (File.Exists(fullPath))
@@ -175,6 +189,7 @@ namespace GONet
                 processResults(library.Entries);
             }
             IsDesignTimeMetadataCached = true;
+            onComplete?.Invoke();
 
             yield return null;
 #endif
@@ -182,6 +197,8 @@ namespace GONet
 
         private static void CacheAllDesignTimeMetadata(IEnumerable<DesignTimeMetadata> allProjectDesignTimeMetadata)
         {
+            isDesignTimeMetadataCachingComplete = false;
+
             foreach (DesignTimeMetadata designTimeMetadata in allProjectDesignTimeMetadata)
             {
                 if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
@@ -189,15 +206,81 @@ namespace GONet
                     GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeMetadata.Location.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
                     if ((object)template != null)
                     {
-                        //GONetLog.Debug("found TEMPLATE for design time location: " + designTimeMetadata.Location);
+                        GONetLog.Debug($"CacheAllDesignTimeMetadata: Found RESOURCES template for '{template.name}' at location: {designTimeMetadata.Location}");
+
+                        // IMPORTANT: Ensure the template gets proper CodeGenerationId from its companion, not from metadata circular dependency
+                        if (designTimeMetadata.CodeGenerationId == 0)
+                        {
+                            // Try to get CodeGenerationId directly from the template's companion if it exists
+                            try
+                            {
+                                var companion = Generation.GONetParticipant_AutoMagicalSyncCompanion_Generated_Factory.CreateInstance(template);
+                                if (companion != null)
+                                {
+                                    designTimeMetadata.CodeGenerationId = companion.CodeGenerationId;
+                                    GONetLog.Debug($"CacheAllDesignTimeMetadata: Set CodeGenerationId={companion.CodeGenerationId} for template '{template.name}'");
+                                    companion.Dispose(); // Clean up since we only needed the CodeGenerationId
+                                }
+                                else
+                                {
+                                    GONetLog.Warning($"CacheAllDesignTimeMetadata: Template '{template.name}' has no companion, CodeGenerationId remains 0");
+                                }
+                            }
+                            catch (System.Exception ex)
+                            {
+                                GONetLog.Warning($"CacheAllDesignTimeMetadata: Could not create companion for template '{template.name}': {ex.Message}");
+                            }
+                        }
+
                         designTimeMetadataToProjectTemplate[designTimeMetadata] = template;
+
+                        // Cache the metadata for the template so it has proper CodeGenerationId
+                        designTimeMetadataLookup.Set(designTimeMetadata.Location, designTimeMetadata);
                     }
+                    else
+                    {
+                        GONetLog.Warning($"CacheAllDesignTimeMetadata: Could not find RESOURCES template for location: {designTimeMetadata.Location}");
+                    }
+                }
+                else if (designTimeMetadata.Location.StartsWith(ADDRESSABLES_HIERARCHY_PREFIX))
+                {
+                    // For addressables, we only cache the metadata - actual asset loading happens on-demand
+                    GONetLog.Debug($"CacheAllDesignTimeMetadata: Caching ADDRESSABLES metadata for location: {designTimeMetadata.Location}");
+                    designTimeMetadataLookup.Set(designTimeMetadata.Location, designTimeMetadata);
                 }
                 else if (designTimeMetadata.Location.StartsWith(SCENE_HIERARCHY_PREFIX))
                 {
                     //GONetLog.Debug($"associating SCENE design time location: {designTimeMetadata.Location}");
                     designTimeMetadataLookup.Set(designTimeMetadata.Location, designTimeMetadata);
                 }
+            }
+
+            isDesignTimeMetadataCachingComplete = true;
+            GONetLog.Debug($"CacheAllDesignTimeMetadata: Caching complete - {designTimeMetadataLookup.Count} entries cached");
+
+            // Process any deferred lookups that were queued while caching was in progress
+            ProcessDeferredLookups();
+        }
+
+        private static void ProcessDeferredLookups()
+        {
+            if (deferredLookupQueue.Count > 0)
+            {
+                GONetLog.Debug($"ProcessDeferredLookups: Processing {deferredLookupQueue.Count} deferred metadata lookups");
+
+                // Process each deferred participant
+                for (int i = deferredLookupQueue.Count - 1; i >= 0; i--)
+                {
+                    GONetParticipant participant = deferredLookupQueue[i];
+                    if (participant) // Check if still valid
+                    {
+                        // Remove the temporary empty metadata and do proper lookup
+                        GetDesignTimeMetadata(participant, force: true);
+                    }
+                }
+
+                deferredLookupQueue.Clear();
+                GONetLog.Debug($"ProcessDeferredLookups: Completed processing deferred lookups");
             }
         }
 
@@ -217,6 +300,113 @@ namespace GONet
             }
         }
 
+#if ADDRESSABLES_AVAILABLE
+        /// <summary>
+        /// Attempts to load a GONetParticipant prefab from Addressables cache first, then from Resources as fallback.
+        /// </summary>
+        private static GONetParticipant LookupTemplateFromAddressableOrResources(DesignTimeMetadata designTimeMetadata)
+        {
+            // Try Addressables first if key is available
+            if (designTimeMetadata.LoadType == ResourceLoadType.Addressables && !string.IsNullOrEmpty(designTimeMetadata.AddressableKey))
+            {
+                if (addressablePrefabCache.TryGetValue(designTimeMetadata.AddressableKey, out GONetParticipant cachedPrefab))
+                {
+                    return cachedPrefab;
+                }
+
+                // If not cached, try to load synchronously (this should only happen if prefab wasn't pre-warmed)
+                GONetLog.Warning($"Addressable prefab '{designTimeMetadata.AddressableKey}' not found in cache. Consider pre-warming cache for better performance.");
+                GONetLog.Debug($"Attempting to load addressable with key: '{designTimeMetadata.AddressableKey}' from location: '{designTimeMetadata.Location}'");
+                try
+                {
+                    var handle = Addressables.LoadAssetAsync<GameObject>(designTimeMetadata.AddressableKey);
+                    GameObject gameObject = handle.WaitForCompletion();
+                    GONetParticipant result = gameObject?.GetComponent<GONetParticipant>();
+                    if (result != null)
+                    {
+                        addressablePrefabCache[designTimeMetadata.AddressableKey] = result;
+                        return result;
+                    }
+                }
+                catch (UnityEngine.AddressableAssets.InvalidKeyException ex)
+                {
+                    GONetLog.Error($"Invalid addressable key '{designTimeMetadata.AddressableKey}'. This usually means the asset is not properly configured in an Addressable group or has an invalid address. Full error: {ex.Message}");
+                }
+                catch (System.Exception ex)
+                {
+                    GONetLog.Error($"Failed to load addressable prefab '{designTimeMetadata.AddressableKey}': {ex.Message}");
+                }
+            }
+
+            // Fallback to Resources if Addressables failed or not configured
+            return LookupResourceTemplateFromProjectLocation(designTimeMetadata.Location);
+        }
+
+        /// <summary>
+        /// Pre-loads addressable prefabs into cache for immediate access during network spawning.
+        /// Call this during game initialization to avoid runtime delays.
+        /// </summary>
+        public static async Task WarmupAddressablePrefabCache(IEnumerable<string> addressableKeys)
+        {
+            var loadTasks = new List<Task>();
+
+            foreach (string key in addressableKeys)
+            {
+                if (!addressablePrefabCache.ContainsKey(key) && !loadingAddressableKeys.Contains(key))
+                {
+                    loadingAddressableKeys.Add(key);
+                    loadTasks.Add(LoadAndCacheAddressablePrefab(key));
+                }
+            }
+
+            if (loadTasks.Count > 0)
+            {
+                await Task.WhenAll(loadTasks);
+            }
+        }
+
+        /// <summary>
+        /// Pre-loads all addressable prefabs found in design time metadata.
+        /// </summary>
+        public static async Task WarmupAddressablePrefabCache()
+        {
+            var addressableKeys = designTimeMetadataLookup
+                .Where(metadata => metadata.LoadType == ResourceLoadType.Addressables && !string.IsNullOrEmpty(metadata.AddressableKey))
+                .Select(metadata => metadata.AddressableKey)
+                .Distinct();
+
+            await WarmupAddressablePrefabCache(addressableKeys);
+        }
+
+        private static async Task LoadAndCacheAddressablePrefab(string addressableKey)
+        {
+            try
+            {
+                var handle = Addressables.LoadAssetAsync<GameObject>(addressableKey);
+                GameObject gameObject = await handle.Task;
+                GONetParticipant prefab = gameObject?.GetComponent<GONetParticipant>();
+
+                if (prefab != null)
+                {
+                    addressablePrefabCache[addressableKey] = prefab;
+                    GONetLog.Debug($"Cached addressable prefab: {addressableKey}");
+                }
+                else
+                {
+                    GONetLog.Warning($"Failed to load addressable prefab: {addressableKey} (result was null)");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"Error loading addressable prefab '{addressableKey}': {ex.Message}");
+            }
+            finally
+            {
+                loadingAddressableKeys.Remove(addressableKey);
+            }
+        }
+#endif
+
         public static GONetParticipant LookupTemplateFromDesignTimeMetadata(DesignTimeMetadata designTimeMetadata)
         {
             if (designTimeMetadata != null)
@@ -226,8 +416,25 @@ namespace GONet
                     string fullUniquePath = designTimeMetadata.Location.Replace(SCENE_HIERARCHY_PREFIX, string.Empty);
                     return HierarchyUtils.FindByFullUniquePath(fullUniquePath).GetComponent<GONetParticipant>();
                 }
+                else if (designTimeMetadata.Location.StartsWith(ADDRESSABLES_HIERARCHY_PREFIX))
+                {
+#if ADDRESSABLES_AVAILABLE
+                    // Pure addressables lookup using the addressable key
+                    return LookupTemplateFromAddressableOrResources(designTimeMetadata);
+#else
+                    throw new InvalidOperationException($"Addressables support not available. Cannot load prefab from: {designTimeMetadata.Location}");
+#endif
+                }
                 else if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
                 {
+#if ADDRESSABLES_AVAILABLE
+                    // Try addressables-aware lookup first
+                    if (designTimeMetadata.LoadType == ResourceLoadType.Addressables)
+                    {
+                        return LookupTemplateFromAddressableOrResources(designTimeMetadata);
+                    }
+#endif
+                    // Use cached project template for Resources-based prefabs
                     return designTimeMetadataToProjectTemplate[designTimeMetadata];
                 }
             }
@@ -305,6 +512,30 @@ namespace GONet
         internal static GONetParticipant Instantiate_MarkToBeRemotelyControlled(GONetParticipant prefab, Vector3 position, Quaternion rotation)
         {
             GONetParticipant instanceSoonToBeOwnedByServerAndRemotelyControlledByMe = UnityEngine.Object.Instantiate(prefab, position, rotation);
+
+            // Copy design time metadata from prefab to spawned instance (for addressables support)
+            // This is optional - if prefab doesn't have metadata, the system will work as before
+            DesignTimeMetadata prefabMetadata = GetDesignTimeMetadata(prefab);
+            if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
+            {
+                GONetLog.Debug($"Instantiate_MarkToBeRemotelyControlled: Copying metadata from prefab '{prefab.name}' - Location: {prefabMetadata.Location}");
+                DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
+                {
+                    Location = prefabMetadata.Location,
+                    CodeGenerationId = prefabMetadata.CodeGenerationId,
+                    UnityGuid = prefabMetadata.UnityGuid,
+                    AddressableKey = prefabMetadata.AddressableKey,
+                    LoadType = prefabMetadata.LoadType
+                };
+                SetDesignTimeMetadata(instanceSoonToBeOwnedByServerAndRemotelyControlledByMe, instanceMetadata);
+            }
+            else
+            {
+                // This is normal for prefabs that aren't addressable
+                // The system will work as before - metadata will be initialized normally during Awake()
+                GONetLog.Debug($"Instantiate_MarkToBeRemotelyControlled: Prefab '{prefab.name}' has no pre-cached metadata - will be initialized normally");
+            }
+
             markedToBeRemotelyControlled.Add(instanceSoonToBeOwnedByServerAndRemotelyControlledByMe);
             return instanceSoonToBeOwnedByServerAndRemotelyControlledByMe;
         }
@@ -317,13 +548,18 @@ namespace GONet
         };
 
         public static IEnumerable<DesignTimeMetadata> GetAllDesignTimeMetadata() => designTimeMetadataLookup;
+
+        internal static void SetDesignTimeMetadata(GONetParticipant gONetParticipant, DesignTimeMetadata metadata)
+        {
+            designTimeMetadataLookup.Set(gONetParticipant, metadata);
+        }
         public static void ClearAllDesignTimeMetadata()
         {
             designTimeMetadataLookup.Clear();
         }
 
         private static int callDepth = 0;
-        public static DesignTimeMetadata GetDesignTimeMetadata(GONetParticipant gONetParticipant)
+        public static DesignTimeMetadata GetDesignTimeMetadata(GONetParticipant gONetParticipant, bool force = false)
         {
             try
             {
@@ -332,18 +568,92 @@ namespace GONet
 
                 //GONetLog.Debug($"[DREETSleeps] designTimeMetadataLookup.Count: {designTimeMetadataLookup.Count}");
 
-                if (!designTimeMetadataLookup.TryGetValue(gONetParticipant, out DesignTimeMetadata value))
+                if (!designTimeMetadataLookup.TryGetValue(gONetParticipant, out DesignTimeMetadata value) || force)
                 {
-                    bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
-                    DesignTimeMetadata metadata = shouldCreateNewDtm
-                        ? new DesignTimeMetadata()
+                    // Safely get name and guid, handling destroyed objects during build process
+                    string participantName = gONetParticipant ? gONetParticipant.name : "[destroyed]";
+                    string participantGuid = gONetParticipant ? gONetParticipant.UnityGuid : "[unknown]";
+
+                    // IMPORTANT: If caching is not complete and not forced, defer the lookup
+                    if (!isDesignTimeMetadataCachingComplete && !force)
+                    {
+                        GONetLog.Debug($"GetDesignTimeMetadata: Deferring metadata lookup for '{participantName}' until caching completes");
+
+                        // Add to deferred queue if not already there
+                        if (!deferredLookupQueue.Contains(gONetParticipant))
                         {
-                            CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
+                            deferredLookupQueue.Add(gONetParticipant);
                         }
-                        : defaultDTM_EditorNotPlayMode;
-                    GONetLog.Debug($"[DREETS] NEW NEW NEW NEW NEW NEW? {shouldCreateNewDtm}"); // monitor how often new is created!!! do we need a pool ???
-                    designTimeMetadataLookup.Set(gONetParticipant, metadata);
-                    value = metadata;
+
+                        // Return a temporary empty metadata to avoid crashes
+                        bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
+                        DesignTimeMetadata tempMetadata = shouldCreateNewDtm
+                            ? new DesignTimeMetadata() { CodeGenerationId = GONetParticipant.CodeGenerationId_Unset }
+                            : defaultDTM_EditorNotPlayMode;
+                        designTimeMetadataLookup.Set(gONetParticipant, tempMetadata);
+                        return tempMetadata;
+                    }
+
+                    GONetLog.Debug($"GetDesignTimeMetadata: No cached metadata found for GONetParticipant '{participantName}', UnityGuid: {participantGuid}");
+
+                    // DEBUG: Show what's actually in the cache (only when caching is complete)
+                    GONetLog.Debug($"GetDesignTimeMetadata: Current cache has {designTimeMetadataLookup.Count} entries");
+                    int logCount = 0;
+                    foreach (var metadata in designTimeMetadataLookup)
+                    {
+                        if (logCount < 5) // Reduced to prevent spam
+                        {
+                            GONetLog.Debug($"  Cache metadata: Location='{metadata.Location}', CodeGenId={metadata.CodeGenerationId}");
+                            logCount++;
+                        }
+                    }
+
+                    // IMPORTANT: Before creating empty metadata, try to find it by location
+                    // This handles cases where templates are loaded and should have their cached metadata
+                    DesignTimeMetadata foundMetadata = null;
+
+                    // First try project:// prefix for prefabs
+                    string expectedProjectLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
+                    GONetLog.Debug($"GetDesignTimeMetadata: Trying project location lookup: {expectedProjectLocation}");
+                    if (designTimeMetadataLookup.TryGetValue(expectedProjectLocation, out foundMetadata))
+                    {
+                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by project location for '{participantName}'");
+                        // Cache this found metadata for the participant
+                        designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
+                        value = foundMetadata;
+                    }
+                    else
+                    {
+                        // Try other common locations
+                        string resourcesLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
+                        GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {resourcesLocation}");
+                        if (designTimeMetadataLookup.TryGetValue(resourcesLocation, out foundMetadata))
+                        {
+                            GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                            designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
+                            value = foundMetadata;
+                        }
+                        else
+                        {
+                            // Last resort: create empty metadata
+                            bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
+                            DesignTimeMetadata metadata = shouldCreateNewDtm
+                                ? new DesignTimeMetadata()
+                                {
+                                    CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
+                                }
+                                : defaultDTM_EditorNotPlayMode;
+                            GONetLog.Warning($"GetDesignTimeMetadata: Creating empty metadata for '{participantName}' - no location found");
+                            designTimeMetadataLookup.Set(gONetParticipant, metadata);
+                            value = metadata;
+                        }
+                    }
+                }
+                else
+                {
+                    // Safely get name, handling destroyed objects during build process
+                    string participantName = gONetParticipant ? gONetParticipant.name : "[destroyed]";
+                    GONetLog.Debug($"GetDesignTimeMetadata: Found cached metadata for GONetParticipant '{participantName}', Location: {value.Location}");
                 }
                 return value;
             }

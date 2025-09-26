@@ -44,6 +44,20 @@ namespace GONet.Generation
             }
         }
 
+        [SerializeField] private string addressableKey;
+        public string AddressableKey
+        {
+            get => addressableKey ?? string.Empty;
+            set => addressableKey = value;
+        }
+
+        [SerializeField] private ResourceLoadType loadType;
+        public ResourceLoadType LoadType
+        {
+            get => loadType;
+            set => loadType = value;
+        }
+
         public override int GetHashCode()
         {
             if (!string.IsNullOrEmpty(UnityGuid))
@@ -194,6 +208,13 @@ namespace GONet.Generation
             }
         }
 #endif
+    }
+
+    [Serializable]
+    public enum ResourceLoadType : byte
+    {
+        Resources = 0,
+        Addressables = 1
     }
 
     [Serializable]

@@ -3058,6 +3058,40 @@ namespace GONet
                     : UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation, HierarchyUtils.FindByFullUniquePath(instantiateEvent.ParentFullUniquePath).transform);
             template.wasInstantiatedForce = false; // be safe and set back to false
 
+            // Copy design time metadata from template to spawned instance (for addressables support)
+            // This is optional - if template doesn't have metadata, the system will work as before
+            GONetLog.Debug($"Instantiate_Remote: Template '{template.name}' before GetDesignTimeMetadata lookup");
+            DesignTimeMetadata templateMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(template);
+
+            if (templateMetadata != null)
+            {
+                GONetLog.Debug($"Instantiate_Remote: Template '{template.name}' metadata found - Location: '{templateMetadata.Location}', CodeGenId: {templateMetadata.CodeGenerationId}, UnityGuid: '{templateMetadata.UnityGuid}'");
+
+                if (!string.IsNullOrWhiteSpace(templateMetadata.Location))
+                {
+                    GONetLog.Debug($"Instantiate_Remote: Copying metadata from template '{template.name}' - Location: {templateMetadata.Location}");
+                    DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
+                    {
+                        Location = templateMetadata.Location,
+                        CodeGenerationId = templateMetadata.CodeGenerationId,
+                        UnityGuid = templateMetadata.UnityGuid,
+                        AddressableKey = templateMetadata.AddressableKey,
+                        LoadType = templateMetadata.LoadType
+                    };
+                    GONetSpawnSupport_Runtime.SetDesignTimeMetadata(instance, instanceMetadata);
+                }
+                else
+                {
+                    GONetLog.Warning($"Instantiate_Remote: Template '{template.name}' metadata has empty Location field!");
+                }
+            }
+            else
+            {
+                // This is normal for prefabs that aren't addressable (like GONet_LocalContext)
+                // The system will work as before - metadata will be initialized normally during Awake()
+                GONetLog.Debug($"Instantiate_Remote: Template '{template.name}' has no metadata object - will be initialized normally");
+            }
+
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
             {
                 instance.gameObject.name = instantiateEvent.InstanceName;

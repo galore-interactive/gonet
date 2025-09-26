@@ -820,6 +820,9 @@ namespace GONet.Generation
                 { // the folling replaces this: UpdateAssetsSnaps();
                     gnpsInProjectResources = GatherGONetParticipantsInAllResourcesFolders();
 
+                    // Also scan for addressable GONetParticipant prefabs during build
+                    GONetSpawnSupport_DesignTime.EnsureDesignTimeLocationsCurrent_AddressablesOnly();
+
                     //Get the updated asset folder snaps and ensure guids set on prefabs
                     foreach (GONetParticipant gonetParticipantPrefab in gnpsInProjectResources)
                     {

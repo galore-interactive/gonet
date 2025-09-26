@@ -16,6 +16,7 @@
 using GONet;
 using GONet.Sample;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class ProjectileSpawner : GONetBehaviour
@@ -74,9 +75,11 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (shouldInstantiateBasedOnInput)
             {
-                GONetParticipant gnp = 
+                GONetParticipant gnp =
                     GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation);
                 GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it.  Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
+
+                InstantiateAddressablesPrefab();
             }
         }
 
@@ -98,5 +101,15 @@ public class ProjectileSpawner : GONetBehaviour
                 projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
             }
         }
+    }
+
+    private async Task InstantiateAddressablesPrefab()
+    {
+        const string oohLaLa_addressablesPrefabPath = "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab";
+
+        GONetParticipant addressablePrefab = await GONetAddressablesHelper.LoadGONetPrefabAsync(oohLaLa_addressablesPrefabPath);
+
+        GONetParticipant addressableInstance = 
+            GONetMain.Client_InstantiateToBeRemotelyControlledByMe(addressablePrefab, transform.position, transform.rotation);
     }
 }
