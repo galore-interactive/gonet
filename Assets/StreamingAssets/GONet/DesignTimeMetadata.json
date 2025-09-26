@@ -96,6 +96,11 @@
             "codeGenerationId": 4
         },
         {
+            "location": "scene://ProjectileTest/GameObject",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
             "location": "scene://ProjectileTest/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1
