@@ -24,13 +24,16 @@ namespace GONet.Editor
     [CreateAssetMenu(fileName = "GONetProjectSettings", menuName = "GONet/Project Settings", order = 1)]
     public class GONetProjectSettings : ScriptableObject
     {
+        [Header("⚠️ EXPERIMENTAL FEATURES - Use with caution")]
+        [Space(5)]
         [Header("Team Development Settings")]
-        [Tooltip("⚠️ Changes take effect immediately during editor session.\n\n" +
+        [Tooltip("⚠️ EXPERIMENTAL FEATURE - Changes take effect immediately during editor session.\n\n" +
                 "Enable team-aware dirty checking that uses content hashing to detect actual GONet-related changes from teammates.\n\n" +
                 "✅ ENABLE for team development: Detects when teammates make GONet changes that require rebuilding\n" +
                 "❌ DISABLE for solo development: Uses faster timestamp-based checking (default)\n\n" +
                 "When enabled, the system performs deep content analysis of GONet prefabs, sync settings, and scenes to detect only meaningful changes. " +
-                "This is more accurate for team environments but requires additional processing time.")]
+                "This is more accurate for team environments but requires additional processing time.\n\n" +
+                "Note: This feature is experimental and may need refinement based on team usage patterns.")]
         public bool enableTeamAwareDirtyChecking = false;
 
         [Header("Performance Settings")]
