@@ -44,7 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  UnityGuid: 
+  UnityGuid: 7940d4494038e1b4a92eb5769cb729ee
   animatorSyncSupport:
     keys: []
     values: []

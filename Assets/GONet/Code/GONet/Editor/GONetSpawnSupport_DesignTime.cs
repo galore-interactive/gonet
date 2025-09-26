@@ -159,12 +159,105 @@ namespace GONet.Editor
         }
 
         /// <summary>
-        /// Performs immediate addressables change detection before play mode transition.
-        /// This ensures any pending addressables changes are detected and recorded
-        /// before the dirty file existence check occurs.
+        /// Performs immediate change detection before play mode transition.
+        /// Uses either traditional timestamp-based checking or advanced content-based checking
+        /// depending on the team-aware dirty checking configuration.
+        /// </summary>
+        private static void CheckForChangesBeforePlayMode()
+        {
+            try
+            {
+                // Check if team-aware dirty checking is enabled
+                bool useContentBasedChecking = IsTeamAwareDirtyCheckingEnabled();
+
+                if (useContentBasedChecking)
+                {
+                    PerformContentBasedDirtyChecking();
+                }
+                else
+                {
+                    // Use traditional addressables checking for solo development
+#if ADDRESSABLES_AVAILABLE
+                    CheckForAddressablesChangesBeforePlayMode_Traditional();
+#endif
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error in pre-play mode change detection: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Checks if team-aware dirty checking is enabled by looking at GONetProjectSettings configuration.
+        /// </summary>
+        internal static bool IsTeamAwareDirtyCheckingEnabled()
+        {
+            try
+            {
+                var projectSettings = GONetProjectSettings.Instance;
+                bool isEnabled = projectSettings != null && projectSettings.enableTeamAwareDirtyChecking;
+                UnityEngine.Debug.Log($"GONet: IsTeamAwareDirtyCheckingEnabled - projectSettings: {(projectSettings != null ? "found" : "null")}, enableTeamAwareDirtyChecking: {(projectSettings?.enableTeamAwareDirtyChecking ?? false)}, result: {isEnabled}");
+                return isEnabled;
+            }
+            catch (System.Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"GONet: Error checking team-aware dirty checking setting: {ex.Message}");
+                return false; // Default to false if we can't determine
+            }
+        }
+
+        /// <summary>
+        /// Performs advanced content-based dirty checking for team environments.
+        /// Uses multi-threaded content hashing to detect actual GONet-relevant changes.
+        /// </summary>
+        private static async void PerformContentBasedDirtyChecking()
+        {
+            try
+            {
+                GONetLog.Debug("Starting team-aware content-based dirty checking...");
+
+                // Create current content snapshot
+                var currentSnapshot = await GONetContentSnapshot.CreateSnapshotAsync();
+
+                // Load previous snapshot from last build
+                string snapshotPath = GetContentSnapshotFilePath();
+                var previousSnapshot = GONetContentSnapshot.LoadSnapshot(snapshotPath);
+
+                // Compare snapshots to find changes
+                var changes = GONetContentSnapshot.CompareSnapshots(currentSnapshot, previousSnapshot);
+
+                // Record any detected changes as dirty reasons
+                foreach (var change in changes)
+                {
+                    AddGONetDesignTimeDirtyReason($"Team-aware detection: {change}");
+                    GONetLog.Debug($"Content-based detection: {change}");
+                }
+
+                if (changes.Any())
+                {
+                    GONetLog.Debug($"Team-aware dirty checking found {changes.Count} GONet-related changes from teammates or uncommitted work");
+                }
+                else
+                {
+                    GONetLog.Debug("Team-aware dirty checking: No GONet-related changes detected");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error in content-based dirty checking: {ex.Message}");
+                // Fallback to traditional checking if content-based fails
+#if ADDRESSABLES_AVAILABLE
+                CheckForAddressablesChangesBeforePlayMode_Traditional();
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Traditional addressables change detection for solo development (faster, timestamp-based).
         /// </summary>
 #if ADDRESSABLES_AVAILABLE
-        private static void CheckForAddressablesChangesBeforePlayMode()
+        private static void CheckForAddressablesChangesBeforePlayMode_Traditional()
         {
             try
             {
@@ -195,7 +288,7 @@ namespace GONet.Editor
                     {
                         string dirtyReason = $"GONetParticipant at {currentLocation} was added or modified after the last build.";
                         AddGONetDesignTimeDirtyReason(dirtyReason);
-                        GONetLog.Debug($"Pre-play mode detection: {dirtyReason}");
+                        GONetLog.Debug($"Traditional detection: {dirtyReason}");
                     }
                 }
 
@@ -206,27 +299,35 @@ namespace GONet.Editor
                     {
                         string dirtyReason = $"GONetParticipant prefab removed from addressables: {lastBuildMeta.Location}";
                         AddGONetDesignTimeDirtyReason(dirtyReason);
-                        GONetLog.Debug($"Pre-play mode detection: {dirtyReason}");
+                        GONetLog.Debug($"Traditional detection: {dirtyReason}");
                     }
                 }
             }
             catch (System.Exception ex)
             {
-                GONetLog.Warning($"Error in pre-play mode addressables check: {ex.Message}");
+                GONetLog.Warning($"Error in traditional addressables check: {ex.Message}");
             }
         }
 #endif
+
+        /// <summary>
+        /// Gets the file path for storing content snapshots.
+        /// </summary>
+        private static string GetContentSnapshotFilePath()
+        {
+            string folderPath = GetDesignTimeDirtyReasonFolder();
+            return Path.Combine(folderPath, "GONetTeamAwareDirtyCheckSnapshot_MemoryPack.bin");
+        }
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
             // Check when Unity is about to enter play mode (ExitingEditMode)
             if (state == PlayModeStateChange.ExitingEditMode)
             {
-                // IMPORTANT: Check for addressables changes BEFORE checking for dirty file existence
-                // This ensures addressables changes are detected and recorded before the play mode warning check
-#if ADDRESSABLES_AVAILABLE
-                CheckForAddressablesChangesBeforePlayMode();
-#endif
+                // IMPORTANT: Check for changes BEFORE checking for dirty file existence
+                // This ensures changes are detected and recorded before the play mode warning check
+                // Uses either traditional or content-based checking depending on configuration
+                CheckForChangesBeforePlayMode();
 
                 bool didPreventEnteringPlaymode = false;
                 string filePath = GetDesignTimeDirtyReasonsFilePath();
@@ -386,6 +487,17 @@ namespace GONet.Editor
             // Also clear addressables session tracking when builds succeed
             ClearAddressablesSessionTracking();
 #endif
+
+            // Save content snapshot if team-aware dirty checking is enabled
+            if (IsTeamAwareDirtyCheckingEnabled())
+            {
+                UnityEngine.Debug.Log("GONet: Team-aware dirty checking is enabled, saving content snapshot...");
+                SaveContentSnapshotAfterBuild();
+            }
+            else
+            {
+                UnityEngine.Debug.Log("GONet: Team-aware dirty checking is disabled, skipping content snapshot.");
+            }
         }
 
         private static string GetDesignTimeDirtyReasonsFilePath()
@@ -1681,6 +1793,29 @@ namespace GONet.Editor
             string fileContents = JsonUtility.ToJson(designTimeMetadataLibrary, prettyPrint: true);
             GONetLog.Debug($"~~~~~~~~~~~~GEEPs isBuilding? {ProcessBuildHelper.IsBuilding} writing all text to: {fullPath}\n{fileContents}");
             File.WriteAllText(fullPath, fileContents);
+        }
+
+        /// <summary>
+        /// Saves a content snapshot after a successful build (async operation, fire and forget)
+        /// </summary>
+        private static async void SaveContentSnapshotAfterBuild()
+        {
+            try
+            {
+                UnityEngine.Debug.Log("GONet: Creating content snapshot after successful build...");
+
+                var snapshot = await GONetContentSnapshot.CreateSnapshotAsync();
+                string snapshotPath = GetContentSnapshotFilePath();
+
+                GONetContentSnapshot.SaveSnapshot(snapshot, snapshotPath);
+
+                UnityEngine.Debug.Log($"GONet: Content snapshot saved to {snapshotPath}");
+            }
+            catch (System.Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"GONet: Failed to save content snapshot after build: {ex.Message}");
+                UnityEngine.Debug.LogException(ex);
+            }
         }
     }
 }
