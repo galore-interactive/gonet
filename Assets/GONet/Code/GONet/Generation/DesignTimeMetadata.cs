@@ -44,18 +44,33 @@ namespace GONet.Generation
             }
         }
 
-        [SerializeField] private string addressableKey;
-        public string AddressableKey
-        {
-            get => addressableKey ?? string.Empty;
-            set => addressableKey = value;
-        }
-
-        [SerializeField] private ResourceLoadType loadType;
+        /// <summary>
+        /// Gets the resource load type based on the location prefix.
+        /// Supports backwards compatibility: project:// and resources:// both map to Resources.
+        /// </summary>
         public ResourceLoadType LoadType
         {
-            get => loadType;
-            set => loadType = value;
+            get
+            {
+                if (Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                    return ResourceLoadType.Addressables;
+                else
+                    return ResourceLoadType.Resources; // Both project:// and resources:// prefixes use Resources loading
+            }
+        }
+
+        /// <summary>
+        /// Gets the addressable key from the location (for addressables only)
+        /// </summary>
+        public string AddressableKey
+        {
+            get
+            {
+                if (Location.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX))
+                    return Location.Substring(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX.Length);
+                else
+                    return string.Empty;
+            }
         }
 
         public override int GetHashCode()

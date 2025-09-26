@@ -40,6 +40,7 @@ namespace GONet
 
         public const string SCENE_HIERARCHY_PREFIX = "scene://";
         public const string PROJECT_HIERARCHY_PREFIX = "project://";
+        public const string RESOURCES_HIERARCHY_PREFIX = "resources://";
         public const string ADDRESSABLES_HIERARCHY_PREFIX = "addressables://";
         public const string RESOURCES = "Resources/";
 
@@ -201,9 +202,14 @@ namespace GONet
 
             foreach (DesignTimeMetadata designTimeMetadata in allProjectDesignTimeMetadata)
             {
-                if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX) || designTimeMetadata.Location.StartsWith(RESOURCES_HIERARCHY_PREFIX))
                 {
-                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(designTimeMetadata.Location.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty));
+                    // Handle both project:// and resources:// prefixes for backwards compatibility
+                    string assetPath = designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX)
+                        ? designTimeMetadata.Location.Replace(PROJECT_HIERARCHY_PREFIX, string.Empty)
+                        : designTimeMetadata.Location.Replace(RESOURCES_HIERARCHY_PREFIX, string.Empty);
+
+                    GONetParticipant template = LookupResourceTemplateFromProjectLocation(assetPath);
                     if ((object)template != null)
                     {
                         GONetLog.Debug($"CacheAllDesignTimeMetadata: Found RESOURCES template for '{template.name}' at location: {designTimeMetadata.Location}");
@@ -425,7 +431,7 @@ namespace GONet
                     throw new InvalidOperationException($"Addressables support not available. Cannot load prefab from: {designTimeMetadata.Location}");
 #endif
                 }
-                else if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX))
+                else if (designTimeMetadata.Location.StartsWith(PROJECT_HIERARCHY_PREFIX) || designTimeMetadata.Location.StartsWith(RESOURCES_HIERARCHY_PREFIX))
                 {
 #if ADDRESSABLES_AVAILABLE
                     // Try addressables-aware lookup first
@@ -523,9 +529,7 @@ namespace GONet
                 {
                     Location = prefabMetadata.Location,
                     CodeGenerationId = prefabMetadata.CodeGenerationId,
-                    UnityGuid = prefabMetadata.UnityGuid,
-                    AddressableKey = prefabMetadata.AddressableKey,
-                    LoadType = prefabMetadata.LoadType
+                    UnityGuid = prefabMetadata.UnityGuid
                 };
                 SetDesignTimeMetadata(instanceSoonToBeOwnedByServerAndRemotelyControlledByMe, instanceMetadata);
             }
@@ -612,22 +616,37 @@ namespace GONet
                     // This handles cases where templates are loaded and should have their cached metadata
                     DesignTimeMetadata foundMetadata = null;
 
-                    // First try project:// prefix for prefabs
-                    string expectedProjectLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
-                    GONetLog.Debug($"GetDesignTimeMetadata: Trying project location lookup: {expectedProjectLocation}");
-                    if (designTimeMetadataLookup.TryGetValue(expectedProjectLocation, out foundMetadata))
+                    // First try resources:// prefix for prefabs (new format)
+                    string expectedResourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
+                    GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {expectedResourcesLocation}");
+                    if (designTimeMetadataLookup.TryGetValue(expectedResourcesLocation, out foundMetadata))
                     {
-                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by project location for '{participantName}'");
+                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                        // Cache this found metadata for the participant
+                        designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
+                        value = foundMetadata;
+                    }
+                    // Fallback to project:// prefix for backwards compatibility
+                    else if (designTimeMetadataLookup.TryGetValue($"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab", out foundMetadata))
+                    {
+                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by legacy project location for '{participantName}'");
                         // Cache this found metadata for the participant
                         designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                         value = foundMetadata;
                     }
                     else
                     {
-                        // Try other common locations
-                        string resourcesLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
+                        // Try other common locations with resources:// first, then project:// for backwards compatibility
+                        string resourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
+                        string legacyResourcesLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
                         GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {resourcesLocation}");
                         if (designTimeMetadataLookup.TryGetValue(resourcesLocation, out foundMetadata))
+                        {
+                            GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                            designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
+                            value = foundMetadata;
+                        }
+                        else if (designTimeMetadataLookup.TryGetValue(legacyResourcesLocation, out foundMetadata))
                         {
                             GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
                             designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);

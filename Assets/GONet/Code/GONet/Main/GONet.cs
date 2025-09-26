@@ -3074,9 +3074,7 @@ namespace GONet
                     {
                         Location = templateMetadata.Location,
                         CodeGenerationId = templateMetadata.CodeGenerationId,
-                        UnityGuid = templateMetadata.UnityGuid,
-                        AddressableKey = templateMetadata.AddressableKey,
-                        LoadType = templateMetadata.LoadType
+                        UnityGuid = templateMetadata.UnityGuid
                     };
                     GONetSpawnSupport_Runtime.SetDesignTimeMetadata(instance, instanceMetadata);
                 }
