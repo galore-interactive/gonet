@@ -1,10 +1,10 @@
 {
     "Entries": [
         {
-            "location": "addressables://Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile",
+            "location": "addressables://Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab",
             "unityGuid": "6c8edddcae242744db81442d9023b0d6",
-            "codeGenerationId": 0,
-            "addressableKey": "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile",
+            "codeGenerationId": 1,
+            "addressableKey": "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab",
             "loadType": 1
         },
         {

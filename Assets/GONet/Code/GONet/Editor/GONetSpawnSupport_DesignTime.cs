@@ -898,9 +898,9 @@ namespace GONet.Editor
                             GONetParticipant prefab = AssetDatabase.LoadAssetAtPath<GONetParticipant>(prefabPath);
                             if (prefab != null)
                             {
-                                // For folders, use the prefab name as the addressable key
-                                string prefabName = System.IO.Path.GetFileNameWithoutExtension(prefabPath);
-                                string addressableKey = string.Concat(entry.address, "/", prefabName);
+                                // For folders, use the full prefab filename (including .prefab extension) as the addressable key
+                                string prefabFileName = System.IO.Path.GetFileName(prefabPath);
+                                string addressableKey = string.Concat(entry.address, "/", prefabFileName);
                                 string addressableLocation = string.Concat(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX, addressableKey);
 
                                 // Create or update design time metadata
