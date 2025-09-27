@@ -42,6 +42,7 @@ namespace GONet.Editor
         public Dictionary<string, string> SceneContentHashes = new Dictionary<string, string>();
         public Dictionary<string, string> SyncProfileHashes = new Dictionary<string, string>();
         public Dictionary<string, string> ConfigObjectHashes = new Dictionary<string, string>();
+        public Dictionary<string, bool> AddressableSettings = new Dictionary<string, bool>();
     }
 
     [Serializable]
@@ -126,12 +127,13 @@ namespace GONet.Editor
                 SnapshotTime = DateTime.UtcNow
             };
 
-            // First, gather all file paths on the main thread (required for AssetDatabase calls)
+            // First, gather all file paths and addressable settings on the main thread (required for AssetDatabase calls)
             var prefabPaths = GetAllGONetPrefabPaths().ToArray();
             var scenePaths = GetAllGONetScenePaths().ToArray();
             var profilePaths = GetAllSyncProfilePaths().ToArray();
+            var addressableSettings = GatherAddressableSettings(prefabPaths);
 
-            UnityEngine.Debug.Log($"GONet: Content snapshot discovery - Prefabs: {prefabPaths.Length}, Scenes: {scenePaths.Length}, Profiles: {profilePaths.Length}");
+            UnityEngine.Debug.Log($"GONet: Content snapshot discovery - Prefabs: {prefabPaths.Length}, Scenes: {scenePaths.Length}, Profiles: {profilePaths.Length}, Addressable Settings: {addressableSettings.Count}");
 
             // Then run content analysis in parallel on background threads
             var tasks = new List<Task>
@@ -139,7 +141,8 @@ namespace GONet.Editor
                 Task.Run(() => PopulatePrefabHashesFromPaths(snapshot, prefabPaths)),
                 Task.Run(() => PopulateSceneHashesFromPaths(snapshot, scenePaths)),
                 Task.Run(() => PopulateSyncProfileHashesFromPaths(snapshot, profilePaths)),
-                Task.Run(() => PopulateConfigObjectHashes(snapshot))
+                Task.Run(() => PopulateConfigObjectHashes(snapshot)),
+                Task.Run(() => PopulateAddressableSettingsFromData(snapshot, addressableSettings))
             };
 
             await Task.WhenAll(tasks);
@@ -149,7 +152,8 @@ namespace GONet.Editor
                           $"Prefabs: {snapshot.PrefabContentHashes.Count}, " +
                           $"Scenes: {snapshot.SceneContentHashes.Count}, " +
                           $"Profiles: {snapshot.SyncProfileHashes.Count}, " +
-                          $"Configs: {snapshot.ConfigObjectHashes.Count}");
+                          $"Configs: {snapshot.ConfigObjectHashes.Count}, " +
+                          $"Addressable Settings: {snapshot.AddressableSettings.Count}");
 
             return snapshot;
         }
@@ -220,6 +224,7 @@ namespace GONet.Editor
             CompareHashDictionaries("Scene", current.SceneContentHashes, previous.SceneContentHashes, changes);
             CompareHashDictionaries("Sync Profile", current.SyncProfileHashes, previous.SyncProfileHashes, changes);
             CompareHashDictionaries("Config Object", current.ConfigObjectHashes, previous.ConfigObjectHashes, changes);
+            CompareAddressableSettings("Addressable", current.AddressableSettings, previous.AddressableSettings, changes);
 
             return changes;
         }
@@ -602,6 +607,107 @@ namespace GONet.Editor
                 {
                     changes.Add($"Deleted {category}: {kvp.Key}");
                 }
+            }
+        }
+
+        private static void CompareAddressableSettings(string category, Dictionary<string, bool> current, Dictionary<string, bool> previous, List<string> changes)
+        {
+            // Check for new or modified addressable settings
+            foreach (var kvp in current)
+            {
+                if (!previous.ContainsKey(kvp.Key))
+                {
+                    string action = kvp.Value ? "marked as addressable" : "marked as non-addressable";
+                    changes.Add($"New prefab {action}: {kvp.Key}");
+                }
+                else if (previous[kvp.Key] != kvp.Value)
+                {
+                    string action = kvp.Value ? "marked as addressable" : "unmarked as addressable";
+                    changes.Add($"Prefab {action}: {kvp.Key}");
+                }
+            }
+
+            // Check for deleted prefabs
+            foreach (var kvp in previous)
+            {
+                if (!current.ContainsKey(kvp.Key))
+                {
+                    changes.Add($"Deleted prefab: {kvp.Key}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gathers addressable settings for all prefab paths on the main thread.
+        /// This must be done on the main thread due to Addressables API restrictions.
+        /// </summary>
+        private static Dictionary<string, bool> GatherAddressableSettings(string[] prefabPaths)
+        {
+            var addressableSettings = new Dictionary<string, bool>();
+
+#if ADDRESSABLES_AVAILABLE
+            try
+            {
+                var addressablesConfig = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+                if (addressablesConfig == null)
+                {
+                    // No addressables configuration - all prefabs are non-addressable
+                    foreach (var path in prefabPaths)
+                    {
+                        addressableSettings[path] = false;
+                    }
+                    return addressableSettings;
+                }
+
+                // Check each prefab path to see if it's configured as addressable
+                foreach (var prefabPath in prefabPaths)
+                {
+                    try
+                    {
+                        string guid = AssetDatabase.AssetPathToGUID(prefabPath);
+                        if (!string.IsNullOrEmpty(guid))
+                        {
+                            var entry = addressablesConfig.FindAssetEntry(guid);
+                            addressableSettings[prefabPath] = entry != null;
+                        }
+                        else
+                        {
+                            addressableSettings[prefabPath] = false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        GONetLog.Warning($"Error checking addressable status for {prefabPath}: {ex.Message}");
+                        addressableSettings[prefabPath] = false; // Default to non-addressable on error
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Warning($"Error gathering addressable settings: {ex.Message}");
+                // Default all to non-addressable on error
+                foreach (var path in prefabPaths)
+                {
+                    addressableSettings[path] = false;
+                }
+            }
+#else
+            // Addressables not available - all prefabs are non-addressable
+            foreach (var path in prefabPaths)
+            {
+                addressableSettings[path] = false;
+            }
+#endif
+
+            return addressableSettings;
+        }
+
+        private static void PopulateAddressableSettingsFromData(ContentSnapshot snapshot, Dictionary<string, bool> addressableData)
+        {
+            // Simple copy - no threading issues since this is just copying data
+            foreach (var kvp in addressableData)
+            {
+                snapshot.AddressableSettings[kvp.Key] = kvp.Value;
             }
         }
 
