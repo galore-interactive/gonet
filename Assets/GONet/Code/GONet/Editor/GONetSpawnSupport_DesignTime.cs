@@ -121,7 +121,33 @@ namespace GONet.Editor
             EditorApplication.projectWindowChanged += OnProjectChanged;
 #endif
             */
-            
+
+            // IMPORTANT: Unregister event handlers first to prevent accumulation during domain reloads
+            // This prevents the warning accumulation issue where 1 warning becomes 3
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly;
+            EditorApplication.projectChanged -= OnProjectChanged_TakeNoteOfAnyGONetChanges_ProjectOnly;
+
+            GONetParticipant.OnDestroyCalled -= GONetParticipant_OnDestroyCalled;
+            GONetParticipant.OnAwakeEditor -= GONetParticipant_OnAwakeEditor;
+            GONetParticipant.OnEnableEditor -= GONetParticipant_OnEnableEditor;
+            GONetParticipant.OnDisableEditor -= GONetParticipant_OnDisableEditor;
+            GONetParticipant.OnValidateEditor -= GONetParticipant_OnValidateEditor;
+
+            CompilationPipeline.compilationStarted -= OnCompilationStarted;
+            CompilationPipeline.compilationFinished -= OnCompilationFinished;
+
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
+
+            EditorApplication.update -= CompilationRecoveryCheck;
+            EditorApplication.update -= ResetInitialEditorLoadFlag;
+
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            EditorSceneManager.sceneOpened -= EditorSceneManager_sceneOpened;
+
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+
+            // Now register the event handlers
             // Instead, in v1.4+, we just monitor GONet related changes and take note that there are changes from last build to warn users later
             EditorApplication.hierarchyChanged += OnHierarchyChanged_TakeNoteOfAnyGONetChanges_SceneOnly;
             EditorApplication.projectChanged += OnProjectChanged_TakeNoteOfAnyGONetChanges_ProjectOnly;
@@ -139,10 +165,10 @@ namespace GONet.Editor
 
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
-            
+
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
-            
+
             // Recover the IsCompiling state from EditorPrefs (in case of domain reload)
             if (EditorPrefs.HasKey(IsCompilingKey) && EditorPrefs.GetBool(IsCompilingKey, false))
             {
@@ -453,6 +479,16 @@ namespace GONet.Editor
                 !EditorApplication.isUpdating && // handle scene loading or editor updates
                 !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
                 !IsQuitting;
+
+            // IMPORTANT: Skip dirty detection if we're just opening a prefab for editing
+            // OnAwake is called naturally when double-clicking a prefab, which shouldn't count as a change
+            bool isInPrefabEditingMode = IsInPrefabEditingMode(gonetParticipant);
+            if (isInPrefabEditingMode)
+            {
+                UnityEngine.Debug.Log($"GONet: OnAwakeEditor - Skipping dirty detection for '{gonetParticipant?.gameObject?.name}' because it's in prefab editing mode");
+                return;
+            }
+
             if (isTargetedDesignTimeOnlyAction &&
                 (IsInSceneIncludedInBuild(gonetParticipant) || DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject)))
             {
@@ -670,8 +706,16 @@ namespace GONet.Editor
 
             UnityEngine.Debug.Log($"GONet: OnEnableEditor - isInScene: {isInScene}, hasProjectPath: {hasProjectPath}, isInPrefabMode: {isInPrefabMode}");
 
+            // IMPORTANT: Skip dirty detection if we're just opening a prefab for editing
+            // OnEnable is called naturally when double-clicking a prefab, which shouldn't count as a change
+            if (isInPrefabMode)
+            {
+                UnityEngine.Debug.Log($"GONet: OnEnableEditor - Skipping dirty detection for '{goName}' because it's in prefab editing mode");
+                return;
+            }
+
             if (isTargetedDesignTimeOnlyAction &&
-                (isInScene || hasProjectPath || isInPrefabMode))
+                (isInScene || hasProjectPath))
             {
                 string dirtyReason = $"GONetParticipant was enabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 UnityEngine.Debug.Log($"GONet: OnEnableEditor - ADDING DIRTY REASON: {dirtyReason}");
@@ -756,8 +800,13 @@ namespace GONet.Editor
 
             UnityEngine.Debug.Log($"GONet: OnValidateEditor - isInScene: {isInScene}, hasProjectPath: {hasProjectPath}, isInPrefabMode: {isInPrefabMode}");
 
+            // IMPORTANT: For OnValidate, we should NOT skip if it's a genuine user interaction
+            // OnValidate can be called both during prefab loading AND when user changes properties
+            // We should only record dirty reasons for actual user property changes, not automatic loading
+            // Note: OnAwake/OnEnable should always be skipped in prefab mode, but OnValidate needs this check
+
             if (isTargetedDesignTimeOnlyAction &&
-                (isInScene || hasProjectPath || isInPrefabMode))
+                (isInScene || hasProjectPath))
             {
                 string dirtyReason = $"GONetParticipant properties changed on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 UnityEngine.Debug.Log($"GONet: OnValidateEditor - ADDING DIRTY REASON: {dirtyReason}");
@@ -793,14 +842,24 @@ namespace GONet.Editor
             {
                 UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Valid prefab stage found, checking if '{goName}' is part of contents");
                 // We're in prefab stage mode - check if this GameObject is part of the prefab being edited
-                if (currentPrefabStage.IsPartOfPrefabContents(gonetParticipant.gameObject))
+                try
                 {
-                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' IS part of prefab stage contents - DETECTED PREFAB STAGE MODE");
-                    return true; // Confirmed: editing in prefab stage mode
+                    if (currentPrefabStage.IsPartOfPrefabContents(gonetParticipant.gameObject))
+                    {
+                        UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' IS part of prefab stage contents - DETECTED PREFAB STAGE MODE");
+                        return true; // Confirmed: editing in prefab stage mode
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' is NOT part of prefab stage contents");
+                    }
                 }
-                else
+                catch (System.InvalidOperationException ex)
                 {
-                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - '{goName}' is NOT part of prefab stage contents");
+                    // Unity doesn't allow accessing prefabContentsRoot during Awake/OnEnable
+                    // In this case, we're likely in prefab stage mode but can't confirm yet
+                    UnityEngine.Debug.Log($"GONet: IsInPrefabEditingMode - Cannot check prefab contents during Awake/OnEnable ('{ex.Message}'). Assuming prefab stage mode since stage is active.");
+                    return true; // Conservative approach: assume we're in prefab editing mode
                 }
             }
 

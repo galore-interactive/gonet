@@ -503,9 +503,9 @@ namespace GONet
                 bool isLikelyUserInteraction = IsLikelyUserInitiatedValidation();
                 UnityEngine.Debug.Log($"GONet: OnValidate - IsLikelyUserInitiatedValidation: {isLikelyUserInteraction}");
 
-                if (isInPrefabPreview && isLikelyUserInteraction)
+                if (isInPrefabPreview || isLikelyUserInteraction)
                 {
-                    UnityEngine.Debug.Log($"GONet: OnValidate - In prefab preview mode for '{gameObject?.name ?? "null"}' - triggering OnValidateEditor");
+                    UnityEngine.Debug.Log($"GONet: OnValidate - Triggering OnValidateEditor for '{gameObject?.name ?? "null"}' (isInPrefabPreview: {isInPrefabPreview}, isLikelyUserInteraction: {isLikelyUserInteraction})");
                     // Trigger OnValidateEditor event for property change detection
                     OnValidateEditor?.Invoke(this);
                 }
@@ -555,11 +555,30 @@ namespace GONet
                 return false; // We're in an asset import worker process
             }
 
-            // Check if we're in a prefab stage (double-click editing) - this is always user interaction
+            // Check if we're in a prefab stage (double-click editing)
             var currentPrefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
             if (currentPrefabStage != null)
             {
-                return true; // Definitely user interaction in prefab stage
+                // If we're in prefab stage mode, only count it as user interaction if this GameObject
+                // is actually part of the prefab being edited, not just loaded during asset scanning
+                try
+                {
+                    if (currentPrefabStage.IsPartOfPrefabContents(gameObject))
+                    {
+                        return true; // This GameObject is part of the prefab being edited
+                    }
+                    else
+                    {
+                        // This GameObject is NOT part of the prefab being edited - likely Unity's internal loading
+                        // during asset scanning while another prefab is open
+                        return false;
+                    }
+                }
+                catch (System.InvalidOperationException)
+                {
+                    // Can't check during Awake/OnEnable - be conservative
+                    return false;
+                }
             }
 
             // Use a simple heuristic: if the object is selected in the project or hierarchy,
@@ -590,20 +609,35 @@ namespace GONet
 
         private bool IsInPrefabPreviewMode()
         {
-            /* reference for troubleshooting
-            GameObject prefabSource = UnityEditor.PrefabUtility.GetCorrespondingObjectFromSource(gameObject);
-            GameObject prefabRoot = UnityEditor.PrefabUtility.GetNearestPrefabInstanceRoot(gameObject);
-            var magoo = UnityEditor.PrefabUtility.GetOriginalSourceRootWhereGameObjectIsAdded(gameObject);
-            var slgo = UnityEditor.PrefabUtility.GetOutermostPrefabInstanceRoot(gameObject);
-            var dickl = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-            var kk = UnityEditor.PrefabUtility.GetPrefabAssetType(gameObject);
-            var jjjdfi = UnityEditor.PrefabUtility.GetPrefabInstanceHandle(gameObject);
-            var iiiss = UnityEditor.PrefabUtility.IsAnyPrefabInstanceRoot(gameObject);
-            var eee = UnityEditor.PrefabUtility.IsOutermostPrefabInstanceRoot(gameObject);
-            var any = UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gameObject);
-            */
+            // IMPORTANT: Use the SAME logic as IsLikelyUserInitiatedValidation for consistency
+            // This prevents the regression loop where these two methods give conflicting results
 
-            // Check if the object is part of any prefab
+            // Check if we're in a prefab stage (double-click editing)
+            var currentPrefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+            if (currentPrefabStage != null)
+            {
+                // If we're in prefab stage mode, only count it as preview mode if this GameObject
+                // is actually part of the prefab being edited, not just loaded during asset scanning
+                try
+                {
+                    if (currentPrefabStage.IsPartOfPrefabContents(gameObject))
+                    {
+                        return true; // This GameObject is part of the prefab being edited
+                    }
+                    else
+                    {
+                        // This GameObject is NOT part of the prefab being edited - not preview mode
+                        return false;
+                    }
+                }
+                catch (System.InvalidOperationException)
+                {
+                    // Can't check during Awake/OnEnable - be conservative
+                    return false;
+                }
+            }
+
+            // Check if this is single-click inspector editing (no prefab stage active)
             if (UnityEditor.PrefabUtility.IsPartOfAnyPrefab(gameObject))
             {
                 // Check if the object is in an unloaded or temporary scene (scene path is null or empty)
@@ -613,7 +647,7 @@ namespace GONet
                     string assetPath = UnityEditor.PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
                     if (!string.IsNullOrEmpty(assetPath))
                     {
-                        return true; // Confirmed to be in Prefab Preview Mode
+                        return true; // Confirmed to be in Prefab Preview Mode (single-click)
                     }
                 }
             }
