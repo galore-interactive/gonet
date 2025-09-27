@@ -1557,28 +1557,103 @@ namespace GONet.Editor
                 string assetPath = null;
                 string address = null;
 
+                // Debug: Log the actual type of eventData to understand what Unity passes
+                UnityEngine.Debug.Log($"GONet: ProcessAddressablesModificationDirect - eventType: {eventType}, eventData type: {eventData?.GetType()?.Name ?? "null"}");
+
                 if (eventData is AddressableAssetEntry entry)
                 {
                     assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
                     address = entry.address;
+                    UnityEngine.Debug.Log($"GONet: Extracted from AddressableAssetEntry - assetPath: {assetPath}, address: {address}");
+                }
+                else if (eventData is System.Collections.Generic.List<AddressableAssetEntry> entryList && entryList.Count > 0)
+                {
+                    // Unity sometimes passes a List<AddressableAssetEntry> instead of a single entry
+                    UnityEngine.Debug.Log($"GONet: Processing List<AddressableAssetEntry> with {entryList.Count} entries");
+
+                    // Process each entry in the list
+                    foreach (var listEntry in entryList)
+                    {
+                        string entryAssetPath = AssetDatabase.GUIDToAssetPath(listEntry.guid);
+                        UnityEngine.Debug.Log($"GONet: Processing list entry - assetPath: {entryAssetPath}, address: {listEntry.address}");
+
+                        // Check if this is a GONetParticipant prefab and process it
+                        if (ProcessSingleAddressableEntry(entryAssetPath, listEntry.address, eventType))
+                        {
+                            UnityEngine.Debug.Log($"GONet: Successfully processed addressable entry: {entryAssetPath}");
+                        }
+                    }
+                    return; // Exit early since we processed the list
+                }
+                else if (eventData is string guid)
+                {
+                    // Sometimes Unity might pass just the GUID string for removed entries
+                    assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    UnityEngine.Debug.Log($"GONet: Extracted from GUID string - assetPath: {assetPath}");
+                }
+                else if (eventData != null)
+                {
+                    // Try to get asset path from other possible object types
+                    UnityEngine.Debug.Log($"GONet: Unknown eventData type, attempting reflection...");
+                    var eventDataType = eventData.GetType();
+
+                    // Try to find a "guid" field or property
+                    var guidField = eventDataType.GetField("guid");
+                    var guidProperty = eventDataType.GetProperty("guid");
+
+                    if (guidField != null)
+                    {
+                        var guidValue = guidField.GetValue(eventData)?.ToString();
+                        if (!string.IsNullOrEmpty(guidValue))
+                        {
+                            assetPath = AssetDatabase.GUIDToAssetPath(guidValue);
+                            UnityEngine.Debug.Log($"GONet: Extracted from guid field - assetPath: {assetPath}");
+                        }
+                    }
+                    else if (guidProperty != null)
+                    {
+                        var guidValue = guidProperty.GetValue(eventData)?.ToString();
+                        if (!string.IsNullOrEmpty(guidValue))
+                        {
+                            assetPath = AssetDatabase.GUIDToAssetPath(guidValue);
+                            UnityEngine.Debug.Log($"GONet: Extracted from guid property - assetPath: {assetPath}");
+                        }
+                    }
                 }
 
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    GONetLog.Debug($"Could not extract asset path from addressables modification event");
+                    UnityEngine.Debug.Log($"GONet: Could not extract asset path from addressables modification event (eventData: {eventData})");
                     return;
                 }
 
+                // Process the single entry
+                ProcessSingleAddressableEntry(assetPath, address, eventType);
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error processing addressables modification: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Processes a single addressable entry and records it if it's a GONetParticipant prefab.
+        /// Returns true if the entry was processed and recorded, false otherwise.
+        /// </summary>
+        private static bool ProcessSingleAddressableEntry(string assetPath, string address, AddressableAssetSettings.ModificationEvent eventType)
+        {
+            try
+            {
                 // Check if this asset is a GONetParticipant prefab
                 if (!assetPath.EndsWith(".prefab", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    return; // Not a prefab, ignore
+                    return false; // Not a prefab, ignore
                 }
 
                 GONetParticipant gnp = AssetDatabase.LoadAssetAtPath<GONetParticipant>(assetPath);
                 if (gnp == null)
                 {
-                    return; // Not a GONetParticipant prefab, ignore
+                    return false; // Not a GONetParticipant prefab, ignore
                 }
 
                 // Now we know this is a GONetParticipant prefab that was modified in addressables
@@ -1595,16 +1670,18 @@ namespace GONet.Editor
                 if (WasChangeAlreadyRecordedThisSession(assetPath, changeType))
                 {
                     GONetLog.Debug($"Skipping duplicate addressables change in session: {changeType} {assetPath}");
-                    return;
+                    return false;
                 }
 
                 // Record the change using our holistic dual persistence system
                 RecordAddressablesChange(assetPath, changeType);
                 GONetLog.Debug($"Direct addressables change detected and recorded: {changeType} {assetPath}");
+                return true;
             }
             catch (System.Exception ex)
             {
-                GONetLog.Warning($"Error processing addressables modification: {ex.Message}");
+                GONetLog.Warning($"Error processing single addressable entry ({assetPath}): {ex.Message}");
+                return false;
             }
         }
 
