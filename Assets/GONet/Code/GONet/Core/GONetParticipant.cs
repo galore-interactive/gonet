@@ -498,13 +498,21 @@ namespace GONet
                     UnityEngine.Debug.Log($"GONet: OnValidate - IsPartOfAnyPrefab: {isPartOfAnyPrefab}, AssetType: {assetType}, AssetPath: '{assetPath}'");
                 }
 
-                if (isInPrefabPreview)
-                {
-                    UnityEngine.Debug.Log($"GONet: OnValidate - In prefab preview mode for '{gameObject?.name ?? "null"}'");
-                }
+                // Additional filtering: Only trigger OnValidateEditor if this appears to be a genuine user interaction
+                // Skip if we're currently in asset database operations or if the inspector isn't visible
+                bool isLikelyUserInteraction = IsLikelyUserInitiatedValidation();
+                UnityEngine.Debug.Log($"GONet: OnValidate - IsLikelyUserInitiatedValidation: {isLikelyUserInteraction}");
 
-                // Trigger OnValidateEditor event for property change detection
-                OnValidateEditor?.Invoke(this);
+                if (isInPrefabPreview && isLikelyUserInteraction)
+                {
+                    UnityEngine.Debug.Log($"GONet: OnValidate - In prefab preview mode for '{gameObject?.name ?? "null"}' - triggering OnValidateEditor");
+                    // Trigger OnValidateEditor event for property change detection
+                    OnValidateEditor?.Invoke(this);
+                }
+                else
+                {
+                    UnityEngine.Debug.Log($"GONet: OnValidate - NOT triggering OnValidateEditor for '{gameObject?.name ?? "null"}' (isInPrefabPreview: {isInPrefabPreview}, isLikelyUserInteraction: {isLikelyUserInteraction})");
+                }
             }
             else
             {
@@ -527,6 +535,57 @@ namespace GONet
                 //GONetLog.Debug($"GONetParticipant was added or changed on GameObject: {gameObject.name} (Design-time only).");
             }
             */
+        }
+
+        /// <summary>
+        /// Attempts to determine if the current OnValidate call is likely due to user interaction
+        /// rather than internal Unity asset loading/scanning operations.
+        /// </summary>
+        private bool IsLikelyUserInitiatedValidation()
+        {
+            // Check if we're currently refreshing or importing assets
+            if (EditorApplication.isUpdating)
+            {
+                return false; // Asset database is updating
+            }
+
+            // Check if AssetDatabase is currently refreshing
+            if (UnityEditor.AssetDatabase.IsAssetImportWorkerProcess())
+            {
+                return false; // We're in an asset import worker process
+            }
+
+            // Check if we're in a prefab stage (double-click editing) - this is always user interaction
+            var currentPrefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+            if (currentPrefabStage != null)
+            {
+                return true; // Definitely user interaction in prefab stage
+            }
+
+            // Use a simple heuristic: if the object is selected in the project or hierarchy,
+            // and we're not in the middle of a batch operation, it's likely user interaction
+            if (UnityEditor.Selection.activeGameObject == gameObject ||
+                UnityEditor.Selection.Contains(gameObject))
+            {
+                return true; // Object is currently selected - likely user interaction
+            }
+
+            // Check if this object's asset is selected in the project window
+            if (gameObject != null)
+            {
+                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(gameObject);
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    var assetObject = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                    if (UnityEditor.Selection.Contains(assetObject))
+                    {
+                        return true; // Asset is selected in project window
+                    }
+                }
+            }
+
+            // If none of the above conditions are met, it's likely an internal Unity operation
+            return false;
         }
 
         private bool IsInPrefabPreviewMode()
