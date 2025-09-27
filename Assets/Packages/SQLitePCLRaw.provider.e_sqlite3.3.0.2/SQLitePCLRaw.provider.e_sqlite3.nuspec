@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>SQLitePCLRaw.provider.e_sqlite3</id>
+    <version>3.0.2</version>
+    <authors>Eric Sink</authors>
+    <license type="expression">Apache-2.0</license>
+    <licenseUrl>https://licenses.nuget.org/Apache-2.0</licenseUrl>
+    <description>SQLitePCLRaw is a Portable Class Library (PCL) for low-level (raw) access to SQLite.  Packages named 'SQLitePCLRaw.provider.*' (like this one) are 'plugins' that allow SQLitePCLRaw.core to access the native SQLite library.  This provider does DllImport of 'e_sqlite3', the SQLite builds provided with SQLitePCLRaw.</description>
+    <copyright>Copyright 2014-2025 SourceGear, LLC</copyright>
+    <tags>sqlite</tags>
+    <repository type="git" url="https://github.com/ericsink/SQLitePCL.raw" commit="ca83fcd795385c6ac99b0f9680d000f27f35c1b4" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.7.1">
+        <dependency id="SQLitePCLRaw.core" version="3.0.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework="net8.0">
+        <dependency id="SQLitePCLRaw.core" version="3.0.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework="net8.0-windows7.0">
+        <dependency id="SQLitePCLRaw.core" version="3.0.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="SQLitePCLRaw.core" version="3.0.2" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
