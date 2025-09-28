@@ -226,12 +226,12 @@ namespace GONet.Editor
             {
                 var projectSettings = GONetProjectSettings.Instance;
                 bool isEnabled = projectSettings != null && projectSettings.enableTeamAwareDirtyChecking;
-                UnityEngine.Debug.Log($"GONet: IsTeamAwareDirtyCheckingEnabled - projectSettings: {(projectSettings != null ? "found" : "null")}, enableTeamAwareDirtyChecking: {(projectSettings?.enableTeamAwareDirtyChecking ?? false)}, result: {isEnabled}");
+                GONetLog.Debug($"IsTeamAwareDirtyCheckingEnabled - projectSettings: {(projectSettings != null ? "found" : "null")}, enableTeamAwareDirtyChecking: {(projectSettings?.enableTeamAwareDirtyChecking ?? false)}, result: {isEnabled}");
                 return isEnabled;
             }
             catch (System.Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"GONet: Error checking team-aware dirty checking setting: {ex.Message}");
+                GONetLog.Warning($"Error checking team-aware dirty checking setting: {ex.Message}");
                 return false; // Default to false if we can't determine
             }
         }
@@ -530,12 +530,12 @@ namespace GONet.Editor
             // Save content snapshot if team-aware dirty checking is enabled
             if (IsTeamAwareDirtyCheckingEnabled())
             {
-                UnityEngine.Debug.Log("GONet: Team-aware dirty checking is enabled, saving content snapshot...");
+                GONetLog.Debug("Team-aware dirty checking is enabled, saving content snapshot...");
                 SaveContentSnapshotAfterBuild();
             }
             else
             {
-                UnityEngine.Debug.Log("GONet: Team-aware dirty checking is disabled, skipping content snapshot.");
+                GONetLog.Debug("Team-aware dirty checking is disabled, skipping content snapshot...");
             }
         }
 
@@ -1555,7 +1555,7 @@ namespace GONet.Editor
                                                        IDataBuilder builder,
                                                        IDataBuilderResult result)
         {
-            UnityEngine.Debug.Log("GONet: Addressables build completed, checking for GONetParticipant changes");
+            GONetLog.Debug("Addressables build completed, checking for GONetParticipant changes");
 
             // Force update of the cache after addressables build
             UpdateAddressableAssetPathsCache();
@@ -1584,7 +1584,7 @@ namespace GONet.Editor
                 eventType == AddressableAssetSettings.ModificationEvent.EntryRemoved ||
                 eventType == AddressableAssetSettings.ModificationEvent.EntryModified)
             {
-                UnityEngine.Debug.Log($"GONet: Addressables modification detected ({eventType}), checking for GONet changes");
+                GONetLog.Debug($"Addressables modification detected ({eventType}), checking for GONet changes");
                 UpdateAddressableAssetPathsCache();
 
                 // Use direct detection approach that doesn't depend on metadata caching
@@ -1605,29 +1605,29 @@ namespace GONet.Editor
                 string address = null;
 
                 // Debug: Log the actual type of eventData to understand what Unity passes
-                UnityEngine.Debug.Log($"GONet: ProcessAddressablesModificationDirect - eventType: {eventType}, eventData type: {eventData?.GetType()?.Name ?? "null"}");
+                GONetLog.Debug($"ProcessAddressablesModificationDirect - eventType: {eventType}, eventData type: {eventData?.GetType()?.Name ?? "null"}");
 
                 if (eventData is AddressableAssetEntry entry)
                 {
                     assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
                     address = entry.address;
-                    UnityEngine.Debug.Log($"GONet: Extracted from AddressableAssetEntry - assetPath: {assetPath}, address: {address}");
+                    GONetLog.Debug($"Extracted from AddressableAssetEntry - assetPath: {assetPath}, address: {address}");
                 }
                 else if (eventData is System.Collections.Generic.List<AddressableAssetEntry> entryList && entryList.Count > 0)
                 {
                     // Unity sometimes passes a List<AddressableAssetEntry> instead of a single entry
-                    UnityEngine.Debug.Log($"GONet: Processing List<AddressableAssetEntry> with {entryList.Count} entries");
+                    GONetLog.Debug($"Processing List<AddressableAssetEntry> with {entryList.Count} entries");
 
                     // Process each entry in the list
                     foreach (var listEntry in entryList)
                     {
                         string entryAssetPath = AssetDatabase.GUIDToAssetPath(listEntry.guid);
-                        UnityEngine.Debug.Log($"GONet: Processing list entry - assetPath: {entryAssetPath}, address: {listEntry.address}");
+                        GONetLog.Debug($"Processing list entry - assetPath: {entryAssetPath}, address: {listEntry.address}");
 
                         // Check if this is a GONetParticipant prefab and process it
                         if (ProcessSingleAddressableEntry(entryAssetPath, listEntry.address, eventType))
                         {
-                            UnityEngine.Debug.Log($"GONet: Successfully processed addressable entry: {entryAssetPath}");
+                            GONetLog.Debug($"Successfully processed addressable entry: {entryAssetPath}");
                         }
                     }
                     return; // Exit early since we processed the list
@@ -1636,12 +1636,12 @@ namespace GONet.Editor
                 {
                     // Sometimes Unity might pass just the GUID string for removed entries
                     assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    UnityEngine.Debug.Log($"GONet: Extracted from GUID string - assetPath: {assetPath}");
+                    GONetLog.Debug($"Extracted from GUID string - assetPath: {assetPath}");
                 }
                 else if (eventData != null)
                 {
                     // Try to get asset path from other possible object types
-                    UnityEngine.Debug.Log($"GONet: Unknown eventData type, attempting reflection...");
+                    GONetLog.Debug($"Unknown eventData type, attempting reflection...");
                     var eventDataType = eventData.GetType();
 
                     // Try to find a "guid" field or property
@@ -1654,7 +1654,7 @@ namespace GONet.Editor
                         if (!string.IsNullOrEmpty(guidValue))
                         {
                             assetPath = AssetDatabase.GUIDToAssetPath(guidValue);
-                            UnityEngine.Debug.Log($"GONet: Extracted from guid field - assetPath: {assetPath}");
+                            GONetLog.Debug($"Extracted from guid field - assetPath: {assetPath}");
                         }
                     }
                     else if (guidProperty != null)
@@ -1663,14 +1663,14 @@ namespace GONet.Editor
                         if (!string.IsNullOrEmpty(guidValue))
                         {
                             assetPath = AssetDatabase.GUIDToAssetPath(guidValue);
-                            UnityEngine.Debug.Log($"GONet: Extracted from guid property - assetPath: {assetPath}");
+                            GONetLog.Debug($"Extracted from guid property - assetPath: {assetPath}");
                         }
                     }
                 }
 
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    UnityEngine.Debug.Log($"GONet: Could not extract asset path from addressables modification event (eventData: {eventData})");
+                    GONetLog.Debug($"Could not extract asset path from addressables modification event (eventData: {eventData})");
                     return;
                 }
 
@@ -1824,7 +1824,7 @@ namespace GONet.Editor
             string json = JsonUtility.ToJson(new SerializableStringList { items = cachedPaths.ToArray() });
             SessionState.SetString(SESSION_STATE_ADDRESSABLES_CACHE_KEY, json);
 
-            // UnityEngine.Debug.Log($"UpdateAddressableAssetPathsCache: Cached {cachedPaths.Count} addressable asset paths in SessionState");
+            // GONetLog.Debug($"UpdateAddressableAssetPathsCache: Cached {cachedPaths.Count} addressable asset paths in SessionState");
         }
 
         [System.Serializable]
@@ -1856,7 +1856,7 @@ namespace GONet.Editor
                 }
                 catch (System.Exception ex)
                 {
-                    UnityEngine.Debug.LogWarning($"Failed to deserialize addressable cache from SessionState: {ex.Message}");
+                    GONetLog.Warning($"Failed to deserialize addressable cache from SessionState: {ex.Message}");
                 }
             }
 
@@ -2136,19 +2136,19 @@ namespace GONet.Editor
         {
             try
             {
-                UnityEngine.Debug.Log("GONet: Creating content snapshot after successful build...");
+                GONetLog.Debug("Creating content snapshot after successful build...");
 
                 var snapshot = await GONetContentSnapshot.CreateSnapshotAsync();
                 string snapshotPath = GetContentSnapshotFilePath();
 
                 GONetContentSnapshot.SaveSnapshot(snapshot, snapshotPath);
 
-                UnityEngine.Debug.Log($"GONet: Content snapshot saved to {snapshotPath}");
+                GONetLog.Debug($"Content snapshot saved to {snapshotPath}");
             }
             catch (System.Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"GONet: Failed to save content snapshot after build: {ex.Message}");
-                UnityEngine.Debug.LogException(ex);
+                GONetLog.Warning($"Failed to save content snapshot after build: {ex.Message}");
+                GONetLog.Error($"Exception saving content snapshot: {ex}");
             }
         }
     }
