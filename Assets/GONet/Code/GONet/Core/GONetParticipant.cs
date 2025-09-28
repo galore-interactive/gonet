@@ -467,25 +467,24 @@ namespace GONet
         private void OnValidate()
         {
             // Conservative logging to understand OnValidate context
-            UnityEngine.Debug.Log($"GONet: OnValidate called for GameObject '{gameObject?.name ?? "null"}'");
-            UnityEngine.Debug.Log($"GONet: OnValidate - isPlaying: {EditorApplication.isPlaying}, isPlayingOrWillChangePlaymode: {EditorApplication.isPlayingOrWillChangePlaymode}, isExitingPlayMode: {isExitingPlayMode}, isGenerating: {isGenerating}");
+            // Removed verbose debug logging that was spamming console
 
             if (!EditorApplication.isPlaying &&
                 !EditorApplication.isPlayingOrWillChangePlaymode &&
                  !isExitingPlayMode &&
                  !isGenerating)
             {
-                UnityEngine.Debug.Log($"GONet: OnValidate - passed guard conditions for '{gameObject?.name ?? "null"}'");
+                // Validation proceeding after guard conditions
 
                 // Check prefab context with detailed logging
                 bool isInPrefabPreview = IsInPrefabPreviewMode();
-                UnityEngine.Debug.Log($"GONet: OnValidate - IsInPrefabPreviewMode: {isInPrefabPreview}");
+                // Checked prefab preview mode
 
                 // Log scene information
                 var scene = gameObject?.scene;
                 if (scene.HasValue)
                 {
-                    UnityEngine.Debug.Log($"GONet: OnValidate - Scene name: '{scene.Value.name}', path: '{scene.Value.path}', isLoaded: {scene.Value.isLoaded}");
+                    // Scene context checked
                 }
 
                 // Log prefab information
@@ -495,28 +494,28 @@ namespace GONet
                     var assetType = UnityEditor.PrefabUtility.GetPrefabAssetType(gameObject);
                     string assetPath = UnityEditor.AssetDatabase.GetAssetPath(gameObject);
 
-                    UnityEngine.Debug.Log($"GONet: OnValidate - IsPartOfAnyPrefab: {isPartOfAnyPrefab}, AssetType: {assetType}, AssetPath: '{assetPath}'");
+                    // Prefab context checked
                 }
 
                 // Additional filtering: Only trigger OnValidateEditor if this appears to be a genuine user interaction
                 // Skip if we're currently in asset database operations or if the inspector isn't visible
                 bool isLikelyUserInteraction = IsLikelyUserInitiatedValidation();
-                UnityEngine.Debug.Log($"GONet: OnValidate - IsLikelyUserInitiatedValidation: {isLikelyUserInteraction}");
+                // User interaction detection completed
 
                 if (isInPrefabPreview || isLikelyUserInteraction)
                 {
-                    UnityEngine.Debug.Log($"GONet: OnValidate - Triggering OnValidateEditor for '{gameObject?.name ?? "null"}' (isInPrefabPreview: {isInPrefabPreview}, isLikelyUserInteraction: {isLikelyUserInteraction})");
+                    // Triggering OnValidateEditor event
                     // Trigger OnValidateEditor event for property change detection
                     OnValidateEditor?.Invoke(this);
                 }
                 else
                 {
-                    UnityEngine.Debug.Log($"GONet: OnValidate - NOT triggering OnValidateEditor for '{gameObject?.name ?? "null"}' (isInPrefabPreview: {isInPrefabPreview}, isLikelyUserInteraction: {isLikelyUserInteraction})");
+                    // Skipping OnValidateEditor event (not user-initiated)
                 }
             }
             else
             {
-                UnityEngine.Debug.Log($"GONet: OnValidate - skipped due to guard conditions for '{gameObject?.name ?? "null"}'");
+                // OnValidate skipped due to guard conditions
             }
 
             /* option used in editor namespace code only....here for reference
