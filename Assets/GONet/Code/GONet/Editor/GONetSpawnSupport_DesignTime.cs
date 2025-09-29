@@ -854,18 +854,24 @@ namespace GONet.Editor
                 // Unity calls it for ALL loaded prefabs whenever ANYTHING changes in the scene
                 // We're going to completely ignore OnValidate for prefab assets
 
-                if (hasProjectPath)
+                // Check if this is ANY kind of prefab (project://, resources://, addressables://)
+                string fullPath = DesignTimeMetadata.GetFullPath(gonetParticipant);
+                bool isPrefab = fullPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) ||
+                               fullPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
+                               fullPath.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX);
+
+                if (isPrefab)
                 {
                     // This is a prefab asset - ALWAYS SKIP OnValidate
                     // OnValidate is too unreliable for prefabs - Unity calls it constantly for no user action
-                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] BLOCKING OnValidate for prefab {fullPathInProject} - OnValidate disabled for all prefabs");
+                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] BLOCKING OnValidate for prefab {fullPath} - OnValidate disabled for all prefabs");
                     return;
                 }
 
                 // For scene objects ONLY, OnValidate is somewhat reliable, so we'll allow it through
                 // This means we can still detect when users change properties on scene GameObjects
 
-                string dirtyReason = $"GONetParticipant properties changed on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                string dirtyReason = $"GONetParticipant properties changed on GameObject: {fullPath} (Design-time only).";
                 // Adding dirty reason for property change
                 AddGONetDesignTimeDirtyReason(dirtyReason);
             }
