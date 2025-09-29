@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5160c06b849c4146a215ebaa556b25f, type: 3}
   m_Name: GONetProjectSettings
   m_EditorClassIdentifier: 
-  enableTeamAwareDirtyChecking: 0
+  enableTeamAwareDirtyChecking: 1
   maxParallelThreads: 0
   enableVerboseLogging: 0

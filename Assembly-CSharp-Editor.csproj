@@ -135,6 +135,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\RealWorldScenarioTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetPrefabSaveDetector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetParticipantCompanionBehaviourCustomInspector.cs" />
@@ -1160,6 +1161,10 @@
       <HintPath>Library\ScriptAssemblies\UnityEditor.TestRunner.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="MCPForUnity.Runtime">
+      <HintPath>Library\ScriptAssemblies\MCPForUnity.Runtime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.Sysroot.Linux_x86_64">
       <HintPath>Library\ScriptAssemblies\Unity.Sysroot.Linux_x86_64.dll</HintPath>
       <Private>False</Private>
@@ -1202,6 +1207,10 @@
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>Library\ScriptAssemblies\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="MCPForUnity.Editor">
+      <HintPath>Library\ScriptAssemblies\MCPForUnity.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VSCode.Editor">

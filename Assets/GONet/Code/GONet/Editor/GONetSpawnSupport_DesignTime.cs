@@ -39,6 +39,8 @@ namespace GONet.Editor
     [InitializeOnLoad]
     public static class GONetSpawnSupport_DesignTime
     {
+        private static double lastPrefabStageClosedTime = -1;
+        private static readonly double PREFAB_STAGE_TRANSITION_GRACE_PERIOD = 2.0; // seconds
         private static bool IsCompiling
         {
             get => EditorPrefs.GetBool(IsCompilingKey, false);
@@ -168,6 +170,9 @@ namespace GONet.Editor
 
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
+
+            // Hook into prefab stage events to track when prefab stage closes
+            UnityEditor.SceneManagement.PrefabStage.prefabStageClosing += OnPrefabStageClosing;
 
             // Recover the IsCompiling state from EditorPrefs (in case of domain reload)
             if (EditorPrefs.HasKey(IsCompilingKey) && EditorPrefs.GetBool(IsCompilingKey, false))
@@ -346,6 +351,13 @@ namespace GONet.Editor
         {
             string folderPath = GetDesignTimeDirtyReasonFolder();
             return Path.Combine(folderPath, "GONetTeamAwareDirtyCheckSnapshot_MemoryPack.bin");
+        }
+
+        private static void OnPrefabStageClosing(UnityEditor.SceneManagement.PrefabStage stage)
+        {
+            // Track when the prefab stage is closing
+            lastPrefabStageClosedTime = EditorApplication.timeSinceStartup;
+            GONetLog.Debug($"Prefab stage closing - setting grace period timestamp: {lastPrefabStageClosedTime}");
         }
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
@@ -703,9 +715,27 @@ namespace GONet.Editor
                 return;
             }
 
+            // IMPORTANT: Skip if this is happening shortly after prefab stage closed
+            // When exiting prefab stage, Unity calls OnDisable/OnEnable on the prefab asset
+            // This is NOT a user toggling the component, just Unity's internal behavior
+            double timeSincePrefabStageClosed = EditorApplication.timeSinceStartup - lastPrefabStageClosedTime;
+            if (lastPrefabStageClosedTime > 0 && timeSincePrefabStageClosed < PREFAB_STAGE_TRANSITION_GRACE_PERIOD)
+            {
+                // We're within the grace period after prefab stage closed - skip logging
+                GONetLog.Debug($"Skipping event for {gonetParticipant.gameObject.name} - within grace period after prefab stage close ({timeSincePrefabStageClosed:F2}s)");
+                return;
+            }
+
             if (isTargetedDesignTimeOnlyAction &&
                 (isInScene || hasProjectPath))
             {
+                // NEW: Use prefab save detector to filter out Unity's internal save behavior
+                if (hasProjectPath && GONetPrefabSaveDetector.ShouldSkipPrefabEvent(fullPathInProject, "OnEnable"))
+                {
+                    // This is part of Unity's internal prefab save behavior - skip it
+                    return;
+                }
+
                 string dirtyReason = $"GONetParticipant was enabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 // Adding dirty reason for enabled GONetParticipant
                 AddGONetDesignTimeDirtyReason(dirtyReason);
@@ -744,11 +774,34 @@ namespace GONet.Editor
             bool hasProjectPath = DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject);
             bool isInPrefabMode = IsInPrefabEditingMode(gonetParticipant);
 
-            // Checked scene and project path status
+            // OnDisable is called naturally when entering/exiting prefab mode, which shouldn't count as a change
+            if (isInPrefabMode)
+            {
+                // Skipping dirty detection - in prefab editing mode
+                return;
+            }
+
+            // IMPORTANT: Skip if this is happening shortly after prefab stage closed
+            // When exiting prefab stage, Unity calls OnDisable/OnEnable on the prefab asset
+            // This is NOT a user toggling the component, just Unity's internal behavior
+            double timeSincePrefabStageClosed = EditorApplication.timeSinceStartup - lastPrefabStageClosedTime;
+            if (lastPrefabStageClosedTime > 0 && timeSincePrefabStageClosed < PREFAB_STAGE_TRANSITION_GRACE_PERIOD)
+            {
+                // We're within the grace period after prefab stage closed - skip logging
+                GONetLog.Debug($"Skipping event for {gonetParticipant.gameObject.name} - within grace period after prefab stage close ({timeSincePrefabStageClosed:F2}s)");
+                return;
+            }
 
             if (isTargetedDesignTimeOnlyAction &&
-                (isInScene || hasProjectPath || isInPrefabMode))
+                (isInScene || hasProjectPath))
             {
+                // NEW: Use prefab save detector to filter out Unity's internal save behavior
+                if (hasProjectPath && GONetPrefabSaveDetector.ShouldSkipPrefabEvent(fullPathInProject, "OnDisable"))
+                {
+                    // This is part of Unity's internal prefab save behavior - skip it
+                    return;
+                }
+
                 string dirtyReason = $"GONetParticipant was disabled on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 // Adding dirty reason for disabled GONetParticipant
                 AddGONetDesignTimeDirtyReason(dirtyReason);
