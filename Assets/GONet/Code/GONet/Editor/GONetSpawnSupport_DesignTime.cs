@@ -667,12 +667,34 @@ namespace GONet.Editor
                 !EditorApplication.isUpdating && // handle scene loading or editor updates
                 !Application.isBatchMode && // Avoid triggering in CI/CD build pipelines
                 !IsQuitting;
-            if (isTargetedDesignTimeOnlyAction && 
-                (IsInSceneIncludedInBuild(gonetParticipant) || DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject)))
+
+            if (isTargetedDesignTimeOnlyAction)
             {
-                // if in here, we know this is a new GNP being added into scene in editor edit mode (i.e., design time add)
-                string dirtyReason = $"GONetParticipant was removed from GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
-                AddGONetDesignTimeDirtyReason(dirtyReason);
+                bool isInScene = IsInSceneIncludedInBuild(gonetParticipant);
+                bool hasProjectPath = DesignTimeMetadata.TryGetFullPathInProject(gonetParticipant, out string fullPathInProject);
+
+                // Check if we're in prefab editing mode - OnDestroy gets called when exiting prefab stage
+                bool isInPrefabMode = IsInPrefabEditingMode(gonetParticipant);
+                if (isInPrefabMode)
+                {
+                    // Skip - this is happening inside prefab editing mode
+                    return;
+                }
+
+                // Check if this is happening shortly after prefab stage closed
+                double timeSincePrefabStageClosed = EditorApplication.timeSinceStartup - lastPrefabStageClosedTime;
+                if (lastPrefabStageClosedTime > 0 && timeSincePrefabStageClosed < PREFAB_STAGE_TRANSITION_GRACE_PERIOD)
+                {
+                    // We're within the grace period after prefab stage closed - skip
+                    GONetLog.Debug($"Skipping OnDestroy for {gonetParticipant.gameObject.name} - within grace period after prefab stage close ({timeSincePrefabStageClosed:F2}s)");
+                    return;
+                }
+
+                if (isInScene || hasProjectPath)
+                {
+                    string dirtyReason = $"GONetParticipant was removed from GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
+                    AddGONetDesignTimeDirtyReason(dirtyReason);
+                }
             }
         }
 
@@ -850,28 +872,53 @@ namespace GONet.Editor
             if (isTargetedDesignTimeOnlyAction &&
                 (isInScene || hasProjectPath))
             {
-                // NUCLEAR OPTION: OnValidate for prefabs is completely unreliable
-                // Unity calls it for ALL loaded prefabs whenever ANYTHING changes in the scene
-                // We're going to completely ignore OnValidate for prefab assets
-
                 // Check if this is ANY kind of prefab (project://, resources://, addressables://)
                 string fullPath = DesignTimeMetadata.GetFullPath(gonetParticipant);
                 bool isPrefab = fullPath.StartsWith(GONetSpawnSupport_Runtime.PROJECT_HIERARCHY_PREFIX) ||
                                fullPath.StartsWith(GONetSpawnSupport_Runtime.RESOURCES_HIERARCHY_PREFIX) ||
                                fullPath.StartsWith(GONetSpawnSupport_Runtime.ADDRESSABLES_HIERARCHY_PREFIX);
 
+                string dirtyReason = $"GONetParticipant properties changed on GameObject: {fullPath} (Design-time only).";
+
                 if (isPrefab)
                 {
-                    // This is a prefab asset - ALWAYS SKIP OnValidate
-                    // OnValidate is too unreliable for prefabs - Unity calls it constantly for no user action
-                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] BLOCKING OnValidate for prefab {fullPath} - OnValidate disabled for all prefabs");
+                    // For prefabs, we need to be selective about OnValidate
+                    // We want to allow it when user is actually editing the prefab
+                    // But block it when Unity is just revalidating all prefabs
+
+                    // Check if we're in prefab editing mode AND this is the prefab being edited
+                    if (isInPrefabMode)
+                    {
+                        var currentPrefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
+                        if (currentPrefabStage != null)
+                        {
+                            string editingPath = currentPrefabStage.assetPath;
+                            // Check if this is the prefab currently being edited
+                            if (fullPath.Contains(editingPath) || editingPath.Contains(gonetParticipant.gameObject.name))
+                            {
+                                // User is actively editing THIS prefab - allow OnValidate
+                                GONetLog.Debug($"[GONetSpawnSupport_DesignTime] Allowing OnValidate for actively edited prefab {fullPath}");
+                                AddGONetDesignTimeDirtyReason(dirtyReason);
+                                return;
+                            }
+                        }
+                    }
+
+                    // Check if this prefab was selected in the last few seconds (single-click editing)
+                    if (UnityEditor.Selection.activeGameObject == gonetParticipant.gameObject)
+                    {
+                        // User has this prefab selected - likely editing in Inspector
+                        GONetLog.Debug($"[GONetSpawnSupport_DesignTime] Allowing OnValidate for selected prefab {fullPath}");
+                        AddGONetDesignTimeDirtyReason(dirtyReason);
+                        return;
+                    }
+
+                    // This is a prefab NOT being edited - skip OnValidate
+                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] Skipping OnValidate for non-edited prefab {fullPath}");
                     return;
                 }
 
-                // For scene objects ONLY, OnValidate is somewhat reliable, so we'll allow it through
-                // This means we can still detect when users change properties on scene GameObjects
-
-                string dirtyReason = $"GONetParticipant properties changed on GameObject: {fullPath} (Design-time only).";
+                // For scene objects, OnValidate is reliable, so we'll allow it through
                 // Adding dirty reason for property change
                 AddGONetDesignTimeDirtyReason(dirtyReason);
             }
