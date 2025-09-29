@@ -850,15 +850,20 @@ namespace GONet.Editor
             if (isTargetedDesignTimeOnlyAction &&
                 (isInScene || hasProjectPath))
             {
-                // NEW: Skip OnValidate for prefabs if this might be Unity's internal revalidation
-                // When you change something in a scene, Unity often revalidates all loaded prefab assets
-                // We should only log OnValidate for prefabs if the user is actually editing that specific prefab
-                if (hasProjectPath && !isInPrefabMode)
+                // NUCLEAR OPTION: OnValidate for prefabs is completely unreliable
+                // Unity calls it for ALL loaded prefabs whenever ANYTHING changes in the scene
+                // We're going to completely ignore OnValidate for prefab assets
+
+                if (hasProjectPath)
                 {
-                    // This is a prefab asset being validated but NOT being edited - likely Unity's internal revalidation
-                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] Skipping OnValidate for {fullPathInProject} - prefab not being edited");
+                    // This is a prefab asset - ALWAYS SKIP OnValidate
+                    // OnValidate is too unreliable for prefabs - Unity calls it constantly for no user action
+                    GONetLog.Debug($"[GONetSpawnSupport_DesignTime] BLOCKING OnValidate for prefab {fullPathInProject} - OnValidate disabled for all prefabs");
                     return;
                 }
+
+                // For scene objects ONLY, OnValidate is somewhat reliable, so we'll allow it through
+                // This means we can still detect when users change properties on scene GameObjects
 
                 string dirtyReason = $"GONetParticipant properties changed on GameObject: {DesignTimeMetadata.GetFullPath(gonetParticipant)} (Design-time only).";
                 // Adding dirty reason for property change
