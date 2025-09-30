@@ -138,12 +138,14 @@ namespace GONet.Sample
             if (connectionStatusText != null)
             {
                 string connectionStatus = "Not Connected";
+                bool isConnectionBad = true; // Red text by default
 
                 if (GONetMain.IsServer)
                 {
                     // Server: Show number of connected clients
                     uint clientCount = GONetMain.gonetServer != null ? GONetMain.gonetServer.numConnections : 0;
                     connectionStatus = clientCount == 1 ? "1 Client" : $"{clientCount} Clients";
+                    isConnectionBad = clientCount == 0; // Red if no clients
                 }
                 else if (GONetMain.IsClient && GONetMain.GONetClient != null)
                 {
@@ -163,9 +165,15 @@ namespace GONet.Sample
                         NetcodeIO.NET.ClientState.ConnectTokenExpired => "Token Expired",
                         _ => "Unknown"
                     };
+
+                    // Green only when connected, yellow when connecting, red otherwise
+                    isConnectionBad = state != NetcodeIO.NET.ClientState.Connected &&
+                                     state != NetcodeIO.NET.ClientState.SendingConnectionRequest &&
+                                     state != NetcodeIO.NET.ClientState.SendingChallengeResponse;
                 }
 
                 connectionStatusText.text = $"Connection: {connectionStatus}";
+                connectionStatusText.color = isConnectionBad ? Color.red : Color.white;
             }
         }
     }
