@@ -14,6 +14,7 @@
  */
 
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -167,6 +168,53 @@ namespace GONet
 
             UnloadScene_Internal(sceneName, -1, SceneLoadType.BuildSettings);
         }
+
+#if ADDRESSABLES_AVAILABLE
+        /// <summary>
+        /// Loads a scene from Addressables system.
+        /// SERVER ONLY - clients should not call this directly.
+        /// </summary>
+        /// <param name="sceneName">Addressable name/key of the scene</param>
+        /// <param name="mode">Single or Additive loading mode</param>
+        /// <param name="activateOnLoad">Whether to activate the scene immediately when loaded</param>
+        /// <param name="priority">Loading priority (0-100, higher = higher priority)</param>
+        public void LoadSceneFromAddressables(
+            string sceneName,
+            LoadSceneMode mode = LoadSceneMode.Single,
+            bool activateOnLoad = true,
+            int priority = 100)
+        {
+            if (!GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] Only server can load scenes. Use RequestLoadScene() from clients.");
+                return;
+            }
+
+            LoadScene_Internal(sceneName, -1, SceneLoadType.Addressables, mode, activateOnLoad, priority);
+        }
+
+        /// <summary>
+        /// Unloads an Addressables scene.
+        /// SERVER ONLY - clients should not call this directly.
+        /// </summary>
+        /// <param name="sceneName">Name of the Addressables scene to unload</param>
+        public void UnloadAddressablesScene(string sceneName)
+        {
+            if (!GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] Only server can unload scenes.");
+                return;
+            }
+
+            if (!loadedAdditiveScenes.Contains(sceneName))
+            {
+                GONetLog.Warning($"[GONetSceneManager] Scene '{sceneName}' is not loaded additively, cannot unload");
+                return;
+            }
+
+            UnloadScene_Internal(sceneName, -1, SceneLoadType.Addressables);
+        }
+#endif
 
         // ========================================
         // INTERNAL IMPLEMENTATION
@@ -643,40 +691,147 @@ namespace GONet
 #if ADDRESSABLES_AVAILABLE
         private async void LoadSceneFromAddressablesAsync(SceneLoadEvent evt)
         {
-            var handle = Addressables.LoadSceneAsync(
-                evt.SceneName,
-                evt.Mode,
-                evt.ActivateOnLoad,
-                evt.Priority
-            );
-
-            await handle.Task;
-
-            if (handle.Status == AsyncOperationStatus.Succeeded)
+            try
             {
+                GONetLog.Debug($"[GONetSceneManager] Starting Addressables scene load: '{evt.SceneName}'");
+
+                // Clean up any existing handle for this scene if in Single mode
+                if (evt.Mode == LoadSceneMode.Single && addressableSceneHandles.Count > 0)
+                {
+                    GONetLog.Debug("[GONetSceneManager] Single mode load - releasing all existing Addressable scene handles");
+                    foreach (var kvp in addressableSceneHandles.ToList())
+                    {
+                        if (kvp.Value.IsValid())
+                        {
+                            Addressables.Release(kvp.Value);
+                        }
+                        addressableSceneHandles.Remove(kvp.Key);
+                    }
+                }
+
+                var handle = Addressables.LoadSceneAsync(
+                    evt.SceneName,
+                    evt.Mode,
+                    evt.ActivateOnLoad,
+                    evt.Priority
+                );
+
+                // Store handle immediately for tracking
                 addressableSceneHandles[evt.SceneName] = handle;
-                OnSceneLoadCompleted?.Invoke(evt.SceneName, evt.Mode);
-                GONetLog.Info($"[GONetSceneManager] Addressable scene loaded: {evt.SceneName}");
+
+                // Wait for completion
+                await handle.Task;
+
+                // Check result
+                if (handle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    GONetLog.Info($"[GONetSceneManager] Addressable scene loaded successfully: '{evt.SceneName}' (Mode: {evt.Mode})");
+
+                    // OnSceneLoadCompleted will be fired by OnUnitySceneLoaded
+                    // But we can add additional Addressables-specific handling here if needed
+                }
+                else
+                {
+                    GONetLog.Error($"[GONetSceneManager] Failed to load addressable scene '{evt.SceneName}': {handle.OperationException?.Message ?? "Unknown error"}");
+
+                    // Clean up failed handle
+                    addressableSceneHandles.Remove(evt.SceneName);
+                    scenesLoading.Remove(evt.SceneName);
+
+                    if (handle.IsValid())
+                    {
+                        Addressables.Release(handle);
+                    }
+                }
             }
-            else
+            catch (System.Exception ex)
             {
-                GONetLog.Error($"[GONetSceneManager] Failed to load addressable scene '{evt.SceneName}': {handle.OperationException}");
+                GONetLog.Error($"[GONetSceneManager] Exception loading addressable scene '{evt.SceneName}': {ex.Message}\n{ex.StackTrace}");
+
+                // Clean up on exception
+                addressableSceneHandles.Remove(evt.SceneName);
+                scenesLoading.Remove(evt.SceneName);
             }
         }
 
         private async void UnloadSceneFromAddressablesAsync(string sceneName)
         {
-            if (!addressableSceneHandles.TryGetValue(sceneName, out var handle))
+            try
             {
-                GONetLog.Warning($"[GONetSceneManager] Cannot unload addressable scene '{sceneName}' - not loaded or not tracked");
-                return;
+                if (!addressableSceneHandles.TryGetValue(sceneName, out var handle))
+                {
+                    GONetLog.Warning($"[GONetSceneManager] Cannot unload addressable scene '{sceneName}' - not loaded or not tracked");
+                    scenesUnloading.Remove(sceneName);
+                    return;
+                }
+
+                if (!handle.IsValid())
+                {
+                    GONetLog.Warning($"[GONetSceneManager] Handle for addressable scene '{sceneName}' is no longer valid");
+                    addressableSceneHandles.Remove(sceneName);
+                    scenesUnloading.Remove(sceneName);
+                    return;
+                }
+
+                GONetLog.Debug($"[GONetSceneManager] Starting Addressables scene unload: '{sceneName}'");
+
+                var unloadHandle = Addressables.UnloadSceneAsync(handle);
+                await unloadHandle.Task;
+
+                if (unloadHandle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    GONetLog.Info($"[GONetSceneManager] Addressable scene unloaded successfully: '{sceneName}'");
+                    addressableSceneHandles.Remove(sceneName);
+                }
+                else
+                {
+                    GONetLog.Error($"[GONetSceneManager] Failed to unload addressable scene '{sceneName}': {unloadHandle.OperationException?.Message ?? "Unknown error"}");
+
+                    // Still remove from tracking even if unload failed
+                    addressableSceneHandles.Remove(sceneName);
+                }
             }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[GONetSceneManager] Exception unloading addressable scene '{sceneName}': {ex.Message}\n{ex.StackTrace}");
 
-            var unloadHandle = Addressables.UnloadSceneAsync(handle);
-            await unloadHandle.Task;
+                // Clean up on exception
+                addressableSceneHandles.Remove(sceneName);
+            }
+            finally
+            {
+                // Always ensure unloading state is cleaned up
+                scenesUnloading.Remove(sceneName);
+            }
+        }
 
-            addressableSceneHandles.Remove(sceneName);
-            GONetLog.Info($"[GONetSceneManager] Addressable scene unloaded: {sceneName}");
+        /// <summary>
+        /// Gets the Addressable scene handle for a loaded scene.
+        /// Returns null if scene not loaded via Addressables or handle not found.
+        /// </summary>
+        public AsyncOperationHandle<SceneInstance>? GetAddressableSceneHandle(string sceneName)
+        {
+            if (addressableSceneHandles.TryGetValue(sceneName, out var handle))
+            {
+                return handle;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Releases all Addressable scene handles (for cleanup on shutdown).
+        /// </summary>
+        internal void ReleaseAllAddressableSceneHandles()
+        {
+            foreach (var kvp in addressableSceneHandles)
+            {
+                if (kvp.Value.IsValid())
+                {
+                    GONetLog.Debug($"[GONetSceneManager] Releasing Addressable scene handle: '{kvp.Key}'");
+                    Addressables.Release(kvp.Value);
+                }
+            }
+            addressableSceneHandles.Clear();
         }
 #endif
     }
