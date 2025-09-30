@@ -310,12 +310,14 @@ namespace GONet.Sample
             // Server's own requests are auto-approved
             if (GONetMain.IsServer && requestingAuthority == GONetMain.MyAuthorityId)
             {
+                GONetLog.Info($"[SceneSelectionUI] Server's own request - auto-approved");
                 return true;
             }
 
-            // Client request on server - show approval dialog
+            // Client request on server - show approval dialog and deny for now
             if (GONetMain.IsServer)
             {
+                GONetLog.Info($"[SceneSelectionUI] Client request - showing approval dialog");
                 pendingSceneName = sceneName;
                 pendingLoadMode = mode;
                 pendingRequestingAuthority = requestingAuthority;
@@ -326,11 +328,11 @@ namespace GONet.Sample
                     approvalPanel.SetActive(true);
                 }
 
-                // Return false for now - approval will trigger the load
+                // Return false to deny the automatic load - approval button will trigger manual load
                 return false;
             }
 
-            // Client's own requests always go through (server will validate)
+            // Client's own requests - this validation runs on client side, always allow
             return true;
         }
 

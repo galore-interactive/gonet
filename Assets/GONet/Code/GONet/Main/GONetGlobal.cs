@@ -429,6 +429,16 @@ namespace GONet
         [TargetRpc(nameof(ServerAuthorityId), validationMethod: nameof(Validate_RequestLoadScene))]
         internal void RPC_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
         {
+            // IMPORTANT: This RPC should only execute on the server
+            // When called from client, it sends to server but also executes locally
+            // We need to check if we're the server before processing
+            if (!GONetMain.IsServer)
+            {
+                // This is the client-side call that triggers the RPC send
+                // Don't execute the logic here, just let it send to server
+                return;
+            }
+
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
             SceneLoadType loadType = (SceneLoadType)loadTypeRaw;
 
