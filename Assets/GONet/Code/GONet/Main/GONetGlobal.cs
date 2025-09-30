@@ -354,8 +354,8 @@ namespace GONet
         /// SERVER RPC: Client requests server to load a scene.
         /// Server validates via OnValidateSceneLoad hook before loading.
         /// </summary>
-        [TargetRPC]
-        private void RPC_Server_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
+        [ServerRpc]
+        internal void RPC_Server_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
         {
             // Get requesting client's authority ID
             ushort requestingAuthorityId = GONetMain.MyAuthorityId; // On server, this will be overridden by RPC system to be the sender's ID
@@ -386,8 +386,8 @@ namespace GONet
         /// <summary>
         /// SERVER RPC: Client requests server to unload a scene.
         /// </summary>
-        [TargetRPC]
-        private void RPC_Server_RequestUnloadScene(string sceneName)
+        [ServerRpc]
+        internal void RPC_Server_RequestUnloadScene(string sceneName)
         {
             // Get requesting client's authority ID
             ushort requestingAuthorityId = GONetMain.MyAuthorityId;
