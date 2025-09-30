@@ -50,6 +50,18 @@ namespace GONet
         [SerializeField]
         internal GONetLocal gonetLocalPrefab;
 
+        [Tooltip("Enable automatic client/server role detection based on port availability.\n\n" +
+                "When enabled:\n" +
+                "• First instance (port free) → Starts as SERVER\n" +
+                "• Additional instances (port occupied) → Start as CLIENTS\n" +
+                "• Command line args (-server/-client) always override auto-detection\n\n" +
+                "This is ideal for local development and testing, eliminating manual role selection.\n\n" +
+                "When disabled:\n" +
+                "• You must explicitly specify -server or -client via command line\n" +
+                "• Or use keyboard shortcuts (Ctrl+Alt+S for server, Ctrl+Alt+C for client)\n\n" +
+                "Default: Enabled (recommended for development)")]
+        public bool enableAutoRoleDetection = true;
+
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 
@@ -223,6 +235,13 @@ namespace GONet
             }
 
             ActualServerConnectionInfoSet -= Editor_AttemptStartAsClientIfAppropriate;
+
+            // Check if auto-detection is enabled
+            if (!enableAutoRoleDetection)
+            {
+                GONetLog.Info("[GONetGlobal] Auto role detection is disabled. Use command line args (-server/-client) or keyboard shortcuts (Ctrl+Alt+S/C) to start manually.");
+                return;
+            }
 
             // Auto-detect whether to start as server or client based on port availability
             // Only do this if we're not already a client or server

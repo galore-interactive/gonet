@@ -24,6 +24,19 @@ namespace GONet.Editor
     [CreateAssetMenu(fileName = "GONetProjectSettings", menuName = "GONet/Project Settings", order = 1)]
     public class GONetProjectSettings : ScriptableObject
     {
+        [Header("Client/Server Auto-Detection")]
+        [Tooltip("Enable automatic client/server role detection based on port availability.\n\n" +
+                "When enabled:\n" +
+                "• First instance (port free) → Starts as SERVER\n" +
+                "• Additional instances (port occupied) → Start as CLIENTS\n" +
+                "• Command line args (-server/-client) always override auto-detection\n\n" +
+                "This is ideal for local development and testing, eliminating the need for manual role selection.\n\n" +
+                "When disabled:\n" +
+                "• You must explicitly specify -server or -client via command line arguments\n" +
+                "• Or use the manual keyboard shortcuts (Ctrl+Alt+S for server, Ctrl+Alt+C for client)\n\n" +
+                "Default: Enabled (recommended for development workflow)")]
+        public bool enableAutoRoleDetection = true;
+
         [Header("⚠️ EXPERIMENTAL FEATURES - Use with caution")]
         [Space(5)]
         [Header("Team Development Settings")]
