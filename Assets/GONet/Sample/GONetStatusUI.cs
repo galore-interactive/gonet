@@ -138,14 +138,14 @@ namespace GONet.Sample
             if (connectionStatusText != null)
             {
                 string connectionStatus = "Not Connected";
-                bool isConnectionBad = true; // Red text by default
+                Color statusColor = Color.red; // Red by default
 
                 if (GONetMain.IsServer)
                 {
                     // Server: Show number of connected clients
                     uint clientCount = GONetMain.gonetServer != null ? GONetMain.gonetServer.numConnections : 0;
                     connectionStatus = clientCount == 1 ? "1 Client" : $"{clientCount} Clients";
-                    isConnectionBad = clientCount == 0; // Red if no clients
+                    statusColor = clientCount == 0 ? Color.red : Color.white; // Red if no clients, white otherwise
                 }
                 else if (GONetMain.IsClient && GONetMain.GONetClient != null)
                 {
@@ -166,14 +166,24 @@ namespace GONet.Sample
                         _ => "Unknown"
                     };
 
-                    // Green only when connected, yellow when connecting, red otherwise
-                    isConnectionBad = state != NetcodeIO.NET.ClientState.Connected &&
-                                     state != NetcodeIO.NET.ClientState.SendingConnectionRequest &&
-                                     state != NetcodeIO.NET.ClientState.SendingChallengeResponse;
+                    // Color coding: Green (connected), Yellow (connecting), Red (errors/disconnected)
+                    if (state == NetcodeIO.NET.ClientState.Connected)
+                    {
+                        statusColor = Color.white;
+                    }
+                    else if (state == NetcodeIO.NET.ClientState.SendingConnectionRequest ||
+                             state == NetcodeIO.NET.ClientState.SendingChallengeResponse)
+                    {
+                        statusColor = Color.yellow;
+                    }
+                    else
+                    {
+                        statusColor = Color.red;
+                    }
                 }
 
                 connectionStatusText.text = $"Connection: {connectionStatus}";
-                connectionStatusText.color = isConnectionBad ? Color.red : Color.white;
+                connectionStatusText.color = statusColor;
             }
         }
     }
