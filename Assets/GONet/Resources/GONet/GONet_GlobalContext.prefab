@@ -48,8 +48,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isTickReceiver: 0
-  GONetServerPREFAB: {fileID: 114919729767367322, guid: 21cf7d9988e07984caf609c7700b8538, type: 3}
-  GONetClientPREFAB: {fileID: 114597615443404838, guid: 4d70fba7ada04564ca38354a46d4d5f2, type: 3}
+  GONetServerPREFAB: {fileID: 114919729767367322, guid: 21cf7d9988e07984caf609c7700b8538,
+    type: 3}
+  GONetClientPREFAB: {fileID: 114597615443404838, guid: 4d70fba7ada04564ca38354a46d4d5f2,
+    type: 3}
   authorityPrefab: {fileID: 0}
   spawnPoints: []
 --- !u!114 &8643402947905904696
@@ -100,5 +102,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isTickReceiver: 0
   valueBlendingBufferLeadTimeMilliseconds: 150
-  gonetLocalPrefab: {fileID: 5118336138822136954, guid: 338c05f05b3eb634894468e022a5a11f, type: 3}
+  gonetLocalPrefab: {fileID: 5118336138822136954, guid: 338c05f05b3eb634894468e022a5a11f,
+    type: 3}
+  enableAutoRoleDetection: 1
   shouldAttemptAutoStartAsClient: 1
+  server: 
+  serverPort: 0
