@@ -224,32 +224,36 @@ namespace GONet
 
             ActualServerConnectionInfoSet -= Editor_AttemptStartAsClientIfAppropriate;
 
-            // just for editor, we can assume we only want to auto start client when server running locally already or server is remote
-            bool isAppropriate = 
-                !GONetMain.IsClient && 
-                !GONetMain.IsServer && 
-                (!NetworkUtils.IsIPAddressOnLocalMachine(serverIP) ||
-                  NetworkUtils.IsLocalPortListening(serverPort));
-            
-            if (isAppropriate) // do not attempt to start a client when we already know this is the server...no matter what the shouldAttemptAutoStartAsClient set to true seems to indicate!
+            // Auto-detect whether to start as server or client based on port availability
+            // Only do this if we're not already a client or server
+            if (!GONetMain.IsClient && !GONetMain.IsServer)
             {
                 var sampleSpawner = GetComponent<GONetSampleSpawner>();
                 if (sampleSpawner)
                 {
-                    sampleSpawner.InstantiateClientIfNotAlready();
+                    bool isServerRemote = !NetworkUtils.IsIPAddressOnLocalMachine(serverIP);
+                    bool isPortOccupied = NetworkUtils.IsLocalPortListening(serverPort);
+
+                    if (isServerRemote || isPortOccupied)
+                    {
+                        // Server is running remotely or port is occupied locally → start as client
+                        sampleSpawner.InstantiateClientIfNotAlready();
+                        GONetLog.Info($"[GONetGlobal] Editor auto-detection: Starting as CLIENT (server at {serverIP}:{serverPort})");
+                    }
+                    else
+                    {
+                        // Port is free and server would be local → start as server
+                        sampleSpawner.InstantiateServerIfNotAlready();
+                        GONetLog.Info($"[GONetGlobal] Editor auto-detection: Port {serverPort} is free, starting as SERVER");
+                    }
                 }
                 else
                 {
                     const string UNABLE = "Unable to honor your setting of true on ";
                     const string BECAUSE = " because we could not find ";
-                    const string ATTACHED = " attached to this GameObject, which is required to automatically start the client in this manner.";
+                    const string ATTACHED = " attached to this GameObject, which is required to automatically start in this manner.";
                     GONetLog.Error(string.Concat(UNABLE, nameof(shouldAttemptAutoStartAsClient), BECAUSE, nameof(GONetSampleSpawner), ATTACHED));
                 }
-            }
-            else
-            {
-                const string INAP = "It was deemed inappropriate to auto-start a client; however, do not fret if this is a client that was started via a build executable passing in '-client' as a command line argument since that would still be honored in which case this is a client.";
-                GONetLog.Info(INAP);
             }
         }
 
