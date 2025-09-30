@@ -61,10 +61,16 @@ namespace GONet.Sample
                 backToMenuButton.gameObject.SetActive(false); // Hidden in menu scene
             }
 
-            // Setup validation hook to allow all requests in this demo
+            // Setup validation hook and enable async approval for server
             if (GONetMain.SceneManager != null)
             {
                 GONetMain.SceneManager.OnValidateSceneLoad += ValidateSceneLoad;
+
+                // Enable async approval mode on server
+                if (GONetMain.IsServer)
+                {
+                    GONetMain.SceneManager.RequiresAsyncApproval = true;
+                }
 
                 // Subscribe to scene events for status updates
                 GONetMain.SceneManager.OnSceneLoadStarted += OnSceneLoadStarted;
@@ -314,7 +320,7 @@ namespace GONet.Sample
                 return true;
             }
 
-            // Client request on server - show approval dialog and deny for now
+            // Client request on server - show approval dialog
             if (GONetMain.IsServer)
             {
                 GONetLog.Info($"[SceneSelectionUI] Client request - showing approval dialog");
@@ -328,8 +334,9 @@ namespace GONet.Sample
                     approvalPanel.SetActive(true);
                 }
 
-                // Return false to deny the automatic load - approval button will trigger manual load
-                return false;
+                // Return true to allow RPC through - async approval will send response later
+                // ExpectFollowOnResponse flag will be set automatically since RequiresAsyncApproval is true
+                return true;
             }
 
             // Client's own requests - this validation runs on client side, always allow
@@ -341,11 +348,14 @@ namespace GONet.Sample
             GONetLog.Info($"[SceneSelectionUI] Server APPROVED scene change to '{pendingSceneName}'");
             approvalPanel.SetActive(false);
 
-            // Server manually loads the scene
+            // Server loads the scene
             if (GONetMain.SceneManager != null)
             {
                 GONetMain.SceneManager.LoadSceneFromBuildSettings(pendingSceneName, pendingLoadMode);
             }
+
+            // Send approval response to client via GONetSceneManager public API
+            GONetMain.SceneManager.SendSceneRequestResponse(pendingRequestingAuthority, true, pendingSceneName, "");
         }
 
         private void OnDenyClicked()
@@ -353,7 +363,8 @@ namespace GONet.Sample
             GONetLog.Info($"[SceneSelectionUI] Server DENIED scene change to '{pendingSceneName}'");
             approvalPanel.SetActive(false);
 
-            // TODO: Could send denial message to client here
+            // Send denial response to client via GONetSceneManager public API
+            GONetMain.SceneManager.SendSceneRequestResponse(pendingRequestingAuthority, false, pendingSceneName, "Server denied the request");
         }
 
         private void OnSceneLoadStarted(string sceneName, LoadSceneMode mode)

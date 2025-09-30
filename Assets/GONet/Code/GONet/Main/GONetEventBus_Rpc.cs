@@ -615,6 +615,30 @@ namespace GONet
             return id;
         }
 
+        /// <summary>
+        /// Helper method to build RpcDeliveryReport from validation result.
+        /// Consolidates delivery report construction logic to avoid code duplication across argument variants.
+        /// </summary>
+        /// <param name="validationResult">The validation result containing allow/deny information</param>
+        /// <param name="targetBuffer">Buffer containing target authority IDs</param>
+        /// <param name="reportId">Validation report ID (0 if no report stored)</param>
+        /// <returns>Constructed RpcDeliveryReport with all fields populated</returns>
+        private RpcDeliveryReport BuildDeliveryReport(RpcValidationResult validationResult, ushort[] targetBuffer, ulong reportId)
+        {
+            var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+            var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedTargets,
+                FailedDelivery = deniedTargets,
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.ModifiedData != null,
+                ValidationReportId = reportId,
+                ExpectFollowOnResponse = validationResult.ExpectFollowOnResponse // Propagate async flag
+            };
+        }
+
         internal bool TryGetStoredRpcValidationReport(ulong reportId, out RpcValidationResult report)
         {
             return storedValidationReports.TryGetValue(reportId, out report);
@@ -2201,16 +2225,7 @@ namespace GONet
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
 
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
 
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
@@ -2478,16 +2493,7 @@ namespace GONet
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
 
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
 
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
@@ -2738,16 +2744,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3010,16 +3007,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3282,16 +3270,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3554,16 +3533,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -3826,16 +3796,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -4098,16 +4059,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }
@@ -4370,16 +4322,7 @@ namespace GONet
                     if (metadata.ExpectsDeliveryReport)
                     {
                         deniedBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
-                        var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
-
-                        var report = new RpcDeliveryReport
-                        {
-                            DeliveredTo = allowedTargets,
-                            FailedDelivery = deniedTargets,
-                            FailureReason = validationResult.DenialReason,
-                            WasModified = validationResult.ModifiedData != null,
-                            ValidationReportId = reportId
-                        };
+                        var report = BuildDeliveryReport(validationResult, targetBuffer, reportId);
                         // Send report back to caller
                         SendDeliveryReport(GONetMain.MyAuthorityId, report, metadata);
                     }

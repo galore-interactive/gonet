@@ -403,6 +403,49 @@ namespace GONet
         /// Zero if no detailed report is available.
         /// </summary>
         public ulong ValidationReportId { get; set; }
+
+        /// <summary>
+        /// <para>Indicates that the RPC was validated but requires asynchronous processing before completion.</para>
+        /// <para>When true, the caller should expect a follow-on response RPC from the target.</para>
+        ///
+        /// <para><b>Use Case - Async Approval Pattern:</b></para>
+        /// <para>This flag enables server-side approval workflows where validation allows the RPC through,
+        /// but actual execution is deferred until manual approval (e.g., admin confirmation, user interaction).</para>
+        ///
+        /// <para><b>Example - Scene Change Approval:</b></para>
+        /// <code>
+        /// // Client requests scene change
+        /// var report = await RPC_RequestLoadScene("NewScene");
+        /// if (report.ExpectFollowOnResponse)
+        /// {
+        ///     // Server is processing request asynchronously
+        ///     // Wait for RPC_SceneRequestResponse RPC with approval/denial
+        /// }
+        ///
+        /// // Server validation
+        /// RpcValidationResult Validate_RequestLoadScene(...)
+        /// {
+        ///     result.AllowAll(); // Let RPC through
+        ///     result.ExpectFollowOnResponse = true; // Signal async processing
+        ///     return result;
+        /// }
+        ///
+        /// // Server RPC handler shows approval UI, then sends response
+        /// void RPC_RequestLoadScene(...)
+        /// {
+        ///     ShowApprovalDialog();
+        /// }
+        ///
+        /// // After approval, server sends response
+        /// void RPC_SceneRequestResponse(ushort clientId, bool approved, ...)
+        /// {
+        ///     // Client receives definitive approval/denial
+        /// }
+        /// </code>
+        ///
+        /// <para>See GONet scene management sample for complete implementation.</para>
+        /// </summary>
+        public bool ExpectFollowOnResponse { get; set; }
     }
 
     /// <summary>
@@ -439,6 +482,26 @@ namespace GONet
         /// Internal field for framework use only - contains serialized modified parameters
         /// </summary>
         internal byte[] ModifiedData { get; set; }
+
+        /// <summary>
+        /// <para>Signals that this RPC requires asynchronous processing and the caller should expect a follow-on response.</para>
+        /// <para>When set to true, this flag is automatically propagated to the RpcDeliveryReport.</para>
+        ///
+        /// <para><b>Usage in Validators:</b></para>
+        /// <code>
+        /// RpcValidationResult Validate_MyAsyncRpc(ref string data)
+        /// {
+        ///     var result = context.GetValidationResult();
+        ///     result.AllowAll(); // Allow RPC through
+        ///     result.ExpectFollowOnResponse = true; // Signal async processing to caller
+        ///     return result;
+        /// }
+        /// </code>
+        ///
+        /// <para>The caller will receive this flag in the delivery report and can await a separate response RPC.</para>
+        /// <para>See RpcDeliveryReport.ExpectFollowOnResponse for complete example.</para>
+        /// </summary>
+        public bool ExpectFollowOnResponse { get; set; }
 
         /// <summary>
         /// Internal flag to track disposal state and prevent double-disposal

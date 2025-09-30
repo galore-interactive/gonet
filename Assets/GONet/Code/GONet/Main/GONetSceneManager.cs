@@ -64,6 +64,13 @@ namespace GONet
         public event SceneLoadValidationDelegate OnValidateSceneLoad;
 
         /// <summary>
+        /// Set to true if scene load requests require async approval (e.g., server UI confirmation).
+        /// When true, validation will pass but signal ExpectFollowOnResponse, and the server
+        /// must send an explicit response RPC after approval/denial.
+        /// </summary>
+        public bool RequiresAsyncApproval { get; set; } = false;
+
+        /// <summary>
         /// Internal method to invoke validation. Used by RPC validation in GONetGlobal.
         /// Returns true if validation passes or no validators are registered.
         /// </summary>
@@ -94,6 +101,26 @@ namespace GONet
         /// Called when scene unload begins
         /// </summary>
         public event SceneLoadDelegate OnSceneUnloadStarted;
+
+        /// <summary>
+        /// Called when async scene request response is received (approval/denial).
+        /// Parameters: (approved, sceneName, denialReason)
+        /// </summary>
+        public delegate void SceneRequestResponseDelegate(bool approved, string sceneName, string denialReason);
+
+        /// <summary>
+        /// Invoked on client when server sends response to scene load request
+        /// </summary>
+        public event SceneRequestResponseDelegate OnSceneRequestResponse;
+
+        /// <summary>
+        /// Internal method to invoke scene request response event.
+        /// Called by GONetGlobal when RPC_SceneRequestResponse is received.
+        /// </summary>
+        internal void InvokeSceneRequestResponse(bool approved, string sceneName, string denialReason)
+        {
+            OnSceneRequestResponse?.Invoke(approved, sceneName, denialReason);
+        }
 
         // ========================================
         // INITIALIZATION
@@ -254,8 +281,8 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting scene load: '{sceneName}' (Mode: {mode})");
 
-            // Send RPC to server (TargetRpc with validation)
-            global.RPC_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.BuildSettings);
+            // Send RPC to server via internal helper (which calls CallRpc)
+            global.SendSceneLoadRequest(sceneName, (byte)mode, (byte)SceneLoadType.BuildSettings);
         }
 
 #if ADDRESSABLES_AVAILABLE
@@ -281,8 +308,8 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting Addressables scene load: '{sceneName}' (Mode: {mode})");
 
-            // Send RPC to server (TargetRpc with validation)
-            global.RPC_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.Addressables);
+            // Send RPC to server via internal helper (which calls CallRpc)
+            global.SendSceneLoadRequest(sceneName, (byte)mode, (byte)SceneLoadType.Addressables);
         }
 #endif
 
@@ -307,8 +334,30 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting scene unload: '{sceneName}'");
 
-            // Send RPC to server (TargetRpc with validation)
-            global.RPC_RequestUnloadScene(sceneName);
+            // Send RPC to server via internal helper (which calls CallRpc)
+            global.SendSceneUnloadRequest(sceneName);
+        }
+
+        /// <summary>
+        /// SERVER ONLY: Send scene request response to client (approval or denial).
+        /// Used in async approval workflows where server shows UI confirmation dialog.
+        /// </summary>
+        /// <param name="clientId">Authority ID of the client to receive the response</param>
+        /// <param name="approved">True if request was approved, false if denied</param>
+        /// <param name="sceneName">Name of the scene that was requested</param>
+        /// <param name="reason">Optional reason for denial (only used when approved=false)</param>
+        public void SendSceneRequestResponse(ushort clientId, bool approved, string sceneName, string reason = "")
+        {
+            if (!GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] SendSceneRequestResponse() can only be called by server");
+                return;
+            }
+
+            GONetLog.Info($"[GONetSceneManager] Sending scene request response to client {clientId}: {(approved ? "APPROVED" : "DENIED")} - '{sceneName}'");
+
+            // Call internal helper on GONetGlobal which invokes CallRpc
+            global.SendSceneRequestResponse(clientId, approved, sceneName, reason);
         }
 
         // ========================================

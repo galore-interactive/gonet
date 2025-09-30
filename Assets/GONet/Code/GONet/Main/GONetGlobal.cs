@@ -19,6 +19,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -427,7 +428,7 @@ namespace GONet
         /// Uses TargetRpc for built-in validation support.
         /// </summary>
         [TargetRpc(nameof(ServerAuthorityId), validationMethod: nameof(Validate_RequestLoadScene))]
-        internal void RPC_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
+        internal async Task<RpcDeliveryReport> RPC_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
         {
             // IMPORTANT: This RPC should only execute on the server
             // When called from client, it sends to server but also executes locally
@@ -436,7 +437,7 @@ namespace GONet
             {
                 // This is the client-side call that triggers the RPC send
                 // Don't execute the logic here, just let it send to server
-                return;
+                return default;
             }
 
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
@@ -459,6 +460,8 @@ namespace GONet
             {
                 GONetLog.Error($"[GONetGlobal] Unsupported scene load type: {loadType}");
             }
+
+            return default;
         }
 
         /// <summary>
@@ -495,7 +498,73 @@ namespace GONet
 
             // Allow all targets (in this case, should only be the server)
             result.AllowAll();
+
+            // If validation requires async approval (e.g., server UI), set ExpectFollowOnResponse
+            // This signals to the caller that a follow-on RPC will be sent with the final decision
+            result.ExpectFollowOnResponse = sceneManager.RequiresAsyncApproval;
+
             return result;
+        }
+
+        /// <summary>
+        /// TARGET RPC: Server sends scene load request response to client.
+        /// Uses first ushort parameter to specify target client authority ID.
+        /// </summary>
+        /// <param name="targetClientId">Authority ID of the client to receive the response</param>
+        /// <param name="approved">True if request was approved, false if denied</param>
+        /// <param name="sceneName">Name of the scene that was requested</param>
+        /// <param name="denialReason">If denied, the reason for denial (optional)</param>
+        [TargetRpc]
+        internal void RPC_SceneRequestResponse(ushort targetClientId, bool approved, string sceneName, string denialReason = "")
+        {
+            if (approved)
+            {
+                GONetLog.Info($"[GONetGlobal] Scene request approved: '{sceneName}'");
+            }
+            else
+            {
+                string reason = string.IsNullOrEmpty(denialReason) ? "Request denied" : denialReason;
+                GONetLog.Warning($"[GONetGlobal] Scene request denied: '{sceneName}' - {reason}");
+            }
+
+            // Notify scene manager of response
+            GONetMain.SceneManager.InvokeSceneRequestResponse(approved, sceneName, denialReason);
+        }
+
+        /// <summary>
+        /// INTERNAL: Sends scene load request RPC to server.
+        /// <para><b>USER NOTE:</b> This method is internal infrastructure and should NOT be called by user code.</para>
+        /// <para>Due to GONet being in the same assembly as your game code, internal methods are technically accessible,
+        /// but calling them directly bypasses the intended public API.</para>
+        /// <para><b>Instead, use:</b> <c>GONetMain.SceneManager.RequestLoadBuildSettingsScene(...)</c> or <c>RequestLoadAddressablesScene(...)</c></para>
+        /// </summary>
+        internal void SendSceneLoadRequest(string sceneName, byte modeRaw, byte loadTypeRaw)
+        {
+            CallRpc(nameof(RPC_RequestLoadScene), sceneName, modeRaw, loadTypeRaw);
+        }
+
+        /// <summary>
+        /// INTERNAL: Sends scene unload request RPC to server.
+        /// <para><b>USER NOTE:</b> This method is internal infrastructure and should NOT be called by user code.</para>
+        /// <para>Due to GONet being in the same assembly as your game code, internal methods are technically accessible,
+        /// but calling them directly bypasses the intended public API.</para>
+        /// <para><b>Instead, use:</b> <c>GONetMain.SceneManager.RequestUnloadScene(...)</c></para>
+        /// </summary>
+        internal void SendSceneUnloadRequest(string sceneName)
+        {
+            CallRpc(nameof(RPC_RequestUnloadScene), sceneName);
+        }
+
+        /// <summary>
+        /// INTERNAL: Sends scene request response RPC to client.
+        /// <para><b>USER NOTE:</b> This method is internal infrastructure and should NOT be called by user code.</para>
+        /// <para>Due to GONet being in the same assembly as your game code, internal methods are technically accessible,
+        /// but calling them directly bypasses the intended public API.</para>
+        /// <para><b>Instead, use:</b> <c>GONetMain.SceneManager.SendSceneRequestResponse(...)</c></para>
+        /// </summary>
+        internal void SendSceneRequestResponse(ushort clientId, bool approved, string sceneName, string reason = "")
+        {
+            CallRpc(nameof(RPC_SceneRequestResponse), clientId, approved, sceneName, reason);
         }
 
         /// <summary>
