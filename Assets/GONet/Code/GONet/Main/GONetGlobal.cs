@@ -351,24 +351,20 @@ namespace GONet
         // ========================================
 
         /// <summary>
-        /// SERVER RPC: Client requests server to load a scene.
-        /// Server validates via OnValidateSceneLoad hook before loading.
+        /// TARGET RPC: Request server to load a scene (usable by both clients and server).
+        /// Uses TargetRpc for built-in validation support.
         /// </summary>
-        [ServerRpc]
-        internal void RPC_Server_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
+        [TargetRpc(RpcTarget.Owner, validationMethod: nameof(Validate_RequestLoadScene))]
+        internal void RPC_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
         {
-            // Get requesting client's authority ID
-            ushort requestingAuthorityId = GONetMain.MyAuthorityId; // On server, this will be overridden by RPC system to be the sender's ID
-
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
             SceneLoadType loadType = (SceneLoadType)loadTypeRaw;
 
-            GONetLog.Info($"[GONetGlobal] Server received scene load request from client {requestingAuthorityId}: '{sceneName}' (Mode: {mode}, Type: {loadType})");
+            GONetLog.Info($"[GONetGlobal] Scene load request received: '{sceneName}' (Mode: {mode}, Type: {loadType})");
 
-            // Forward to scene manager with requesting authority ID
+            // Forward to scene manager
             if (loadType == SceneLoadType.BuildSettings)
             {
-                // Use internal method that accepts requestingAuthorityId
                 GONetMain.SceneManager.LoadSceneFromBuildSettings(sceneName, mode);
             }
 #if ADDRESSABLES_AVAILABLE
@@ -384,19 +380,48 @@ namespace GONet
         }
 
         /// <summary>
-        /// SERVER RPC: Client requests server to unload a scene.
+        /// Validation method for scene load requests.
+        /// Called by TargetRpc system before executing RPC_RequestLoadScene.
         /// </summary>
-        [ServerRpc]
-        internal void RPC_Server_RequestUnloadScene(string sceneName)
+        private bool Validate_RequestLoadScene(ushort callerAuthorityId, string sceneName, byte modeRaw, byte loadTypeRaw)
         {
-            // Get requesting client's authority ID
-            ushort requestingAuthorityId = GONetMain.MyAuthorityId;
+            LoadSceneMode mode = (LoadSceneMode)modeRaw;
 
-            GONetLog.Info($"[GONetGlobal] Server received scene unload request from client {requestingAuthorityId}: '{sceneName}'");
+            // Use scene manager's validation hook
+            var sceneManager = GONetMain.SceneManager;
+            if (sceneManager.OnValidateSceneLoad != null)
+            {
+                bool allowed = sceneManager.OnValidateSceneLoad(sceneName, mode, callerAuthorityId);
+                if (!allowed)
+                {
+                    GONetLog.Warning($"[GONetGlobal] Scene load request denied by validation: '{sceneName}' from client {callerAuthorityId}");
+                    return false;
+                }
+            }
 
-            // Validate that client should be allowed to request this
-            // (scene manager validation hooks will handle detailed validation)
+            return true;
+        }
+
+        /// <summary>
+        /// TARGET RPC: Request server to unload a scene (usable by both clients and server).
+        /// Uses TargetRpc for built-in validation support.
+        /// </summary>
+        [TargetRpc(RpcTarget.Owner, validationMethod: nameof(Validate_RequestUnloadScene))]
+        internal void RPC_RequestUnloadScene(string sceneName)
+        {
+            GONetLog.Info($"[GONetGlobal] Scene unload request received: '{sceneName}'");
             GONetMain.SceneManager.UnloadScene(sceneName);
+        }
+
+        /// <summary>
+        /// Validation method for scene unload requests.
+        /// Called by TargetRpc system before executing RPC_RequestUnloadScene.
+        /// </summary>
+        private bool Validate_RequestUnloadScene(ushort callerAuthorityId, string sceneName)
+        {
+            // Can add validation hook for unload if needed in future
+            // For now, allow all unload requests (scene manager will validate if scene is loaded)
+            return true;
         }
     }
 }

@@ -242,8 +242,8 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting scene load: '{sceneName}' (Mode: {mode})");
 
-            // Send RPC to server
-            global.RPC_Server_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.BuildSettings);
+            // Send RPC to server (TargetRpc with validation)
+            global.RPC_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.BuildSettings);
         }
 
 #if ADDRESSABLES_AVAILABLE
@@ -269,8 +269,8 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting Addressables scene load: '{sceneName}' (Mode: {mode})");
 
-            // Send RPC to server
-            global.RPC_Server_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.Addressables);
+            // Send RPC to server (TargetRpc with validation)
+            global.RPC_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.Addressables);
         }
 #endif
 
@@ -295,8 +295,8 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client requesting scene unload: '{sceneName}'");
 
-            // Send RPC to server
-            global.RPC_Server_RequestUnloadScene(sceneName);
+            // Send RPC to server (TargetRpc with validation)
+            global.RPC_RequestUnloadScene(sceneName);
         }
 
         // ========================================
