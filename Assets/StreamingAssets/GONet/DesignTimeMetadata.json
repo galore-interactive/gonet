@@ -21,6 +21,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "scene://GONetSample/GONet_GlobalContext",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
             "location": "scene://JustAnotherScene/AutoRotaters/GameObject",
             "unityGuid": "",
             "codeGenerationId": 3

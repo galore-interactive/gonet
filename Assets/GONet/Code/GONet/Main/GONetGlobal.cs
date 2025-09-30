@@ -349,6 +349,24 @@ namespace GONet
         // ========================================
         // SCENE MANAGEMENT RPCs (Phase 5)
         // ========================================
+        //
+        // IMPORTANT NOTES FOR ADDING RPCs TO CLASSES IN NAMESPACES:
+        //
+        // 1. RPC methods can be internal or public (both work with code generator)
+        // 2. Classes with RPCs MUST derive from GONetParticipantCompanionBehaviour
+        // 3. Classes CAN be in namespaces - generator handles this correctly
+        // 4. For TargetRpc with validation:
+        //    - Use property-based targeting: [TargetRpc(nameof(PropertyName), validationMethod: nameof(ValidateMethod))]
+        //    - First constructor parameter must be a property/field name (string), NOT RpcTarget enum
+        //    - Validation methods must return RpcValidationResult (not bool)
+        //    - Validation methods must use ref parameters matching the RPC signature
+        //    - Example: private RpcValidationResult ValidateMyRpc(ref string param1, ref int param2)
+        // 5. Get validation context via GONetMain.EventBus.GetValidationContext()
+        // 6. Use context.GetValidationResult() to get the result object
+        // 7. Call result.AllowAll() or result.DenyAll() to control RPC execution
+        //
+        // See RPC_RequestLoadScene and Validate_RequestLoadScene below for complete examples.
+        // ========================================
 
         /// <summary>
         /// Property that returns the server's authority ID for TargetRpc targeting.

@@ -2589,7 +2589,11 @@ namespace GONet.Generation
 
         private static string GetParameterDataStructName(MethodInfo method)
         {
-            return $"{method.DeclaringType.FullName}_{method.Name}_RpcData";
+            // Use simple type name (without namespace) to create valid C# struct names.
+            // The generated structs are declared within the same namespace as the component,
+            // so type resolution works correctly without needing the full namespace prefix.
+            // This allows RPC classes to exist in namespaces (e.g., GONet.GONetGlobal).
+            return $"{method.DeclaringType.Name}_{method.Name}_RpcData";
         }
 
         private static string GetFriendlyTypeName(Type type)
