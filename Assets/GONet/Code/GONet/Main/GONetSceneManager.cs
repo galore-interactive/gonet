@@ -178,8 +178,58 @@ namespace GONet
             SceneLoadType loadType,
             LoadSceneMode mode,
             bool activateOnLoad,
-            int priority)
+            int priority,
+            ushort requestingAuthorityId = 0)
         {
+            // Validation hook - allow subscribers to deny scene load
+            if (OnValidateSceneLoad != null)
+            {
+                bool allowed = OnValidateSceneLoad(sceneName, mode, requestingAuthorityId);
+                if (!allowed)
+                {
+                    GONetLog.Warning($"[GONetSceneManager] Scene load denied by validation: {sceneName} (requester: {requestingAuthorityId})");
+                    return;
+                }
+            }
+
+            // Verify scene exists in build settings (if loading from build settings)
+            if (loadType == SceneLoadType.BuildSettings)
+            {
+                if (buildIndex >= 0)
+                {
+                    if (buildIndex >= SceneManager.sceneCountInBuildSettings)
+                    {
+                        GONetLog.Error($"[GONetSceneManager] Invalid build index {buildIndex} - only {SceneManager.sceneCountInBuildSettings} scenes in build settings");
+                        return;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(sceneName))
+                {
+                    // Verify scene name exists in build settings
+                    bool found = false;
+                    for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+                    {
+                        string path = SceneUtility.GetScenePathByBuildIndex(i);
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            string name = System.IO.Path.GetFileNameWithoutExtension(path);
+                            if (name == sceneName)
+                            {
+                                found = true;
+                                buildIndex = i; // Store build index for event
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        GONetLog.Error($"[GONetSceneManager] Scene '{sceneName}' not found in build settings");
+                        return;
+                    }
+                }
+            }
+
             // Publish persistent event for all clients (including late-joiners)
             var evt = new SceneLoadEvent
             {
@@ -298,21 +348,39 @@ namespace GONet
 
             if (evt.LoadType == SceneLoadType.BuildSettings)
             {
-                AsyncOperation operation;
-                // Use build index if available, otherwise use name
-                if (evt.SceneBuildIndex >= 0)
-                {
-                    operation = SceneManager.LoadSceneAsync(evt.SceneBuildIndex, evt.Mode);
-                }
-                else
-                {
-                    operation = SceneManager.LoadSceneAsync(evt.SceneName, evt.Mode);
-                }
+                AsyncOperation operation = null;
 
-                // Store the operation for progress tracking
-                if (operation != null)
+                try
                 {
-                    scenesLoading[evt.SceneName] = operation;
+                    // Use build index if available, otherwise use name
+                    if (evt.SceneBuildIndex >= 0)
+                    {
+                        operation = SceneManager.LoadSceneAsync(evt.SceneBuildIndex, evt.Mode);
+                    }
+                    else
+                    {
+                        operation = SceneManager.LoadSceneAsync(evt.SceneName, evt.Mode);
+                    }
+
+                    // Store the operation for progress tracking
+                    if (operation != null)
+                    {
+                        scenesLoading[evt.SceneName] = operation;
+                        operation.allowSceneActivation = evt.ActivateOnLoad;
+
+                        // Add completion callback
+                        operation.completed += (op) => OnSceneLoadOperationCompleted(evt.SceneName, evt.Mode, op);
+                    }
+                    else
+                    {
+                        GONetLog.Error($"[GONetSceneManager] LoadSceneAsync returned null for scene '{evt.SceneName}'");
+                        scenesLoading.Remove(evt.SceneName);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    GONetLog.Error($"[GONetSceneManager] Exception loading scene '{evt.SceneName}': {ex.Message}");
+                    scenesLoading.Remove(evt.SceneName);
                 }
             }
 #if ADDRESSABLES_AVAILABLE
@@ -329,6 +397,16 @@ namespace GONet
 #endif
         }
 
+        private void OnSceneLoadOperationCompleted(string sceneName, LoadSceneMode mode, AsyncOperation operation)
+        {
+            if (!operation.isDone)
+            {
+                GONetLog.Warning($"[GONetSceneManager] Scene load operation completed callback fired but isDone is false for '{sceneName}'");
+            }
+
+            GONetLog.Debug($"[GONetSceneManager] Scene load operation completed: '{sceneName}' (Mode: {mode})");
+        }
+
         private void UnloadSceneLocally(SceneUnloadEvent evt)
         {
             // Track unloading state
@@ -339,11 +417,29 @@ namespace GONet
                 Scene scene = SceneManager.GetSceneByName(evt.SceneName);
                 if (scene.IsValid() && scene.isLoaded)
                 {
-                    SceneManager.UnloadSceneAsync(scene);
+                    try
+                    {
+                        AsyncOperation operation = SceneManager.UnloadSceneAsync(scene);
+                        if (operation != null)
+                        {
+                            operation.completed += (op) => OnSceneUnloadOperationCompleted(evt.SceneName, op);
+                        }
+                        else
+                        {
+                            GONetLog.Error($"[GONetSceneManager] UnloadSceneAsync returned null for scene '{evt.SceneName}'");
+                            scenesUnloading.Remove(evt.SceneName);
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        GONetLog.Error($"[GONetSceneManager] Exception unloading scene '{evt.SceneName}': {ex.Message}");
+                        scenesUnloading.Remove(evt.SceneName);
+                    }
                 }
                 else
                 {
-                    // Scene not found - remove from tracking
+                    // Scene not found or not loaded - remove from tracking
+                    GONetLog.Warning($"[GONetSceneManager] Cannot unload scene '{evt.SceneName}' - not valid or not loaded");
                     scenesUnloading.Remove(evt.SceneName);
                 }
             }
@@ -353,6 +449,16 @@ namespace GONet
                 UnloadSceneFromAddressablesAsync(evt.SceneName);
             }
 #endif
+        }
+
+        private void OnSceneUnloadOperationCompleted(string sceneName, AsyncOperation operation)
+        {
+            if (!operation.isDone)
+            {
+                GONetLog.Warning($"[GONetSceneManager] Scene unload operation completed callback fired but isDone is false for '{sceneName}'");
+            }
+
+            GONetLog.Debug($"[GONetSceneManager] Scene unload operation completed: '{sceneName}'");
         }
 
         // ========================================
@@ -474,6 +580,60 @@ namespace GONet
         {
             if (scenesUnloading.Contains(scene.name))
                 scenesUnloading.Remove(scene.name);
+        }
+
+        // ========================================
+        // COROUTINE HELPERS
+        // ========================================
+
+        /// <summary>
+        /// Coroutine that waits for a specific scene to finish loading.
+        /// Use with StartCoroutine from a MonoBehaviour.
+        /// Example: yield return StartCoroutine(SceneManager.WaitForSceneLoad("MyScene"));
+        /// </summary>
+        public System.Collections.IEnumerator WaitForSceneLoad(string sceneName)
+        {
+            // Wait until scene is no longer in loading state
+            while (IsSceneLoading(sceneName))
+            {
+                yield return null;
+            }
+
+            // Verify scene actually loaded successfully
+            if (!IsSceneLoaded(sceneName))
+            {
+                GONetLog.Error($"[GONetSceneManager] Scene '{sceneName}' failed to load");
+            }
+        }
+
+        /// <summary>
+        /// Coroutine that waits for a specific scene to finish unloading.
+        /// </summary>
+        public System.Collections.IEnumerator WaitForSceneUnload(string sceneName)
+        {
+            // Wait until scene is no longer in unloading state
+            while (IsSceneUnloading(sceneName))
+            {
+                yield return null;
+            }
+
+            // Verify scene actually unloaded
+            if (IsSceneLoaded(sceneName))
+            {
+                GONetLog.Error($"[GONetSceneManager] Scene '{sceneName}' failed to unload");
+            }
+        }
+
+        /// <summary>
+        /// Coroutine that waits until no scenes are loading.
+        /// Useful when loading multiple scenes and need to wait for all to complete.
+        /// </summary>
+        public System.Collections.IEnumerator WaitForAllSceneLoads()
+        {
+            while (IsAnySceneLoading)
+            {
+                yield return null;
+            }
         }
 
         // ========================================
