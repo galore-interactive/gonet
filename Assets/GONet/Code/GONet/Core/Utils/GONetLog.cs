@@ -531,14 +531,32 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// Gets a role identifier string that includes server/client role and unique client ID.
+        /// Format: "[Server]" or "[Client:AuthorityId]"
+        /// </summary>
+        private static string GetRoleIdentifier()
+        {
+            if (GONetMain.IsServer)
+            {
+                return "[Server]";
+            }
+            else if (GONetMain.IsClient)
+            {
+                // Include unique client authority ID to differentiate multiple clients
+                return string.Format("[Client:{0}]", GONetMain.MyAuthorityId);
+            }
+            return string.Empty;
+        }
+
         private static string FormatMessage(string level, string message)
         {
-            const string FORMAT = "[{0}]{5}{6} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{7}/{3}s) {4}";
-            const string CLIENT = "[Client]";
-            const string SERVER = "[Server]";
+            string roleIdentifier = GetRoleIdentifier();
+
+            const string FORMAT = "[{0}]{5} (Thread:{1}) ({2:dd MMM yyyy H:mm:ss.fff}) (frame:{7}/{3}s) {4}";
             return string.Format(FORMAT, level, Thread.CurrentThread.ManagedThreadId, DateTime.Now, GONetMain.Time?.ElapsedSeconds, message,
-                GONetMain.IsServer ? SERVER : string.Empty,
-                GONetMain.IsClient ? CLIENT : string.Empty,
+                roleIdentifier,
+                string.Empty, // Removed separate client tag (now combined in roleIdentifier)
                 GONetMain.Time?.FrameCount);
         }
 
@@ -586,12 +604,14 @@ namespace GONet
                     }
 
                     // Format and write the log directly
-                    string formattedMessage = string.Format("[{0}] (Thread:{1}) {2:yyyy-MM-dd HH:mm:ss.fff} {3}{4}",
+                    string roleIdentifier = GetRoleIdentifier();
+                    string formattedMessage = string.Format("[{0}]{5} (Thread:{1}) {2:yyyy-MM-dd HH:mm:ss.fff} {3}{4}",
                         logMessage.Level.ToString().ToUpper(),
                         logMessage.ThreadId,
                         logMessage.Timestamp,
                         logMessage.Message,
-                        Environment.NewLine);
+                        Environment.NewLine,
+                        roleIdentifier);
 
                     WriteToFile(formattedMessage);
                     ForceFlush(false);
@@ -769,12 +789,14 @@ namespace GONet
                 Interlocked.Decrement(ref _queuedItemsCount);
 
                 // Format the log entry
-                batchBuilder.AppendFormat("[{0}] (Thread:{1}) {2:yyyy-MM-dd HH:mm:ss.fff} {3}{4}",
+                string roleIdentifier = GetRoleIdentifier();
+                batchBuilder.AppendFormat("[{0}]{5} (Thread:{1}) {2:yyyy-MM-dd HH:mm:ss.fff} {3}{4}",
                     message.Level.ToString().ToUpper(),
                     message.ThreadId,
                     message.Timestamp,
                     message.Message,
-                    Environment.NewLine);
+                    Environment.NewLine,
+                    roleIdentifier);
 
                 // Write to file in batches to reduce I/O
                 if (batchBuilder.Length > 4096)
