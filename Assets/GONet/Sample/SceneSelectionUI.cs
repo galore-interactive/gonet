@@ -232,7 +232,7 @@ namespace GONet.Sample
             else if (GONetMain.IsClient)
             {
                 // Client requests through RPC
-                GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single, SceneLoadType.BuildSettings);
+                GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single);
             }
             else
             {
