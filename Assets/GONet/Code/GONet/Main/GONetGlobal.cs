@@ -371,7 +371,7 @@ namespace GONet
         /// <summary>
         /// Property that returns the server's authority ID for TargetRpc targeting.
         /// </summary>
-        private ushort ServerAuthorityId => GONetMain.OwnerAuthorityId_Server;
+        internal ushort ServerAuthorityId => GONetMain.OwnerAuthorityId_Server;
 
         /// <summary>
         /// TARGET RPC: Request server to load a scene (usable by both clients and server).
@@ -406,7 +406,7 @@ namespace GONet
         /// Validation method for scene load requests.
         /// Called by TargetRpc system before executing RPC_RequestLoadScene.
         /// </summary>
-        private RpcValidationResult Validate_RequestLoadScene(ref string sceneName, ref byte modeRaw, ref byte loadTypeRaw)
+        internal RpcValidationResult Validate_RequestLoadScene(ref string sceneName, ref byte modeRaw, ref byte loadTypeRaw)
         {
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
 
@@ -454,7 +454,7 @@ namespace GONet
         /// Validation method for scene unload requests.
         /// Called by TargetRpc system before executing RPC_RequestUnloadScene.
         /// </summary>
-        private RpcValidationResult Validate_RequestUnloadScene(ref string sceneName)
+        internal RpcValidationResult Validate_RequestUnloadScene(ref string sceneName)
         {
             // Get validation context and result
             var context = GONetMain.EventBus.GetValidationContext();
