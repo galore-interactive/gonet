@@ -56,36 +56,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\tr\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\de\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\cs\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\Microsoft.CodeAnalysis.VisualBasic.Analyzers.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\pt-BR\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\ru\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\zh-Hant\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\de\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\zh-Hans\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\es\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\zh-Hant\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\ru\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\fr\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\fr\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.Analyzers.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\ja\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\ko\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\cs\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\it\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\Microsoft.CodeAnalysis.Analyzers.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\tr\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\ko\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\es\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\pl\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\pt-BR\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\pl\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\it\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\vb\zh-Hans\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\ja\Microsoft.CodeAnalysis.Analyzers.resources.dll" />
-    <Analyzer Include="D:\projects\unity\gonet-git\Assets\Packages\Microsoft.CodeAnalysis.Analyzers.3.11.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.Analyzers.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.12f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.12f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
