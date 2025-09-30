@@ -145,7 +145,7 @@ namespace GONet.Sample
                     // Server: Show number of connected clients
                     uint clientCount = GONetMain.gonetServer != null ? GONetMain.gonetServer.numConnections : 0;
                     connectionStatus = clientCount == 1 ? "1 Client" : $"{clientCount} Clients";
-                    statusColor = clientCount == 0 ? Color.red : Color.white; // Red if no clients, white otherwise
+                    statusColor = clientCount == 0 ? Color.yellow : Color.white; // Yellow if no clients, white otherwise
                 }
                 else if (GONetMain.IsClient && GONetMain.GONetClient != null)
                 {
@@ -169,7 +169,7 @@ namespace GONet.Sample
                     // Color coding: Green (connected), Yellow (connecting), Red (errors/disconnected)
                     if (state == NetcodeIO.NET.ClientState.Connected)
                     {
-                        statusColor = Color.white;
+                        statusColor = Color.green;
                     }
                     else if (state == NetcodeIO.NET.ClientState.SendingConnectionRequest ||
                              state == NetcodeIO.NET.ClientState.SendingChallengeResponse)
