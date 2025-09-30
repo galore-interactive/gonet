@@ -60,16 +60,16 @@ namespace GONet.Sample
             panelRect.anchorMax = new Vector2(0, 1);
             panelRect.pivot = new Vector2(0, 1);
             panelRect.anchoredPosition = new Vector2(10, -10);
-            panelRect.sizeDelta = new Vector2(300, 80);
+            panelRect.sizeDelta = new Vector2(320, 95);
 
             Image panelImage = panelGO.AddComponent<Image>();
             panelImage.color = new Color(0, 0, 0, 0.7f);
 
             // Create time text
-            timeText = CreateText(panelGO.transform, "TimeText", "Time: 0.00", 16, new Vector2(10, -10), new Vector2(280, 30));
+            timeText = CreateText(panelGO.transform, "TimeText", "Time: 0.00", 24, new Vector2(10, -10), new Vector2(280, 35));
 
             // Create role text
-            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 16, new Vector2(10, -45), new Vector2(280, 30));
+            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 24, new Vector2(10, -50), new Vector2(280, 35));
         }
 
         private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size)
