@@ -19,6 +19,17 @@ namespace GONet.Sample
         [SerializeField] private Button rpcPlaygroundButton;
         [SerializeField] private Button backToMenuButton;
 
+        // Server approval UI
+        private GameObject approvalPanel;
+        private Text approvalMessageText;
+        private Button approveButton;
+        private Button denyButton;
+
+        // Pending request info
+        private string pendingSceneName;
+        private LoadSceneMode pendingLoadMode;
+        private ushort pendingRequestingAuthority;
+
         [Header("Scene Names")]
         [SerializeField] private string projectileTestSceneName = "ProjectileTest";
         [SerializeField] private string rpcPlaygroundSceneName = "JustAnotherScene";
@@ -73,7 +84,7 @@ namespace GONet.Sample
                 return;
             }
 
-            // Create panel
+            // Create main panel
             GameObject panel = new GameObject("SceneSelectionPanel");
             panel.transform.SetParent(canvas.transform, false);
             RectTransform panelRect = panel.AddComponent<RectTransform>();
@@ -83,6 +94,9 @@ namespace GONet.Sample
             panelRect.offsetMax = Vector2.zero;
             Image panelImage = panel.AddComponent<Image>();
             panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+
+            // Create approval panel (initially hidden)
+            BuildApprovalPanel(canvas);
 
             // Title
             titleText = CreateText(panel.transform, "Title", "GONet Scene Management Demo", 24, TextAnchor.UpperCenter);
@@ -159,6 +173,51 @@ namespace GONet.Sample
             label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             return button;
+        }
+
+        private void BuildApprovalPanel(Canvas canvas)
+        {
+            // Create approval panel (centered, smaller than main panel)
+            approvalPanel = new GameObject("ApprovalPanel");
+            approvalPanel.transform.SetParent(canvas.transform, false);
+            RectTransform approvalRect = approvalPanel.AddComponent<RectTransform>();
+            approvalRect.anchorMin = new Vector2(0.3f, 0.35f);
+            approvalRect.anchorMax = new Vector2(0.7f, 0.65f);
+            approvalRect.offsetMin = Vector2.zero;
+            approvalRect.offsetMax = Vector2.zero;
+            Image approvalImage = approvalPanel.AddComponent<Image>();
+            approvalImage.color = new Color(0.15f, 0.15f, 0.2f, 0.95f);
+
+            // Approval title
+            Text titleText = CreateText(approvalPanel.transform, "ApprovalTitle", "Scene Change Request", 20, TextAnchor.UpperCenter);
+            RectTransform titleRect = titleText.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.1f, 0.75f);
+            titleRect.anchorMax = new Vector2(0.9f, 0.9f);
+
+            // Approval message
+            approvalMessageText = CreateText(approvalPanel.transform, "ApprovalMessage", "Client requesting scene change...", 16, TextAnchor.MiddleCenter);
+            RectTransform msgRect = approvalMessageText.GetComponent<RectTransform>();
+            msgRect.anchorMin = new Vector2(0.1f, 0.4f);
+            msgRect.anchorMax = new Vector2(0.9f, 0.7f);
+
+            // Approve button
+            approveButton = CreateButton(approvalPanel.transform, "ApproveButton", "APPROVE", 0.15f);
+            RectTransform approveRect = approveButton.GetComponent<RectTransform>();
+            approveRect.anchorMin = new Vector2(0.1f, 0.15f);
+            approveRect.anchorMax = new Vector2(0.45f, 0.3f);
+            approveButton.GetComponent<Image>().color = new Color(0.2f, 0.7f, 0.2f, 1f);
+            approveButton.onClick.AddListener(OnApproveClicked);
+
+            // Deny button
+            denyButton = CreateButton(approvalPanel.transform, "DenyButton", "DENY", 0.15f);
+            RectTransform denyRect = denyButton.GetComponent<RectTransform>();
+            denyRect.anchorMin = new Vector2(0.55f, 0.15f);
+            denyRect.anchorMax = new Vector2(0.9f, 0.3f);
+            denyButton.GetComponent<Image>().color = new Color(0.8f, 0.2f, 0.2f, 1f);
+            denyButton.onClick.AddListener(OnDenyClicked);
+
+            // Start hidden
+            approvalPanel.SetActive(false);
         }
 
         private void OnDestroy()
@@ -241,15 +300,58 @@ namespace GONet.Sample
         }
 
         /// <summary>
-        /// Validation hook - in this demo, we allow all scene load requests.
-        /// In production, you would add permission checks here.
+        /// Validation hook - shows approval UI for client requests on server.
+        /// Server's own requests are auto-approved.
         /// </summary>
         private bool ValidateSceneLoad(string sceneName, LoadSceneMode mode, ushort requestingAuthority)
         {
             GONetLog.Info($"[SceneSelectionUI] Validating scene load request: '{sceneName}' from authority {requestingAuthority}");
 
-            // For this demo, allow all requests
+            // Server's own requests are auto-approved
+            if (GONetMain.IsServer && requestingAuthority == GONetMain.MyAuthorityId)
+            {
+                return true;
+            }
+
+            // Client request on server - show approval dialog
+            if (GONetMain.IsServer)
+            {
+                pendingSceneName = sceneName;
+                pendingLoadMode = mode;
+                pendingRequestingAuthority = requestingAuthority;
+
+                if (approvalPanel != null && approvalMessageText != null)
+                {
+                    approvalMessageText.text = $"Client (Authority {requestingAuthority}) requests:\n\n'{sceneName}'\n\nApprove this scene change?";
+                    approvalPanel.SetActive(true);
+                }
+
+                // Return false for now - approval will trigger the load
+                return false;
+            }
+
+            // Client's own requests always go through (server will validate)
             return true;
+        }
+
+        private void OnApproveClicked()
+        {
+            GONetLog.Info($"[SceneSelectionUI] Server APPROVED scene change to '{pendingSceneName}'");
+            approvalPanel.SetActive(false);
+
+            // Server manually loads the scene
+            if (GONetMain.SceneManager != null)
+            {
+                GONetMain.SceneManager.LoadSceneFromBuildSettings(pendingSceneName, pendingLoadMode);
+            }
+        }
+
+        private void OnDenyClicked()
+        {
+            GONetLog.Info($"[SceneSelectionUI] Server DENIED scene change to '{pendingSceneName}'");
+            approvalPanel.SetActive(false);
+
+            // TODO: Could send denial message to client here
         }
 
         private void OnSceneLoadStarted(string sceneName, LoadSceneMode mode)
