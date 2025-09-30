@@ -117,7 +117,7 @@ namespace GONet.Sample
             textComp.fontSize = fontSize;
             textComp.alignment = alignment;
             textComp.color = Color.white;
-            textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            textComp.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return textComp;
         }
 
@@ -156,7 +156,7 @@ namespace GONet.Sample
             label.fontSize = 18;
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
-            label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             return button;
         }
