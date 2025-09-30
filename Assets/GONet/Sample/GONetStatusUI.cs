@@ -29,6 +29,7 @@ namespace GONet.Sample
         private Text headerText;
         private Text timeText;
         private Text roleText;
+        private Text connectionStatusText;
         private bool wasServerSpawned;
 
         private void Awake()
@@ -61,7 +62,7 @@ namespace GONet.Sample
             panelRect.anchorMax = new Vector2(0, 1);
             panelRect.pivot = new Vector2(0, 1);
             panelRect.anchoredPosition = new Vector2(10, -10);
-            panelRect.sizeDelta = new Vector2(520, 170);
+            panelRect.sizeDelta = new Vector2(520, 225);
 
             Image panelImage = panelGO.AddComponent<Image>();
             panelImage.color = new Color(0, 0, 0, 0.7f);
@@ -73,7 +74,10 @@ namespace GONet.Sample
             timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -70), new Vector2(500, 45));
 
             // Create role text - consistent spacing
-            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 48, new Vector2(10, -125), new Vector2(500, 45));
+            roleText = CreateText(panelGO.transform, "RoleText", "Role: Unknown", 48, new Vector2(10, -125), new Vector2(500, 45));
+
+            // Create connection status text - consistent spacing
+            connectionStatusText = CreateText(panelGO.transform, "ConnectionStatusText", "Connection: Not Connected", 48, new Vector2(10, -180), new Vector2(500, 45));
         }
 
         private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size, FontStyle fontStyle = FontStyle.Normal)
@@ -111,7 +115,7 @@ namespace GONet.Sample
 
             if (roleText != null)
             {
-                string role = "Connecting...";
+                string role = "Unknown";
 
                 if (GONetMain.IsServer && GONetMain.IsClient)
                 {
@@ -129,6 +133,39 @@ namespace GONet.Sample
                 }
 
                 roleText.text = $"Role: {role}";
+            }
+
+            if (connectionStatusText != null)
+            {
+                string connectionStatus = "Not Connected";
+
+                if (GONetMain.IsServer)
+                {
+                    // Server: Show number of connected clients
+                    uint clientCount = GONetMain.gonetServer != null ? GONetMain.gonetServer.numConnections : 0;
+                    connectionStatus = clientCount == 1 ? "1 Client" : $"{clientCount} Clients";
+                }
+                else if (GONetMain.IsClient && GONetMain.GONetClient != null)
+                {
+                    // Client: Show connection state
+                    var state = GONetMain.GONetClient.ConnectionState;
+                    connectionStatus = state switch
+                    {
+                        NetcodeIO.NET.ClientState.Connected => "Connected",
+                        NetcodeIO.NET.ClientState.SendingConnectionRequest => "Connecting",
+                        NetcodeIO.NET.ClientState.SendingChallengeResponse => "Connecting",
+                        NetcodeIO.NET.ClientState.Disconnected => "Disconnected",
+                        NetcodeIO.NET.ClientState.ConnectionDenied => "Connection Denied",
+                        NetcodeIO.NET.ClientState.ConnectionRequestTimedOut => "Connection Timeout",
+                        NetcodeIO.NET.ClientState.ChallengeResponseTimedOut => "Connection Timeout",
+                        NetcodeIO.NET.ClientState.ConnectionTimedOut => "Connection Timeout",
+                        NetcodeIO.NET.ClientState.InvalidConnectToken => "Invalid Token",
+                        NetcodeIO.NET.ClientState.ConnectTokenExpired => "Token Expired",
+                        _ => "Unknown"
+                    };
+                }
+
+                connectionStatusText.text = $"Connection: {connectionStatus}";
             }
         }
     }
