@@ -33,7 +33,7 @@ namespace GONet.Utils
         const string GONETID_SUFFIX = "3|]";
         static readonly int GONETID_SUFFIX_LENGTH = GONETID_SUFFIX.Length;
 
-        private const string DONT_DESTROY_ON_LOAD_SCENE = "DontDestroyOnLoad";
+        internal const string DONT_DESTROY_ON_LOAD_SCENE = "DontDestroyOnLoad";
         static readonly ArrayPool<GameObject> goArrayPool = new ArrayPool<GameObject>(100, 5, 2, 50);
 
         /// <summary>

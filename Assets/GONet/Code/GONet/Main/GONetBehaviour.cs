@@ -57,6 +57,12 @@ namespace GONet
         /// </summary>
         public GONetEventBus EventBus => GONetMain.EventBus;
 
+        /// <summary>
+        /// Convenient access to GONet's scene manager for networked scene loading/unloading.
+        /// Server-authoritative: only server can initiate scene changes.
+        /// </summary>
+        public GONetSceneManager SceneManager => GONetMain.SceneManager;
+
         protected virtual void Awake()
         {
             GONetMain.RegisterBehaviour(this);

@@ -129,7 +129,7 @@ namespace GONet
             ServerIPAddress_Actual = string.IsNullOrWhiteSpace(serverIPAddress_Actual) ? ServerIPAddress_Default : serverIPAddress_Actual;
             ServerPort_Actual = (serverPort_Actual == default || serverPort_Actual < 0) ? ServerPort_Default : serverPort_Actual;
 
-            SceneManager.sceneLoaded += OnSceneLoaded;
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 
             GONetMain.InitOnUnityMainThread(this, gameObject.GetComponent<GONetSessionContext>(), valueBlendingBufferLeadTimeMilliseconds);
 

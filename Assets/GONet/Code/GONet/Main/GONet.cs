@@ -51,6 +51,13 @@ namespace GONet
 
         public static GONetGlobal Global { get; private set; }
 
+        /// <summary>
+        /// Manages networked scene loading and unloading.
+        /// Server-authoritative: only server can initiate scene changes.
+        /// Access from GONetBehaviour via this.SceneManager property.
+        /// </summary>
+        public static GONetSceneManager SceneManager { get; private set; }
+
         private static GONetSessionContext globalSessionContext;
         public static GONetSessionContext GlobalSessionContext
         {
@@ -149,9 +156,16 @@ namespace GONet
             InitQuantizers();
             InitObjectPools();
             InitClientTime();
+            InitSceneManager();
 
             ticksAtLastInit_UtcNow = DateTime.UtcNow.Ticks;
 
+        }
+
+        private static void InitSceneManager()
+        {
+            SceneManager = new GONetSceneManager(Global);
+            GONetLog.Debug("[GONetMain] Scene manager initialized");
         }
 
         private static void InitClientTime()
@@ -1899,6 +1913,30 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// Resets time sync to gap-closing mode.
+        /// Call this after major events like scene changes or network hiccups.
+        /// This triggers the same aggressive time sync sequence as initial connection
+        /// (3 successful syncs required before gap is considered closed).
+        /// CLIENT ONLY - has no effect on server.
+        /// </summary>
+        /// <param name="reason">Reason for reset (for logging/debugging)</param>
+        public static void ResetTimeSyncGap(string reason = "unknown")
+        {
+            if (!IsClient) return;
+
+            GONetLog.Info($"[TimeSync] Resetting time sync gap for reason: {reason}");
+
+            // Reset to gap-closing phase
+            client_hasClosedTimeSyncGapWithServer = false;
+            System.Threading.Interlocked.Exchange(ref clientStableSyncCount, 0);
+
+            // Reset scheduler to trigger immediate sync
+            TimeSyncScheduler.ResetOnConnection();
+
+            // Send initial barrage (same as connection)
+            Client_SyncTimeWithServer_SendInitialBarrage();
+        }
 
         /// <summary>
         /// "IfAppropriate" is to indicate this runs on a schedule....if it is not the right time, this will do nothing.

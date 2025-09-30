@@ -818,4 +818,117 @@ namespace GONet
             }
         }
     }
+
+    #region Scene Management Events
+
+    /// <summary>
+    /// Indicates which loading system to use for the scene.
+    /// </summary>
+    public enum SceneLoadType : byte
+    {
+        /// <summary>
+        /// Traditional: Scene in Build Settings, loaded by name/build index
+        /// </summary>
+        BuildSettings = 0,
+
+        /// <summary>
+        /// Modern: Scene loaded via Unity Addressables system
+        /// </summary>
+        Addressables = 1
+    }
+
+    /// <summary>
+    /// Persistent event for scene loading.
+    /// Server publishes this when loading a scene, clients receive and load accordingly.
+    /// Late-joining clients receive this event to sync scene state.
+    /// </summary>
+    [MemoryPackable]
+    public partial class SceneLoadEvent : IPersistentEvent
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// Scene name (for Build Settings) or addressable key (for Addressables)
+        /// </summary>
+        public string SceneName;
+
+        /// <summary>
+        /// Build index for scenes in Build Settings (fallback identifier)
+        /// </summary>
+        public int SceneBuildIndex = -1;
+
+        /// <summary>
+        /// Which loading system to use
+        /// </summary>
+        public SceneLoadType LoadType;
+
+        /// <summary>
+        /// Single or Additive loading mode
+        /// </summary>
+        public UnityEngine.SceneManagement.LoadSceneMode Mode;
+
+        /// <summary>
+        /// For Addressables: Whether to activate scene immediately after loading
+        /// </summary>
+        public bool ActivateOnLoad = true;
+
+        /// <summary>
+        /// For Addressables: Loading priority
+        /// </summary>
+        public int Priority = 100;
+    }
+
+    /// <summary>
+    /// Persistent event for scene unloading.
+    /// Cancels out corresponding SceneLoadEvent for late-joining clients.
+    /// </summary>
+    [MemoryPackable]
+    public partial class SceneUnloadEvent : IPersistentEvent, ICancelOutOtherEvents
+    {
+        public long OccurredAtElapsedTicks { get; set; }
+
+        /// <summary>
+        /// Scene name or addressable key to unload
+        /// </summary>
+        public string SceneName;
+
+        /// <summary>
+        /// Build index for fallback identification
+        /// </summary>
+        public int SceneBuildIndex = -1;
+
+        /// <summary>
+        /// Which loading system was used
+        /// </summary>
+        public SceneLoadType LoadType;
+
+        static readonly Type[] otherEventsTypeCancelledOut = new[] {
+            typeof(SceneLoadEvent)
+        };
+
+        [MemoryPackIgnore]
+        public Type[] OtherEventTypesCancelledOut => otherEventsTypeCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            if (otherEvent is SceneLoadEvent loadEvent)
+            {
+                // Cancel if same scene name
+                if (!string.IsNullOrEmpty(SceneName) && SceneName == loadEvent.SceneName)
+                    return true;
+
+                // Fallback: cancel if same build index (and both are build settings scenes)
+                if (SceneBuildIndex >= 0 &&
+                    SceneBuildIndex == loadEvent.SceneBuildIndex &&
+                    LoadType == SceneLoadType.BuildSettings &&
+                    loadEvent.LoadType == SceneLoadType.BuildSettings)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    #endregion
 }
+
