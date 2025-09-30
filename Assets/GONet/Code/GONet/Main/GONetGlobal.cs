@@ -33,6 +33,11 @@ namespace GONet
     [RequireComponent(typeof(GONetSessionContext))] // NOTE: requiring GONetSessionContext will thereby get the DontDestroyOnLoad behavior
     public sealed class GONetGlobal : GONetParticipantCompanionBehaviour
     {
+        /// <summary>
+        /// Singleton instance to prevent duplicate GONetGlobal instances across scenes.
+        /// </summary>
+        private static GONetGlobal instance;
+
         #region TODO this should be configurable/set elsewhere potentially AFTER loading up and depending on other factors like match making etc...
 
         //public string serverIP;
@@ -118,6 +123,15 @@ namespace GONet
 
         protected override void Awake()
         {
+            // Self-destroying singleton pattern: Prevent duplicate GONetGlobal instances
+            if (instance != null && instance != this)
+            {
+                GONetLog.Warning($"[GONetGlobal] Duplicate GONetGlobal detected in scene '{gameObject.scene.name}'. Destroying duplicate to prevent conflicts.");
+                Destroy(gameObject);
+                return;
+            }
+            instance = this;
+
             if (gonetLocalPrefab == null)
             {
                 Debug.LogError("Sorry.  We have to exit the application.  GONet requires GONetGlobal to have a prefab for GONetLocal set in the field named " + nameof(gonetLocalPrefab));
