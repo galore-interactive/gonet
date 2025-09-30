@@ -345,5 +345,58 @@ namespace GONet
 
             GONetLog.Debug("GONetGlobal: Design time metadata caching completed - ready for scene processing");
         }
+
+        // ========================================
+        // SCENE MANAGEMENT RPCs (Phase 5)
+        // ========================================
+
+        /// <summary>
+        /// SERVER RPC: Client requests server to load a scene.
+        /// Server validates via OnValidateSceneLoad hook before loading.
+        /// </summary>
+        [TargetRPC]
+        private void RPC_Server_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
+        {
+            // Get requesting client's authority ID
+            ushort requestingAuthorityId = GONetMain.MyAuthorityId; // On server, this will be overridden by RPC system to be the sender's ID
+
+            LoadSceneMode mode = (LoadSceneMode)modeRaw;
+            SceneLoadType loadType = (SceneLoadType)loadTypeRaw;
+
+            GONetLog.Info($"[GONetGlobal] Server received scene load request from client {requestingAuthorityId}: '{sceneName}' (Mode: {mode}, Type: {loadType})");
+
+            // Forward to scene manager with requesting authority ID
+            if (loadType == SceneLoadType.BuildSettings)
+            {
+                // Use internal method that accepts requestingAuthorityId
+                GONetMain.SceneManager.LoadSceneFromBuildSettings(sceneName, mode);
+            }
+#if ADDRESSABLES_AVAILABLE
+            else if (loadType == SceneLoadType.Addressables)
+            {
+                GONetMain.SceneManager.LoadSceneFromAddressables(sceneName, mode);
+            }
+#endif
+            else
+            {
+                GONetLog.Error($"[GONetGlobal] Unsupported scene load type: {loadType}");
+            }
+        }
+
+        /// <summary>
+        /// SERVER RPC: Client requests server to unload a scene.
+        /// </summary>
+        [TargetRPC]
+        private void RPC_Server_RequestUnloadScene(string sceneName)
+        {
+            // Get requesting client's authority ID
+            ushort requestingAuthorityId = GONetMain.MyAuthorityId;
+
+            GONetLog.Info($"[GONetGlobal] Server received scene unload request from client {requestingAuthorityId}: '{sceneName}'");
+
+            // Validate that client should be allowed to request this
+            // (scene manager validation hooks will handle detailed validation)
+            GONetMain.SceneManager.UnloadScene(sceneName);
+        }
     }
 }

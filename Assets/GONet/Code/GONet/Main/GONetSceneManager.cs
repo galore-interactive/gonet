@@ -217,6 +217,89 @@ namespace GONet
 #endif
 
         // ========================================
+        // CLIENT REQUEST APIS (Phase 5)
+        // ========================================
+
+        /// <summary>
+        /// CLIENT ONLY: Request the server to load a scene from Build Settings.
+        /// Server will validate the request via OnValidateSceneLoad hook before loading.
+        /// </summary>
+        /// <param name="sceneName">Name of the scene to request loading</param>
+        /// <param name="mode">Loading mode (Single or Additive)</param>
+        public void RequestLoadScene(string sceneName, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            if (GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] Server should use LoadSceneFromBuildSettings() directly, not RequestLoadScene()");
+                return;
+            }
+
+            if (!GONetMain.IsClient)
+            {
+                GONetLog.Warning("[GONetSceneManager] RequestLoadScene() can only be called by clients");
+                return;
+            }
+
+            GONetLog.Info($"[GONetSceneManager] Client requesting scene load: '{sceneName}' (Mode: {mode})");
+
+            // Send RPC to server
+            global.RPC_Server_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.BuildSettings);
+        }
+
+#if ADDRESSABLES_AVAILABLE
+        /// <summary>
+        /// CLIENT ONLY: Request the server to load a scene from Addressables.
+        /// Server will validate the request via OnValidateSceneLoad hook before loading.
+        /// </summary>
+        /// <param name="sceneName">Addressable key/name of the scene to request loading</param>
+        /// <param name="mode">Loading mode (Single or Additive)</param>
+        public void RequestLoadAddressablesScene(string sceneName, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            if (GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] Server should use LoadSceneFromAddressables() directly, not RequestLoadAddressablesScene()");
+                return;
+            }
+
+            if (!GONetMain.IsClient)
+            {
+                GONetLog.Warning("[GONetSceneManager] RequestLoadAddressablesScene() can only be called by clients");
+                return;
+            }
+
+            GONetLog.Info($"[GONetSceneManager] Client requesting Addressables scene load: '{sceneName}' (Mode: {mode})");
+
+            // Send RPC to server
+            global.RPC_Server_RequestLoadScene(sceneName, (byte)mode, (byte)SceneLoadType.Addressables);
+        }
+#endif
+
+        /// <summary>
+        /// CLIENT ONLY: Request the server to unload a scene.
+        /// Server will validate the request before unloading.
+        /// </summary>
+        /// <param name="sceneName">Name of the scene to request unloading</param>
+        public void RequestUnloadScene(string sceneName)
+        {
+            if (GONetMain.IsServer)
+            {
+                GONetLog.Warning("[GONetSceneManager] Server should use UnloadScene() directly, not RequestUnloadScene()");
+                return;
+            }
+
+            if (!GONetMain.IsClient)
+            {
+                GONetLog.Warning("[GONetSceneManager] RequestUnloadScene() can only be called by clients");
+                return;
+            }
+
+            GONetLog.Info($"[GONetSceneManager] Client requesting scene unload: '{sceneName}'");
+
+            // Send RPC to server
+            global.RPC_Server_RequestUnloadScene(sceneName);
+        }
+
+        // ========================================
         // INTERNAL IMPLEMENTATION
         // ========================================
 
