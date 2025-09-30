@@ -39,6 +39,8 @@ namespace GONet.Editor
     [InitializeOnLoad]
     public static class GONetSpawnSupport_DesignTime
     {
+        private const string BUILD_SETTINGS_DIRTY_REASON_PREFIX = "[BUILD_SETTINGS] ";
+
         private static double lastPrefabStageClosedTime = -1;
         private static readonly double PREFAB_STAGE_TRANSITION_GRACE_PERIOD = 2.0; // seconds
         private static bool IsCompiling
@@ -408,6 +410,9 @@ namespace GONet.Editor
 
             static void AddDirtyReasonIfScenesInBuildDiffer(string dirtyReasonFilePath)
             {
+                // First, clear any existing build settings dirty reasons so they can "heal" if fixed
+                RemoveGONetDesignTimeDirtyReasonsByPrefix(BUILD_SETTINGS_DIRTY_REASON_PREFIX);
+
                 if (TryGetGONetMostRecentSuccessfulBuild(out GONetMostRecentSuccessfulBuild record))
                 {
                     List<string> currentScenePaths = EditorBuildSettings.scenes
@@ -418,8 +423,47 @@ namespace GONet.Editor
                     bool areAnyDeviataions = !currentScenePaths.SequenceEqual(record.ScenePathsIncluded);
                     if (areAnyDeviataions)
                     {
-                        const string errorMessage = "The scene paths listed in the last successful build do not match the current list of scene paths in the build settings.";
+                        string errorMessage = BUILD_SETTINGS_DIRTY_REASON_PREFIX + "The scene paths listed in the last successful build do not match the current list of scene paths in the build settings.";
                         AddGONetDesignTimeDirtyReason(errorMessage);
+                    }
+
+                    // Find the index of the first enabled scene in current build settings
+                    int currentFirstSceneIndex = -1;
+                    for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+                    {
+                        if (EditorBuildSettings.scenes[i].enabled)
+                        {
+                            currentFirstSceneIndex = i;
+                            break;
+                        }
+                    }
+
+                    // Check if the first scene to be loaded has changed
+                    if (currentFirstSceneIndex != record.FirstSceneIndex)
+                    {
+                        string previousFirstScene = record.FirstSceneIndex >= 0 && record.FirstSceneIndex < EditorBuildSettings.scenes.Length
+                            ? EditorBuildSettings.scenes[record.FirstSceneIndex].path
+                            : "none";
+                        string currentFirstScene = currentFirstSceneIndex >= 0 && currentFirstSceneIndex < EditorBuildSettings.scenes.Length
+                            ? EditorBuildSettings.scenes[currentFirstSceneIndex].path
+                            : "none";
+
+                        string errorMessage = BUILD_SETTINGS_DIRTY_REASON_PREFIX + $"The first scene to be loaded has changed since the last successful build. Previous: '{previousFirstScene}' (index {record.FirstSceneIndex}), Current: '{currentFirstScene}' (index {currentFirstSceneIndex}).";
+                        AddGONetDesignTimeDirtyReason(errorMessage);
+                    }
+
+                    // Check if the user is trying to play from a scene that is not the first scene in the build
+                    Scene activeScene = SceneManager.GetActiveScene();
+                    if (!string.IsNullOrEmpty(activeScene.path) && currentFirstSceneIndex >= 0)
+                    {
+                        string firstSceneInBuild = EditorBuildSettings.scenes[currentFirstSceneIndex].path;
+
+                        // Compare the active scene path with the first scene in build settings
+                        if (!activeScene.path.Equals(firstSceneInBuild, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string errorMessage = BUILD_SETTINGS_DIRTY_REASON_PREFIX + $"You are trying to enter play mode from scene '{activeScene.path}', but the first scene in build settings is '{firstSceneInBuild}'. GONet requires you to play from the first scene in the build.";
+                            AddGONetDesignTimeDirtyReason(errorMessage);
+                        }
                     }
                 }
             }
@@ -565,9 +609,22 @@ namespace GONet.Editor
             {
                 scenePathsIncluded.Add(buildScene.path);
             }
+
+            // Find the index of the first enabled scene in build settings
+            int firstSceneIndex = -1;
+            for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+            {
+                if (EditorBuildSettings.scenes[i].enabled)
+                {
+                    firstSceneIndex = i;
+                    break;
+                }
+            }
+
             GONetMostRecentSuccessfulBuild record = new()
             {
                 ScenePathsIncluded = scenePathsIncluded.ToArray(),
+                FirstSceneIndex = firstSceneIndex,
                 DateTimeBuildSucceeded = DateTime.UtcNow,
             };
 
@@ -595,6 +652,7 @@ namespace GONet.Editor
         public class GONetMostRecentSuccessfulBuild
         {
             public string[] ScenePathsIncluded;
+            public int FirstSceneIndex; // Index of the first scene to be loaded
 
             [SerializeField] private string dateTimeBuildSucceeded;
             public DateTime DateTimeBuildSucceeded
@@ -648,6 +706,65 @@ namespace GONet.Editor
             {
                 // Handle any file writing errors
                 GONetLog.Debug($"Error writing to log file: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Removes all dirty reasons from the file that start with the specified prefix.
+        /// This allows specific categories of dirty reasons to "heal" when the issue is resolved.
+        /// </summary>
+        internal static void RemoveGONetDesignTimeDirtyReasonsByPrefix(string prefix)
+        {
+            string filePath = GetDesignTimeDirtyReasonsFilePath();
+
+            if (!File.Exists(filePath))
+            {
+                return; // Nothing to remove
+            }
+
+            try
+            {
+                // Read all lines from the file
+                string[] allLines = File.ReadAllLines(filePath);
+
+                // Filter out lines that contain the prefix (checking after the timestamp)
+                List<string> filteredLines = new List<string>();
+                foreach (string line in allLines)
+                {
+                    // Each line format is: "timestamp: [PREFIX] reason"
+                    // We need to check if the reason part (after ": ") starts with the prefix
+                    int colonIndex = line.IndexOf(": ");
+                    if (colonIndex >= 0 && colonIndex + 2 < line.Length)
+                    {
+                        string reasonPart = line.Substring(colonIndex + 2);
+                        if (!reasonPart.StartsWith(prefix))
+                        {
+                            filteredLines.Add(line);
+                        }
+                    }
+                    else
+                    {
+                        // Malformed line, keep it just in case
+                        filteredLines.Add(line);
+                    }
+                }
+
+                // Write the filtered lines back to the file (or delete if empty)
+                if (filteredLines.Count > 0)
+                {
+                    File.WriteAllLines(filePath, filteredLines);
+                }
+                else
+                {
+                    // If no lines remain, delete the file
+                    File.Delete(filePath);
+                }
+
+                GONetLog.Debug($"Removed dirty reasons with prefix: {prefix}");
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Debug($"Error removing dirty reasons by prefix: {ex.Message}");
             }
         }
 
