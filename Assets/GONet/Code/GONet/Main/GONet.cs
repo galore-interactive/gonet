@@ -1281,6 +1281,10 @@ namespace GONet
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
             recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map[gonetParticipant.GONetId] = gonetParticipant.GONetIdAtInstantiation;
 
+            // Clean up spawn scene tracking when GNP is disabled/destroyed
+            ClearParticipantSpawnScene(gonetParticipant);
+            definedInSceneParticipantInstanceIDs.Remove(gonetParticipant.GetInstanceID());
+
             using (var en = allGONetBehaviours.GetEnumerator())
             {
                 while (en.MoveNext())
@@ -3149,6 +3153,13 @@ namespace GONet
             remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
 
+            // Track which scene this GNP was spawned in
+            string spawnSceneName = GONetSceneUtils.GetSceneIdentifier(instance.gameObject);
+            if (!string.IsNullOrEmpty(spawnSceneName))
+            {
+                RecordParticipantSpawnScene(instance, spawnSceneName);
+            }
+
             isCurrentlyProcessingInstantiateGNPEvent = false;
 
             return instance;
@@ -4185,13 +4196,65 @@ namespace GONet
 
         static readonly HashSet<int> definedInSceneParticipantInstanceIDs = new HashSet<int>();
 
+        /// <summary>
+        /// Maps GONetParticipant instance IDs to the scene name they were spawned in or loaded with.
+        /// Used for scene-based spawn tracking and late-joiner synchronization.
+        /// </summary>
+        static readonly Dictionary<int, string> participantInstanceID_to_SpawnSceneName = new Dictionary<int, string>();
+
         internal static void RecordParticipantsAsDefinedInScene(List<GONetParticipant> gonetParticipantsInLevel)
         {
             gonetParticipantsInLevel.ForEach(gonetParticipant => {
                 definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID());
+
+                // Track which scene this GNP was defined in
+                string sceneName = GONetSceneUtils.GetSceneIdentifier(gonetParticipant.gameObject);
+                if (!string.IsNullOrEmpty(sceneName))
+                {
+                    participantInstanceID_to_SpawnSceneName[gonetParticipant.GetInstanceID()] = sceneName;
+                    GONetLog.Debug($"[SceneTracking] Recorded GNP '{gonetParticipant.gameObject.name}' as defined in scene '{sceneName}'");
+                }
+
                 OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(gonetParticipant);
                 //GONetLog.Debug($" recording GNP defined in scene...go.Name: {gonetParticipant.gameObject.name} instanceId: {gonetParticipant.GetInstanceID()}");
             });
+        }
+
+        /// <summary>
+        /// Records that a GONetParticipant was instantiated (spawned at runtime) in the specified scene.
+        /// Called by spawn system when instantiating objects.
+        /// </summary>
+        internal static void RecordParticipantSpawnScene(GONetParticipant gonetParticipant, string sceneName)
+        {
+            if (gonetParticipant != null && !string.IsNullOrEmpty(sceneName))
+            {
+                participantInstanceID_to_SpawnSceneName[gonetParticipant.GetInstanceID()] = sceneName;
+                GONetLog.Debug($"[SceneTracking] Recorded spawned GNP '{gonetParticipant.gameObject.name}' in scene '{sceneName}'");
+            }
+        }
+
+        /// <summary>
+        /// Gets the scene name that a GONetParticipant was spawned in or defined in.
+        /// Returns null if not tracked.
+        /// </summary>
+        public static string GetParticipantSpawnScene(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant == null)
+                return null;
+
+            participantInstanceID_to_SpawnSceneName.TryGetValue(gonetParticipant.GetInstanceID(), out string sceneName);
+            return sceneName;
+        }
+
+        /// <summary>
+        /// Clears spawn scene tracking for a GONetParticipant (e.g., when destroyed).
+        /// </summary>
+        internal static void ClearParticipantSpawnScene(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant != null)
+            {
+                participantInstanceID_to_SpawnSceneName.Remove(gonetParticipant.GetInstanceID());
+            }
         }
 
         internal static void AssignOwnerAuthorityIds_IfAppropriate(List<GONetParticipant> gonetParticipantsInConsideration)
