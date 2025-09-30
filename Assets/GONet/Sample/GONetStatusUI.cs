@@ -26,6 +26,7 @@ namespace GONet.Sample
     /// </summary>
     public class GONetStatusUI : MonoBehaviour
     {
+        private Text headerText;
         private Text timeText;
         private Text roleText;
         private bool wasServerSpawned;
@@ -60,16 +61,19 @@ namespace GONet.Sample
             panelRect.anchorMax = new Vector2(0, 1);
             panelRect.pivot = new Vector2(0, 1);
             panelRect.anchoredPosition = new Vector2(10, -10);
-            panelRect.sizeDelta = new Vector2(320, 95);
+            panelRect.sizeDelta = new Vector2(520, 155);
 
             Image panelImage = panelGO.AddComponent<Image>();
             panelImage.color = new Color(0, 0, 0, 0.7f);
 
+            // Create header text
+            headerText = CreateText(panelGO.transform, "HeaderText", "GONet Stats", 48, new Vector2(10, -10), new Vector2(480, 50));
+
             // Create time text
-            timeText = CreateText(panelGO.transform, "TimeText", "Time: 0.00", 24, new Vector2(10, -10), new Vector2(280, 35));
+            timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -65), new Vector2(480, 50));
 
             // Create role text
-            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 24, new Vector2(10, -50), new Vector2(280, 35));
+            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 48, new Vector2(10, -110), new Vector2(480, 50));
         }
 
         private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size)
@@ -90,6 +94,9 @@ namespace GONet.Sample
             text.alignment = TextAnchor.MiddleLeft;
             text.color = Color.white;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 10;
+            text.resizeTextMaxSize = fontSize;
 
             return text;
         }
@@ -98,7 +105,7 @@ namespace GONet.Sample
         {
             if (timeText != null)
             {
-                timeText.text = $"Time: {GONetMain.Time.ElapsedSeconds:F2}s";
+                timeText.text = $"Sync'd Time: {GONetMain.Time.ElapsedSeconds:F3}s";
             }
 
             if (roleText != null)
