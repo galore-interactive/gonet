@@ -153,9 +153,21 @@ namespace GONet
 
             enabledGONetParticipants.Clear();
 
+            // Create persistent status UI
+            CreateStatusUI();
+
             if (shouldAttemptAutoStartAsClient)
             {
                 Editor_AttemptStartAsClientIfAppropriate(ServerIPAddress_Actual, ServerPort_Actual);
+            }
+        }
+
+        private void CreateStatusUI()
+        {
+            // Add GONetStatusUI component if it doesn't already exist
+            if (GetComponent<GONet.Sample.GONetStatusUI>() == null)
+            {
+                gameObject.AddComponent<GONet.Sample.GONetStatusUI>();
             }
         }
 
