@@ -142,6 +142,7 @@
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeConstraintAttribute.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe32.Dirty.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe64.Dirty.cs" />
+    <Compile Include="Assets\GONet\Sample\SceneSelectionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAddressablesHelper.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Tests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CRC32.cs" />
