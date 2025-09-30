@@ -61,22 +61,22 @@ namespace GONet.Sample
             panelRect.anchorMax = new Vector2(0, 1);
             panelRect.pivot = new Vector2(0, 1);
             panelRect.anchoredPosition = new Vector2(10, -10);
-            panelRect.sizeDelta = new Vector2(520, 155);
+            panelRect.sizeDelta = new Vector2(520, 170);
 
             Image panelImage = panelGO.AddComponent<Image>();
             panelImage.color = new Color(0, 0, 0, 0.7f);
 
-            // Create header text
-            headerText = CreateText(panelGO.transform, "HeaderText", "GONet Stats", 48, new Vector2(10, -10), new Vector2(480, 50));
+            // Create header text - larger and bold to distinguish it
+            headerText = CreateText(panelGO.transform, "HeaderText", "GONet Info", 56, new Vector2(10, -10), new Vector2(500, 50), FontStyle.Bold);
 
-            // Create time text
-            timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -65), new Vector2(480, 50));
+            // Create time text - consistent spacing
+            timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -70), new Vector2(500, 45));
 
-            // Create role text
-            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 48, new Vector2(10, -110), new Vector2(480, 50));
+            // Create role text - consistent spacing
+            roleText = CreateText(panelGO.transform, "RoleText", "Role: Connecting...", 48, new Vector2(10, -125), new Vector2(500, 45));
         }
 
-        private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size)
+        private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size, FontStyle fontStyle = FontStyle.Normal)
         {
             GameObject textGO = new GameObject(name);
             textGO.transform.SetParent(parent, false);
@@ -91,6 +91,7 @@ namespace GONet.Sample
             Text text = textGO.AddComponent<Text>();
             text.text = initialText;
             text.fontSize = fontSize;
+            text.fontStyle = fontStyle;
             text.alignment = TextAnchor.MiddleLeft;
             text.color = Color.white;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
