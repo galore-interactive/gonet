@@ -94,6 +94,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetEventBus_Rpc.cs" />
     <Compile Include="Assets\GONet\Sample\GONetMouseEventRelay.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\BufferPool.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GONetSceneUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\BitConverter.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Client.cs" />
@@ -166,6 +167,7 @@
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Safe.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\GONetEvents.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\StringUtils.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetSceneManager.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Analysis\ValueBlendingAnalyzerBehavior.cs" />
     <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />

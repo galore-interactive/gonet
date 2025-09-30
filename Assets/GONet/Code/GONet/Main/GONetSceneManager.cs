@@ -36,6 +36,11 @@ namespace GONet
         private readonly GONetGlobal global;
         private readonly HashSet<string> loadedAdditiveScenes = new HashSet<string>();
 
+        // State tracking
+        private readonly Dictionary<string, AsyncOperation> scenesLoading = new Dictionary<string, AsyncOperation>();
+        private readonly HashSet<string> scenesUnloading = new HashSet<string>();
+        private readonly HashSet<string> scenesLoadedHistory = new HashSet<string>();
+
 #if ADDRESSABLES_AVAILABLE
         private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> addressableSceneHandles =
             new Dictionary<string, AsyncOperationHandle<SceneInstance>>();
@@ -88,6 +93,10 @@ namespace GONet
             // Subscribe to scene events
             GONetMain.EventBus.Subscribe<SceneLoadEvent>(OnSceneLoadEvent);
             GONetMain.EventBus.Subscribe<SceneUnloadEvent>(OnSceneUnloadEvent);
+
+            // Subscribe to Unity's scene loaded/unloaded events for state tracking
+            SceneManager.sceneLoaded += OnUnitySceneLoaded;
+            SceneManager.sceneUnloaded += OnUnitySceneUnloaded;
 
             GONetLog.Debug("[GONetSceneManager] Initialized");
         }
@@ -281,16 +290,29 @@ namespace GONet
 
         private void LoadSceneLocally(SceneLoadEvent evt)
         {
+            // Track loading state
+            if (!scenesLoading.ContainsKey(evt.SceneName))
+            {
+                scenesLoading[evt.SceneName] = null; // Will be set to AsyncOperation below
+            }
+
             if (evt.LoadType == SceneLoadType.BuildSettings)
             {
+                AsyncOperation operation;
                 // Use build index if available, otherwise use name
                 if (evt.SceneBuildIndex >= 0)
                 {
-                    SceneManager.LoadSceneAsync(evt.SceneBuildIndex, evt.Mode);
+                    operation = SceneManager.LoadSceneAsync(evt.SceneBuildIndex, evt.Mode);
                 }
                 else
                 {
-                    SceneManager.LoadSceneAsync(evt.SceneName, evt.Mode);
+                    operation = SceneManager.LoadSceneAsync(evt.SceneName, evt.Mode);
+                }
+
+                // Store the operation for progress tracking
+                if (operation != null)
+                {
+                    scenesLoading[evt.SceneName] = operation;
                 }
             }
 #if ADDRESSABLES_AVAILABLE
@@ -302,18 +324,27 @@ namespace GONet
             else
             {
                 GONetLog.Error("[GONetSceneManager] Addressables not available but scene requested Addressables loading!");
+                scenesLoading.Remove(evt.SceneName);
             }
 #endif
         }
 
         private void UnloadSceneLocally(SceneUnloadEvent evt)
         {
+            // Track unloading state
+            scenesUnloading.Add(evt.SceneName);
+
             if (evt.LoadType == SceneLoadType.BuildSettings)
             {
                 Scene scene = SceneManager.GetSceneByName(evt.SceneName);
                 if (scene.IsValid() && scene.isLoaded)
                 {
                     SceneManager.UnloadSceneAsync(scene);
+                }
+                else
+                {
+                    // Scene not found - remove from tracking
+                    scenesUnloading.Remove(evt.SceneName);
                 }
             }
 #if ADDRESSABLES_AVAILABLE
@@ -344,6 +375,105 @@ namespace GONet
         {
             Scene scene = SceneManager.GetSceneByName(sceneName);
             return scene.IsValid() && scene.isLoaded;
+        }
+
+        // ========================================
+        // STATE TRACKING (from SceneManagementUtils)
+        // ========================================
+
+        /// <summary>
+        /// Returns true if any scene is currently loading
+        /// </summary>
+        public bool IsAnySceneLoading => scenesLoading.Count > 0;
+
+        /// <summary>
+        /// Returns true if the specified scene is currently loading
+        /// </summary>
+        public bool IsSceneLoading(string sceneName) => scenesLoading.ContainsKey(sceneName);
+
+        /// <summary>
+        /// Returns true if any scene is currently unloading
+        /// </summary>
+        public bool IsAnySceneUnloading => scenesUnloading.Count > 0;
+
+        /// <summary>
+        /// Returns true if the specified scene is currently unloading
+        /// </summary>
+        public bool IsSceneUnloading(string sceneName) => scenesUnloading.Contains(sceneName);
+
+        /// <summary>
+        /// Returns true if the scene was loaded at some point and is now unloaded
+        /// </summary>
+        public bool IsSceneUnloaded(string sceneName) =>
+            scenesLoadedHistory.Contains(sceneName) && !IsSceneLoaded(sceneName);
+
+        /// <summary>
+        /// Gets all scenes that are currently in the process of loading
+        /// </summary>
+        public IEnumerable<string> GetLoadingScenes() => scenesLoading.Keys;
+
+        /// <summary>
+        /// Gets all scenes that are currently in the process of unloading
+        /// </summary>
+        public IEnumerable<string> GetUnloadingScenes() => scenesUnloading;
+
+        /// <summary>
+        /// Gets the loading progress (0-1) for a specific scene.
+        /// Returns -1 if scene is not currently loading.
+        /// </summary>
+        public float GetSceneLoadingProgress(string sceneName)
+        {
+            if (scenesLoading.TryGetValue(sceneName, out AsyncOperation operation) && operation != null)
+            {
+                return operation.progress;
+            }
+            return -1f;
+        }
+
+        /// <summary>
+        /// Gets statistics about scene loading state (for debugging)
+        /// </summary>
+        public string GetSceneLoadingStats()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== GONet Scene Manager Stats ===");
+            sb.AppendLine($"Currently Loading: {scenesLoading.Count}");
+            foreach (var scene in scenesLoading.Keys)
+                sb.AppendLine($"  - {scene}");
+
+            sb.AppendLine($"Currently Unloading: {scenesUnloading.Count}");
+            foreach (var scene in scenesUnloading)
+                sb.AppendLine($"  - {scene}");
+
+            sb.AppendLine($"Loaded Additive Scenes: {loadedAdditiveScenes.Count}");
+            foreach (var scene in loadedAdditiveScenes)
+                sb.AppendLine($"  - {scene}");
+
+            sb.AppendLine($"Scene Load History: {scenesLoadedHistory.Count} scenes");
+
+#if ADDRESSABLES_AVAILABLE
+            sb.AppendLine($"Addressable Scene Handles: {addressableSceneHandles.Count}");
+            foreach (var kvp in addressableSceneHandles)
+                sb.AppendLine($"  - {kvp.Key} (Valid: {kvp.Value.IsValid()})");
+#endif
+
+            return sb.ToString();
+        }
+
+        // Unity scene event handlers for state tracking
+        private void OnUnitySceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (scenesLoading.ContainsKey(scene.name))
+                scenesLoading.Remove(scene.name);
+
+            scenesLoadedHistory.Add(scene.name);
+            OnSceneLoadCompleted?.Invoke(scene.name, mode);
+        }
+
+        private void OnUnitySceneUnloaded(Scene scene)
+        {
+            if (scenesUnloading.Contains(scene.name))
+                scenesUnloading.Remove(scene.name);
         }
 
         // ========================================
