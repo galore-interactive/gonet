@@ -4167,6 +4167,7 @@ namespace GONet
                 {
                     GONetParticipant item = gonetParticipantsInConsideration[i];
                     item.OwnerAuthorityId = MyAuthorityId;
+                    AssignGONetIdRaw_IfAppropriate(item); // IMPORTANT: After setting OwnerAuthorityId, we need to assign the full GONetId (composite of raw + authority) to avoid partial GONetId
                 }
             }
         }
@@ -4178,13 +4179,14 @@ namespace GONet
         {
             using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                { // header...just message type/id...well, and now time 
+                { // header...just message type/id...well, and now time
                     uint messageID = messageTypeToMessageIDMap[typeof(AutoMagicalSync_AllCurrentValues_Message)];
                     bitStream.WriteUInt(messageID);
 
                     bitStream.WriteLong(Time.ElapsedTicks);
                 }
 
+                GONetLog.Debug($"About to serialize all current values bundle for new client. activeAutoSyncCompanionsByCodeGenerationIdMap has {activeAutoSyncCompanionsByCodeGenerationIdMap.Count} code gen ID entries");
                 SerializeBody_AllCurrentValuesBundle(bitStream); // body
 
                 bitStream.WriteCurrentPartialByte();
@@ -4808,6 +4810,10 @@ namespace GONet
 
         private static void SerializeBody_AllCurrentValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten)
         {
+            int totalGNPs = 0;
+            int serializedGNPs = 0;
+            int excludedGNPs = 0;
+
             var enumeratorOuter = activeAutoSyncCompanionsByCodeGenerationIdMap.GetEnumerator();
             while (enumeratorOuter.MoveNext())
             {
@@ -4816,21 +4822,33 @@ namespace GONet
                 while (enumeratorInner.MoveNext())
                 {
                     var current = enumeratorInner.Current;
+                    totalGNPs++;
 
                     GONetParticipant gonetParticipant = current.Key;
-                    if (gonetParticipant.DoesGONetIdContainAllComponents())
+                    // IMPORTANT: Check both that all components are set AND that GONetId is not 0
+                    // This can happen if a client connects after OnEnable but before Start assigns the GONetId
+                    bool hasAllComponents = gonetParticipant.DoesGONetIdContainAllComponents();
+                    bool idIsNotZero = gonetParticipant.GONetId != GONetParticipant.GONetId_Unset;
+
+                    if (hasAllComponents && idIsNotZero)
                     {
+                        GONetLog.Debug($"Serializing GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetParticipant.GONetId} (raw: {gonetParticipant.gonetId_raw}, authority: {gonetParticipant.OwnerAuthorityId})");
+
                         GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Serialize(bitStream_headerAlreadyWritten, gonetParticipant, gonetParticipant.GONetId);
 
                         GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = current.Value;
                         monitoringSupport.SerializeAll(bitStream_headerAlreadyWritten);
+                        serializedGNPs++;
                     }
                     else
                     {
-                        GONetLog.Error($"Excluding GNP with partial GONetId: {gonetParticipant.GONetId} from all current values bundle to avoid deserialization/processing issues on the other side.  But WHY!?!?!?!?");
+                        excludedGNPs++;
+                        GONetLog.Error($"Excluding GNP '{gonetParticipant.gameObject.name}' with partial GONetId: {gonetParticipant.GONetId} (raw: {gonetParticipant.gonetId_raw}, authority: {gonetParticipant.OwnerAuthorityId}) hasAllComponents: {hasAllComponents} idIsNotZero: {idIsNotZero} from all current values bundle.  WasDefinedInScene: {WasDefinedInScene(gonetParticipant)}");
                     }
                 }
             }
+
+            GONetLog.Debug($"Serialization complete. Total GNPs: {totalGNPs}, Serialized: {serializedGNPs}, Excluded: {excludedGNPs}");
         }
 
         /// <summary>
@@ -5012,23 +5030,34 @@ namespace GONet
 
         private static void DeserializeBody_AllValuesBundle(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, int bytesUsedCount, GONetConnection sourceOfChangeConnection, long elapsedTicksAtSend)
         {
+            GONetLog.Debug($"Starting deserialization of all values bundle. bytesUsedCount: {bytesUsedCount}, stream position: {bitStream_headerAlreadyRead.Position_Bytes}");
+
+            int deserializedCount = 0;
             int streamPositionBytes_preGonetId;
-            while ((streamPositionBytes_preGonetId = bitStream_headerAlreadyRead.Position_Bytes) < bytesUsedCount) // while more data to read/process
+            // IMPORTANT: Use <= to ensure we don't read past the last complete byte
+            // The WriteCurrentPartialByte() on serialization side means bytesUsedCount includes the final partial byte
+            // We need to leave enough room for at least a GONetId (minimum 4 bytes) to avoid reading garbage
+            const int MIN_GONETID_BYTES = 4; // GONetId is a uint, minimum 4 bytes
+            while ((streamPositionBytes_preGonetId = bitStream_headerAlreadyRead.Position_Bytes) + MIN_GONETID_BYTES <= bytesUsedCount) // while more data to read/process
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
+
+                GONetLog.Debug($"Deserialized GONetId: {gonetId} at stream position (pre: {streamPositionBytes_preGonetId}, post: {bitStream_headerAlreadyRead.Position_Bytes})");
 
                 if (GONetParticipant.DoesGONetIdContainAllComponents(gonetId))
                 {
                     GONetParticipant gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                     GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.CodeGenerationId][gonetParticipant];
 
-                    //UnityEngine.Debug.Log($"[DREETS] Deserialize init all for GONetId: {gonetId}");
+                    GONetLog.Debug($"Successfully deserialized GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetId}");
                     syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
-                    
+
                     PublishEventAsSoonAsSufficientInfoAvailable(
-                        new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant), 
-                        gonetParticipant, 
+                        new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant),
+                        gonetParticipant,
                         isRelatedLocalContentRequired: true);
+
+                    deserializedCount++;
                 }
                 else
                 {
@@ -5036,6 +5065,8 @@ namespace GONet
                     return;
                 }
             }
+
+            GONetLog.Debug($"Deserialization complete. Total GONetIds deserialized: {deserializedCount}");
         }
 
         /// <summary>
