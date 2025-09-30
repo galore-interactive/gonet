@@ -64,6 +64,18 @@ namespace GONet
         public event SceneLoadValidationDelegate OnValidateSceneLoad;
 
         /// <summary>
+        /// Internal method to invoke validation. Used by RPC validation in GONetGlobal.
+        /// Returns true if validation passes or no validators are registered.
+        /// </summary>
+        internal bool InvokeValidation(string sceneName, LoadSceneMode mode, ushort requestingAuthority)
+        {
+            if (OnValidateSceneLoad == null)
+                return true;
+
+            return OnValidateSceneLoad(sceneName, mode, requestingAuthority);
+        }
+
+        /// <summary>
         /// Called when scene load begins (after validation, before actual load)
         /// </summary>
         public delegate void SceneLoadDelegate(string sceneName, LoadSceneMode mode);

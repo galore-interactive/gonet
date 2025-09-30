@@ -351,10 +351,15 @@ namespace GONet
         // ========================================
 
         /// <summary>
+        /// Property that returns the server's authority ID for TargetRpc targeting.
+        /// </summary>
+        private ushort ServerAuthorityId => GONetMain.OwnerAuthorityId_Server;
+
+        /// <summary>
         /// TARGET RPC: Request server to load a scene (usable by both clients and server).
         /// Uses TargetRpc for built-in validation support.
         /// </summary>
-        [TargetRpc(RpcTarget.Owner, validationMethod: nameof(Validate_RequestLoadScene))]
+        [TargetRpc(nameof(ServerAuthorityId), validationMethod: nameof(Validate_RequestLoadScene))]
         internal void RPC_RequestLoadScene(string sceneName, byte modeRaw, byte loadTypeRaw)
         {
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
@@ -383,30 +388,44 @@ namespace GONet
         /// Validation method for scene load requests.
         /// Called by TargetRpc system before executing RPC_RequestLoadScene.
         /// </summary>
-        private bool Validate_RequestLoadScene(ushort callerAuthorityId, string sceneName, byte modeRaw, byte loadTypeRaw)
+        private RpcValidationResult Validate_RequestLoadScene(ref string sceneName, ref byte modeRaw, ref byte loadTypeRaw)
         {
             LoadSceneMode mode = (LoadSceneMode)modeRaw;
 
-            // Use scene manager's validation hook
-            var sceneManager = GONetMain.SceneManager;
-            if (sceneManager.OnValidateSceneLoad != null)
+            // Get validation context and result
+            var context = GONetMain.EventBus.GetValidationContext();
+            if (!context.HasValue)
             {
-                bool allowed = sceneManager.OnValidateSceneLoad(sceneName, mode, callerAuthorityId);
-                if (!allowed)
-                {
-                    GONetLog.Warning($"[GONetGlobal] Scene load request denied by validation: '{sceneName}' from client {callerAuthorityId}");
-                    return false;
-                }
+                GONetLog.Error("[GONetGlobal] No validation context available for scene load request");
+                var errorResult = RpcValidationResult.CreatePreAllocated(0);
+                errorResult.DenyAll("No validation context");
+                return errorResult;
             }
 
-            return true;
+            var validationContext = context.Value;
+            var result = validationContext.GetValidationResult();
+            ushort callerAuthorityId = validationContext.SourceAuthorityId;
+
+            // Use scene manager's validation hook
+            var sceneManager = GONetMain.SceneManager;
+            bool allowed = sceneManager.InvokeValidation(sceneName, mode, callerAuthorityId);
+            if (!allowed)
+            {
+                GONetLog.Warning($"[GONetGlobal] Scene load request denied by validation: '{sceneName}' from client {callerAuthorityId}");
+                result.DenyAll($"Scene load denied for '{sceneName}'");
+                return result;
+            }
+
+            // Allow all targets (in this case, should only be the server)
+            result.AllowAll();
+            return result;
         }
 
         /// <summary>
         /// TARGET RPC: Request server to unload a scene (usable by both clients and server).
         /// Uses TargetRpc for built-in validation support.
         /// </summary>
-        [TargetRpc(RpcTarget.Owner, validationMethod: nameof(Validate_RequestUnloadScene))]
+        [TargetRpc(nameof(ServerAuthorityId), validationMethod: nameof(Validate_RequestUnloadScene))]
         internal void RPC_RequestUnloadScene(string sceneName)
         {
             GONetLog.Info($"[GONetGlobal] Scene unload request received: '{sceneName}'");
@@ -417,11 +436,24 @@ namespace GONet
         /// Validation method for scene unload requests.
         /// Called by TargetRpc system before executing RPC_RequestUnloadScene.
         /// </summary>
-        private bool Validate_RequestUnloadScene(ushort callerAuthorityId, string sceneName)
+        private RpcValidationResult Validate_RequestUnloadScene(ref string sceneName)
         {
+            // Get validation context and result
+            var context = GONetMain.EventBus.GetValidationContext();
+            if (!context.HasValue)
+            {
+                GONetLog.Error("[GONetGlobal] No validation context available for scene unload request");
+                var errorResult = RpcValidationResult.CreatePreAllocated(0);
+                errorResult.DenyAll("No validation context");
+                return errorResult;
+            }
+
+            var result = context.Value.GetValidationResult();
+
             // Can add validation hook for unload if needed in future
             // For now, allow all unload requests (scene manager will validate if scene is loaded)
-            return true;
+            result.AllowAll();
+            return result;
         }
     }
 }
