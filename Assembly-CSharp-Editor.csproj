@@ -128,6 +128,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\BitByBitByteArrayBuilderTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetRuntimeComponentInitializerEditor.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestHelpers.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />

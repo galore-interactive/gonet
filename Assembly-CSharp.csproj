@@ -109,6 +109,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetServer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\DesignTimeMetadata.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetRuntimeComponentInitializer.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Sample\CircularMotion.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\SyncEvent_GeneratedTypes.cs" />
