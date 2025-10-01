@@ -4390,6 +4390,56 @@ namespace GONet
             return lastAssignedGONetIdRaw;
         }
 
+        /// <summary>
+        /// Assigns a specific GONetId to a participant directly (used for syncing scene-defined objects from server to client).
+        /// </summary>
+        internal static void AssignGONetIdRaw_Direct(GONetParticipant gonetParticipant, uint gonetId)
+        {
+            gonetParticipant.GONetId = gonetId;
+            GONetLog.Debug($"[GONetId] Directly assigned GONetId {gonetId} to '{gonetParticipant.gameObject.name}'");
+        }
+
+        /// <summary>
+        /// Finds a GONetParticipant by its design-time location within a specific scene.
+        /// </summary>
+        internal static GONetParticipant FindParticipantByDesignTimeLocation(string designTimeLocation, string sceneName)
+        {
+            // Search through all registered GONetParticipants
+            foreach (var kvp in gonetParticipantByGONetIdMap)
+            {
+                GONetParticipant participant = kvp.Value;
+
+                // Check if this participant is in the correct scene and matches the location
+                if (participant != null &&
+                    participant.IsDesignTimeMetadataInitd &&
+                    participant.DesignTimeLocation == designTimeLocation)
+                {
+                    // Verify it's in the correct scene
+                    string participantScene = GONetSceneManager.GetSceneIdentifier(participant.gameObject);
+                    if (participantScene == sceneName)
+                    {
+                        return participant;
+                    }
+                }
+            }
+
+            // If not found in the map, search scene-defined objects directly
+            if (definedInSceneParticipants_byScene.TryGetValue(sceneName, out HashSet<GONetParticipant> sceneParticipants))
+            {
+                foreach (var participant in sceneParticipants)
+                {
+                    if (participant != null &&
+                        participant.IsDesignTimeMetadataInitd &&
+                        participant.DesignTimeLocation == designTimeLocation)
+                    {
+                        return participant;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private static void AutoPropagateInitialInstantiation(GONetParticipant gonetParticipant)
         {
             // CRITICAL: Ensure design-time metadata is initialized BEFORE creating the spawn event

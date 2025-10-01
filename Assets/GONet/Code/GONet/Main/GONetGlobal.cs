@@ -320,6 +320,12 @@ namespace GONet
                 if (GONetMain.IsClientVsServerStatusKnown)
                 {
                     GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+
+                    // IMPORTANT: If this is the server and there are connected clients, sync scene-defined object GONetIds
+                    if (GONetMain.IsServer && GONetMain.GONetServer != null && GONetMain.GONetServer.numConnections > 0)
+                    {
+                        StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
+                    }
                 }
                 else
                 {
@@ -349,6 +355,34 @@ namespace GONet
             }
 
             GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+        }
+
+        private IEnumerator SyncSceneDefinedObjectIds_WhenReady(string sceneName, List<GONetParticipant> sceneParticipants)
+        {
+            // Wait a frame to ensure all GONetIds have been assigned
+            yield return null;
+
+            // Collect design-time locations and GONetIds for all scene-defined objects
+            List<string> designTimeLocations = new List<string>();
+            List<uint> gonetIds = new List<uint>();
+
+            foreach (var participant in sceneParticipants)
+            {
+                if (participant != null &&
+                    participant.IsDesignTimeMetadataInitd &&
+                    participant.GONetId != 0 &&
+                    !string.IsNullOrEmpty(participant.DesignTimeLocation))
+                {
+                    designTimeLocations.Add(participant.DesignTimeLocation);
+                    gonetIds.Add(participant.GONetId);
+                }
+            }
+
+            if (designTimeLocations.Count > 0)
+            {
+                GONetLog.Info($"[GONetGlobal] Syncing {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to all clients");
+                SendSceneDefinedObjectIdSync(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray());
+            }
         }
 
         private static void FindAndAppend<T>(GameObject[] gameObjects, /* IN/OUT */ List<T> listToAppend, Func<T, bool> filter)
@@ -615,6 +649,51 @@ namespace GONet
             // For now, allow all unload requests (scene manager will validate if scene is loaded)
             result.AllowAll();
             return result;
+        }
+
+        /// <summary>
+        /// CLIENT RPC: Server sends scene-defined object GONetId assignments to all clients after loading a scene.
+        /// This ensures clients assign the same GONetIds to their scene-defined objects as the server.
+        /// </summary>
+        [ClientRpc]
+        internal void RPC_SyncSceneDefinedObjectIds(string sceneName, string[] designTimeLocations, uint[] gonetIds)
+        {
+            // Only process on clients
+            if (GONetMain.IsServer)
+                return;
+
+            GONetLog.Info($"[GONetGlobal] Received scene GONetId sync for '{sceneName}' - {designTimeLocations.Length} objects");
+
+            // Match each design-time location to a GONetParticipant and assign its GONetId
+            for (int i = 0; i < designTimeLocations.Length; i++)
+            {
+                string location = designTimeLocations[i];
+                uint gonetId = gonetIds[i];
+
+                // Find the GONetParticipant with this design-time location
+                GONetParticipant participant = GONetMain.FindParticipantByDesignTimeLocation(location, sceneName);
+                if (participant != null)
+                {
+                    // Assign the GONetId to match the server's assignment
+                    GONetMain.AssignGONetIdRaw_Direct(participant, gonetId);
+                    GONetLog.Debug($"[GONetGlobal] Assigned GONetId {gonetId} to scene object '{participant.gameObject.name}' at location '{location}'");
+                }
+                else
+                {
+                    GONetLog.Warning($"[GONetGlobal] Could not find scene object at location '{location}' to assign GONetId {gonetId}");
+                }
+            }
+
+            GONetLog.Info($"[GONetGlobal] Completed scene GONetId sync for '{sceneName}'");
+        }
+
+        /// <summary>
+        /// INTERNAL: Sends scene-defined object GONetId assignments to all clients.
+        /// Called by server after loading a scene with scene-defined objects.
+        /// </summary>
+        internal void SendSceneDefinedObjectIdSync(string sceneName, string[] designTimeLocations, uint[] gonetIds)
+        {
+            CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), sceneName, designTimeLocations, gonetIds);
         }
     }
 }
