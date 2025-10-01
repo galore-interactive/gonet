@@ -1355,8 +1355,20 @@ namespace GONet
         /// </summary>
         private static void OnDespawnGNPEvent_Remote(GONetEventEnvelope<DespawnGONetParticipantEvent> eventEnvelope)
         {
+            uint gonetId = eventEnvelope.Event.GONetId;
+
+            // IMPORTANT: If this GONetId has a deferred spawn, defer the despawn too!
+            // Otherwise we process despawn before spawn completes, leaving a ghost object.
+            bool hasDeferredSpawn = deferredSpawnEvents.Exists(spawnEvent => spawnEvent.GONetId == gonetId);
+            if (hasDeferredSpawn)
+            {
+                GONetLog.Warning($"[SPAWN_SYNC] DEFERRING despawn for GONetId {gonetId} - spawn is still deferred, will despawn after spawn completes");
+                deferredDespawnEvents.Add(eventEnvelope.Event);
+                return;
+            }
+
             GONetParticipant gonetParticipant = null;
-            if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
+            if (gonetParticipantByGONetIdMap.TryGetValue(gonetId, out gonetParticipant))
             {
                 gonetIdsDestroyedViaPropagation.Add(gonetParticipant.GONetId); // this container must have the gonetId added first in order to prevent OnDestroy_AutoPropagateRemoval_IfAppropriate from thinking it is appropriate to propagate more when it is already being propagated
 
@@ -1375,7 +1387,7 @@ namespace GONet
             else
             {
                 const string DGNP = "Despawn GONetParticipant event received from remote source, but we have no record of this to despawn it. GONetId: ";
-                GONetLog.Warning(string.Concat(DGNP, eventEnvelope.Event.GONetId));
+                GONetLog.Warning(string.Concat(DGNP, gonetId));
             }
         }
 
@@ -4537,6 +4549,11 @@ namespace GONet
         static readonly List<InstantiateGONetParticipantEvent> deferredSpawnEvents = new List<InstantiateGONetParticipantEvent>();
 
         /// <summary>
+        /// Despawn events that arrived while spawns were deferred. These must be processed AFTER the deferred spawns complete.
+        /// </summary>
+        static readonly List<DespawnGONetParticipantEvent> deferredDespawnEvents = new List<DespawnGONetParticipantEvent>();
+
+        /// <summary>
         /// Holds a deferred AllValues bundle that needs to be processed after spawns are complete.
         /// </summary>
         private struct DeferredAllValuesBundle
@@ -4642,6 +4659,50 @@ namespace GONet
                     deferredAllValuesBundle = null;
 
                     GONetLog.Warning($"[INIT] Deferred AllValues bundle processing complete");
+                }
+
+                // IMPORTANT: Process any deferred despawns AFTER spawns and AllValues complete
+                // This ensures proper order: spawn -> initialize values -> despawn (if needed)
+                if (deferredDespawnEvents.Count > 0)
+                {
+                    // Find despawns that match the spawns we just processed
+                    List<DespawnGONetParticipantEvent> toProcessDespawns = new List<DespawnGONetParticipantEvent>();
+                    foreach (var despawnEvent in deferredDespawnEvents)
+                    {
+                        // Check if this despawn's GONetId was in the spawns we just processed
+                        if (toProcess.Exists(spawnEvent => spawnEvent.GONetId == despawnEvent.GONetId))
+                        {
+                            toProcessDespawns.Add(despawnEvent);
+                        }
+                    }
+
+                    if (toProcessDespawns.Count > 0)
+                    {
+                        GONetLog.Warning($"[SPAWN_SYNC] Processing {toProcessDespawns.Count} deferred despawns after spawns completed");
+
+                        foreach (var despawnEvent in toProcessDespawns)
+                        {
+                            GONetLog.Debug($"[SPAWN_SYNC] Processing deferred despawn for GONetId {despawnEvent.GONetId}");
+
+                            // Look up the participant and destroy it
+                            GONetParticipant gonetParticipant = null;
+                            if (gonetParticipantByGONetIdMap.TryGetValue(despawnEvent.GONetId, out gonetParticipant))
+                            {
+                                gonetIdsDestroyedViaPropagation.Add(gonetParticipant.GONetId);
+
+                                if (gonetParticipant != null && gonetParticipant.gameObject != null)
+                                {
+                                    GONetLog.Debug($"[SPAWN_SYNC] Despawning '{gonetParticipant.gameObject.name}' (GONetId {despawnEvent.GONetId})");
+                                    UnityEngine.Object.Destroy(gonetParticipant.gameObject);
+                                }
+                            }
+
+                            // Remove from deferred list
+                            deferredDespawnEvents.Remove(despawnEvent);
+                        }
+
+                        GONetLog.Warning($"[SPAWN_SYNC] Deferred despawn processing complete");
+                    }
                 }
             }
             else
