@@ -410,6 +410,10 @@ namespace GONet
             if (gonetParticipant == this.gonetParticipant)
             {
                 OnGONetReady();
+
+                // CRITICAL: Notify the RPC system that this component is ready to receive RPCs
+                // This triggers processing of any deferred RPCs that arrived before this component was added
+                GONetEventBus.OnComponentReadyToReceiveRpcs(gonetParticipant);
             }
         }
 

@@ -28,6 +28,35 @@ namespace GONet
     /// </summary>
     public sealed partial class GONetEventBus
     {
+        #region Component Not Ready Exception
+
+        /// <summary>
+        /// Exception thrown by generated RPC handlers when the target component doesn't exist yet.
+        /// This triggers automatic deferral of the RPC until the component is added.
+        ///
+        /// NOTE ON DESIGN: Yes, we're using exceptions for flow control here. This is generally an anti-pattern,
+        /// but it's justified in this case because:
+        /// 1. This is truly exceptional - only happens during late-joiner init with runtime-added components
+        /// 2. The frequency is low (connection/scene-load, not hot gameplay loop)
+        /// 3. Handlers are already async, so exception overhead is relatively small
+        /// 4. Alternatives (sentinel values, shared flags, type registries) are more complex and error-prone
+        /// 5. Self-documenting - clearly communicates the deferred RPC pattern
+        /// </summary>
+        public class RpcComponentNotReadyException : Exception
+        {
+            public uint GONetId { get; }
+            public uint RpcId { get; }
+
+            public RpcComponentNotReadyException(uint gonetId, uint rpcId)
+                : base($"Component not ready for RPC 0x{rpcId:X8} on GONetId {gonetId}")
+            {
+                GONetId = gonetId;
+                RpcId = rpcId;
+            }
+        }
+
+        #endregion
+
         #region Deferred RPC Processing - High Performance Object Pooled System
 
         /// <summary>
@@ -84,6 +113,31 @@ namespace GONet
         private static int totalDeferredRpcs = 0;
         private static int successfulDeferredRpcs = 0;
         private static int timedOutDeferredRpcs = 0;
+
+        /// <summary>
+        /// Public API for generated RPC handlers to defer an RPC when the component doesn't exist yet.
+        /// This handles runtime-added components (GONetRuntimeComponentInitializer) that receive RPCs before they're initialized.
+        /// </summary>
+        public static void DeferRpcFromGeneratedHandler(GONetEventEnvelope<RpcEvent> envelope)
+        {
+            DeferRpcForLater(envelope.Event, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant, isPersistent: false);
+        }
+
+        /// <summary>
+        /// Called by GONetParticipantCompanionBehaviour when it becomes ready to receive RPCs.
+        /// Processes any deferred RPCs that were waiting for this component to be added.
+        /// </summary>
+        public static void OnComponentReadyToReceiveRpcs(GONetParticipant participant)
+        {
+            if (participant == null || deferredRpcs.Count == 0) return;
+
+            uint gonetId = participant.GONetId;
+            if (gonetId == 0) return;
+
+            // Process all deferred RPCs for this GONetId
+            // The generated handlers will check if the component exists now
+            OnGONetParticipantRegistered(gonetId);
+        }
 
         /// <summary>
         /// Defers an RPC for later processing when the target GONetParticipant is not yet available
@@ -896,6 +950,53 @@ namespace GONet
         internal void RegisterRpcHandler(uint rpcId, Func<GONetEventEnvelope<RpcEvent>, Task> handler)
         {
             rpcHandlers[rpcId] = handler;
+
+            // CRITICAL: Check if any deferred RPCs are waiting for this handler
+            // This handles runtime-added components that receive RPCs before they're initialized
+            ProcessDeferredRpcsForHandler(rpcId);
+        }
+
+        /// <summary>
+        /// Processes any deferred RPCs that are waiting for a specific RPC handler to be registered.
+        /// Called automatically when a new handler is registered via RegisterRpcHandler.
+        /// </summary>
+        private static void ProcessDeferredRpcsForHandler(uint rpcId)
+        {
+            if (deferredRpcs.Count == 0) return;
+
+            // Find and process all deferred RPCs for this handler
+            for (int i = deferredRpcs.Count - 1; i >= 0; i--)
+            {
+                var deferred = deferredRpcs[i];
+                uint deferredRpcId = deferred.IsPersistent ? deferred.PersistentRpcEvent.RpcId : deferred.RpcEvent.RpcId;
+
+                if (deferredRpcId == rpcId)
+                {
+                    uint targetGoNetId = deferred.IsPersistent ? deferred.PersistentRpcEvent.GONetId : deferred.RpcEvent.GONetId;
+                    var gnp = GONetMain.GetGONetParticipantById(targetGoNetId);
+
+                    if (gnp != null)
+                    {
+                        GONetLog.Debug($"RPC handler 0x{rpcId:X8} now registered - processing deferred {(deferred.IsPersistent ? "persistent " : "")}RPC");
+
+                        successfulDeferredRpcs++;
+                        if (deferred.IsPersistent)
+                        {
+                            var envelope = GONetEventEnvelope<PersistentRpcEvent>.Borrow(deferred.PersistentRpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                            Instance.HandlePersistentRpcForMe(envelope);
+                        }
+                        else
+                        {
+                            var envelope = GONetEventEnvelope<RpcEvent>.Borrow(deferred.RpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                            Instance.HandleRpcForMe_Immediate(envelope);
+                        }
+
+                        RemoveDeferredRpc(i, deferred, targetGoNetId);
+                    }
+                }
+            }
         }
 
         private async void HandleRpcForMe(GONetEventEnvelope<RpcEvent> envelope)
@@ -916,7 +1017,12 @@ namespace GONet
 
             if (!rpcHandlers.TryGetValue(rpcEvent.RpcId, out var handler))
             {
-                GONetLog.Warning($"No handler registered for RPC ID: 0x{rpcEvent.RpcId:X8}");
+                // CRITICAL: Handler not registered yet - this can happen when runtime-added components
+                // receive RPCs before they're fully initialized (e.g., GONetRuntimeComponentInitializer)
+                // Defer the RPC until the handler is registered
+                GONetLog.Debug($"Handler not registered yet for RPC ID: 0x{rpcEvent.RpcId:X8} - deferring until component is ready");
+                DeferRpcForLater(rpcEvent, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: false);
                 return;
             }
 
@@ -927,6 +1033,13 @@ namespace GONet
             {
                 await handler(envelope);
                 // The handler will send response if needed
+            }
+            catch (RpcComponentNotReadyException)
+            {
+                // Component doesn't exist yet - defer the RPC until it's added
+                GONetLog.Debug($"Component not ready for RPC 0x{rpcEvent.RpcId:X8} on GONetId {rpcEvent.GONetId} - deferring");
+                DeferRpcForLater(rpcEvent, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: false);
             }
             catch (Exception ex)
             {
@@ -1139,7 +1252,12 @@ namespace GONet
 
             if (!rpcHandlers.TryGetValue(rpcEvent.RpcId, out var handler))
             {
-                GONetLog.Warning($"No handler registered for persistent RPC ID: 0x{rpcEvent.RpcId:X8}");
+                // CRITICAL: Handler not registered yet - this can happen when runtime-added components
+                // receive persistent RPCs before they're fully initialized (e.g., GONetRuntimeComponentInitializer)
+                // Defer the RPC until the handler is registered
+                GONetLog.Debug($"Handler not registered yet for persistent RPC ID: 0x{rpcEvent.RpcId:X8} - deferring until component is ready");
+                DeferRpcForLater(null, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: true, persistentRpcEvent: rpcEvent);
                 return;
             }
 
@@ -1159,6 +1277,13 @@ namespace GONet
             {
                 await handler(transientEnvelope);
                 // The handler will send response if needed
+            }
+            catch (RpcComponentNotReadyException)
+            {
+                // Component doesn't exist yet - defer the RPC until it's added
+                GONetLog.Debug($"Component not ready for persistent RPC 0x{rpcEvent.RpcId:X8} on GONetId {rpcEvent.GONetId} - deferring");
+                DeferRpcForLater(null, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
+                    isPersistent: true, persistentRpcEvent: rpcEvent);
             }
             catch (Exception ex)
             {

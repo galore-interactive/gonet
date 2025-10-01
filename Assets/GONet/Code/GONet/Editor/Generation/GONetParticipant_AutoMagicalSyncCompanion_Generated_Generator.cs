@@ -2501,8 +2501,19 @@ namespace GONet.Generation
             sb.AppendLine($"            eventBus.RegisterRpcHandler({className}_RpcIds.{method.Name}_RpcId, async (envelope) =>");
             sb.AppendLine("            {");
             sb.AppendLine("                var rpcEvent = envelope.Event;");
-            sb.AppendLine($"                var instance = GONetMain.GetGONetParticipantById(rpcEvent.GONetId)?.GetComponent<{className}>();");
-            sb.AppendLine("                if (instance == null) return;");
+            sb.AppendLine($"                var gnp = GONetMain.GetGONetParticipantById(rpcEvent.GONetId);");
+            sb.AppendLine($"                var instance = gnp?.GetComponent<{className}>();");
+            sb.AppendLine("                ");
+            sb.AppendLine("                // CRITICAL: If participant exists but component doesn't, throw exception to trigger deferral");
+            sb.AppendLine("                // This handles runtime-added components that receive RPCs before they're initialized");
+            sb.AppendLine("                if (instance == null)");
+            sb.AppendLine("                {");
+            sb.AppendLine("                    if (gnp != null)");
+            sb.AppendLine("                    {");
+            sb.AppendLine("                        throw new GONetEventBus.RpcComponentNotReadyException(rpcEvent.GONetId, rpcEvent.RpcId);");
+            sb.AppendLine("                    }");
+            sb.AppendLine("                    return; // Participant doesn't exist - silently ignore");
+            sb.AppendLine("                }");
             sb.AppendLine();
 
             // Add target checking for TargetRpc
