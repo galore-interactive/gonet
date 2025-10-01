@@ -4404,12 +4404,11 @@ namespace GONet
         /// </summary>
         internal static GONetParticipant FindParticipantByDesignTimeLocation(string designTimeLocation, string sceneName)
         {
-            // Search through all registered GONetParticipants
-            foreach (var kvp in gonetParticipantByGONetIdMap)
-            {
-                GONetParticipant participant = kvp.Value;
+            // Search all GONetParticipants in the scene (including those without GONetIds assigned yet)
+            GONetParticipant[] allParticipants = UnityEngine.Object.FindObjectsOfType<GONetParticipant>();
 
-                // Check if this participant is in the correct scene and matches the location
+            foreach (GONetParticipant participant in allParticipants)
+            {
                 if (participant != null &&
                     participant.IsDesignTimeMetadataInitd &&
                     participant.DesignTimeLocation == designTimeLocation)
@@ -4417,20 +4416,6 @@ namespace GONet
                     // Verify it's in the correct scene
                     string participantScene = GONetSceneManager.GetSceneIdentifier(participant.gameObject);
                     if (participantScene == sceneName)
-                    {
-                        return participant;
-                    }
-                }
-            }
-
-            // If not found in the map, search scene-defined objects directly
-            if (definedInSceneParticipants_byScene.TryGetValue(sceneName, out HashSet<GONetParticipant> sceneParticipants))
-            {
-                foreach (var participant in sceneParticipants)
-                {
-                    if (participant != null &&
-                        participant.IsDesignTimeMetadataInitd &&
-                        participant.DesignTimeLocation == designTimeLocation)
                     {
                         return participant;
                     }

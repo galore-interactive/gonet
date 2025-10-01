@@ -322,7 +322,7 @@ namespace GONet
                     GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
 
                     // IMPORTANT: If this is the server and there are connected clients, sync scene-defined object GONetIds
-                    if (GONetMain.IsServer && GONetMain.GONetServer != null && GONetMain.GONetServer.numConnections > 0)
+                    if (GONetMain.IsServer && GONetMain.gonetServer != null && GONetMain.gonetServer.numConnections > 0)
                     {
                         StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
                     }
