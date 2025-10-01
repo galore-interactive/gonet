@@ -166,10 +166,21 @@ namespace GONet.Sample
                         _ => "Unknown"
                     };
 
-                    // Color coding: Green (connected), Yellow (connecting), Red (errors/disconnected)
+                    // Color coding: Green (initialized), Yellow (connecting/initializing), Red (errors/disconnected)
                     if (state == NetcodeIO.NET.ClientState.Connected)
                     {
-                        statusColor = Color.green;
+                        // Check if client is fully initialized with server
+                        bool isInitialized = GONetMain.GONetClient.IsInitializedWithServer;
+                        if (isInitialized)
+                        {
+                            connectionStatus = "Connected (Initialized)";
+                            statusColor = Color.green;
+                        }
+                        else
+                        {
+                            connectionStatus = "Connected (Initializing...)";
+                            statusColor = Color.yellow;
+                        }
                     }
                     else if (state == NetcodeIO.NET.ClientState.SendingConnectionRequest ||
                              state == NetcodeIO.NET.ClientState.SendingChallengeResponse)

@@ -102,8 +102,16 @@ namespace GONet.Generation
 
         public static implicit operator DesignTimeMetadata(string location)
         {
+            // IMPORTANT: If location is empty/null, GetDesignTimeMetadata will now return default
+            // This prevents the "TON CLEETLE!" error when trying to cache empty location strings
             DesignTimeMetadata metadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(location);
-            metadata.Location = location;
+
+            // Only set Location if it's not empty (metadata will be default if location was empty)
+            if (!string.IsNullOrWhiteSpace(location) && metadata != default)
+            {
+                metadata.Location = location;
+            }
+
             return metadata;
         }
 

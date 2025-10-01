@@ -492,8 +492,20 @@ namespace GONet
 
             GONetLog.Info($"[GONetSceneManager] Client received scene load: {evt.SceneName} ({evt.LoadType}, {evt.Mode})");
 
-            // Reset time sync to gap-closing mode for scene changes
-            GONetMain.ResetTimeSyncGap($"scene_load_{evt.SceneName}");
+            bool isClientInitialized = GONetMain.IsClient && GONetMain.GONetClient != null && GONetMain.GONetClient.IsInitializedWithServer;
+
+            // IMPORTANT: Skip time sync reset BEFORE scene load if client isn't initialized yet
+            // During initial connection, interrupting time sync breaks value synchronization
+            // But we WILL reset after the scene finishes loading (see OnSceneLoadOperationCompleted)
+            if (isClientInitialized)
+            {
+                GONetLog.Info($"[TimeSync] Resetting time sync BEFORE scene load (client already initialized): {evt.SceneName}");
+                GONetMain.ResetTimeSyncGap($"scene_load_start_{evt.SceneName}");
+            }
+            else
+            {
+                GONetLog.Info($"[TimeSync] Skipping pre-load time sync reset - client not yet initialized (will reset after load completes)");
+            }
 
             // Notify subscribers
             OnSceneLoadStarted?.Invoke(evt.SceneName, evt.Mode);
@@ -767,6 +779,24 @@ namespace GONet
                 scenesLoading.Remove(scene.name);
 
             scenesLoadedHistory.Add(scene.name);
+
+            // IMPORTANT: Reset time sync AFTER scene load completes (especially for large scenes)
+            // This ensures time sync is accurate after potentially long load times
+            // For late-joining clients during initial connection, this is their FIRST time sync reset
+            if (GONetMain.IsClient)
+            {
+                bool wasAlreadyInitialized = GONetMain.GONetClient != null && GONetMain.GONetClient.IsInitializedWithServer;
+                if (wasAlreadyInitialized)
+                {
+                    GONetLog.Info($"[TimeSync] Resetting time sync AFTER scene load completed (client already initialized): {scene.name}");
+                }
+                else
+                {
+                    GONetLog.Info($"[TimeSync] Resetting time sync AFTER scene load completed (late-joining client - first reset): {scene.name}");
+                }
+                GONetMain.ResetTimeSyncGap($"scene_load_complete_{scene.name}");
+            }
+
             OnSceneLoadCompleted?.Invoke(scene.name, mode);
         }
 

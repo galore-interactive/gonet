@@ -78,6 +78,40 @@ namespace GONet.Editor
             }
             */
 
+            { // AutoDontDestroyOnLoad - IMPORTANT: This should be at the top!
+                var pre = GUI.enabled;
+                GUI.enabled = !Application.isPlaying;
+                EditorGUILayout.BeginHorizontal();
+                SerializedProperty serializedProperty = serializedObject.FindProperty(nameof(GONetParticipant.AutoDontDestroyOnLoad));
+                const string TT = @"When enabled, this GONetParticipant (and its GameObject) will be automatically moved to the DontDestroyOnLoad scene when instantiated at runtime.
+
+This is essential for objects that must persist across scene changes, such as:
+- GONet_GlobalContext (networking session context)
+- GONet_LocalContext (per-client connection state)
+- Player objects that should survive scene transitions
+- Any networked object that needs to remain active during scene loading
+
+WHY THIS IS IMPORTANT:
+Without this flag, these objects would be destroyed during scene changes, breaking network synchronization and causing late-joining clients to fail initialization.
+
+When a scene unloads, any objects in that scene are normally destroyed. By moving to DontDestroyOnLoad, the object persists and remains synchronized across all clients.
+
+WHEN TO USE:
+- Enable for networking infrastructure objects (GONet contexts)
+- Enable for player objects that should persist across scenes
+- Enable for any object spawned at runtime that needs to survive scene changes
+- Leave disabled for scene-specific objects that should be destroyed with their scene
+
+NOTE: This only affects runtime instantiation. Objects placed directly in scenes during design time follow Unity's normal scene lifecycle.";
+                GUIContent tooltip = new GUIContent(StringUtils.AddSpacesBeforeUppercase(nameof(GONetParticipant.AutoDontDestroyOnLoad), 1), TT);
+                if (EditorGUILayout.PropertyField(serializedProperty, tooltip))
+                {
+                    // Property field changed
+                }
+                EditorGUILayout.EndHorizontal();
+                GUI.enabled = pre;
+            }
+
             { // IsRigidBodyOwnerOnlyControlled
                 var pre = GUI.enabled;
                 GUI.enabled = !Application.isPlaying;

@@ -75,6 +75,7 @@ MonoBehaviour:
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
+  AutoDontDestroyOnLoad: 1
   wasInstantiatedForce: 0
 --- !u!114 &8643402947905904697
 MonoBehaviour:

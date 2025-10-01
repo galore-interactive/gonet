@@ -758,6 +758,15 @@ namespace GONet
                 ++callDepth;
                 if (!canBypassDepthCheck && callDepth > 1) return default;
 
+                // IMPORTANT: Prevent caching metadata with empty/null location strings
+                // This prevents the "TON CLEETLE!" error that occurs when Set() is called with an invalid location
+                // If designTimeLocation is empty, it means the GONetParticipant's metadata wasn't initialized yet
+                if (string.IsNullOrWhiteSpace(designTimeLocation))
+                {
+                    GONetLog.Warning($"GetDesignTimeMetadata called with empty/null location. This likely means metadata wasn't initialized before creating a spawn event. Returning default metadata.");
+                    return default;
+                }
+
                 if (!designTimeMetadataLookup.TryGetValue(designTimeLocation, out DesignTimeMetadata value))
                 {
                     bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;

@@ -55,6 +55,7 @@ MonoBehaviour:
   ShouldHideDuringRemoteInstantiate: 0
   IsPositionSyncd: 0
   IsRotationSyncd: 0
+  AutoDontDestroyOnLoad: 1
 --- !u!114 &5118336138822136954
 MonoBehaviour:
   m_ObjectHideFlags: 0

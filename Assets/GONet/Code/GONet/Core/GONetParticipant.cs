@@ -225,6 +225,25 @@ namespace GONet
         /// </summary>
         public bool ShouldHideDuringRemoteInstantiate;
 
+        /// <summary>
+        /// <para>
+        /// If true, automatically calls <see cref="UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)"/> on this GameObject when instantiated.
+        /// This ensures the object persists across scene changes.
+        /// </para>
+        /// <para>
+        /// <b>IMPORTANT:</b> This flag must be set BEFORE the GONetParticipant is enabled/started.
+        /// For runtime-spawned objects, set this in the prefab or immediately after instantiation before GONet processes it.
+        /// For scene-defined objects, set this in the inspector.
+        /// </para>
+        /// <para>
+        /// <b>NOTE:</b> GONet uses this flag to properly track which scene spawns belong to.
+        /// If you manually call DontDestroyOnLoad() without setting this flag, GONet may incorrectly
+        /// associate the object with a scene during late-joiner synchronization.
+        /// </para>
+        /// </summary>
+        [Tooltip("If true, automatically calls DontDestroyOnLoad on this GameObject when instantiated. Must be set before GONetParticipant is enabled.")]
+        public bool AutoDontDestroyOnLoad;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow, uint gonetId_priorToChanges)
         {
@@ -699,7 +718,7 @@ namespace GONet
 
             if (!IsInternallyConfigured)
             {
-                Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(DesignTimeLocation)} and {nameof(CodeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation' and/or 'Fix GONet Generated Code', then once that completes re-run the game build and try again.");
+                Debug.LogError($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(DesignTimeLocation)} and {nameof(CodeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation' and/or 'Fix GONet Generated Code', then once that completes re-run the game build and try again.  **DEBUG**: DesignTimeLocation='{DesignTimeLocation}', CodeGenerationId={CodeGenerationId}, IsDesignTimeMetadataInitd={IsDesignTimeMetadataInitd}");
                 enabled = false;
             }
         }
