@@ -3059,7 +3059,7 @@ namespace GONet
                             {
                                 bool isInitRelated = IsChannelClientInitializationRelated(networkData.channelId);
                                 bool isInitialized = _gonetClient != null && _gonetClient.IsInitializedWithServer;
-                                GONetLog.Debug($"[MSG] Received message - channel: {networkData.channelId}, size: {networkData.bytesUsedCount}, isInitRelated: {isInitRelated}, isInitialized: {isInitialized}, willQueue: {shouldQueueForProcessingAfterInitialization}");
+                                //GONetLog.Debug($"[MSG] Received message - channel: {networkData.channelId}, size: {networkData.bytesUsedCount}, isInitRelated: {isInitRelated}, isInitialized: {isInitialized}, willQueue: {shouldQueueForProcessingAfterInitialization}");
                             }
 
                             if (shouldQueueForProcessingAfterInitialization)
@@ -6033,10 +6033,10 @@ namespace GONet
                         if (isBundleTypeValueChanges)
                         {
                             // IMPORTANT: Log value change application for Client:2
-                            if (IsClient)
-                            {
-                                GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
-                            }
+                            //if (IsClient)
+                            //{
+                                //GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
+                            //}
                             syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
                             AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];

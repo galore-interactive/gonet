@@ -657,6 +657,8 @@ namespace GONet
                         else
                         {
                             // Last resort: create empty metadata
+                            // NOTE: This is expected behavior during initial startup when metadata cache is still loading
+                            // These entries are added to deferredLookupQueue and resolved properly via ProcessDeferredLookups()
                             bool shouldCreateNewDtm = Application.isPlaying || IsNewDtmForced;
                             DesignTimeMetadata metadata = shouldCreateNewDtm
                                 ? new DesignTimeMetadata()
@@ -664,7 +666,7 @@ namespace GONet
                                     CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                                 }
                                 : defaultDTM_EditorNotPlayMode;
-                            GONetLog.Warning($"GetDesignTimeMetadata: Creating empty metadata for '{participantName}' - no location found");
+                            GONetLog.Debug($"GetDesignTimeMetadata: Creating temporary metadata for '{participantName}' - will resolve after full cache load");
                             designTimeMetadataLookup.Set(gONetParticipant, metadata);
                             value = metadata;
                         }

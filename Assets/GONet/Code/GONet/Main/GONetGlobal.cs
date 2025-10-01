@@ -39,6 +39,12 @@ namespace GONet
         /// </summary>
         private static GONetGlobal instance;
 
+        /// <summary>
+        /// Public accessor for the singleton instance.
+        /// Use this instead of FindObjectOfType to ensure you get the persistent instance, not a duplicate that's about to be destroyed.
+        /// </summary>
+        public static GONetGlobal Instance => instance;
+
         #region TODO this should be configurable/set elsewhere potentially AFTER loading up and depending on other factors like match making etc...
 
         //public string serverIP;
@@ -127,8 +133,11 @@ namespace GONet
             // Self-destroying singleton pattern: Prevent duplicate GONetGlobal instances
             if (instance != null && instance != this)
             {
-                GONetLog.Warning($"[GONetGlobal] Duplicate GONetGlobal detected in scene '{gameObject.scene.name}'. Destroying duplicate to prevent conflicts.");
-                Destroy(gameObject);
+                GONetLog.Warning($"[GONetGlobal] Duplicate GONetGlobal detected in scene '{gameObject.scene.name}'. Destroying duplicate immediately to prevent any processing.");
+
+                // CRITICAL: Use DestroyImmediate (not Destroy) to prevent any further processing on this duplicate
+                // This ensures GONetParticipant and other components don't try to initialize or process on a duplicate that shouldn't exist
+                DestroyImmediate(gameObject);
                 return;
             }
             instance = this;
@@ -184,6 +193,28 @@ namespace GONet
             {
                 gameObject.AddComponent<GONet.Sample.GONetStatusUI>();
             }
+        }
+
+        protected override void OnDestroy()
+        {
+            // CRITICAL: Clear singleton reference when this instance is destroyed
+            // This is essential for Unity Editor play mode to prevent stale references
+            // that cause non-deterministic behavior between play sessions
+            if (instance == this)
+            {
+                instance = null;
+                GONetLog.Debug("[GONetGlobal] Cleared singleton instance reference on destroy");
+            }
+
+            // Unsubscribe from scene events to prevent memory leaks
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+
+            // NOTE: We do NOT clear design-time metadata caches here as they contain
+            // critical build-time information needed to detect changes between builds.
+            // The 98 vs 51 log difference is acceptable - it's not a bug, just different
+            // code paths on first load vs cached load.
+
+            base.OnDestroy();
         }
 
         public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
