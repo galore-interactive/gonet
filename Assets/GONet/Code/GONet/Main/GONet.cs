@@ -1981,6 +1981,16 @@ namespace GONet
             if (!IsClient) return;
 
             bool wasAlreadyClosed = client_hasClosedTimeSyncGapWithServer;
+
+            // IMPORTANT: Don't reset time sync if the client hasn't closed the initial gap yet!
+            // Late-joining clients need to complete their initial time sync sequence without interruption.
+            // Only reset for clients that have already achieved sync and are experiencing a scene change.
+            if (!wasAlreadyClosed)
+            {
+                GONetLog.Info($"[TimeSync] CLIENT: Skipping time sync reset for reason '{reason}' - client still closing initial gap (wasAlreadyClosed: {wasAlreadyClosed})");
+                return;
+            }
+
             GONetLog.Info($"[TimeSync] CLIENT: Resetting time sync gap for reason: {reason}, wasAlreadyClosed: {wasAlreadyClosed}");
 
             // Reset to gap-closing phase
@@ -3092,7 +3102,37 @@ namespace GONet
                             }
                             else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
                             {
-                                DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                // IMPORTANT: If we have deferred spawns waiting for scene load, we must also defer the AllValues bundle
+                                // Otherwise we'll try to apply values to GameObjects that haven't been spawned yet (causing dictionary lookup failures)
+                                if (deferredSpawnEvents.Count > 0)
+                                {
+                                    GONetLog.Warning($"[INIT] Deferring AllValues bundle processing - {deferredSpawnEvents.Count} spawns are waiting for scene load");
+
+                                    // IMPORTANT: Copy only the remaining bytes AFTER the header (which has already been read)
+                                    // The bitStream position is currently at the start of the body, after reading messageID and elapsedTicks
+                                    int currentPosition = bitStream.Position_Bytes;
+                                    int remainingBytes = networkData.bytesUsedCount - currentPosition;
+                                    byte[] deferredBytes = new byte[remainingBytes];
+                                    Array.Copy(bitStream.GetBuffer(), currentPosition, deferredBytes, 0, remainingBytes);
+
+                                    // Store which scene we're waiting for (use the first deferred spawn's scene as reference)
+                                    string requiredScene = deferredSpawnEvents.Count > 0 ? deferredSpawnEvents[0].SceneIdentifier : "";
+
+                                    deferredAllValuesBundle = new DeferredAllValuesBundle
+                                    {
+                                        RawBytes = deferredBytes,
+                                        BytesUsedCount = remainingBytes,
+                                        RelatedConnection = networkData.relatedConnection,
+                                        ElapsedTicksAtSend = elapsedTicksAtSend,
+                                        RequiredSceneName = requiredScene
+                                    };
+
+                                    GONetLog.Warning($"[INIT] AllValues bundle deferred - waiting for scene '{requiredScene}' and {deferredSpawnEvents.Count} spawns to process (bytes: {remainingBytes})");
+                                }
+                                else
+                                {
+                                    DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                }
                             }
                             else if (messageType == typeof(ServerSaysClientInitializationCompletion))
                             {
@@ -3101,6 +3141,15 @@ namespace GONet
                                     GONetLog.Debug($"[INIT] Client received ServerSaysClientInitializationCompletion - setting IsInitializedWithServer = true");
                                     GONetClient.IsInitializedWithServer = true;
                                     GONetLog.Debug($"[INIT] Client is now initialized with server - will instantiate GONetLocal");
+
+                                    // IMPORTANT: Log registered sync companions for debugging
+                                    int totalCompanions = 0;
+                                    foreach (var codeGenEntry in activeAutoSyncCompanionsByCodeGenerationIdMap)
+                                    {
+                                        totalCompanions += codeGenEntry.Value.Count;
+                                        GONetLog.Debug($"[AUTOMAGIC] Client has {codeGenEntry.Value.Count} sync companions registered for CodeGenId {codeGenEntry.Key}");
+                                    }
+                                    GONetLog.Debug($"[AUTOMAGIC] Client total sync companions registered: {totalCompanions}");
                                 }
                             } // else?  TODO lookup proper deserialize method instead of if-else-if statement(s)
                         }
@@ -4475,6 +4524,25 @@ namespace GONet
         static readonly List<InstantiateGONetParticipantEvent> deferredSpawnEvents = new List<InstantiateGONetParticipantEvent>();
 
         /// <summary>
+        /// Holds a deferred AllValues bundle that needs to be processed after spawns are complete.
+        /// </summary>
+        private struct DeferredAllValuesBundle
+        {
+            public byte[] RawBytes;
+            public int BytesUsedCount;
+            public GONetConnection RelatedConnection;
+            public long ElapsedTicksAtSend;
+            public string RequiredSceneName;
+        }
+
+        /// <summary>
+        /// Deferred AllValues bundle waiting for spawns to be processed.
+        /// <para>When a client receives the initialization AllValues bundle before spawns are processed,
+        /// it's stored here and processed after deferred spawns complete.</para>
+        /// </summary>
+        static DeferredAllValuesBundle? deferredAllValuesBundle = null;
+
+        /// <summary>
         /// Checks if a scene is currently loaded.
         /// </summary>
         private static bool IsSceneCurrentlyLoaded(string sceneIdentifier)
@@ -4541,6 +4609,26 @@ namespace GONet
                     {
                         GONetLog.Error($"[SPAWN_SYNC] FAILED to spawn deferred GONetId {spawnEvent.GONetId}!");
                     }
+                }
+
+                // IMPORTANT: After processing deferred spawns, check if we have a deferred AllValues bundle waiting
+                // The AllValues bundle must be processed AFTER spawns so the GONetParticipants exist in the lookup maps
+                if (deferredAllValuesBundle.HasValue && deferredAllValuesBundle.Value.RequiredSceneName == sceneName)
+                {
+                    GONetLog.Warning($"[INIT] Processing deferred AllValues bundle after spawns completed for scene '{sceneName}'");
+
+                    DeferredAllValuesBundle bundle = deferredAllValuesBundle.Value;
+
+                    // Reconstruct the BitStream from the stored bytes using GetBuilder_WithNewData
+                    using (BitByBitByteArrayBuilder reconstructedBitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(bundle.RawBytes, bundle.BytesUsedCount))
+                    {
+                        DeserializeBody_AllValuesBundle(reconstructedBitStream, bundle.BytesUsedCount, bundle.RelatedConnection, bundle.ElapsedTicksAtSend);
+                    }
+
+                    // Clean up
+                    deferredAllValuesBundle = null;
+
+                    GONetLog.Warning($"[INIT] Deferred AllValues bundle processing complete");
                 }
             }
             else
@@ -5564,6 +5652,13 @@ namespace GONet
         private static void DeserializeBody_BundleOfChoice(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend, Type chosenBundleType)
         {
             //if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message)) GONetLog.Debug($"remote source sent us at rest bundle.");
+
+            // IMPORTANT: Log when Client:2 receives AutoMagicalSync messages
+            if (IsClient)
+            {
+                GONetLog.Info($"[SYNC-RX] Client received {chosenBundleType.Name} on channel {channelId} from authority {sourceOfChangeConnection?.OwnerAuthorityId ?? 0}");
+            }
+
             uint gonetId_previous = 0;
 
             while (true)
@@ -5662,11 +5757,22 @@ namespace GONet
                     if (gonetParticipant.IsMine) // with recent changes, bundles all all the same for all clients, which means you will receive your own stuff too...essentially want to skip, but have to move the bit reader forward!
                     {
                         syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index);
+
+                        // IMPORTANT: Log when Client:2 skips its own values
+                        if (IsClient)
+                        {
+                            GONetLog.Info($"[SYNC-SKIP] Client skipping own value - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
+                        }
                     }
                     else
                     {
                         if (isBundleTypeValueChanges)
                         {
+                            // IMPORTANT: Log value change application for Client:2
+                            if (IsClient)
+                            {
+                                GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
+                            }
                             syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
                             AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];

@@ -143,7 +143,6 @@ namespace GONet
             for (int iConnection = 0; iConnection < numConnections; ++iConnection)
             {
                 GONetConnection_ServerToClient gONetConnection_ServerToClient = remoteClients[iConnection].ConnectionToClient;
-
                 gONetConnection_ServerToClient.SendMessageOverChannel(bytes, bytesUsedCount, channelId);
             }
         }
