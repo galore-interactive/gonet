@@ -38,6 +38,8 @@ namespace GONet.Sample
         [Header("Auto-Build UI")]
         [SerializeField] private bool autoBuildUI = true;
 
+        private bool hasSetupAsyncApproval = false;
+
         private void Awake()
         {
             if (autoBuildUI && (statusText == null || projectileTestButton == null))
@@ -61,20 +63,18 @@ namespace GONet.Sample
                 backToMenuButton.gameObject.SetActive(false); // Hidden in menu scene
             }
 
-            // Setup validation hook and enable async approval for server
+            // Setup validation hook
             if (GONetMain.SceneManager != null)
             {
                 GONetMain.SceneManager.OnValidateSceneLoad += ValidateSceneLoad;
 
-                // Enable async approval mode on server
-                if (GONetMain.IsServer)
-                {
-                    GONetMain.SceneManager.RequiresAsyncApproval = true;
-                }
-
                 // Subscribe to scene events for status updates
                 GONetMain.SceneManager.OnSceneLoadStarted += OnSceneLoadStarted;
                 GONetMain.SceneManager.OnSceneLoadCompleted += OnSceneLoadCompleted;
+            }
+            else
+            {
+                GONetLog.Warning($"[SceneSelectionUI] GONetMain.SceneManager is NULL in Start()!");
             }
 
             UpdateUI();
@@ -239,6 +239,15 @@ namespace GONet.Sample
 
         private void Update()
         {
+            // Enable async approval mode once server is detected
+            // This must be done in Update because GONetMain.IsServer may not be set yet in Start()
+            if (!hasSetupAsyncApproval && GONetMain.IsServer && GONetMain.SceneManager != null)
+            {
+                GONetLog.Info($"[SceneSelectionUI] Setting RequiresAsyncApproval = true (IsServer: {GONetMain.IsServer})");
+                GONetMain.SceneManager.RequiresAsyncApproval = true;
+                hasSetupAsyncApproval = true;
+            }
+
             // Update UI every frame to show current state
             UpdateUI();
         }
@@ -311,7 +320,7 @@ namespace GONet.Sample
         /// </summary>
         private bool ValidateSceneLoad(string sceneName, LoadSceneMode mode, ushort requestingAuthority)
         {
-            GONetLog.Info($"[SceneSelectionUI] Validating scene load request: '{sceneName}' from authority {requestingAuthority}");
+            GONetLog.Info($"[SceneSelectionUI] Validating scene load request: '{sceneName}' from authority {requestingAuthority} (MyAuthorityId: {GONetMain.MyAuthorityId})");
 
             // Server's own requests are auto-approved
             if (GONetMain.IsServer && requestingAuthority == GONetMain.MyAuthorityId)
@@ -323,7 +332,7 @@ namespace GONet.Sample
             // Client request on server - show approval dialog
             if (GONetMain.IsServer)
             {
-                GONetLog.Info($"[SceneSelectionUI] Client request - showing approval dialog");
+                GONetLog.Info($"[SceneSelectionUI] Client request - showing approval dialog (requestingAuthority={requestingAuthority} != MyAuthorityId={GONetMain.MyAuthorityId})");
                 pendingSceneName = sceneName;
                 pendingLoadMode = mode;
                 pendingRequestingAuthority = requestingAuthority;

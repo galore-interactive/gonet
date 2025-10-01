@@ -445,7 +445,22 @@ namespace GONet
 
             GONetLog.Info($"[GONetGlobal] Scene load request received: '{sceneName}' (Mode: {mode}, Type: {loadType})");
 
-            // Forward to scene manager
+            // IMPORTANT: If async approval is required, validation hook will show UI
+            // and the actual scene load happens when user approves (in SceneSelectionUI.OnApproveClicked)
+            // so we must NOT load the scene here - just let validation handle it
+            bool requiresAsyncApproval = GONetMain.SceneManager.RequiresAsyncApproval;
+            GONetLog.Info($"[GONetGlobal] Checking RequiresAsyncApproval: {requiresAsyncApproval}");
+            if (requiresAsyncApproval)
+            {
+                GONetLog.Info($"[GONetGlobal] Scene load requires async approval - validation will handle UI, scene will load after approval");
+                return default;
+            }
+            else
+            {
+                GONetLog.Info($"[GONetGlobal] RequiresAsyncApproval is FALSE - proceeding with immediate scene load");
+            }
+
+            // Forward to scene manager (only when async approval NOT required)
             if (loadType == SceneLoadType.BuildSettings)
             {
                 GONetMain.SceneManager.LoadSceneFromBuildSettings(sceneName, mode);
