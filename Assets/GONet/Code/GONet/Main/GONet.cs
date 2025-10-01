@@ -3337,6 +3337,66 @@ namespace GONet
             GONetLog.Debug($"[INIT] Server received GONetLocal from client AuthorityId: {newClientGONetLocal.GONetParticipant.OwnerAuthorityId} - marking client as IsInitializedWithServer = true");
             remoteClient.IsInitializedWithServer = true;
             GONetLog.Debug($"[INIT] Client AuthorityId {newClientGONetLocal.GONetParticipant.OwnerAuthorityId} is now fully initialized with server");
+
+            // IMPORTANT: Send scene-defined object GONetId assignments AFTER client is initialized
+            // This ensures the client has loaded scenes and initialized all GONetParticipants
+            Server_SendClientSceneDefinedObjectIds(remoteClient.ConnectionToClient);
+            GONetLog.Debug($"[INIT] Sent scene-defined object GONetId assignments to client AuthorityId: {newClientGONetLocal.GONetParticipant.OwnerAuthorityId}");
+        }
+
+        /// <summary>
+        /// Sends GONetId assignments for all scene-defined objects in currently loaded scenes to a newly connected client.
+        /// This ensures late-joining clients receive the same GONetIds that were assigned to scene objects on the server.
+        /// </summary>
+        private static void Server_SendClientSceneDefinedObjectIds(GONetConnection_ServerToClient gonetConnection_ServerToClient)
+        {
+            // Get all currently loaded scenes
+            HashSet<string> loadedScenes = new HashSet<string>();
+            for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+            {
+                Scene scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                if (scene.isLoaded)
+                {
+                    loadedScenes.Add(scene.name);
+                }
+            }
+
+            // For each loaded scene, collect scene-defined object GONetIds
+            foreach (string sceneName in loadedScenes)
+            {
+                List<string> designTimeLocations = new List<string>();
+                List<uint> gonetIds = new List<uint>();
+
+                // Find all GONetParticipants that were defined in this scene
+                foreach (int instanceId in definedInSceneParticipantInstanceIDs)
+                {
+                    if (participantInstanceID_to_SpawnSceneName.TryGetValue(instanceId, out string participantScene) &&
+                        participantScene == sceneName)
+                    {
+                        // Find the actual participant
+                        foreach (var kvp in gonetParticipantByGONetIdMap)
+                        {
+                            GONetParticipant participant = kvp.Value;
+                            if (participant != null &&
+                                participant.GetInstanceID() == instanceId &&
+                                participant.IsDesignTimeMetadataInitd &&
+                                participant.GONetId != 0 &&
+                                !string.IsNullOrEmpty(participant.DesignTimeLocation))
+                            {
+                                designTimeLocations.Add(participant.DesignTimeLocation);
+                                gonetIds.Add(participant.GONetId);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (designTimeLocations.Count > 0)
+                {
+                    GONetLog.Info($"[INIT] Sending {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to newly connected client AuthorityId: {gonetConnection_ServerToClient.OwnerAuthorityId}");
+                    Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), gonetConnection_ServerToClient.OwnerAuthorityId);
+                }
+            }
         }
 
         private static void Server_SendClientPersistentEventsSinceStart(GONetConnection_ServerToClient gonetConnection_ServerToClient)
