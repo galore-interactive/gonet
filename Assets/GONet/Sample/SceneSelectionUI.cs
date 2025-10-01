@@ -25,10 +25,17 @@ namespace GONet.Sample
         private Button approveButton;
         private Button denyButton;
 
-        // Pending request info
+        // Client waiting/response UI
+        private GameObject clientResponsePanel;
+        private Text clientResponseMessageText;
+        private Button clientResponseCloseButton;
+        private bool isAwaitingResponse = false; // Track if THIS client is waiting for a response
+
+        // Pending request info (server-side tracking)
         private string pendingSceneName;
         private LoadSceneMode pendingLoadMode;
         private ushort pendingRequestingAuthority;
+        private bool hasPendingRequest = false;
 
         [Header("Scene Names")]
         [SerializeField] private string projectileTestSceneName = "ProjectileTest";
@@ -63,7 +70,7 @@ namespace GONet.Sample
                 backToMenuButton.gameObject.SetActive(false); // Hidden in menu scene
             }
 
-            // Setup validation hook
+            // Setup validation hook and event subscriptions
             if (GONetMain.SceneManager != null)
             {
                 GONetMain.SceneManager.OnValidateSceneLoad += ValidateSceneLoad;
@@ -71,6 +78,9 @@ namespace GONet.Sample
                 // Subscribe to scene events for status updates
                 GONetMain.SceneManager.OnSceneLoadStarted += OnSceneLoadStarted;
                 GONetMain.SceneManager.OnSceneLoadCompleted += OnSceneLoadCompleted;
+
+                // Subscribe to scene request response for client feedback
+                GONetMain.SceneManager.OnSceneRequestResponse += OnSceneRequestResponseReceived;
             }
             else
             {
@@ -103,6 +113,9 @@ namespace GONet.Sample
 
             // Create approval panel (initially hidden)
             BuildApprovalPanel(canvas);
+
+            // Create client response panel (initially hidden)
+            BuildClientResponsePanel(canvas);
 
             // Title
             titleText = CreateText(panel.transform, "Title", "GONet Scene Management Demo", 24, TextAnchor.UpperCenter);
@@ -226,6 +239,49 @@ namespace GONet.Sample
             approvalPanel.SetActive(false);
         }
 
+        private void BuildClientResponsePanel(Canvas canvas)
+        {
+            // Create client response panel (centered, larger to accommodate longer messages)
+            clientResponsePanel = new GameObject("ClientResponsePanel");
+            clientResponsePanel.transform.SetParent(canvas.transform, false);
+            RectTransform responseRect = clientResponsePanel.AddComponent<RectTransform>();
+            responseRect.anchorMin = new Vector2(0.25f, 0.3f);
+            responseRect.anchorMax = new Vector2(0.75f, 0.7f);
+            responseRect.offsetMin = Vector2.zero;
+            responseRect.offsetMax = Vector2.zero;
+            Image responseImage = clientResponsePanel.AddComponent<Image>();
+            responseImage.color = new Color(0.15f, 0.15f, 0.2f, 0.95f);
+
+            // Response message (leave more room at bottom for button)
+            clientResponseMessageText = CreateText(clientResponsePanel.transform, "ResponseMessage", "Awaiting server approval...", 16, TextAnchor.MiddleCenter);
+            RectTransform msgRect = clientResponseMessageText.GetComponent<RectTransform>();
+            msgRect.anchorMin = new Vector2(0.1f, 0.35f);
+            msgRect.anchorMax = new Vector2(0.9f, 0.85f);
+
+            // Close button (bottom center, bigger)
+            clientResponseCloseButton = CreateButton(clientResponsePanel.transform, "CloseButton", "Close", 0.25f);
+            RectTransform closeRect = clientResponseCloseButton.GetComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(0.3f, 0.08f);
+            closeRect.anchorMax = new Vector2(0.7f, 0.25f);
+            clientResponseCloseButton.GetComponent<Image>().color = new Color(0.6f, 0.2f, 0.2f, 1f);
+            clientResponseCloseButton.onClick.AddListener(OnClientResponseCloseClicked);
+
+            // Enable Best Fit on the button text
+            Text buttonText = clientResponseCloseButton.GetComponentInChildren<Text>();
+            if (buttonText != null)
+            {
+                buttonText.resizeTextForBestFit = true;
+                buttonText.resizeTextMinSize = 10;
+                buttonText.resizeTextMaxSize = 20;
+            }
+
+            // Initially hide the close button (only show for denials)
+            clientResponseCloseButton.gameObject.SetActive(false);
+
+            // Start hidden
+            clientResponsePanel.SetActive(false);
+        }
+
         private void OnDestroy()
         {
             // Cleanup
@@ -234,6 +290,7 @@ namespace GONet.Sample
                 GONetMain.SceneManager.OnValidateSceneLoad -= ValidateSceneLoad;
                 GONetMain.SceneManager.OnSceneLoadStarted -= OnSceneLoadStarted;
                 GONetMain.SceneManager.OnSceneLoadCompleted -= OnSceneLoadCompleted;
+                GONetMain.SceneManager.OnSceneRequestResponse -= OnSceneRequestResponseReceived;
             }
         }
 
@@ -305,12 +362,30 @@ namespace GONet.Sample
             }
             else if (GONetMain.IsClient)
             {
-                // Client requests through RPC
+                // Client requests through RPC - show "awaiting approval" UI
                 GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single);
+
+                // Show awaiting approval message
+                if (clientResponsePanel != null && clientResponseMessageText != null)
+                {
+                    clientResponseMessageText.text = $"Awaiting server approval for:\n\n'{sceneName}'";
+                    clientResponseCloseButton.gameObject.SetActive(false); // No close button while waiting
+                    clientResponsePanel.SetActive(true);
+                    isAwaitingResponse = true; // Mark this client as awaiting a response
+                }
             }
             else
             {
                 GONetLog.Warning("[SceneSelectionUI] Not connected as server or client");
+            }
+        }
+
+        private void OnClientResponseCloseClicked()
+        {
+            if (clientResponsePanel != null)
+            {
+                clientResponsePanel.SetActive(false);
+                isAwaitingResponse = false; // Clear the flag
             }
         }
 
@@ -329,13 +404,45 @@ namespace GONet.Sample
                 return true;
             }
 
-            // Client request on server - show approval dialog
+            // Client request on server - check for conflicts before showing approval dialog
             if (GONetMain.IsServer)
             {
+                // Check if another request is already pending
+                if (hasPendingRequest)
+                {
+                    GONetLog.Warning($"[SceneSelectionUI] Request from authority {requestingAuthority} DENIED - another request is already pending approval");
+                    GONetMain.SceneManager.SendSceneRequestResponse(requestingAuthority, false, sceneName,
+                        "Another scene change request is already pending approval. Please wait.");
+                    return false; // Deny this request
+                }
+
+                // Check if a scene is currently loading
+                if (GONetMain.SceneManager != null && GONetMain.SceneManager.IsSceneLoading(sceneName))
+                {
+                    GONetLog.Warning($"[SceneSelectionUI] Request from authority {requestingAuthority} DENIED - scene '{sceneName}' is already loading");
+                    GONetMain.SceneManager.SendSceneRequestResponse(requestingAuthority, false, sceneName,
+                        $"Scene '{sceneName}' is already loading. Please wait.");
+                    return false; // Deny this request
+                }
+
+                // Check if any scene is loading (for different scene requests)
+                if (GONetMain.SceneManager != null &&
+                    (GONetMain.SceneManager.IsSceneLoading(projectileTestSceneName) ||
+                     GONetMain.SceneManager.IsSceneLoading(rpcPlaygroundSceneName) ||
+                     GONetMain.SceneManager.IsSceneLoading(menuSceneName)))
+                {
+                    GONetLog.Warning($"[SceneSelectionUI] Request from authority {requestingAuthority} DENIED - a scene change is already in progress");
+                    GONetMain.SceneManager.SendSceneRequestResponse(requestingAuthority, false, sceneName,
+                        "A scene change is already in progress. Please wait.");
+                    return false; // Deny this request
+                }
+
+                // No conflicts - show approval dialog
                 GONetLog.Info($"[SceneSelectionUI] Client request - showing approval dialog (requestingAuthority={requestingAuthority} != MyAuthorityId={GONetMain.MyAuthorityId})");
                 pendingSceneName = sceneName;
                 pendingLoadMode = mode;
                 pendingRequestingAuthority = requestingAuthority;
+                hasPendingRequest = true; // Mark request as pending
 
                 if (approvalPanel != null && approvalMessageText != null)
                 {
@@ -356,6 +463,7 @@ namespace GONet.Sample
         {
             GONetLog.Info($"[SceneSelectionUI] Server APPROVED scene change to '{pendingSceneName}'");
             approvalPanel.SetActive(false);
+            hasPendingRequest = false; // Clear pending request flag
 
             // Server loads the scene
             if (GONetMain.SceneManager != null)
@@ -371,6 +479,7 @@ namespace GONet.Sample
         {
             GONetLog.Info($"[SceneSelectionUI] Server DENIED scene change to '{pendingSceneName}'");
             approvalPanel.SetActive(false);
+            hasPendingRequest = false; // Clear pending request flag
 
             // Send denial response to client via GONetSceneManager public API
             GONetMain.SceneManager.SendSceneRequestResponse(pendingRequestingAuthority, false, pendingSceneName, "Server denied the request");
@@ -384,6 +493,40 @@ namespace GONet.Sample
         private void OnSceneLoadCompleted(string sceneName, LoadSceneMode mode)
         {
             GONetLog.Info($"[SceneSelectionUI] Scene load completed: {sceneName}");
+
+            // Hide client response panel when scene loads (approval was granted)
+            if (clientResponsePanel != null && clientResponsePanel.activeSelf)
+            {
+                clientResponsePanel.SetActive(false);
+                isAwaitingResponse = false; // Clear the flag
+            }
+        }
+
+        private void OnSceneRequestResponseReceived(bool approved, string sceneName, string denialReason)
+        {
+            GONetLog.Info($"[SceneSelectionUI] Scene request response received - Approved: {approved}, Scene: '{sceneName}', Reason: '{denialReason}', IsAwaitingResponse: {isAwaitingResponse}");
+
+            // Only show response UI if THIS client is awaiting a response
+            if (!isAwaitingResponse || clientResponsePanel == null || clientResponseMessageText == null)
+                return;
+
+            if (approved)
+            {
+                // Approval - scene will load, so just hide the "awaiting approval" panel
+                // The OnSceneLoadCompleted handler will also hide it when scene actually loads
+                clientResponsePanel.SetActive(false);
+                isAwaitingResponse = false; // Clear the flag
+                GONetLog.Info($"[SceneSelectionUI] Client: Server approved scene '{sceneName}' - scene will load");
+            }
+            else
+            {
+                // Denial - show denial message with close button
+                clientResponseMessageText.text = $"Request DENIED:\n\n'{sceneName}'\n\n{denialReason}";
+                clientResponseCloseButton.gameObject.SetActive(true); // Show Close button
+                clientResponsePanel.SetActive(true);
+                // Don't clear isAwaitingResponse yet - wait for user to close the panel
+                GONetLog.Warning($"[SceneSelectionUI] Client: Server denied scene '{sceneName}' - Reason: {denialReason}");
+            }
         }
     }
 }
