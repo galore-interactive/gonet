@@ -562,6 +562,48 @@ namespace GONet
             Client_SyncTimeWithServer_SendInitialBarrage();
         }
 
+        /// <summary>
+        /// Processes messages that were queued because they referenced GONetIds that weren't assigned yet.
+        /// Called after scene-defined object GONetIds have been synchronized from the server.
+        /// </summary>
+        internal static void ProcessQueuedMessagesWaitingForGONetIds()
+        {
+            if (!IsClient || _gonetClient == null)
+                return;
+
+            int queueSize = _gonetClient.incomingNetworkData_waitingForGONetIds.Count;
+            if (queueSize == 0)
+            {
+                GONetLog.Debug("[GONETID-QUEUE] No queued messages to process");
+                return;
+            }
+
+            GONetLog.Info($"[GONETID-QUEUE] Processing {queueSize} queued messages that were waiting for GONetId assignments");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            while (_gonetClient.incomingNetworkData_waitingForGONetIds.Count > 0)
+            {
+                NetworkData item = _gonetClient.incomingNetworkData_waitingForGONetIds.Dequeue();
+                try
+                {
+                    ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(item);
+                    processedCount++;
+                }
+                catch (Exception e)
+                {
+                    failedCount++;
+                    GONetLog.Error($"[GONETID-QUEUE] Failed to process queued message: {e.Message}");
+                    // Still need to return the message to the pool
+                    SingleProducerQueues queues = singleProducerReceiveQueuesByThread[item.messageBytesBorrowedOnThread];
+                    queues.queueForPostWorkResourceReturn.Enqueue(item);
+                }
+            }
+
+            GONetLog.Info($"[GONETID-QUEUE] Finished processing queued messages - Processed: {processedCount}, Failed: {failedCount}");
+        }
+
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdAtInstantiationMap = new Dictionary<uint, GONetParticipant>(5000);
         internal static readonly Dictionary<uint, uint> recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map = new Dictionary<uint, uint>(1000);
@@ -3046,6 +3088,7 @@ namespace GONet
         /// </summary>
         private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData)
         {
+            bool shouldReturnToPool = true; // Track whether message should be returned to pool (false if queued elsewhere)
             try
             {
                 if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
@@ -3149,7 +3192,47 @@ namespace GONet
                                 }
                                 else
                                 {
-                                    DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                    try
+                                    {
+                                        DeserializeBody_AllValuesBundle(bitStream, networkData.bytesUsedCount, networkData.relatedConnection, elapsedTicksAtSend);
+                                    }
+                                    catch (KeyNotFoundException keyNotFoundEx)
+                                    {
+                                        // GONetId not found - likely scene-defined object IDs not assigned yet
+                                        QosType channelQuality = GONetChannel.ById(networkData.channelId).QualityOfService;
+                                        if (IsClient && channelQuality == QosType.Reliable)
+                                        {
+                                            // Queue this message for retry after GONetId sync completes
+                                            if (_gonetClient.incomingNetworkData_waitingForGONetIds.Count < GONetClient.MAX_GONETID_QUEUE_SIZE)
+                                            {
+                                                _gonetClient.incomingNetworkData_waitingForGONetIds.Enqueue(networkData);
+                                                GONetLog.Debug($"[GONETID-QUEUE] Queued reliable message (channel: {networkData.channelId}) waiting for GONetId assignment. Queue size: {_gonetClient.incomingNetworkData_waitingForGONetIds.Count}");
+
+                                                // Skip processing, but DON'T return to pool - it's now owned by the queue
+                                                shouldReturnToPool = false;
+                                            }
+                                            else
+                                            {
+                                                // Queue full - log error and drop oldest
+                                                GONetLog.Error($"[GONETID-QUEUE] Queue full ({GONetClient.MAX_GONETID_QUEUE_SIZE} messages)! Dropping oldest message. This indicates a problem with GONetId synchronization.");
+                                                NetworkData droppedMessage = _gonetClient.incomingNetworkData_waitingForGONetIds.Dequeue();
+
+                                                // Return dropped message to pool
+                                                SingleProducerQueues droppedQueues = singleProducerReceiveQueuesByThread[droppedMessage.messageBytesBorrowedOnThread];
+                                                droppedQueues.queueForPostWorkResourceReturn.Enqueue(droppedMessage);
+
+                                                // Queue current message
+                                                _gonetClient.incomingNetworkData_waitingForGONetIds.Enqueue(networkData);
+                                                shouldReturnToPool = false;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Unreliable message or not a client - just drop it
+                                            GONetLog.Debug($"[GONETID-QUEUE] Dropping unreliable message (channel: {networkData.channelId}) due to missing GONetId - as designed");
+                                        }
+                                        // Let it fall through to the finally block for cleanup
+                                    }
                                 }
                             }
                             else if (messageType == typeof(ServerSaysClientInitializationCompletion))
@@ -3190,7 +3273,10 @@ namespace GONet
             }
             finally
             {
-                { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
+                // Only return to pool if message wasn't queued elsewhere (e.g., waiting for GONetIds)
+                if (shouldReturnToPool)
+                {
+                    // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
                     SingleProducerQueues singleProducerReceiveQueues = singleProducerReceiveQueuesByThread[networkData.messageBytesBorrowedOnThread];
                     singleProducerReceiveQueues.queueForPostWorkResourceReturn.Enqueue(networkData);
                 }

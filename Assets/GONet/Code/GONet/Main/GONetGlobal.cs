@@ -698,6 +698,13 @@ namespace GONet
             {
                 GONetLog.Info($"[GONetGlobal] Successfully assigned all {assignedCount} scene-defined object GONetIds for scene '{sceneName}'");
             }
+
+            // IMPORTANT: Mark that scene-defined object IDs are ready and process any queued messages
+            if (GONetMain.IsClient && GONetMain.GONetClient != null)
+            {
+                GONetMain.GONetClient.areSceneDefinedObjectIdsReady = true;
+                GONetMain.ProcessQueuedMessagesWaitingForGONetIds();
+            }
         }
 
         /// <summary>

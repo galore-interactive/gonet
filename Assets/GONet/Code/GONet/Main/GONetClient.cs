@@ -67,7 +67,24 @@ namespace GONet
 
         internal readonly Queue<GONetMain.NetworkData> incomingNetworkData_mustProcessAfterClientInitialized = new Queue<GONetMain.NetworkData>(100);
 
+        /// <summary>
+        /// Queue for messages that failed to process due to missing GONetId assignments.
+        /// These will be retried after scene-defined object GONetIds are synchronized.
+        /// </summary>
+        internal readonly Queue<GONetMain.NetworkData> incomingNetworkData_waitingForGONetIds = new Queue<GONetMain.NetworkData>(100);
+
+        /// <summary>
+        /// Maximum size for the GONetId waiting queue to prevent unbounded growth.
+        /// </summary>
+        internal const int MAX_GONETID_QUEUE_SIZE = 1000;
+
         bool isInitializedWithServer;
+
+        /// <summary>
+        /// Indicates whether scene-defined object GONetIds have been assigned.
+        /// Messages requiring GONetIds will be queued until this is true.
+        /// </summary>
+        internal bool areSceneDefinedObjectIdsReady = false;
         public bool IsInitializedWithServer
         {
             get => IsConnectedToServer && isInitializedWithServer;
