@@ -340,9 +340,9 @@ namespace GONet
             // TODO GONetEventBus.Instance.ResetAll or UnsubscribeAll
 
             var s1 = GONetMain.EventBus.Subscribe<GONetParticipantDisabledEvent>(OnGNPDisabled);
-            var s2 = GONetMain.EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyGNP);
+            var s2 = GONetMain.EventBus.Subscribe<DespawnGONetParticipantEvent>(OnDespawnGNP);
 
-            IGONetEvent ev = new DestroyGONetParticipantEvent();
+            IGONetEvent ev = new DespawnGONetParticipantEvent();
             Assert.AreEqual(0, GONetMain.EventBus.Publish(ev));
 
             s1.Unsubscribe();
@@ -405,7 +405,7 @@ namespace GONet
             UnityEngine.Debug.Log($"Field-by-field Copying: {fieldMS} ms, Memory Copy: {memoryMS} ms");
         }
 
-        private void OnDestroyGNP(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
+        private void OnDespawnGNP(GONetEventEnvelope<DespawnGONetParticipantEvent> eventEnvelope)
         {
             Assert.AreEqual(0, GONetMain.EventBus.Publish(new GONetParticipantDisabledEvent()));
         }

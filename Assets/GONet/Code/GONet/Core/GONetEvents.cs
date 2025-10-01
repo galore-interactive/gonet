@@ -80,9 +80,9 @@ namespace GONet
 
     /// <summary>
     /// This is something that would only apply to event class that implement <see cref="IPersistentEvent"/> that get queued up on server and sent to newly connecting clients.
-    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypesCancelledOut"/> and see if they cancel one another out 
+    /// Instances that implement this tell GONet to look for instances of the other events of type <see cref="OtherEventTypesCancelledOut"/> and see if they cancel one another out
     /// so these messages can be removed from consideration in pairs as to not send these events anywhere.
-    /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DestroyGONetParticipantEvent"/>.
+    /// Example: <see cref="InstantiateGONetParticipantEvent"/> is cancelled out by <see cref="DespawnGONetParticipantEvent"/>.
     /// </summary>
     public interface ICancelOutOtherEvents
     {
@@ -274,6 +274,14 @@ namespace GONet
 
         public bool ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority;
 
+        /// <summary>
+        /// Identifies which scene this GONetParticipant was spawned in.
+        /// <para>This is used for scene-based persistent event filtering to ensure late-joining clients
+        /// only receive spawns relevant to their currently loaded scenes.</para>
+        /// <para>Value is either the scene name from build settings or the addressable path for addressable scenes.</para>
+        /// </summary>
+        public string SceneIdentifier;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
@@ -289,6 +297,8 @@ namespace GONet
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
+
+            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
 
@@ -309,6 +319,8 @@ namespace GONet
 
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
+
+            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
 
@@ -331,6 +343,8 @@ namespace GONet
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
 
+            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
+
             @event.OccurredAtElapsedTicks = default;
 
             return @event;
@@ -338,14 +352,51 @@ namespace GONet
     }
 
     /// <summary>
-    /// This is used internally to command all machines in the system to destroy the <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
+    /// Commands all machines to despawn a <see cref="GONetParticipant"/> and its <see cref="GameObject"/>.
+    /// <para>This event represents an **intentional gameplay despawn** (not scene lifecycle destruction).</para>
+    ///
+    /// <para><b>Networking Behavior:</b></para>
+    /// <list type="bullet">
+    /// <item><b>Network Propagation:</b> YES - Sent to all remote connections</item>
+    /// <item><b>Persistent Event:</b> YES - Added to persistent event history for late-joining clients</item>
+    /// <item><b>Cancels Spawn:</b> YES - Cancels corresponding <see cref="InstantiateGONetParticipantEvent"/> in persistent history</item>
+    /// </list>
+    ///
+    /// <para><b>When This Event is Published:</b></para>
+    /// <list type="bullet">
+    /// <item>Player/AI destroys an object through gameplay logic</item>
+    /// <item>Projectile hits target and is removed</item>
+    /// <item>Pickup item is collected and removed</item>
+    /// <item>Any intentional, non-scene-related object removal</item>
+    /// </list>
+    ///
+    /// <para><b>When This Event is NOT Published:</b></para>
+    /// <list type="bullet">
+    /// <item>Scene is unloading (objects destroyed as part of scene lifecycle)</item>
+    /// <item>Application is quitting</item>
+    /// <item>Object is in a DontDestroyOnLoad scene during scene transition</item>
+    /// </list>
+    ///
+    /// <para><b>Usage Example:</b></para>
+    /// <code>
+    /// // Subscribe to gameplay despawns only (not scene unloads)
+    /// GONetMain.EventBus.Subscribe&lt;DespawnGONetParticipantEvent&gt;(evt => {
+    ///     GONetLog.Info($"Object despawned through gameplay: {evt.GONetId}");
+    ///     // Handle gameplay-specific cleanup, scoring, etc.
+    /// });
+    /// </code>
+    ///
+    /// <para>See GONet scene management documentation for complete scene lifecycle details.</para>
     /// </summary>
     [MemoryPackable]
-    public partial class DestroyGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
+    public partial class DespawnGONetParticipantEvent : IPersistentEvent, ICancelOutOtherEvents
     {
         [MemoryPackIgnore]
         public long OccurredAtElapsedTicks { get; set; }
 
+        /// <summary>
+        /// The GONetId of the GONetParticipant being despawned.
+        /// </summary>
         public uint GONetId;
 
         static readonly Type[] otherEventsTypeCancelledOut = new[] {
@@ -362,7 +413,7 @@ namespace GONet
             if (otherEvent is InstantiateGONetParticipantEvent)
             {
                 InstantiateGONetParticipantEvent instantiationEvent = (InstantiateGONetParticipantEvent)otherEvent;
-                return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset && 
+                return instantiationEvent.GONetId != GONetParticipant.GONetId_Unset &&
                     (instantiationEvent.GONetId == GONetId || instantiationEvent.GONetId == GONetMain.GetGONetIdAtInstantiation(GONetId));
             }
             else if (otherEvent is ValueMonitoringSupport_NewBaselineEvent)

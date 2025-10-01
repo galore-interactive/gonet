@@ -23,6 +23,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 using GONetCodeGenerationId = System.Byte;
 using GONetChannelId = System.Byte;
@@ -874,8 +875,8 @@ namespace GONet
             EventBus.Subscribe<GONetParticipantDeserializeInitAllCompletedEvent>(OnDeserializeInitAllCompletedGNPEvent);
             EventBus.Subscribe<GONetParticipantDisabledEvent>(OnDisabledGNPEvent);
 
-            var subscription = EventBus.Subscribe<DestroyGONetParticipantEvent>(OnDestroyGNPEvent_Remote, envelope => envelope.IsSourceRemote);
-            subscription.SetSubscriptionPriority_INTERNAL(int.MinValue); // process internally LAST since the GO will be destroyed and other subscribers may want to do something just prior to it being destroyed
+            var despawnSubscription = EventBus.Subscribe<DespawnGONetParticipantEvent>(OnDespawnGNPEvent_Remote, envelope => envelope.IsSourceRemote);
+            despawnSubscription.SetSubscriptionPriority_INTERNAL(int.MinValue); // process internally LAST since the GO will be destroyed and other subscribers may want to do something just prior to it being destroyed
 
             EventBus.SubscribeAnySyncEvents(OnSyncValueChangeProcessed_Persist_Local);
 
@@ -1295,10 +1296,14 @@ namespace GONet
             }
         }
 
-        private static void OnDestroyGNPEvent_Remote(GONetEventEnvelope<DestroyGONetParticipantEvent> eventEnvelope)
+        /// <summary>
+        /// Handles remote <see cref="DespawnGONetParticipantEvent"/> notifications.
+        /// <para>This is called when a remote client/server despawns a GONetParticipant through gameplay logic
+        /// (e.g., projectile hits, enemy dies, player destroys object).</para>
+        /// <para><b>IMPORTANT:</b> This is NOT called for scene unload destroys, which are local-only.</para>
+        /// </summary>
+        private static void OnDespawnGNPEvent_Remote(GONetEventEnvelope<DespawnGONetParticipantEvent> eventEnvelope)
         {
-            ////GONetLog.Debug("DREETS pork");
-
             GONetParticipant gonetParticipant = null;
             if (gonetParticipantByGONetIdMap.TryGetValue(eventEnvelope.Event.GONetId, out gonetParticipant))
             {
@@ -1306,20 +1311,19 @@ namespace GONet
 
                 if (gonetParticipant == null || gonetParticipant.gameObject == null)
                 {
-                    const string REC = "Received remote notification to destroy a GNP, but Unity says it's already null.  Ensure only the owner (i.e., GNP.IsMine) is the one who calls Unity's Destroy() method and the propogation across the network will be automatic via GONet.";
+                    const string REC = "Received remote notification to despawn a GNP, but Unity says it's already null. Ensure only the owner (i.e., GNP.IsMine) is the one who calls Unity's Destroy() method and the propagation across the network will be automatic via GONet.";
                     GONetLog.Error(REC);
                 }
                 else
                 {
-                    //const string DEAD = "Received remote notification to destroy a GNP.GONetId: ";
-                    //GONetLog.Info(string.Concat(DEAD, gonetParticipant.GONetId));
+                    //GONetLog.Debug($"Received remote notification to despawn a GNP. GONetId: {gonetParticipant.GONetId}");
 
                     UnityEngine.Object.Destroy(gonetParticipant.gameObject);
                 }
             }
             else
             {
-                const string DGNP = "Destroy GONetParticipant event received from remote source, but we have no record of this to destroy it.  GONetId: ";
+                const string DGNP = "Despawn GONetParticipant event received from remote source, but we have no record of this to despawn it. GONetId: ";
                 GONetLog.Warning(string.Concat(DGNP, eventEnvelope.Event.GONetId));
             }
         }
@@ -3154,7 +3158,7 @@ namespace GONet
             instance.IsOKToStartAutoMagicalProcessing = true;
 
             // Track which scene this GNP was spawned in
-            string spawnSceneName = GONetSceneUtils.GetSceneIdentifier(instance.gameObject);
+            string spawnSceneName = GONetSceneManager.GetSceneIdentifier(instance.gameObject);
             if (!string.IsNullOrEmpty(spawnSceneName))
             {
                 RecordParticipantSpawnScene(instance, spawnSceneName);
@@ -4149,13 +4153,68 @@ namespace GONet
             gonetParticipant.IsOKToStartAutoMagicalProcessing = true; // VERY IMPORTANT that this comes AFTER publishing the event so the flood gates to start syncing data come AFTER other parties are made aware of the GNP in the above event!
         }
 
+        /// <summary>
+        /// Determines if a GONetParticipant is being destroyed as a result of scene unloading.
+        /// <para><b>Detection Logic:</b></para>
+        /// <list type="bullet">
+        /// <item>Returns FALSE if object is in DontDestroyOnLoad scene (these objects survive scene unloads)</item>
+        /// <item>Returns TRUE if application is quitting (everything being destroyed)</item>
+        /// <item>Returns TRUE if object's scene is not loaded or is unloading</item>
+        /// <item>Returns FALSE otherwise (true gameplay despawn)</item>
+        /// </list>
+        /// </summary>
+        /// <param name="gonetParticipant">The GONetParticipant being destroyed</param>
+        /// <returns>True if destruction is from scene unload, false if it's an intentional gameplay despawn</returns>
+        private static bool IsDestroyFromSceneUnload(GONetParticipant gonetParticipant)
+        {
+            if (IsApplicationQuitting)
+            {
+                return true; // Application quitting - not a gameplay despawn
+            }
+
+            Scene objectScene = gonetParticipant.gameObject.scene;
+
+            // DontDestroyOnLoad objects are never scene-unload victims
+            // They persist across scene changes and can only be destroyed intentionally
+            if (GONetSceneManager.IsDontDestroyOnLoad(gonetParticipant.gameObject))
+            {
+                return false; // True gameplay despawn (DontDestroyOnLoad objects aren't affected by scene unloads)
+            }
+
+            // Check if the object's scene is unloading or unloaded
+            if (!objectScene.isLoaded)
+            {
+                return true; // Scene is unloaded - destruction is from scene lifecycle
+            }
+
+            // Check GONet's scene manager for scene unloading state
+            if (SceneManager != null)
+            {
+                string sceneName = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
+                if (!string.IsNullOrEmpty(sceneName) && SceneManager.IsSceneUnloading(sceneName))
+                {
+                    return true; // Scene is actively unloading
+                }
+            }
+
+            return false; // None of the scene-unload conditions met - this is a true gameplay despawn
+        }
+
         internal static void OnDestroy_AutoPropagateRemoval_IfAppropriate(GONetParticipant gonetParticipant)
         {
             if (Application.isPlaying)
             {
                 if (IsMine(gonetParticipant) || (IsServer && !Server_IsClientOwnerConnected(gonetParticipant)))
                 {
-                    AutoPropagateInitialDestroy(gonetParticipant);
+                    // Determine if this is a true gameplay despawn or scene unload destruction
+                    bool isSceneUnloadDestroy = IsDestroyFromSceneUnload(gonetParticipant);
+
+                    if (!isSceneUnloadDestroy)
+                    {
+                        // True gameplay despawn: Send despawn event over network
+                        AutoPropagateDespawn(gonetParticipant);
+                    }
+                    // else: Scene unload - don't send any event (coordinated via GONetSceneManager)
                 }
                 else
                 {
@@ -4178,20 +4237,23 @@ namespace GONet
         }
 
         /// <summary>
-        /// PRE: <paramref name="gonetParticipant"/> is owned by me.
+        /// Publishes a <see cref="DespawnGONetParticipantEvent"/> for an intentional gameplay despawn.
+        /// <para><b>PRE:</b> <paramref name="gonetParticipant"/> is owned by me.</para>
+        /// <para>This is used when a GONetParticipant is destroyed through gameplay logic
+        /// (e.g., projectile hits, enemy dies, player destroys object), NOT from scene unloading.</para>
         /// </summary>
-        private static void AutoPropagateInitialDestroy(GONetParticipant gonetParticipant)
+        /// <param name="gonetParticipant">The GONetParticipant being despawned</param>
+        private static void AutoPropagateDespawn(GONetParticipant gonetParticipant)
         {
-            if (gonetParticipant.GONetId == GONetParticipant.GONetId_Unset) // almost impossible for this to be true, but check anyway
+            if (gonetParticipant.GONetId == GONetParticipant.GONetId_Unset)
             {
-                const string NOID = "GONetParticipant that I own was destroyed by me, but it has not been assigned a GONetId yet, which is highly problematic.  Unable to propagate the destroy to others for that reason.  GameObject.name: ";
+                const string NOID = "GONetParticipant that I own was despawned, but it has not been assigned a GONetId yet. Unable to propagate the despawn to others. GameObject.name: ";
                 GONetLog.Error(string.Concat(NOID, gonetParticipant.gameObject.name));
                 return;
             }
 
-            DestroyGONetParticipantEvent @event = new DestroyGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
-            //GONetLog.Debug("Publish DestroyGONetParticipantEvent now."); /////////////////////////// DREETS!
-            EventBus.Publish(@event); // this causes the auto propagation via local handler to send to all remotes (i.e., all clients if server, server if client)
+            DespawnGONetParticipantEvent @event = new DespawnGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
+            EventBus.Publish(@event);
         }
 
         static readonly HashSet<int> definedInSceneParticipantInstanceIDs = new HashSet<int>();
@@ -4208,7 +4270,7 @@ namespace GONet
                 definedInSceneParticipantInstanceIDs.Add(gonetParticipant.GetInstanceID());
 
                 // Track which scene this GNP was defined in
-                string sceneName = GONetSceneUtils.GetSceneIdentifier(gonetParticipant.gameObject);
+                string sceneName = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
                 if (!string.IsNullOrEmpty(sceneName))
                 {
                     participantInstanceID_to_SpawnSceneName[gonetParticipant.GetInstanceID()] = sceneName;

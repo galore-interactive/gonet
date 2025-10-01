@@ -17,6 +17,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using GONet.Utils;
+
 
 #if ADDRESSABLES_AVAILABLE
 using UnityEngine.AddressableAssets;
@@ -978,5 +980,44 @@ namespace GONet
             addressableSceneHandles.Clear();
         }
 #endif
+
+        // ========================================
+        // SCENE UTILITIES (formerly GONetSceneUtils)
+        // ========================================
+
+        /// <summary>
+        /// Reliably determines if a GameObject is in DontDestroyOnLoad.
+        /// Works in both Editor and Build.
+        /// In Editor: scene.name == "DontDestroyOnLoad"
+        /// In Build: scene is null or invalid
+        /// </summary>
+        public static bool IsDontDestroyOnLoad(GameObject gameObject)
+        {
+            if (gameObject == null) return false;
+
+            Scene scene = gameObject.scene;
+
+            // Fast path: Check validity first (fastest check)
+            // Build: invalid scene = DDOL
+            if (!scene.IsValid())
+                return true;
+
+            // Slower path: String comparison (only if scene is valid)
+            // Editor: scene name is "DontDestroyOnLoad"
+            return scene.name == HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE;
+        }
+
+        /// <summary>
+        /// Gets scene identifier for networked scene association.
+        /// Returns "DontDestroyOnLoad" for DDOL objects, scene name otherwise.
+        /// </summary>
+        public static string GetSceneIdentifier(GameObject gameObject)
+        {
+            if (IsDontDestroyOnLoad(gameObject))
+                return HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE;
+
+            Scene scene = gameObject.scene;
+            return scene.IsValid() ? scene.name : string.Empty;
+        }
     }
 }
