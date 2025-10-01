@@ -266,23 +266,75 @@ namespace GONet
             }
 
             // Check if we're being added to an already-ready GONetParticipant
-            if (gonetParticipant != null && IsGONetFullyReady())
+            // Wrap in try-catch to handle any edge cases during initialization
+            try
             {
-                // Participant is already fully ready - we're being added at runtime
-                WasAddedAtRuntime = true;
+                if (gonetParticipant != null && IsGONetFullyReady())
+                {
+                    // Participant is already fully ready - we're being added at runtime
+                    WasAddedAtRuntime = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                // If we can't determine runtime status, default to false (design-time)
+                // This ensures we don't break initialization even in unexpected scenarios
+                GONetLog.Warning($"[GONetBehaviour] Could not determine WasAddedAtRuntime status for '{GetType().Name}' on '{gameObject?.name ?? "unknown"}': {ex.Message}");
+                WasAddedAtRuntime = false;
             }
         }
 
         /// <summary>
         /// Checks if the associated GONetParticipant is fully initialized and ready for use.
-        /// This means GONetId is assigned and GONetLocal is available in the lookup.
+        /// This means:
+        /// - GONetId is assigned
+        /// - GONetLocal is available in the lookup
+        /// - Client/Server status is known
+        /// - If client, fully initialized with server
         /// </summary>
         private bool IsGONetFullyReady()
         {
-            return gonetParticipant != null
-                && gonetParticipant.GONetId != 0
-                && GONetLocal.LookupByAuthorityId != null
-                && GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId] != null;
+            // Check basic participant initialization
+            if (gonetParticipant == null || gonetParticipant.GONetId == 0)
+            {
+                return false;
+            }
+
+            // Check client/server status is known
+            if (!GONetMain.IsClientVsServerStatusKnown)
+            {
+                return false;
+            }
+
+            // If we're a client, ensure client instance exists and is fully initialized
+            if (GONetMain.IsClient)
+            {
+                if (GONetMain.GONetClient == null)
+                {
+                    return false; // Client but no client instance - not ready
+                }
+
+                if (!GONetMain.GONetClient.IsInitializedWithServer)
+                {
+                    return false; // Client exists but not initialized with server
+                }
+            }
+
+            // Check GONetLocal lookup is available
+            if (GONetLocal.LookupByAuthorityId == null)
+            {
+                return false;
+            }
+
+            // Use the indexer to look up the GONetLocal for this participant's authority ID
+            // The indexer returns null if not found (safe, no exceptions)
+            GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
+            if (local == null)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         protected override void Start()
@@ -292,7 +344,14 @@ namespace GONet
             // If added at runtime to already-ready participant, call OnGONetReady() now
             if (WasAddedAtRuntime && IsGONetFullyReady())
             {
-                OnGONetReady(gonetParticipant);
+                try
+                {
+                    OnGONetReady(gonetParticipant);
+                }
+                catch (Exception ex)
+                {
+                    GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for runtime-added component '{GetType().Name}' on '{gameObject.name}': {ex.Message}\n{ex.StackTrace}");
+                }
             }
         }
 
@@ -332,7 +391,14 @@ namespace GONet
                 // Runtime-added components get this called from Start() instead
                 if (!WasAddedAtRuntime)
                 {
-                    OnGONetReady(gonetParticipant);
+                    try
+                    {
+                        OnGONetReady(gonetParticipant);
+                    }
+                    catch (Exception ex)
+                    {
+                        GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for design-time component '{GetType().Name}' on '{gameObject.name}': {ex.Message}\n{ex.StackTrace}");
+                    }
                 }
             }
         }
@@ -394,7 +460,10 @@ namespace GONet
         ///   <item><description><see cref="GONetParticipant.GONetId"/> is assigned (non-zero)</description></item>
         ///   <item><description><see cref="GONetParticipant.OwnerAuthorityId"/> is assigned</description></item>
         ///   <item><description><see cref="GONetMain.IsServer"/> and <see cref="GONetMain.MyAuthorityId"/> are valid</description></item>
+        ///   <item><description><see cref="GONetMain.IsClientVsServerStatusKnown"/> is true (client/server role is determined)</description></item>
+        ///   <item><description>If client: <see cref="GONetClient.IsInitializedWithServer"/> is true (fully connected and initialized)</description></item>
         ///   <item><description><see cref="GONetLocal"/> instances are available in <see cref="GONetLocal.LookupByAuthorityId"/></description></item>
+        ///   <item><description>This participant's <see cref="GONetLocal"/> is registered in the lookup dictionary</description></item>
         ///   <item><description>All auto-magical syncs are initialized</description></item>
         ///   <item><description>RPCs can be called safely</description></item>
         /// </list>
