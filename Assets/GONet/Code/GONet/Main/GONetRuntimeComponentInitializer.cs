@@ -55,6 +55,25 @@ namespace GONet
     ///     <item><description>Multiple initializers can safely target the same component type across different scenes</description></item>
     ///     <item><description>The selected component type must have a parameterless constructor (standard Unity requirement)</description></item>
     /// </list>
+    ///
+    /// <para><b>CRITICAL - This is NOT a Networked Operation:</b></para>
+    /// <para>GONetRuntimeComponentInitializer adds components LOCALLY on each machine - it does NOT synchronize component addition across the network.
+    /// Each client and server must have the same initializer in their scene to ensure the component exists on all machines.
+    /// This is NOT auto-magical networking - you must design your scenes so all machines execute the same initialization.</para>
+    ///
+    /// <para><b>CRITICAL - Lifecycle Differences:</b></para>
+    /// <para>Components added via GONetRuntimeComponentInitializer have a DIFFERENT lifecycle than design-time components:</para>
+    /// <list type="bullet">
+    ///     <item><description><b>Design-time components:</b> Receive OnGONetParticipantEnabled → OnGONetParticipantStarted → OnGONetParticipantDeserializeInitAllCompleted → OnGONetReady</description></item>
+    ///     <item><description><b>Runtime-added components:</b> ONLY receive OnGONetReady (called from Unity's Start)</description></item>
+    /// </list>
+    ///
+    /// <para><b>RECOMMENDED:</b> Components that may be added at runtime should use <see cref="GONetParticipantCompanionBehaviour.OnGONetReady()"/>
+    /// for initialization instead of <see cref="GONetParticipantCompanionBehaviour.OnGONetParticipantStarted()"/>. OnGONetReady() provides the same
+    /// guarantees (GONetId assigned, OwnerAuthorityId set, GONetLocal available, RPCs ready) and works correctly in BOTH scenarios.</para>
+    ///
+    /// <para><b>WARNING:</b> This is the ONLY officially supported way to add GONetParticipantCompanionBehaviour components at runtime.
+    /// Using Unity's AddComponent() directly is NOT supported and will cause lifecycle issues.</para>
     /// </summary>
     public class GONetRuntimeComponentInitializer : MonoBehaviour
     {

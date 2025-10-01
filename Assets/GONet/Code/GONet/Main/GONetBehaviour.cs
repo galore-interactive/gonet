@@ -173,12 +173,18 @@ namespace GONet
         public virtual void OnGONetParticipantDisabled(GONetParticipant gonetParticipant) { }
 
         /// <summary>
-        /// Since there is some order of operations differences between machines who instantiate a new <see cref="GONetParticipant"/> and others in regards to 
-        /// at what point the <see cref="GONetParticipant.OwnerAuthorityId"/> is set AND one of those differences is the value not being set at the point of 
+        /// Since there is some order of operations differences between machines who instantiate a new <see cref="GONetParticipant"/> and others in regards to
+        /// at what point the <see cref="GONetParticipant.OwnerAuthorityId"/> is set AND one of those differences is the value not being set at the point of
         /// the call to <see cref="OnGONetParticipantStarted(GONetParticipant)"/>, this method exists to have a callback.
         /// </summary>
         /// <param name="gonetParticipant"></param>
         public virtual void OnGONetParticipant_OwnerAuthorityIdSet(GONetParticipant gonetParticipant) { }
+
+        /// <summary>
+        /// Called when GONet is fully initialized and ready for use. This is the recommended hook for initializing components.
+        /// See <see cref="GONetParticipantCompanionBehaviour.OnGONetReady()"/> for full documentation of guarantees.
+        /// </summary>
+        public virtual void OnGONetReady(GONetParticipant gonetParticipant) { }
 
         /// <param name="uniqueTickHz">how many times a second this unique frequency is called at...there are many possibilities since each GONet sync settings profile can have its frequency set to a different value</param>
         /// <param name="elapsedSeconds"></param>
@@ -200,17 +206,31 @@ namespace GONet
 
     /// <summary>
     /// <para>
-    /// For <see cref="GameObject"/>s that have a <see cref="GONet.GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can 
+    /// For <see cref="GameObject"/>s that have a <see cref="GONet.GONetParticipant"/> "installed" on them, the other <see cref="MonoBehaviour"/>s also "installed" can
     /// optionally extend this class to automatically have a reference to the <see cref="GONetParticipant"/> instance to reference it when making decisions
     /// on what to execute.  The most common example is to use <see cref="GONetParticipant.IsMine"/> to know whether or not to execute some game logic or not so that
     /// the logic is only executed on the owner's machine and the networking will handle the rest so the other machines will see the results of the game logic being
     /// executed by "the owner."
     /// </para>
     /// <para>
-    /// It is also important to know that a <see cref="MonoBehaviour"/> that extends this class can be "installed" on a child <see cref="GameObject"/> of where the 
-    /// <see cref="GONetParticipant"/> is "installed" and this class will look up to the parent to find the nearest "installed" <see cref="GONetParticipant"/> and 
+    /// It is also important to know that a <see cref="MonoBehaviour"/> that extends this class can be "installed" on a child <see cref="GameObject"/> of where the
+    /// <see cref="GONetParticipant"/> is "installed" and this class will look up to the parent to find the nearest "installed" <see cref="GONetParticipant"/> and
     /// reference that.  This is helpful when some game logic is present in children that is relevant to networking stuffs and you want to keep it that way.
     /// </para>
+    ///
+    /// <para><b>CRITICAL: Runtime Component Addition</b></para>
+    /// <para>GONetParticipantCompanionBehaviour components are designed to be present on GameObjects from scene load (design-time).
+    /// If you need to add these components at runtime, you MUST use <see cref="GONetRuntimeComponentInitializer"/> - this is the ONLY
+    /// officially supported method. Using Unity's AddComponent() directly is NOT supported and will cause lifecycle issues.</para>
+    ///
+    /// <para><b>Lifecycle Differences:</b></para>
+    /// <list type="bullet">
+    ///   <item><description><b>Design-time:</b> Full lifecycle - OnGONetParticipantEnabled → OnGONetParticipantStarted → OnGONetParticipantDeserializeInitAllCompleted → OnGONetReady</description></item>
+    ///   <item><description><b>Runtime (via GONetRuntimeComponentInitializer):</b> Simplified lifecycle - OnGONetReady only (called from Start)</description></item>
+    /// </list>
+    ///
+    /// <para><b>RECOMMENDED:</b> Use <see cref="OnGONetReady()"/> for initialization. It works correctly in both design-time and runtime scenarios
+    /// with the same guarantees (GONetId assigned, OwnerAuthorityId set, GONetLocal available, RPCs ready).</para>
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     public abstract class GONetParticipantCompanionBehaviour : GONetBehaviour
@@ -219,6 +239,19 @@ namespace GONet
         public GONetParticipant GONetParticipant => gonetParticipant;
 
         protected GONetParticipant gonetParticipant;
+
+        /// <summary>
+        /// <para>Indicates whether this component was added at runtime (after the GONetParticipant was already fully initialized).</para>
+        /// <para>This is set during Awake() and used to determine the proper lifecycle callback sequence.</para>
+        ///
+        /// <para><b>IMPORTANT:</b> The ONLY officially supported way to add GONetParticipantCompanionBehaviour components at runtime
+        /// is via <see cref="GONetRuntimeComponentInitializer"/>. Using Unity's AddComponent() directly is NOT recommended
+        /// and may result in unexpected behavior.</para>
+        ///
+        /// <para><b>Design-time (False):</b> Component was present in the scene when it loaded.</para>
+        /// <para><b>Runtime (True):</b> Component was added via <see cref="GONetRuntimeComponentInitializer"/> after scene load.</para>
+        /// </summary>
+        public bool WasAddedAtRuntime { get; private set; }
 
         protected override void Awake()
         {
@@ -230,6 +263,36 @@ namespace GONet
             {
                 gonetParticipant = xform.gameObject.GetComponent<GONetParticipant>();
                 xform = xform.parent;
+            }
+
+            // Check if we're being added to an already-ready GONetParticipant
+            if (gonetParticipant != null && IsGONetFullyReady())
+            {
+                // Participant is already fully ready - we're being added at runtime
+                WasAddedAtRuntime = true;
+            }
+        }
+
+        /// <summary>
+        /// Checks if the associated GONetParticipant is fully initialized and ready for use.
+        /// This means GONetId is assigned and GONetLocal is available in the lookup.
+        /// </summary>
+        private bool IsGONetFullyReady()
+        {
+            return gonetParticipant != null
+                && gonetParticipant.GONetId != 0
+                && GONetLocal.LookupByAuthorityId != null
+                && GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId] != null;
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+
+            // If added at runtime to already-ready participant, call OnGONetReady() now
+            if (WasAddedAtRuntime && IsGONetFullyReady())
+            {
+                OnGONetReady(gonetParticipant);
             }
         }
 
@@ -264,6 +327,23 @@ namespace GONet
             if (gonetParticipant == this.gonetParticipant)
             {
                 OnGONetParticipantDeserializeInitAllCompleted();
+
+                // Call the unified OnGONetReady() hook for design-time added components
+                // Runtime-added components get this called from Start() instead
+                if (!WasAddedAtRuntime)
+                {
+                    OnGONetReady(gonetParticipant);
+                }
+            }
+        }
+
+        public override void OnGONetReady(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetReady(gonetParticipant);
+
+            if (gonetParticipant == this.gonetParticipant)
+            {
+                OnGONetReady();
             }
         }
 
@@ -304,6 +384,34 @@ namespace GONet
         public virtual void OnGONetParticipantDisabled() { }
 
         public virtual void OnGONetParticipant_OwnerAuthorityIdSet() { }
+
+        /// <summary>
+        /// <para><b>THE UNIFIED INITIALIZATION HOOK</b> - Called when GONet is fully initialized and ready for use.</para>
+        /// <para>This is the RECOMMENDED hook for initializing GONetParticipantCompanionBehaviour components.</para>
+        ///
+        /// <para><b>GUARANTEED when this is called:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="GONetParticipant.GONetId"/> is assigned (non-zero)</description></item>
+        ///   <item><description><see cref="GONetParticipant.OwnerAuthorityId"/> is assigned</description></item>
+        ///   <item><description><see cref="GONetMain.IsServer"/> and <see cref="GONetMain.MyAuthorityId"/> are valid</description></item>
+        ///   <item><description><see cref="GONetLocal"/> instances are available in <see cref="GONetLocal.LookupByAuthorityId"/></description></item>
+        ///   <item><description>All auto-magical syncs are initialized</description></item>
+        ///   <item><description>RPCs can be called safely</description></item>
+        /// </list>
+        ///
+        /// <para><b>Works in ALL scenarios:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><b>Design-time:</b> Component present in scene - called after <see cref="OnGONetParticipantDeserializeInitAllCompleted()"/></description></item>
+        ///   <item><description><b>Runtime:</b> Component added via <see cref="GONetRuntimeComponentInitializer"/> - called from <see cref="Start()"/> (RECOMMENDED method)</description></item>
+        /// </list>
+        ///
+        /// <para><b>CRITICAL:</b> If adding components at runtime, you MUST use <see cref="GONetRuntimeComponentInitializer"/>.
+        /// Using Unity's AddComponent() directly is NOT officially supported and may cause lifecycle issues.</para>
+        ///
+        /// <para><b>TIP:</b> Use <see cref="WasAddedAtRuntime"/> to determine if this component was added at runtime vs design-time if you need
+        /// different initialization logic for each case.</para>
+        /// </summary>
+        public virtual void OnGONetReady() { }
 
         #region RPC Support
         // 0 parameters

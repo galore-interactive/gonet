@@ -122,21 +122,81 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         });
     }
 
-    public override void OnGONetParticipantStarted()
+    public override void OnGONetReady()
     {
-        base.OnGONetParticipantStarted();
+        base.OnGONetReady();
 
-        // Now we have a valid GONetId and OwnerAuthorityId
+        // This hook is called whether this component was added at design-time or runtime
+        // GONetId, OwnerAuthorityId, GONetLocal lookups, etc. are ALL guaranteed to be ready
         localAuthorityId = GONetMain.MyAuthorityId;
         localDisplayName = (GONetMain.IsServer || IsServerAuthorityId(localAuthorityId)) ? "Server" : $"Player_{localAuthorityId}";
 
-        // Don't add ourselves here - let OnGONetParticipantEnabled handle it
+        GONetLog.Info($"[CHAT-DEBUG] OnGONetReady - localAuthorityId: {localAuthorityId}, IsServer: {GONetMain.IsServer}, GONetId: {gonetParticipant?.GONetId ?? 0}, WasAddedAtRuntime: {WasAddedAtRuntime}");
+
+        // CRITICAL: Scan for existing GONetLocal participants that may have been enabled before this chat system was added
+        // This handles the case where GONetRuntimeComponentInitializer adds us AFTER participants are already active
+        ScanForExistingParticipants();
+
+        // CRITICAL: Auto-register ourselves (server or client) if not already in the participants list
+        // This handles scenes without GONetLocal player objects where we still want chat to work
+        if (!participants.Any(p => p.AuthorityId == localAuthorityId))
+        {
+            var self = new ChatParticipant
+            {
+                AuthorityId = localAuthorityId,
+                DisplayName = localDisplayName,
+                IsServer = GONetMain.IsServer || IsServerAuthorityId(localAuthorityId),
+                Status = ConnectionStatus.Connected
+            };
+            participants.Add(self);
+            GONetLog.Info($"[CHAT-DEBUG] Auto-registered self: {localDisplayName} (authority {localAuthorityId}). Total participants: {participants.Count}");
+
+            // If server, broadcast the updated list
+            if (GONetMain.IsServer)
+            {
+                CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
+            }
+        }
 
         // If client, register with server after a short delay
         // Note: Persistent RPCs will automatically provide current state
         if (!GONetMain.IsServer)
         {
             StartCoroutine(RegisterAfterDelay());
+        }
+    }
+
+    private void ScanForExistingParticipants()
+    {
+        GONetLog.Info($"[CHAT-DEBUG] Scanning for existing GONetLocal participants using GONet framework...");
+
+        // Use GONet's internal tracking system instead of FindObjectsOfType
+        // GONetLocal.LookupByAuthorityId provides access to all GONetLocal instances via static dictionary
+        if (GONetLocal.LookupByAuthorityId != null)
+        {
+            int count = 0;
+            foreach (var kvp in GONetLocal.LookupByAuthorityId)
+            {
+                ushort authorityId = kvp.Key;
+                GONetLocal local = kvp.Value;
+                count++;
+
+                if (local != null && local.TryGetComponent(out GONetParticipant gnp) && gnp.enabled)
+                {
+                    GONetLog.Info($"[CHAT-DEBUG] Found GONetLocal for authority {authorityId} ('{local.name}')");
+                    // Manually trigger the participant enabled logic
+                    OnGONetParticipantEnabled(gnp);
+                }
+                else
+                {
+                    GONetLog.Info($"[CHAT-DEBUG] Skipping GONetLocal for authority {authorityId} - component null or disabled");
+                }
+            }
+            GONetLog.Info($"[CHAT-DEBUG] Scanned {count} GONetLocal instances from framework");
+        }
+        else
+        {
+            GONetLog.Info($"[CHAT-DEBUG] GONetLocal.LookupByAuthorityId is null - no participants registered yet");
         }
     }
 
@@ -150,10 +210,14 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         base.OnGONetParticipantEnabled(gonetParticipant);
 
+        GONetLog.Info($"[CHAT-DEBUG] OnGONetParticipantEnabled called for '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId})");
+
         // Check if this participant has a GONetLocal component (represents a player)
         if (gonetParticipant.TryGetComponent(out GONetLocal gonetLocal))
         {
             ushort authorityId = gonetLocal.OwnerAuthorityId;
+
+            GONetLog.Info($"[CHAT-DEBUG] Found GONetLocal with authorityId: {authorityId}, already tracked: {participants.Any(p => p.AuthorityId == authorityId)}");
 
             // Skip if already tracked
             if (participants.Any(p => p.AuthorityId == authorityId))
@@ -170,6 +234,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             };
 
             participants.Add(newParticipant);
+
+            GONetLog.Info($"[CHAT-DEBUG] Added participant {authorityId} to list. Total participants: {participants.Count}");
 
             // Show join message (skip for ourselves)
             if (authorityId != localAuthorityId)
@@ -189,6 +255,10 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
             {
                 CallRpc(nameof(BroadcastParticipantUpdate), participants.ToArray());
             }
+        }
+        else
+        {
+            GONetLog.Info($"[CHAT-DEBUG] Participant '{gonetParticipant.name}' does not have GONetLocal component - skipping");
         }
     }
 
@@ -908,6 +978,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         if (string.IsNullOrEmpty(currentInputText))
             return;
 
+        GONetLog.Info($"[CHAT-DEBUG] SendCurrentMessage called. Mode: {currentChatMode}, Participants count: {participants.Count}, GONetId: {gonetParticipant?.GONetId ?? 0}, IsMine: {gonetParticipant?.IsMine ?? false}");
+
         // Filter profanity locally if server (client-side preview only - real filtering happens server-side)
         string finalContent = GONetMain.IsServer ? FilterProfanity(currentInputText) : currentInputText;
 
@@ -921,6 +993,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 foreach (var p in participants)
                 {
                     uniqueTargets.Add(p.AuthorityId);
+                    GONetLog.Info($"[CHAT-DEBUG] Adding participant {p.AuthorityId} to targets (Status: {p.Status})");
                 }
                 break;
 
@@ -937,6 +1010,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         CurrentMessageTargets = uniqueTargets.ToList();
 
+        GONetLog.Info($"[CHAT-DEBUG] Calling SendMessage RPC with {uniqueTargets.Count} targets: [{string.Join(", ", uniqueTargets)}]");
+
         // Example of async RPC calling with delivery report handling
         // This demonstrates the new CallRpcAsync<TReturn, T1, T2, T3, T4, T5> pattern for complex RPCs
         CallRpcAsync<RpcDeliveryReport, string, string, ChatType, ushort, ushort[]>(
@@ -951,7 +1026,11 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                 // Handle delivery failures gracefully - common in networked environments
                 if (task.Result.FailedDelivery?.Length > 0)
                 {
-                    GONetLog.Warning($"Failed to deliver to some recipients: {task.Result.FailureReason}");
+                    GONetLog.Warning($"[CHAT-DEBUG] Failed to deliver to some recipients: {task.Result.FailureReason}");
+                }
+                else
+                {
+                    GONetLog.Info($"[CHAT-DEBUG] SendMessage RPC completed successfully");
                 }
             });
 
