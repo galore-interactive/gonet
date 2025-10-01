@@ -75,10 +75,16 @@ namespace GONet
             {
                 bool before = IsInitializedWithServer;
 
+                GONetLog.Info($"[INIT] GONetClient.IsInitializedWithServer setter called - value: {value}, before: {before}, IsConnectedToServer: {IsConnectedToServer}, ConnectionState: {ConnectionState}");
+
                 isInitializedWithServer = value;
+
+                bool after = IsInitializedWithServer;
+                GONetLog.Info($"[INIT] After setting isInitializedWithServer field - IsInitializedWithServer property: {after}, will fire event: {!before && after}");
 
                 if (!before && IsInitializedWithServer)
                 {
+                    GONetLog.Info($"[INIT] Firing InitializedWithServer event");
                     InitializedWithServer?.Invoke(this);
                 }
             }

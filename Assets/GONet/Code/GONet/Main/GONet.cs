@@ -545,7 +545,13 @@ namespace GONet
 
         private static void Client_gonetClient_InitializedWithServer(GONetClient client)
         {
+            GONetLog.Info($"[INIT] Client_gonetClient_InitializedWithServer() called - about to instantiate GONetLocal prefab");
             MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
+
+            // CRITICAL: Move GONetLocal to DontDestroyOnLoad scene IMMEDIATELY after instantiation
+            // This prevents it from being incorrectly recorded as "defined in scene" if a scene load is in progress
+            UnityEngine.Object.DontDestroyOnLoad(MyLocal.gameObject);
+            GONetLog.Info($"[INIT] GONetLocal instantiated and moved to DontDestroyOnLoad scene - MyLocal GONetId: {(MyLocal?.GONetParticipant?.GONetId ?? 0)}");
 
             while (client.incomingNetworkData_mustProcessAfterClientInitialized.Count > 0)
             {
@@ -4168,10 +4174,12 @@ namespace GONet
 
         private static void Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL(GONetParticipant gonetParticipant)
         {
-            //GONetLog.Debug($"Start GNP...was defined in scene? {WasDefinedInScene(gonetParticipant)}...name: {gonetParticipant.gameObject.name} instanceId: {gonetParticipant.GetInstanceID()}");
+            bool wasDefinedInScene = WasDefinedInScene(gonetParticipant);
+            GONetLog.Info($"[SPAWN] Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL - name: '{gonetParticipant.gameObject.name}', wasDefinedInScene: {wasDefinedInScene}, IsServer: {IsServer}, IsClient: {IsClient}");
 
-            if (WasDefinedInScene(gonetParticipant))
+            if (wasDefinedInScene)
             {
+                GONetLog.Info($"[SPAWN] '{gonetParticipant.gameObject.name}' was defined in scene - will only assign GONetId on server, NO spawn event propagation");
                 if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
                 {
                     AssignGONetIdRaw_IfAppropriate(gonetParticipant);
@@ -4180,6 +4188,8 @@ namespace GONet
             else
             {
                 bool isThisCondisideredTheMomentOfInitialInstantiation = !remoteSpawns_avoidAutoPropagateSupport.Contains(gonetParticipant);
+                GONetLog.Info($"[SPAWN] '{gonetParticipant.gameObject.name}' NOT defined in scene - isThisCondisideredTheMomentOfInitialInstantiation: {isThisCondisideredTheMomentOfInitialInstantiation}");
+
                 if (isThisCondisideredTheMomentOfInitialInstantiation)
                 {
                     if (IsClient && GONetSpawnSupport_Runtime.IsMarkedToBeRemotelyControlled(gonetParticipant))
@@ -4191,8 +4201,11 @@ namespace GONet
                         gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
                     }
 
+                    GONetLog.Info($"[SPAWN] About to assign GONetId and publish spawn event for '{gonetParticipant.gameObject.name}'");
                     AssignGONetIdRaw_IfAppropriate(gonetParticipant);
+                    GONetLog.Info($"[SPAWN] Assigned GONetId {gonetParticipant.GONetId} to '{gonetParticipant.gameObject.name}'");
                     AutoPropagateInitialInstantiation(gonetParticipant);
+                    GONetLog.Info($"[SPAWN] Published spawn event for '{gonetParticipant.gameObject.name}' with GONetId {gonetParticipant.GONetId}");
                     OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(gonetParticipant); // we now know this was instantiated (by local source...remote source is processed like this elsewhere)....scene stuff gets this called automatically elsewhere
                 }
                 else
@@ -5074,10 +5087,19 @@ namespace GONet
                             for (int iConnection = 0; iConnection < _gonetServer.numConnections; ++iConnection)
                             {
                                 GONetConnection_ServerToClient gONetConnection_ServerToClient = _gonetServer.remoteClients[iConnection].ConnectionToClient;
+                                GONetRemoteClient remoteClient = _gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId);
+                                bool isInitialized = remoteClient.IsInitializedWithServer;
+
+                                // IMPORTANT: Log why AutoMagicalSync messages are NOT sent to specific clients
+                                if (!isInitialized && bundleFragments.fragmentCount > 0)
+                                {
+                                    GONetLog.Warning($"[SYNC-BLOCKED] Server NOT sending AutoMagicalSync to AuthorityId {gONetConnection_ServerToClient.OwnerAuthorityId} - client IsInitializedWithServer: {isInitialized}");
+                                }
+
                                 for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
                                 {
                                     //GONetLog.Debug("AutoMagicalSync_ValueChanges_Message sending right after this. bytesUsedCount: " + bundleFragments.fragmentBytesUsedCount[iFragment]);  /////////////////////////// DREETS!
-                                    if (_gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId).IsInitializedWithServer) // only send to client initialized with server!
+                                    if (isInitialized) // only send to client initialized with server!
                                     {
                                         SendBytesToRemoteConnection(gONetConnection_ServerToClient, bundleFragments.fragmentBytes[iFragment], bundleFragments.fragmentBytesUsedCount[iFragment], useThisChannelId);
                                     }
