@@ -100,6 +100,24 @@ namespace GONet
         public event SceneLoadDelegate OnSceneLoadCompleted;
 
         /// <summary>
+        /// Extensibility hook for custom late-joiner scene synchronization logic.
+        /// Called when client receives a scene load event before processing it.
+        /// Return false to skip the scene load (e.g., if already in the target scene).
+        /// Parameters: (sceneName, mode) → bool shouldLoad
+        /// </summary>
+        public delegate bool ShouldProcessSceneLoadDelegate(string sceneName, LoadSceneMode mode);
+
+        /// <summary>
+        /// Client-side hook to customize scene load processing for late-joiners.
+        /// Use this to implement custom logic such as:
+        /// - Skipping scene load if already in target scene
+        /// - Filtering out stale scene changes
+        /// - Custom scene transition validation
+        /// Return true to proceed with scene load, false to skip.
+        /// </summary>
+        public event ShouldProcessSceneLoadDelegate OnShouldProcessSceneLoad;
+
+        /// <summary>
         /// Called when scene unload begins
         /// </summary>
         public event SceneLoadDelegate OnSceneUnloadStarted;
@@ -491,6 +509,28 @@ namespace GONet
                 return;
 
             GONetLog.Info($"[GONetSceneManager] Client received scene load: {evt.SceneName} ({evt.LoadType}, {evt.Mode})");
+
+            // Check if already in target scene (Single mode only - skip unnecessary reload)
+            if (evt.Mode == LoadSceneMode.Single)
+            {
+                Scene activeScene = SceneManager.GetActiveScene();
+                if (activeScene.name == evt.SceneName)
+                {
+                    GONetLog.Info($"[GONetSceneManager] Already in scene '{evt.SceneName}' - skipping scene load");
+                    return;
+                }
+            }
+
+            // Invoke extensibility hook for custom late-joiner logic
+            if (OnShouldProcessSceneLoad != null)
+            {
+                bool shouldProcess = OnShouldProcessSceneLoad(evt.SceneName, evt.Mode);
+                if (!shouldProcess)
+                {
+                    GONetLog.Info($"[GONetSceneManager] Custom validation skipped scene load: {evt.SceneName}");
+                    return;
+                }
+            }
 
             bool isClientInitialized = GONetMain.IsClient && GONetMain.GONetClient != null && GONetMain.GONetClient.IsInitializedWithServer;
 

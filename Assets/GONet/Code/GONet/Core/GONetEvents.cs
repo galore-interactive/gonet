@@ -892,9 +892,34 @@ namespace GONet
     /// Persistent event for scene loading.
     /// Server publishes this when loading a scene, clients receive and load accordingly.
     /// Late-joining clients receive this event to sync scene state.
+    ///
+    /// <para><b>Cancellation Behavior (LoadSceneMode.Single only):</b></para>
+    /// <para>When loading a scene with LoadSceneMode.Single, this event cancels ALL previous SceneLoadEvent instances
+    /// from the persistent event history. This prevents late-joining clients from experiencing sequential scene loads
+    /// that already-connected clients never saw.</para>
+    ///
+    /// <para><b>Example Problem Without Cancellation:</b></para>
+    /// <list type="bullet">
+    /// <item>Server loads Scene A (Single mode) → SceneLoadEvent #1 persists</item>
+    /// <item>Server loads Scene B (Single mode) → SceneLoadEvent #2 persists</item>
+    /// <item>Server loads Scene C (Single mode) → SceneLoadEvent #3 persists</item>
+    /// <item>Late-joiner connects → Receives all 3 events → Loads A, then B, then C (confusion!)</item>
+    /// </list>
+    ///
+    /// <para><b>Solution With Cancellation:</b></para>
+    /// <list type="bullet">
+    /// <item>Server loads Scene A (Single mode) → SceneLoadEvent #1 persists</item>
+    /// <item>Server loads Scene B (Single mode) → SceneLoadEvent #2 persists, cancels #1</item>
+    /// <item>Server loads Scene C (Single mode) → SceneLoadEvent #3 persists, cancels #2</item>
+    /// <item>Late-joiner connects → Receives only event #3 → Loads C directly (correct!)</item>
+    /// </list>
+    ///
+    /// <para><b>Additive Mode Behavior:</b></para>
+    /// <para>LoadSceneMode.Additive events do NOT cancel previous loads, as additive scenes
+    /// are meant to stack on top of existing scenes.</para>
     /// </summary>
     [MemoryPackable]
-    public partial class SceneLoadEvent : IPersistentEvent
+    public partial class SceneLoadEvent : IPersistentEvent, ICancelOutOtherEvents
     {
         public long OccurredAtElapsedTicks { get; set; }
 
@@ -927,6 +952,32 @@ namespace GONet
         /// For Addressables: Loading priority
         /// </summary>
         public int Priority = 100;
+
+        static readonly Type[] otherEventsTypeCancelledOut = new[] {
+            typeof(SceneLoadEvent)
+        };
+
+        [MemoryPackIgnore]
+        public Type[] OtherEventTypesCancelledOut => otherEventsTypeCancelledOut;
+
+        public bool DoesCancelOutOtherEvent(IGONetEvent otherEvent)
+        {
+            // Only LoadSceneMode.Single cancels previous scene loads
+            // Additive scenes should stack, not replace
+            if (Mode != UnityEngine.SceneManagement.LoadSceneMode.Single)
+            {
+                return false;
+            }
+
+            if (otherEvent is SceneLoadEvent previousLoadEvent)
+            {
+                // Cancel ALL previous SceneLoadEvent instances when loading in Single mode
+                // This ensures late-joiners only see the most recent scene state
+                return true;
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
