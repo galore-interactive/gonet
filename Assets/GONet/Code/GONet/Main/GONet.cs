@@ -5917,12 +5917,6 @@ namespace GONet
         {
             //if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message)) GONetLog.Debug($"remote source sent us at rest bundle.");
 
-            // IMPORTANT: Log when Client:2 receives AutoMagicalSync messages
-            if (IsClient)
-            {
-                GONetLog.Info($"[SYNC-RX] Client received {chosenBundleType.Name} on channel {channelId} from authority {sourceOfChangeConnection?.OwnerAuthorityId ?? 0}");
-            }
-
             uint gonetId_previous = 0;
 
             while (true)
