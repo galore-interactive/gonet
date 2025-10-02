@@ -287,7 +287,12 @@ namespace GONet
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
-            @event.DesignTimeLocation = gonetParticipant.DesignTimeLocation;
+
+            // CRITICAL: Force metadata lookup to bypass caching check
+            // This ensures we get the actual DesignTimeLocation even if metadata caching hasn't completed yet
+            // Without force=true, early spawns (before caching completes) would get empty DesignTimeLocation
+            @event.DesignTimeLocation = GONetSpawnSupport_Runtime.GetDesignTimeMetadata_Location(gonetParticipant, force: true);
+
             @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;
@@ -332,7 +337,11 @@ namespace GONet
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
 
             @event.InstanceName = gonetParticipant.gameObject.name;
-            @event.DesignTimeLocation = gonetParticipant.DesignTimeLocation;
+
+            // CRITICAL: Force metadata lookup to bypass caching check
+            // This ensures we get the actual DesignTimeLocation even if metadata caching hasn't completed yet
+            @event.DesignTimeLocation = GONetSpawnSupport_Runtime.GetDesignTimeMetadata_Location(gonetParticipant, force: true);
+
             @event.ParentFullUniquePath = gonetParticipant.transform.parent == null ? string.Empty : HierarchyUtils.GetFullUniquePath(gonetParticipant.transform.parent.gameObject);
 
             @event.GONetId = gonetParticipant.GONetId;

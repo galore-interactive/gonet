@@ -523,7 +523,8 @@ namespace GONet
 
             // Copy design time metadata from prefab to spawned instance (for addressables support)
             // This is optional - if prefab doesn't have metadata, the system will work as before
-            DesignTimeMetadata prefabMetadata = GetDesignTimeMetadata(prefab);
+            // CRITICAL: Use force=true to ensure metadata is retrieved even if caching hasn't completed yet
+            DesignTimeMetadata prefabMetadata = GetDesignTimeMetadata(prefab, force: true);
             if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
             {
                 GONetLog.Debug($"Instantiate_MarkToBeRemotelyControlled: Copying metadata from prefab '{prefab.name}' - Location: {prefabMetadata.Location}");
@@ -614,14 +615,24 @@ namespace GONet
                         }
                     }
 
-                    // IMPORTANT: Before creating empty metadata, try to find it by location
+                    // IMPORTANT: Before creating empty metadata, try to find it by UnityGuid or location
                     // This handles cases where templates are loaded and should have their cached metadata
                     DesignTimeMetadata foundMetadata = null;
 
-                    // First try resources:// prefix for prefabs (new format)
-                    string expectedResourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
-                    GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {expectedResourcesLocation}");
-                    if (designTimeMetadataLookup.TryGetValue(expectedResourcesLocation, out foundMetadata))
+                    // FIRST: Try lookup by UnityGuid - this is the most reliable way to find prefab metadata
+                    if (!string.IsNullOrWhiteSpace(participantGuid) && designTimeMetadataLookup.TryGetValueByUnityGuid(participantGuid, out foundMetadata))
+                    {
+                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by UnityGuid for '{participantName}', Location: {foundMetadata.Location}");
+                        // Cache this found metadata for the participant
+                        designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
+                        value = foundMetadata;
+                    }
+                    // FALLBACK: Try resources:// prefix for prefabs (path-based lookup)
+                    else
+                    {
+                        string expectedResourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
+                        GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {expectedResourcesLocation}");
+                        if (designTimeMetadataLookup.TryGetValue(expectedResourcesLocation, out foundMetadata))
                     {
                         GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
                         // Cache this found metadata for the participant
@@ -671,6 +682,7 @@ namespace GONet
                             value = metadata;
                         }
                     }
+                    } // Close the FALLBACK else block for path-based lookup
                 }
                 else
                 {
@@ -795,9 +807,9 @@ namespace GONet
             designTimeMetadataLookup.ChangeLocation(previousLocation, newLocation, value);
         }
 
-        internal static string GetDesignTimeMetadata_Location(GONetParticipant gONetParticipant)
+        internal static string GetDesignTimeMetadata_Location(GONetParticipant gONetParticipant, bool force = false)
         {
-            DesignTimeMetadata metadata = GetDesignTimeMetadata(gONetParticipant);
+            DesignTimeMetadata metadata = GetDesignTimeMetadata(gONetParticipant, force);
             if ((object)metadata == null)
             {
                 if (callDepth == 0)
@@ -830,6 +842,22 @@ namespace GONet
             {
                 string gnpInfo = keyGNP != null ? $"GameObject: {keyGNP.gameObject.name}, UnityGuid: {keyGNP.UnityGuid}" : "null";
                 throw new ArgumentException($"BLASTPHEAMOUSE! GONetParticipant: {gnpInfo}, metadata is null: {(object)value == default}");
+            }
+
+            // IMPORTANT: Don't cache empty/temporary metadata from deferral phase
+            // Empty metadata (Location="" and CodeGenId=0) should not overwrite good data
+            // This prevents the corruption where deferred lookups cache empty metadata that later gets returned by GUID lookup
+            bool isEmptyMetadata = string.IsNullOrWhiteSpace(value.Location) && value.CodeGenerationId == 0;
+            if (isEmptyMetadata)
+            {
+                // Only cache empty metadata if there's no existing entry
+                // This allows deferral phase to work, but prevents overwriting good data
+                if (!designTimeMetadataByGNP.ContainsKey(keyGNP))
+                {
+                    designTimeMetadataByGNP[keyGNP] = value;
+                }
+                // Don't add empty metadata to location dictionary at all
+                return;
             }
 
             designTimeMetadataByGNP[keyGNP] = value;
@@ -916,24 +944,32 @@ namespace GONet
                 return false;
             }
 
-            KeyValuePair<GONetParticipant, DesignTimeMetadata> matchKVP_byGNP = 
-                designTimeMetadataByGNP.FirstOrDefault(x => x.Key.UnityGuid == unityGuid || x.Value.UnityGuid == unityGuid);
-            if (matchKVP_byGNP.Equals(default(KeyValuePair<GONetParticipant, DesignTimeMetadata>)))
-            {
-                KeyValuePair<string, DesignTimeMetadata> matchKVP_byLocation = 
-                    designTimeMetadataByLocation.FirstOrDefault(x => x.Value.UnityGuid == unityGuid);
-                if (matchKVP_byLocation.Equals(default(KeyValuePair<string, DesignTimeMetadata>)))
-                {
-                    value = default;
-                    return false;
-                }
+            // CRITICAL FIX: Search designTimeMetadataByLocation FIRST (source of truth from JSON)
+            // This dictionary contains the correct metadata loaded from DesignTimeMetadata.json
+            // Searching designTimeMetadataByGNP first can return empty metadata from the deferral phase
+            KeyValuePair<string, DesignTimeMetadata> matchKVP_byLocation =
+                designTimeMetadataByLocation.FirstOrDefault(x => x.Value.UnityGuid == unityGuid);
 
+            if (!matchKVP_byLocation.Equals(default(KeyValuePair<string, DesignTimeMetadata>)))
+            {
+                // Found in location dictionary - this is the authoritative source
                 value = matchKVP_byLocation.Value;
                 return true;
             }
 
-            value = matchKVP_byGNP.Value;
-            return true;
+            // FALLBACK: Search designTimeMetadataByGNP (may have empty/temporary metadata)
+            // Only use this if not found in location dictionary
+            KeyValuePair<GONetParticipant, DesignTimeMetadata> matchKVP_byGNP =
+                designTimeMetadataByGNP.FirstOrDefault(x => x.Key.UnityGuid == unityGuid || x.Value.UnityGuid == unityGuid);
+
+            if (!matchKVP_byGNP.Equals(default(KeyValuePair<GONetParticipant, DesignTimeMetadata>)))
+            {
+                value = matchKVP_byGNP.Value;
+                return true;
+            }
+
+            value = default;
+            return false;
         }
 
 

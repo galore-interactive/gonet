@@ -1241,7 +1241,7 @@ namespace GONet
             ////GONetLog.Debug("DREETS pork");
 
             const string IR = "pub/sub Instantiate REMOTE about to process...";
-            GONetLog.Debug(IR + $" gonetId: {eventEnvelope.Event.GONetId}, DesignTimeLocation: '{eventEnvelope.Event.SceneIdentifier}', InstanceName: '{eventEnvelope.Event.InstanceName}'");
+            GONetLog.Debug(IR + $" gonetId: {eventEnvelope.Event.GONetId}, DesignTimeLocation: '{eventEnvelope.Event.DesignTimeLocation}', SceneIdentifier: '{eventEnvelope.Event.SceneIdentifier}', InstanceName: '{eventEnvelope.Event.InstanceName}'");
 
             // Check if this spawn requires a scene that isn't loaded yet
             if (!string.IsNullOrEmpty(eventEnvelope.Event.SceneIdentifier))
