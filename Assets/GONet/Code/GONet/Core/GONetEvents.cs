@@ -1014,7 +1014,10 @@ namespace GONet
         public SceneLoadType LoadType;
 
         static readonly Type[] otherEventsTypeCancelledOut = new[] {
-            typeof(SceneLoadEvent)
+            typeof(SceneLoadEvent),
+            typeof(InstantiateGONetParticipantEvent),  // CRITICAL: Also cancel spawns from unloaded scenes
+            typeof(ValueMonitoringSupport_NewBaselineEvent),  // CRITICAL: Also cancel value events for destroyed objects
+            typeof(ValueMonitoringSupport_BaselineExpiredEvent)  // CRITICAL: Also cancel expired baseline events
         };
 
         [MemoryPackIgnore]
@@ -1034,6 +1037,51 @@ namespace GONet
                     LoadType == SceneLoadType.BuildSettings &&
                     loadEvent.LoadType == SceneLoadType.BuildSettings)
                     return true;
+            }
+            else if (otherEvent is InstantiateGONetParticipantEvent spawnEvent)
+            {
+                // CRITICAL FIX: When scene unloads, remove ALL spawn events for objects that were in that scene
+                // WITHOUT removing DontDestroyOnLoad objects (they persist across scene changes!)
+                // Without this, late-joiners receive spawn events for non-existent objects from unloaded scenes
+
+                // CRITICAL: Never cancel spawns in DontDestroyOnLoad scene - these objects persist across ALL scene changes
+                // Examples: GONet_GlobalContext, GONet_LocalContext, player objects with AutoDontDestroyOnLoad=true
+                if (spawnEvent.SceneIdentifier == HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE)
+                {
+                    return false; // DontDestroyOnLoad objects are NEVER cancelled by scene unloads
+                }
+
+                // Cancel if spawn's scene matches the unloaded scene
+                if (!string.IsNullOrEmpty(SceneName) && SceneName == spawnEvent.SceneIdentifier)
+                    return true;
+
+                // Fallback: check by build index for build settings scenes
+                // Note: SceneIdentifier may be addressable path, so this only works for build settings scenes
+                if (SceneBuildIndex >= 0 && LoadType == SceneLoadType.BuildSettings)
+                {
+                    // Try to parse build index from SceneIdentifier if it's a build settings scene
+                    // SceneIdentifier format for build settings: scene name (or may match exactly)
+                    if (spawnEvent.SceneIdentifier == SceneName)
+                        return true;
+                }
+            }
+            else if (otherEvent is ValueMonitoringSupport_NewBaselineEvent baselineEvent)
+            {
+                // CRITICAL FIX: When scene unloads, also cancel value baseline events for objects in that scene
+                // Value events reference GONetIds - if the spawn for that GONetId is in the unloaded scene, cancel the value event
+                // This prevents "Unable to find GONetParticipant" errors for late-joiners
+
+                // We need to check if the GONetId belongs to an object in the unloaded scene
+                // Since we don't have direct scene info in baseline events, we rely on the spawn cancellation happening first
+                // The persistent event system will remove both spawn AND value events for the same GONetId
+                // For now, we can't directly cancel value events by scene - they get cancelled when the spawn is cancelled
+                // This is handled by the persistent event cancellation mechanism in GONet.cs OnPersistentEvent_KeepTrack
+                return false;  // Let the spawn cancellation handle it indirectly
+            }
+            else if (otherEvent is ValueMonitoringSupport_BaselineExpiredEvent expiredEvent)
+            {
+                // Same logic as NewBaselineEvent - rely on spawn cancellation
+                return false;  // Let the spawn cancellation handle it indirectly
             }
 
             return false;

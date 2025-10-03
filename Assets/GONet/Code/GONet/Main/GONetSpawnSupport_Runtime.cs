@@ -584,7 +584,8 @@ namespace GONet
                     // IMPORTANT: If caching is not complete and not forced, defer the lookup
                     if (!isDesignTimeMetadataCachingComplete && !force)
                     {
-                        GONetLog.Debug($"GetDesignTimeMetadata: Deferring metadata lookup for '{participantName}' until caching completes");
+                        // SPAM: Uncomment for metadata initialization debugging
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Deferring metadata lookup for '{participantName}' until caching completes");
 
                         // Add to deferred queue if not already there
                         if (!deferredLookupQueue.Contains(gONetParticipant))
@@ -601,19 +602,20 @@ namespace GONet
                         return tempMetadata;
                     }
 
-                    GONetLog.Debug($"GetDesignTimeMetadata: No cached metadata found for GONetParticipant '{participantName}', UnityGuid: {participantGuid}");
+                    // SPAM: Uncomment for detailed cache debugging
+                    //GONetLog.Debug($"GetDesignTimeMetadata: No cached metadata found for GONetParticipant '{participantName}', UnityGuid: {participantGuid}");
 
                     // DEBUG: Show what's actually in the cache (only when caching is complete)
-                    GONetLog.Debug($"GetDesignTimeMetadata: Current cache has {designTimeMetadataLookup.Count} entries");
-                    int logCount = 0;
-                    foreach (var metadata in designTimeMetadataLookup)
-                    {
-                        if (logCount < 5) // Reduced to prevent spam
-                        {
-                            GONetLog.Debug($"  Cache metadata: Location='{metadata.Location}', CodeGenId={metadata.CodeGenerationId}");
-                            logCount++;
-                        }
-                    }
+                    //GONetLog.Debug($"GetDesignTimeMetadata: Current cache has {designTimeMetadataLookup.Count} entries");
+                    //int logCount = 0;
+                    //foreach (var metadata in designTimeMetadataLookup)
+                    //{
+                    //    if (logCount < 5) // Reduced to prevent spam
+                    //    {
+                    //        GONetLog.Debug($"  Cache metadata: Location='{metadata.Location}', CodeGenId={metadata.CodeGenerationId}");
+                    //        logCount++;
+                    //    }
+                    //}
 
                     // IMPORTANT: Before creating empty metadata, try to find it by UnityGuid or location
                     // This handles cases where templates are loaded and should have their cached metadata
@@ -622,7 +624,8 @@ namespace GONet
                     // FIRST: Try lookup by UnityGuid - this is the most reliable way to find prefab metadata
                     if (!string.IsNullOrWhiteSpace(participantGuid) && designTimeMetadataLookup.TryGetValueByUnityGuid(participantGuid, out foundMetadata))
                     {
-                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by UnityGuid for '{participantName}', Location: {foundMetadata.Location}");
+                        // SPAM: Uncomment for metadata lookup debugging
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by UnityGuid for '{participantName}', Location: {foundMetadata.Location}");
                         // Cache this found metadata for the participant
                         designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                         value = foundMetadata;
@@ -631,10 +634,10 @@ namespace GONet
                     else
                     {
                         string expectedResourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab";
-                        GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {expectedResourcesLocation}");
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {expectedResourcesLocation}");
                         if (designTimeMetadataLookup.TryGetValue(expectedResourcesLocation, out foundMetadata))
                     {
-                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
                         // Cache this found metadata for the participant
                         designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                         value = foundMetadata;
@@ -642,7 +645,7 @@ namespace GONet
                     // Fallback to project:// prefix for backwards compatibility
                     else if (designTimeMetadataLookup.TryGetValue($"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/{participantName.Replace("(Clone)", "")}.prefab", out foundMetadata))
                     {
-                        GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by legacy project location for '{participantName}'");
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by legacy project location for '{participantName}'");
                         // Cache this found metadata for the participant
                         designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                         value = foundMetadata;
@@ -652,16 +655,16 @@ namespace GONet
                         // Try other common locations with resources:// first, then project:// for backwards compatibility
                         string resourcesLocation = $"{RESOURCES_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
                         string legacyResourcesLocation = $"{PROJECT_HIERARCHY_PREFIX}Assets/GONet/Resources/GONet/{participantName.Replace("(Clone)", "")}.prefab";
-                        GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {resourcesLocation}");
+                        //GONetLog.Debug($"GetDesignTimeMetadata: Trying resources location lookup: {resourcesLocation}");
                         if (designTimeMetadataLookup.TryGetValue(resourcesLocation, out foundMetadata))
                         {
-                            GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                            //GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
                             designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                             value = foundMetadata;
                         }
                         else if (designTimeMetadataLookup.TryGetValue(legacyResourcesLocation, out foundMetadata))
                         {
-                            GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
+                            //GONetLog.Debug($"GetDesignTimeMetadata: Found metadata by resources location for '{participantName}'");
                             designTimeMetadataLookup.Set(gONetParticipant, foundMetadata);
                             value = foundMetadata;
                         }
@@ -677,7 +680,7 @@ namespace GONet
                                     CodeGenerationId = GONetParticipant.CodeGenerationId_Unset,
                                 }
                                 : defaultDTM_EditorNotPlayMode;
-                            GONetLog.Debug($"GetDesignTimeMetadata: Creating temporary metadata for '{participantName}' - will resolve after full cache load");
+                            //GONetLog.Debug($"GetDesignTimeMetadata: Creating temporary metadata for '{participantName}' - will resolve after full cache load");
                             designTimeMetadataLookup.Set(gONetParticipant, metadata);
                             value = metadata;
                         }
@@ -718,17 +721,18 @@ namespace GONet
 
                 // First try to get metadata by scene path (works for scene objects)
                 metadata = GetDesignTimeMetadata(fullPathInScene, canBypassDepthCheck: true);
-                GONetLog.Debug($"InitDesignTimeMetadata: Scene path lookup for '{gONetParticipant.gameObject.name}' at '{fullPathInScene}' returned: {(metadata != default ? metadata.Location : "NULL")}");
+                // SPAM: Uncomment for detailed init debugging
+                //GONetLog.Debug($"InitDesignTimeMetadata: Scene path lookup for '{gONetParticipant.gameObject.name}' at '{fullPathInScene}' returned: {(metadata != default ? metadata.Location : "NULL")}");
 
                 // If not found by scene path (empty location means it wasn't found) and object has UnityGuid, try prefab metadata lookup (for instantiated objects)
                 if (string.IsNullOrEmpty(metadata.Location) && !string.IsNullOrWhiteSpace(gONetParticipant.UnityGuid))
                 {
-                    GONetLog.Debug($"InitDesignTimeMetadata: Scene lookup failed for '{gONetParticipant.gameObject.name}', trying UnityGuid lookup: {gONetParticipant.UnityGuid}");
+                    //GONetLog.Debug($"InitDesignTimeMetadata: Scene lookup failed for '{gONetParticipant.gameObject.name}', trying UnityGuid lookup: {gONetParticipant.UnityGuid}");
 
-                    GONetLog.Debug($"InitDesignTimeMetadata: Searching for UnityGuid '{gONetParticipant.UnityGuid}' in designTimeMetadataLookup...");
+                    //GONetLog.Debug($"InitDesignTimeMetadata: Searching for UnityGuid '{gONetParticipant.UnityGuid}' in designTimeMetadataLookup...");
                     if (!designTimeMetadataLookup.TryGetValueByUnityGuid(gONetParticipant.UnityGuid, out metadata))
                     {
-                        GONetLog.Debug($"InitDesignTimeMetadata: TryGetValueByUnityGuid failed, trying designTimeMetadataToProjectTemplate...");
+                        //GONetLog.Debug($"InitDesignTimeMetadata: TryGetValueByUnityGuid failed, trying designTimeMetadataToProjectTemplate...");
                         metadata = designTimeMetadataToProjectTemplate.Keys.FirstOrDefault(x => x.UnityGuid == gONetParticipant.UnityGuid);
                         if (metadata == default)
                         {
@@ -738,16 +742,16 @@ namespace GONet
                         }
                         else
                         {
-                            GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via designTimeMetadataToProjectTemplate for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
+                            //GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via designTimeMetadataToProjectTemplate for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
                         }
                     }
                     else
                     {
-                        GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via TryGetValueByUnityGuid for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
+                        //GONetLog.Debug($"InitDesignTimeMetadata: Found metadata via TryGetValueByUnityGuid for '{gONetParticipant.gameObject.name}', Location: {metadata.Location}");
                     }
                 }
 
-                GONetLog.Debug($"InitDesignTimeMetadata: Final metadata for '{gONetParticipant.gameObject.name}': {(metadata != default ? $"Location={metadata.Location}, CodeGenId={metadata.CodeGenerationId}" : "NULL")}");
+                //GONetLog.Debug($"InitDesignTimeMetadata: Final metadata for '{gONetParticipant.gameObject.name}': {(metadata != default ? $"Location={metadata.Location}, CodeGenId={metadata.CodeGenerationId}" : "NULL")}");
 
                 designTimeMetadataLookup.Set(gONetParticipant, metadata);
 

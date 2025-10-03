@@ -269,7 +269,7 @@ namespace GONet
             // Wrap in try-catch to handle any edge cases during initialization
             try
             {
-                if (gonetParticipant != null && IsGONetFullyReady())
+                if (gonetParticipant != null && IsGONetReady())
                 {
                     // Participant is already fully ready - we're being added at runtime
                     WasAddedAtRuntime = true;
@@ -292,65 +292,37 @@ namespace GONet
         /// - Client/Server status is known
         /// - If client, fully initialized with server
         /// </summary>
-        private bool IsGONetFullyReady()
+        public bool IsGONetReady()
         {
-            // Check basic participant initialization
-            if (gonetParticipant == null || gonetParticipant.GONetId == 0)
-            {
-                return false;
-            }
-
-            // Check client/server status is known
-            if (!GONetMain.IsClientVsServerStatusKnown)
-            {
-                return false;
-            }
-
-            // If we're a client, ensure client instance exists and is fully initialized
-            if (GONetMain.IsClient)
-            {
-                if (GONetMain.GONetClient == null)
-                {
-                    return false; // Client but no client instance - not ready
-                }
-
-                if (!GONetMain.GONetClient.IsInitializedWithServer)
-                {
-                    return false; // Client exists but not initialized with server
-                }
-            }
-
-            // Check GONetLocal lookup is available
-            if (GONetLocal.LookupByAuthorityId == null)
-            {
-                return false;
-            }
-
-            // Use the indexer to look up the GONetLocal for this participant's authority ID
-            // The indexer returns null if not found (safe, no exceptions)
-            GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
-            if (local == null)
-            {
-                return false;
-            }
-
-            return true;
+            return GONetMain.IsGONetReady(gonetParticipant);
         }
 
         protected override void Start()
         {
             base.Start();
 
-            // If added at runtime to already-ready participant, call OnGONetReady() now
-            if (WasAddedAtRuntime && IsGONetFullyReady())
+            // PATH 6: If added at runtime, call OnGONetReady() for ALL participants that are already ready
+            // This ensures runtime-added components (via GONetRuntimeComponentInitializer) don't miss participants
+            // that became ready before the component was added
+            if (WasAddedAtRuntime)
             {
-                try
+                // Call OnGONetReady for ALL ready participants, not just this component's participant
+                // This matches the behavior of OnDeserializeInitAllCompletedGNPEvent which broadcasts to all behaviours
+                foreach (var kvp in GONetMain.gonetParticipantByGONetIdMap)
                 {
-                    OnGONetReady(gonetParticipant);
-                }
-                catch (Exception ex)
-                {
-                    GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for runtime-added component '{GetType().Name}' on '{gameObject.name}': {ex.Message}\n{ex.StackTrace}");
+                    GONetParticipant participant = kvp.Value;
+                    if (GONetMain.IsGONetReady(participant))
+                    {
+                        try
+                        {
+                            GONetLog.Debug($"[GONetBehaviour] Runtime-added component '{GetType().Name}' receiving OnGONetReady for participant '{participant.name}' (GONetId: {participant.GONetId})");
+                            OnGONetReady(participant);
+                        }
+                        catch (Exception ex)
+                        {
+                            GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for runtime-added component '{GetType().Name}' on '{gameObject.name}' with participant '{participant.name}': {ex.Message}\n{ex.StackTrace}");
+                        }
+                    }
                 }
             }
         }
@@ -387,19 +359,10 @@ namespace GONet
             {
                 OnGONetParticipantDeserializeInitAllCompleted();
 
-                // Call the unified OnGONetReady() hook for design-time added components
-                // Runtime-added components get this called from Start() instead
-                if (!WasAddedAtRuntime)
-                {
-                    try
-                    {
-                        OnGONetReady(gonetParticipant);
-                    }
-                    catch (Exception ex)
-                    {
-                        GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for design-time component '{GetType().Name}' on '{gameObject.name}': {ex.Message}\n{ex.StackTrace}");
-                    }
-                }
+                // NOTE: OnGONetReady() is now broadcast from GONet.OnDeserializeInitAllCompletedGNPEvent
+                // to ALL behaviours for ALL participants (not just own participant).
+                // This ensures every behaviour gets notified when any participant becomes ready.
+                // Runtime-added components still get OnGONetReady() called from Start() if already ready.
             }
         }
 

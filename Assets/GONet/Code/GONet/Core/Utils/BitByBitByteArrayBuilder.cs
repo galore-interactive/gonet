@@ -607,6 +607,23 @@ namespace GONet.Utils
             const ulong bitCount = 32;
             //// Debug.Assert(bitCount <= 32);
 
+            // Validate float value before serialization
+            if (float.IsNaN(iFloat))
+            {
+                GONetLog.Warning($"[BitByBitByteArrayBuilder] Attempted to serialize NaN float value. Clamping to 0.");
+                iFloat = 0f;
+            }
+            else if (float.IsInfinity(iFloat))
+            {
+                GONetLog.Warning($"[BitByBitByteArrayBuilder] Attempted to serialize Infinity float value: {iFloat}. Clamping to {(float.IsPositiveInfinity(iFloat) ? "float.MaxValue" : "float.MinValue")}.");
+                iFloat = float.IsPositiveInfinity(iFloat) ? float.MaxValue : float.MinValue;
+            }
+            else if (iFloat > 1000000f || iFloat < -1000000f)
+            {
+                GONetLog.Warning($"[BitByBitByteArrayBuilder] Float value exceeds reasonable bounds: {iFloat}. This may indicate physics objects out of valid range. Clamping to ±1,000,000.");
+                iFloat = iFloat > 0 ? 1000000f : -1000000f;
+            }
+
             if (isUsingBitWriterReader)
             {
                 bitWriter.WriteFloat(iFloat);
@@ -1403,6 +1420,23 @@ namespace GONet.Utils
 
         public unsafe void WriteFloat(float value)
         {
+            // Validate float value before serialization
+            if (float.IsNaN(value))
+            {
+                GONetLog.Warning($"[BitWriter] Attempted to serialize NaN float value. Clamping to 0.");
+                value = 0f;
+            }
+            else if (float.IsInfinity(value))
+            {
+                GONetLog.Warning($"[BitWriter] Attempted to serialize Infinity float value: {value}. Clamping to {(float.IsPositiveInfinity(value) ? "float.MaxValue" : "float.MinValue")}.");
+                value = float.IsPositiveInfinity(value) ? float.MaxValue : float.MinValue;
+            }
+            else if (value > 1000000f || value < -1000000f)
+            {
+                GONetLog.Warning($"[BitWriter] Float value exceeds reasonable bounds: {value}. This may indicate physics objects out of valid range. Clamping to ±1,000,000.");
+                value = value > 0 ? 1000000f : -1000000f;
+            }
+
             uint valueAsUINT = *(uint*)(&value);
             WriteBits(valueAsUINT, 32);
         }

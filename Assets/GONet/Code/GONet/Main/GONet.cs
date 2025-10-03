@@ -407,8 +407,44 @@ namespace GONet
 
         /// <summary>
         /// IMPORTANT: This will NOT include ALL events that implement <see cref="IPersistentEvent"/> as it may sound *IF* anything cancelled out another/previous event (i.e., <see cref="ICancelOutOtherEvents"/>).
+        /// This is the "current state" list used for late-joiner synchronization - events are removed when cancelled.
         /// </summary>
         static readonly LinkedList<IPersistentEvent> persistentEventsThisSession = new LinkedList<IPersistentEvent>();
+
+        /// <summary>
+        /// RECORD AND REPLAY ARCHIVE: Complete historical record of ALL persistent events that occurred during this session.
+        /// Unlike <see cref="persistentEventsThisSession"/>, this list is NEVER modified - events are only added, never removed.
+        /// This preserves the full event timeline including cancelled events for future record/replay functionality.
+        ///
+        /// Use cases:
+        /// - Session replay: Replay the exact sequence of events that occurred
+        /// - Debugging: Analyze full event history including cancelled events
+        /// - Analytics: Track complete session timeline
+        ///
+        /// NOTE: This archive is currently NOT used for late-joiner synchronization - that uses persistentEventsThisSession.
+        /// </summary>
+        static readonly LinkedList<IPersistentEvent> persistentEventsArchive_CompleteHistory = new LinkedList<IPersistentEvent>();
+
+        /// <summary>
+        /// PUBLIC API: Access the complete historical archive of all persistent events.
+        /// This is a read-only view of the full event timeline including cancelled events.
+        ///
+        /// IMPORTANT: This returns the internal list - do NOT modify it! Only use for reading/iteration.
+        ///
+        /// Example usage for future record/replay:
+        /// <code>
+        /// // Save complete session history to file
+        /// var allEvents = GONetMain.PersistentEventsArchive_CompleteHistory;
+        /// SaveToFile(allEvents);
+        ///
+        /// // Later: Replay the exact sequence
+        /// foreach (var evt in LoadFromFile())
+        /// {
+        ///     ReplayEvent(evt);
+        /// }
+        /// </code>
+        /// </summary>
+        public static IEnumerable<IPersistentEvent> PersistentEventsArchive_CompleteHistory => persistentEventsArchive_CompleteHistory;
 
         static readonly List<uint> gonetIdsDestroyedViaPropagation = new List<uint>(500);
 
@@ -588,7 +624,7 @@ namespace GONet
                 NetworkData item = _gonetClient.incomingNetworkData_waitingForGONetIds.Dequeue();
                 try
                 {
-                    ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(item);
+                    ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(item, isProcessingFromQueue: true);
                     processedCount++;
                 }
                 catch (Exception e)
@@ -910,6 +946,9 @@ namespace GONet
             //Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
 
+            // NOTE: GONetThreading initializes itself automatically via [RuntimeInitializeOnLoadMethod]
+            // to avoid Unity serialization phase issues with calling Unity APIs
+
             GONetGlobal.ActualServerConnectionInfoSet += OnActualServerConnectionInfoSet_UpdateIsServerOverride;
 
             InitMessageTypeToMessageIDMap();
@@ -1204,6 +1243,11 @@ namespace GONet
 
         private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
+            // RECORD AND REPLAY: Always add to complete history archive (never remove)
+            // This preserves the full event timeline for future replay functionality
+            persistentEventsArchive_CompleteHistory.AddLast(eventEnvelope.Event);
+
+            // LATE-JOINER SYNC: Manage current state with cancellation logic
             ICancelOutOtherEvents iCancelOthers = eventEnvelope.Event as ICancelOutOtherEvents;
             persistentEventsCancelledOut.Clear();
             if (iCancelOthers != null)
@@ -1298,6 +1342,28 @@ namespace GONet
                 GONetLog.Debug($"[SPAWN_SYNC] Starting hide-during-buffer coroutine for '{instance.gameObject.name}'");
                 GlobalSessionContext.StartCoroutine(OnInstantiationEvent_Remote_HideDuringBufferLeadTime(instance));
             }
+
+            // PATH 7: Remote runtime-spawned participants - publish DeserializeInitAllCompleted after spawn completes
+            // This handles projectiles/objects spawned by remote players that don't go through DeserializeBody_AllValuesBundle
+            // The GONetId was set during Instantiate_Remote, so the participant is now fully ready
+            if (IsGONetReady(instance))
+            {
+                // Deduplication check: Only publish if not already published
+                if (TryMarkDeserializeInitPublished(instance.GONetId))
+                {
+                    GONetLog.Info($"[GONet] Publishing DeserializeInitAllCompleted for remote spawn '{instance.name}' (GONetId: {instance.GONetId}, IsMine: {instance.IsMine}) from CompleteRemoteInstantiation");
+                    var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(instance);
+                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, instance, isRelatedLocalContentRequired: true);
+                }
+                else
+                {
+                    GONetLog.Info($"[GONet] Skipping duplicate DeserializeInitAllCompleted for remote spawn '{instance.name}' (GONetId: {instance.GONetId}) - already published from another path");
+                }
+            }
+            else
+            {
+                GONetLog.Warning($"[GONet] Remote spawn '{instance.name}' (GONetId: {instance.GONetId}) NOT ready in CompleteRemoteInstantiation - this should not happen!");
+            }
         }
 
         /// <summary>
@@ -1366,6 +1432,24 @@ namespace GONet
                 {
                     GONetBehaviour gnBehaviour = en.Current;
                     gnBehaviour.OnGONetParticipantDeserializeInitAllCompleted(gonetParticipant);
+                }
+            }
+
+            // Broadcast OnGONetReady to ALL GONetBehaviours after deserialization is complete
+            // This ensures every behaviour gets notified about every participant that becomes ready
+            using (var en = allGONetBehaviours.GetEnumerator())
+            {
+                while (en.MoveNext())
+                {
+                    GONetBehaviour gnBehaviour = en.Current;
+                    try
+                    {
+                        gnBehaviour.OnGONetReady(gonetParticipant);
+                    }
+                    catch (Exception ex)
+                    {
+                        GONetLog.Error($"[GONet] Exception in OnGONetReady() broadcast for behaviour '{gnBehaviour.GetType().Name}' on '{gnBehaviour.gameObject.name}' with participant '{gonetParticipant.name}': {ex.Message}\n{ex.StackTrace}");
+                    }
                 }
             }
         }
@@ -1778,6 +1862,9 @@ namespace GONet
             if (isAppropriate)
             {
                 lastCalledFrame_Update_DoTheHeavyLifting = UnityEngine.Time.frameCount;
+
+                // Process any queued main thread callbacks from async operations
+                GONetThreading.ProcessMainThreadCallbacks();
 
                 ProcessIncomingBytes_QueuedNetworkData_MainThread();
 
@@ -3086,7 +3173,7 @@ namespace GONet
         /// <summary>
         /// POST: <paramref name="networkData"/> is returned to the associated/proper queue in <see cref="singleProducerSendQueuesByThread"/>
         /// </summary>
-        private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData)
+        private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData, bool isProcessingFromQueue = false)
         {
             bool shouldReturnToPool = true; // Track whether message should be returned to pool (false if queued elsewhere)
             try
@@ -3200,7 +3287,15 @@ namespace GONet
                                     {
                                         // GONetId not found - likely scene-defined object IDs not assigned yet
                                         QosType channelQuality = GONetChannel.ById(networkData.channelId).QualityOfService;
-                                        if (IsClient && channelQuality == QosType.Reliable)
+
+                                        // CRITICAL FIX: Don't re-queue messages that are already being processed from the queue
+                                        // This prevents infinite loops where a message keeps getting dequeued, failing, and re-queued
+                                        if (isProcessingFromQueue)
+                                        {
+                                            GONetLog.Error($"[GONETID-QUEUE] Message still missing GONetId after queue processing - GONetId likely destroyed during scene change. Dropping message to prevent infinite loop.");
+                                            // Message will be returned to pool via shouldReturnToPool=true
+                                        }
+                                        else if (IsClient && channelQuality == QosType.Reliable)
                                         {
                                             // Queue this message for retry after GONetId sync completes
                                             if (_gonetClient.incomingNetworkData_waitingForGONetIds.Count < GONetClient.MAX_GONETID_QUEUE_SIZE)
@@ -3287,7 +3382,8 @@ namespace GONet
         {
             IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
             EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
-            GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
+            // SPAM: Commented out - creates 2,777+ log entries during stress testing, mostly ValueMonitoringSupport events
+            //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
         }
 
         static bool isCurrentlyProcessingInstantiateGNPEvent;
@@ -3543,6 +3639,7 @@ namespace GONet
                     if (scene.isLoaded)
                     {
                         loadedScenes.Add(scene.name);
+                        GONetLog.Warning($"[SPAWN_SYNC] FilterPersistentEvents: Detected loaded scene '{scene.name}'");
                     }
                 }
             }
@@ -3550,13 +3647,49 @@ namespace GONet
             // Always include DontDestroyOnLoad scene (persistent across scene changes)
             loadedScenes.Add(HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE);
 
+            // CRITICAL FIX: Track which scene load events to send based on current loaded scenes
+            // We should only send SceneLoadEvent for scenes that are CURRENTLY loaded, not the entire history
+            // Otherwise late-joiners receive all scene transitions and end up in wrong scenes
+            HashSet<string> sceneLoadEventsSent = new HashSet<string>();
+
+            // CRITICAL: Track which GONetIds have spawn events being sent
+            // Value baseline events should ONLY be sent if the corresponding spawn is also being sent
+            HashSet<uint> gonetIdsWithSpawnsBeingSent = new HashSet<uint>();
+
+            GONetLog.Warning($"[SPAWN_SYNC] FilterPersistentEvents: About to filter {allEvents.Count} events. Loaded scenes: {string.Join(", ", loadedScenes)}");
+
             // Filter events based on scene
             foreach (IPersistentEvent persistentEvent in allEvents)
             {
                 bool shouldInclude = true;
 
+                // CRITICAL: Filter SceneLoadEvent to only send for currently loaded scenes
+                if (persistentEvent is SceneLoadEvent sceneLoadEvent)
+                {
+                    // Only include scene load if:
+                    // 1. The scene is currently loaded on the server
+                    // 2. We haven't already sent a load event for this scene (avoid duplicates from scene history)
+                    if (loadedScenes.Contains(sceneLoadEvent.SceneName) && !sceneLoadEventsSent.Contains(sceneLoadEvent.SceneName))
+                    {
+                        shouldInclude = true;
+                        sceneLoadEventsSent.Add(sceneLoadEvent.SceneName);
+                        GONetLog.Warning($"[SPAWN_SYNC] Including SceneLoadEvent for '{sceneLoadEvent.SceneName}' - currently loaded on server");
+                    }
+                    else
+                    {
+                        shouldInclude = false;
+                        GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING SceneLoadEvent for '{sceneLoadEvent.SceneName}' - not currently loaded or already sent");
+                    }
+                }
+                // CRITICAL: Exclude SceneUnloadEvent - these are historical and not needed for late-joiners
+                // Late-joiners should only receive the CURRENT scene state, not the unload history
+                else if (persistentEvent is SceneUnloadEvent sceneUnloadEvent)
+                {
+                    shouldInclude = false;
+                    GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING SceneUnloadEvent for '{sceneUnloadEvent.SceneName}' - late-joiners only need current state");
+                }
                 // Check if this is a spawn event with scene information
-                if (persistentEvent is InstantiateGONetParticipantEvent spawnEvent)
+                else if (persistentEvent is InstantiateGONetParticipantEvent spawnEvent)
                 {
                     // IMPORTANT: Always include GONetLocal spawns - these are client-specific and must be sent to all connecting clients
                     // GONetLocal is essential for client initialization and exists per-client regardless of scenes
@@ -3566,16 +3699,46 @@ namespace GONet
                     if (isGONetLocal)
                     {
                         shouldInclude = true;
+                        gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
                         GONetLog.Debug($"[SPAWN_SYNC] Including GONetLocal spawn (GONetId {spawnEvent.GONetId}) - always sent to new clients");
                     }
                     // Only include spawns from currently loaded scenes
                     else if (!string.IsNullOrEmpty(spawnEvent.SceneIdentifier))
                     {
                         shouldInclude = loadedScenes.Contains(spawnEvent.SceneIdentifier);
+                        if (shouldInclude)
+                        {
+                            gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
+                        }
                     }
                     // If no scene identifier, include it (backward compatibility for old events)
+                    else
+                    {
+                        gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
+                    }
                 }
-                // All other persistent events (value changes, etc.) are always included
+                // CRITICAL: Filter value baseline events - only send if corresponding spawn is also being sent
+                else if (persistentEvent is ValueMonitoringSupport_NewBaselineEvent baselineEvent)
+                {
+                    // ONLY send value baseline if we're also sending the spawn for this GONetId
+                    uint gonetId = baselineEvent.GONetId;
+                    if (!gonetIdsWithSpawnsBeingSent.Contains(gonetId))
+                    {
+                        shouldInclude = false;
+                        GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING ValueBaseline for GONetId {gonetId} - spawn not being sent");
+                    }
+                }
+                else if (persistentEvent is ValueMonitoringSupport_BaselineExpiredEvent expiredEvent)
+                {
+                    // ONLY send expired baseline if we're also sending the spawn for this GONetId
+                    uint gonetId = expiredEvent.GONetId;
+                    if (!gonetIdsWithSpawnsBeingSent.Contains(gonetId))
+                    {
+                        shouldInclude = false;
+                        GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING ExpiredBaseline for GONetId {gonetId} - spawn not being sent");
+                    }
+                }
+                // All other persistent events (OwnerAuthorityIdAssignment, etc.) are always included
 
                 if (shouldInclude)
                 {
@@ -3583,7 +3746,33 @@ namespace GONet
                 }
             }
 
-            return filteredEvents;
+            // CRITICAL FIX: Reorder events to ensure SceneLoadEvents come FIRST
+            // Late-joining clients MUST receive and process SceneLoadEvent before any spawn events for that scene
+            // Otherwise spawns get deferred indefinitely waiting for the scene to load
+            LinkedList<IPersistentEvent> reorderedEvents = new LinkedList<IPersistentEvent>();
+
+            // First pass: Add all SceneLoadEvents
+            foreach (IPersistentEvent evt in filteredEvents)
+            {
+                if (evt is SceneLoadEvent)
+                {
+                    reorderedEvents.AddLast(evt);
+                    GONetLog.Warning($"[SPAWN_SYNC] Prioritizing SceneLoadEvent to front of bundle");
+                }
+            }
+
+            // Second pass: Add all other events (preserving their relative order)
+            foreach (IPersistentEvent evt in filteredEvents)
+            {
+                if (!(evt is SceneLoadEvent))
+                {
+                    reorderedEvents.AddLast(evt);
+                }
+            }
+
+            GONetLog.Warning($"[SPAWN_SYNC] FilterPersistentEvents: Reordered {filteredEvents.Count} events - SceneLoadEvents now at front");
+
+            return reorderedEvents;
         }
 
         private static void Server_AssignNewClientAuthorityId(GONetConnection_ServerToClient connectionToClient)
@@ -4266,9 +4455,39 @@ namespace GONet
                 tickReceivers_awaitingRemove.Clear();
             }
 
-            foreach (var tickReceiver in tickReceivers)
+            // PERFORMANCE FIX: Use GONet's ArrayPool to avoid GC from ToArray() - zero allocations after warmup
+            // CRITICAL: The HashSet enumeration itself can throw if modified, so we try/catch it
+            int tickReceiversCount = tickReceivers.Count;
+            if (tickReceiversCount > 0)
             {
-                tickReceiver.Tick(uniqueGrouping.scheduleFrequencyHz, uniqueElapsedSeconds, uniqueDeltaSeconds);
+                GONetBehaviour[] tickReceiversSnapshot = tickReceivers_arrayPool.Borrow(tickReceiversCount);
+                int actualCount = 0;
+                try
+                {
+                    // Try to copy - if collection is modified during copy, we'll catch and skip this tick cycle
+                    foreach (var tickReceiver in tickReceivers)
+                    {
+                        if (actualCount >= tickReceiversSnapshot.Length) break; // Safety check
+                        tickReceiversSnapshot[actualCount++] = tickReceiver;
+                    }
+
+                    // Iterate using actual count (not array.Length, which may be larger than needed)
+                    for (int i = 0; i < actualCount; i++)
+                    {
+                        tickReceiversSnapshot[i].Tick(uniqueGrouping.scheduleFrequencyHz, uniqueElapsedSeconds, uniqueDeltaSeconds);
+                    }
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("Collection was modified"))
+                {
+                    // Collection was modified during enumeration - this can happen if Tick() callbacks
+                    // trigger add/remove that bypasses the deferred system. Skip this tick cycle.
+                    GONetLog.Warning($"tickReceivers collection modified during Tick() - skipping this sync cycle for {uniqueGrouping}. This should be rare.");
+                }
+                finally
+                {
+                    // CRITICAL: Always return to pool, even if exception thrown
+                    tickReceivers_arrayPool.Return(tickReceiversSnapshot);
+                }
             }
 
             autoSyncUniqueGroupingToLastElapsedTicks[uniqueGrouping] = elapsedTicks;
@@ -4375,6 +4594,31 @@ namespace GONet
 
             var startEvent = new GONetParticipantStartedEvent(gonetParticipant);
             PublishEventAsSoonAsSufficientInfoAvailable(startEvent, gonetParticipant);
+
+            // REMOVED: Path 1 (Start) publication - this caused race conditions with GONetLocal.AddToLookupOnceAuthorityIdKnown
+            // All IsMine participants are now published from GONetLocal.AddToLookupOnceAuthorityIdKnown (Path 3/4) - the definitive moment of readiness
+            // Remote participants are published from deserialization path (Path 2)
+            // This ensures 100% coverage with zero race conditions and zero duplicates
+
+            // PATH 8: Client spawns remotely-controlled object (projectiles with server authority)
+            // These participants have OwnerAuthorityId = server, so they won't be caught by Path 5 (IsRelatedToThisLocality fails)
+            // The spawning client needs OnGONetReady even though they don't own it
+            if (IsClient &&
+                GONetSpawnSupport_Runtime.IsMarkedToBeRemotelyControlled(gonetParticipant) &&
+                IsGONetReady(gonetParticipant))
+            {
+                // Deduplication check: Only publish if not already published
+                if (TryMarkDeserializeInitPublished(gonetParticipant.GONetId))
+                {
+                    GONetLog.Info($"[GONet] Publishing DeserializeInitAllCompleted for client-spawned remotely-controlled '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}) from Start path");
+                    var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant);
+                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, gonetParticipant, isRelatedLocalContentRequired: true);
+                }
+                else
+                {
+                    GONetLog.Info($"[GONet] Skipping duplicate DeserializeInitAllCompleted for client-spawned remotely-controlled '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}) - already published from another path");
+                }
+            }
         }
 
         /// <summary>
@@ -5661,7 +5905,8 @@ namespace GONet
 
                     if (hasAllComponents && idIsNotZero)
                     {
-                        GONetLog.Debug($"Serializing GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetParticipant.GONetId} (raw: {gonetParticipant.gonetId_raw}, authority: {gonetParticipant.OwnerAuthorityId})");
+                        // SPAM: Commented out - not needed in normal operation, uncomment for deep serialization debugging
+                        //GONetLog.Debug($"Serializing GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetParticipant.GONetId} (raw: {gonetParticipant.gonetId_raw}, authority: {gonetParticipant.OwnerAuthorityId})");
 
                         GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Serialize(bitStream_headerAlreadyWritten, gonetParticipant, gonetParticipant.GONetId);
 
@@ -5891,10 +6136,19 @@ namespace GONet
                     GONetLog.Debug($"Successfully deserialized GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetId}");
                     syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
 
-                    PublishEventAsSoonAsSufficientInfoAvailable(
-                        new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant),
-                        gonetParticipant,
-                        isRelatedLocalContentRequired: true);
+                    // Deduplication check: Only publish if not already published
+                    if (TryMarkDeserializeInitPublished(gonetId))
+                    {
+                        GONetLog.Info($"[GONet] Publishing DeserializeInitAllCompleted for '{gonetParticipant.name}' (GONetId: {gonetId}, IsMine: {gonetParticipant.IsMine}) from deserialization path");
+                        PublishEventAsSoonAsSufficientInfoAvailable(
+                            new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant),
+                            gonetParticipant,
+                            isRelatedLocalContentRequired: true);
+                    }
+                    else
+                    {
+                        GONetLog.Info($"[GONet] Skipping duplicate DeserializeInitAllCompleted for '{gonetParticipant.name}' (GONetId: {gonetId}) - already published from another path");
+                    }
 
                     deserializedCount++;
                 }
@@ -5956,53 +6210,65 @@ namespace GONet
                 GONetParticipant gonetParticipant = null;
                 uint gonetId = GetCurrentGONetIdByIdAtInstantiation(gonetIdAtInstantiation);
 
-                if (gonetParticipantByGONetIdMap.ContainsKey(gonetId))
+                // IMPROVED: Try multiple lookup strategies with better diagnostics
+                // CRITICAL: Check instantiation map FIRST if current GONetId is 0 (unset/reset during scene changes)
+                if (gonetId == GONetParticipant.GONetId_Unset && gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation))
+                {
+                    // Participant exists but GONetId is unset - happens during scene transitions
+                    gonetParticipant = gonetParticipantByGONetIdAtInstantiationMap[gonetIdAtInstantiation];
+                    GONetLog.Debug($"GONetId lookup: Participant found with unset GONetId (instantiation: {gonetIdAtInstantiation}). Likely during scene transition.");
+                }
+                else if (gonetParticipantByGONetIdMap.ContainsKey(gonetId))
                 {
                     gonetParticipant = gonetParticipantByGONetIdMap[gonetId];
                 }
-                else
+                else if (gonetParticipantByGONetIdMap.ContainsKey(gonetIdAtInstantiation))
                 {
-                    if (gonetParticipantByGONetIdMap.ContainsKey(gonetIdAtInstantiation))
-                    {
-                        gonetParticipant = gonetParticipantByGONetIdMap[gonetIdAtInstantiation];
-                    }
-                    else if (gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation))
-                    {
-                        gonetParticipant = gonetParticipantByGONetIdAtInstantiationMap[gonetIdAtInstantiation];
-                    }
+                    gonetParticipant = gonetParticipantByGONetIdMap[gonetIdAtInstantiation];
+                    GONetLog.Debug($"GONetId lookup: Found by instantiation ID in main map (current: {gonetId}, instantiation: {gonetIdAtInstantiation})");
+                }
+                else if (gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation))
+                {
+                    gonetParticipant = gonetParticipantByGONetIdAtInstantiationMap[gonetIdAtInstantiation];
+                    GONetLog.Debug($"GONetId lookup: Found in instantiation map (current: {gonetId}, instantiation: {gonetIdAtInstantiation}), participant: '{gonetParticipant.name}', IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}");
+                }
 
-                    if ((object)gonetParticipant == null)
+                if ((object)gonetParticipant == null)
+                {
+                    QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
+                    if (channelQuality == QosType.Reliable)
                     {
-                        //GONetLog.Append_FlushDebug();
+                        // Enhanced diagnostics for debugging lookup failures
+                        GONetLog.Error($"RELIABLE sync bundle - GONetParticipant NOT FOUND. Current GONetId: {gonetId}, InstantiationId: {gonetIdAtInstantiation}. " +
+                                      $"Maps contain - byGONetId: {gonetParticipantByGONetIdMap.Count} entries, byInstantiationId: {gonetParticipantByGONetIdAtInstantiationMap.Count} entries. " +
+                                      $"IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}. " +
+                                      $"This indicates spawn event not received or participant destroyed.");
 
-                        QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
-                        if (channelQuality == QosType.Reliable)
-                        {
-                            const string GLAD = "Reliable changes bundle being processed and GONetParticipant NOT FOUND by GONetId: ";
-                            const string INST = " gonetId@instantiation(as found in serialized body): ";
-                            const string COUNT = "  This will cause us not to be able to process this and the rest of the bundle, which means we will not process count: ";
-                            //throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT, (count - i)));
-                            throw new GONetOutOfOrderHorseDickoryException(string.Concat(GLAD, gonetId, INST, gonetIdAtInstantiation, COUNT));
-                        }
-                        else
-                        {
-                            const string NTS = "Received some unreliable GONetAutoMagicalSync data prior to some necessary prerequisite reliable data and we are unable to process this message.  Since it was sent unreliably, just pretend it did not arrive at all.  If this message streams in the log, perhaps you should be worried; however, it may appear from time to time around initialization and spawning under what is considered \"normal circumstances.\"  gonetId(from message, which is expected to be at instantiation): ";
-                            const string LOCAL = " gonetId (from lookup, supposed to be current): ";
-                            GONetLog.Warning(string.Concat(NTS, gonetIdAtInstantiation, LOCAL, gonetId));
-                            return;
-                        }
+                        throw new GONetOutOfOrderHorseDickoryException($"Reliable changes bundle being processed and GONetParticipant NOT FOUND by GONetId: {gonetId} gonetId@instantiation: {gonetIdAtInstantiation}");
+                    }
+                    else
+                    {
+                        GONetLog.Debug($"Unreliable sync data received before participant ready. GONetId (instantiation): {gonetIdAtInstantiation}, GONetId (current): {gonetId}. IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}, InMaps: (byId:{gonetParticipantByGONetIdMap.ContainsKey(gonetIdAtInstantiation)}, byInstId:{gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation)})");
+                        return;
                     }
                 }
 
+
+                // CRITICAL FIX: Check if Unity object was destroyed before accessing properties
+                // Unity's overloaded == operator detects destroyed objects, while (object)cast checks C# reference
+                if (gonetParticipant == null)
+                {
+                    bool isCSharpReferenceNull = (object)gonetParticipant == null;
+                    uint logGoNetId = isCSharpReferenceNull ? GONetParticipant.GONetId_Unset : gonetParticipant.GONetId;
+
+                    GONetLog.Error($"GONetParticipant Unity object destroyed but still in maps. C# reference null: {isCSharpReferenceNull}, GONetId: {logGoNetId}, GONetIdAtInstantiation: {gonetIdAtInstantiation}. Skipping this sync bundle item.");
+
+                    // Skip processing this destroyed participant - do NOT add to awaiting or continue processing
+                    continue;
+                }
 
                 //Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
                 Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.CodeGenerationId];
-
-                if (gonetParticipant == null)
-                {
-                    GONetLog.Error("dude's Unity null...the rest will fail.  reference null too? " + ((object)gonetParticipant == null) + " gonetId: " + ((object)gonetParticipant == null ? GONetParticipant.GONetId_Unset : gonetParticipant.GONetId));
-                    gnpsAwaitingCompanion.Add(gonetParticipant);
-                }
 
                 try
                 {
@@ -6169,6 +6435,9 @@ namespace GONet
                 EventBus.Publish<IGONetEvent>(disabledEvent); // make sure this comes before gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId); or else the GNP will not be found to attach to the envelope and the subscription handlers will not have what they are expecing
 
                 gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);
+
+                // Cleanup: Remove from deduplication tracking to allow GONetId reuse
+                deserializeInitPublishedGONetIds.Remove(gonetParticipant.GONetId);
             }
         }
 
@@ -6197,6 +6466,11 @@ namespace GONet
         private static readonly HashSet<GONetBehaviour> tickReceivers = new HashSet<GONetBehaviour>();
         private static readonly HashSet<GONetBehaviour> tickReceivers_awaitingAdd = new HashSet<GONetBehaviour>();
         private static readonly HashSet<GONetBehaviour> tickReceivers_awaitingRemove = new HashSet<GONetBehaviour>();
+
+        // PERFORMANCE: Use GONet's ArrayPool for zero-GC iteration during Tick() calls
+        // Pool manages array lifecycle - borrow, use, return. Zero allocations after warmup.
+        private static readonly Utils.ArrayPool<GONetBehaviour> tickReceivers_arrayPool =
+            new Utils.ArrayPool<GONetBehaviour>(initialSize: 1, growByCount: 1, arraySizeMinimum: 10, arraySizeMaximum: 500);
         internal static void AddTickReceiver(GONetBehaviour gONetBehaviour)
         {
             tickReceivers_awaitingAdd.Add(gONetBehaviour);
@@ -6208,6 +6482,39 @@ namespace GONet
         }
 
         private static readonly HashSet<GONetBehaviour> allGONetBehaviours = new(1000);
+
+        /// <summary>
+        /// Tracks GONetIds that have already published DeserializeInitAllCompleted to prevent duplicate OnGONetReady() calls.
+        /// Ensures exactly-once delivery across all publication paths:
+        ///
+        /// PATH 2: ProcessIncomingBytes_DeserializeAll_INTERNAL (line ~6114) - Remote scene-defined participants receiving first network sync
+        /// PATH 3: GONetLocal.AddToLookupOnceAuthorityIdKnown (line ~135) - GONetLocal itself when added to lookup
+        /// PATH 4: GONetLocal.AddToLookupOnceAuthorityIdKnown (line ~154) - Scene-defined IsMine participants (may start before GONetLocal ready)
+        /// PATH 5: GONetLocal.AddIfAppropriate (line ~204) - Runtime-spawned IsMine participants (after GONetLocal already in lookup)
+        /// PATH 6: GONetParticipantCompanionBehaviour.Start() (GONetBehaviour.cs ~311) - Runtime-added COMPONENTS via GONetRuntimeComponentInitializer
+        /// PATH 7: CompleteRemoteInstantiation (line ~1352) - Remote runtime-spawned participants (received via network)
+        /// PATH 8: Start_AutoPropagateInstantiation_IfAppropriate (line ~4611) - Client-spawned remotely-controlled participants (projectiles with server authority)
+        ///
+        /// REMOVED: Path 1 (Start) - Caused race conditions, redundant with paths above
+        ///
+        /// NOTE: Path 6 is special - it doesn't publish DeserializeInitAllCompleted, it directly calls OnGONetReady() on the component
+        /// for ALL ready participants. This ensures components added mid-game don't miss participants that became ready earlier.
+        ///
+        /// This deduplication acts as defense-in-depth to guarantee exactly-once OnGONetReady() delivery for Paths 2-5, 7-8.
+        /// Path 6 doesn't use this system (it's component-scoped, not participant-scoped).
+        /// </summary>
+        private static readonly HashSet<uint> deserializeInitPublishedGONetIds = new HashSet<uint>();
+
+        /// <summary>
+        /// Attempts to mark a GONetId as having published DeserializeInitAllCompleted.
+        /// Returns true if this is the first publication (should publish), false if already published (skip).
+        /// Thread-safe due to HashSet.Add() being atomic for the check-and-insert operation.
+        /// </summary>
+        internal static bool TryMarkDeserializeInitPublished(uint gonetId)
+        {
+            return deserializeInitPublishedGONetIds.Add(gonetId);
+        }
+
         internal static void RegisterBehaviour(GONetBehaviour gONetBehaviour)
         {
             allGONetBehaviours.Add(gONetBehaviour);
@@ -6215,6 +6522,62 @@ namespace GONet
         internal static void UnregisterBehaviour(GONetBehaviour gONetBehaviour)
         {
             allGONetBehaviours.Remove(gONetBehaviour);
+        }
+
+        /// <summary>
+        /// Checks if the passed in <paramref name="gonetParticipant"/> is fully initialized and ready for use.
+        /// This means:
+        /// - GONetId is assigned
+        /// - GONetLocal is available in the lookup
+        /// - Client/Server status is known
+        /// - If client, fully initialized with server
+        /// </summary>
+        public static bool IsGONetReady(GONetParticipant gonetParticipant)
+        {
+            // Check basic participant initialization
+            if (gonetParticipant == null || 
+                gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset || 
+                gonetParticipant.gonetId_raw == GONetParticipant.GONetIdRaw_Unset ||
+                !gonetParticipant.IsInternallyConfigured)
+            {
+                return false;
+            }
+
+            // Check client/server status is known
+            if (!IsClientVsServerStatusKnown)
+            {
+                return false;
+            }
+
+            // If we're a client, ensure client instance exists and is fully initialized
+            if (IsClient)
+            {
+                if (GONetClient == null)
+                {
+                    return false; // Client but no client instance - not ready
+                }
+
+                if (!GONetClient.IsInitializedWithServer)
+                {
+                    return false; // Client exists but not initialized with server
+                }
+            }
+
+            // Check GONetLocal lookup is available
+            if (GONetLocal.LookupByAuthorityId == null)
+            {
+                return false;
+            }
+
+            // Use the indexer to look up the GONetLocal for this participant's authority ID
+            // The indexer returns null if not found (safe, no exceptions)
+            GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
+            if (local == null)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 

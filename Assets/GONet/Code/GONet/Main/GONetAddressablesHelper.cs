@@ -13,6 +13,7 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -67,11 +68,14 @@ namespace GONet
         /// Example of how to load and instantiate an addressable prefab with GONet networking.
         /// The instantiated object will automatically participate in GONet networking.
         ///
+        /// THREAD SAFETY: This method GUARANTEES execution returns to Unity's main thread after await.
+        /// Safe to call Unity APIs immediately after awaiting.
+        ///
         /// Example usage:
         /// <code>
         /// var bulletPrefab = await GONetAddressablesHelper.LoadGONetPrefabAsync("BulletPrefab");
         /// var bulletInstance = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
-        /// // bulletInstance now has full GONet networking automatically!
+        /// // Safe - guaranteed on Unity main thread!
         /// </code>
         /// </summary>
         /// <param name="addressableKey">The addressable key for the prefab</param>
@@ -80,6 +84,38 @@ namespace GONet
         {
             var handle = Addressables.LoadAssetAsync<GameObject>(addressableKey);
             var gameObject = await handle.Task;
+
+            // CRITICAL IL2CPP FIX: Ensure we're back on Unity main thread after await
+            // In IL2CPP builds, async continuations MAY execute on background threads
+            // We MUST marshal back to Unity main thread before calling Unity APIs
+            await GONetThreading.EnsureMainThread();
+
+            return gameObject.GetComponent<GONetParticipant>();
+        }
+
+        /// <summary>
+        /// ADVANCED USE ONLY: Loads addressable prefab WITHOUT guaranteeing main thread return.
+        ///
+        /// WARNING: After awaiting, you may be on a background thread! Unity API calls will crash!
+        /// Only use this if you understand async threading and will manually marshal to main thread.
+        ///
+        /// Example usage for experts:
+        /// <code>
+        /// var bulletPrefab = await GONetAddressablesHelper.LoadGONetPrefabAsync_Unsafe("BulletPrefab");
+        /// await GONetThreading.EnsureMainThread(); // REQUIRED - manual marshal
+        /// var bulletInstance = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+        /// </code>
+        /// </summary>
+        /// <param name="addressableKey">The addressable key for the prefab</param>
+        /// <returns>The loaded GONetParticipant prefab - WARNING: may not be on main thread!</returns>
+        public static async Task<GONetParticipant> LoadGONetPrefabAsync_Unsafe(string addressableKey)
+        {
+            var handle = Addressables.LoadAssetAsync<GameObject>(addressableKey);
+            var gameObject = await handle.Task;
+
+            // Log diagnostics but DO NOT marshal - caller is responsible
+            GONetThreading.LogCurrentThread();
+
             return gameObject.GetComponent<GONetParticipant>();
         }
 #else

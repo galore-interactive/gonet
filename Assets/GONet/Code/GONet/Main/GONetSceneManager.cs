@@ -442,6 +442,39 @@ namespace GONet
                 }
             }
 
+            // CRITICAL: If loading in Single mode, Unity will automatically unload all other scenes
+            // We MUST publish SceneUnloadEvent for each currently loaded scene BEFORE publishing SceneLoadEvent
+            // This ensures persistent events from old scenes get cancelled (spawns, value baselines, etc.)
+            if (mode == LoadSceneMode.Single)
+            {
+                // Get all currently loaded scenes (before the new scene loads)
+                List<string> scenesToUnload = new List<string>();
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    Scene scene = SceneManager.GetSceneAt(i);
+                    if (scene.isLoaded && scene.name != sceneName)  // Don't unload the scene we're about to load
+                    {
+                        scenesToUnload.Add(scene.name);
+                    }
+                }
+
+                // Publish SceneUnloadEvent for each scene that will be unloaded
+                foreach (string sceneToUnload in scenesToUnload)
+                {
+                    GONetLog.Warning($"[GONetSceneManager] Single mode load - publishing SceneUnloadEvent for '{sceneToUnload}' (will be auto-unloaded by Unity)");
+
+                    var unloadEvt = new SceneUnloadEvent
+                    {
+                        SceneName = sceneToUnload,
+                        SceneBuildIndex = GetSceneBuildIndex(sceneToUnload),
+                        LoadType = loadType,  // Use same load type as the new scene
+                        OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks
+                    };
+
+                    GONetMain.EventBus.Publish(unloadEvt);
+                }
+            }
+
             // Publish persistent event for all clients (including late-joiners)
             var evt = new SceneLoadEvent
             {
@@ -718,6 +751,23 @@ namespace GONet
 
             string scenePath = SceneUtility.GetScenePathByBuildIndex(buildIndex);
             return System.IO.Path.GetFileNameWithoutExtension(scenePath);
+        }
+
+        private int GetSceneBuildIndex(string sceneName)
+        {
+            for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+            {
+                string path = SceneUtility.GetScenePathByBuildIndex(i);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string name = System.IO.Path.GetFileNameWithoutExtension(path);
+                    if (name == sceneName)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;  // Not found in build settings
         }
 
         /// <summary>

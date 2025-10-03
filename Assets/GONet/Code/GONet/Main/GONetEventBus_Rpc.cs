@@ -6618,7 +6618,13 @@ namespace GONet
 
             SendRpcToDirectRemotes(instance, methodName, isReliable, correlationId);
 
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+
+            // CRITICAL: Ensure we're back on Unity main thread after RPC response
+            // RPC responses may arrive on network threads, so async continuation could be on wrong thread
+            await GONetThreading.EnsureMainThread();
+
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 1 parameters
@@ -6636,7 +6642,9 @@ namespace GONet
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, correlationId);
 
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 2 parameters
@@ -6652,7 +6660,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 3 parameters
@@ -6668,7 +6678,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 4 parameters
@@ -6684,7 +6696,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 5 parameters
@@ -6700,7 +6714,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 6 parameters
@@ -6716,7 +6732,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 7 parameters
@@ -6732,7 +6750,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotesAsync - 8 parameters
@@ -6748,7 +6768,9 @@ namespace GONet
             RegisterPendingResponse(correlationId, tcs);
             // Call the void version with correlation ID
             SendRpcToDirectRemotes(instance, methodName, isReliable, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, correlationId);
-            return await tcs.Task;
+            TResult result = await tcs.Task;
+            await GONetThreading.EnsureMainThread();
+            return result;
         }
 
         // SendRpcToDirectRemotes - 0 parameters

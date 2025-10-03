@@ -234,7 +234,7 @@ namespace GONet
 
         private void Server_MakeDoublySureAllClientOwnedGNPsDestroyed(ushort ownerAuthorityId)
         {
-            for (int i = enabledGONetParticipants.Count - 1;  i >= 0; --i)
+            for (int i = enabledGONetParticipants.Count - 1; i >= 0; --i)
             {
                 GONetParticipant enabledGNP = enabledGONetParticipants[i];
                 if (enabledGNP.OwnerAuthorityId == ownerAuthorityId && enabledGNP && enabledGNP.gameObject)
@@ -754,6 +754,13 @@ namespace GONet
         internal void SendSceneDefinedObjectIdSync_ToSpecificClient(string sceneName, string[] designTimeLocations, uint[] gonetIds, ushort targetClientAuthorityId)
         {
             CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds);
+        }
+
+        public override void OnGONetReady(GONetParticipant gonetParticipant)
+        {
+            base.OnGONetReady(gonetParticipant);
+
+            GONetLog.Info($"[GONetGlobal] OnGONetReady() called! GNP info - GONetId: {gonetParticipant.GONetId}, name: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}");
         }
     }
 }

@@ -121,6 +121,48 @@ namespace GONet
             }
 
             localsByAuthorityId[gonetLocal.OwnerAuthorityId] = gonetLocal;
+
+            // CRITICAL: Now that GONetLocal is in the lookup, check ALL IsMine participants that are ready
+            // This includes GONetLocal itself AND scene-defined participants like GONetGlobal that may have
+            // started before GONetLocal was ready
+            GONetLog.Info($"[GONetLocal] GONetLocal added to lookup (OwnerAuthorityId: {gonetLocal.OwnerAuthorityId}), checking all IsMine participants for readiness");
+
+            // Check GONetLocal itself - publish for ALL (IsMine AND remote) once added to lookup
+            // This ensures Client #1 sees OnGONetReady when Client #2's GONetLocal is added to lookup
+            if (GONetMain.IsGONetReady(gonetLocal.GONetParticipant))
+            {
+                // Deduplication check: Only publish if not already published
+                if (GONetMain.TryMarkDeserializeInitPublished(gonetLocal.GONetParticipant.GONetId))
+                {
+                    GONetLog.Info($"[GONetLocal] GONetLocal is ready (IsMine: {gonetLocal.GONetParticipant.IsMine}), publishing DeserializeInitAllCompleted");
+                    var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetLocal.GONetParticipant);
+                    GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                }
+                else
+                {
+                    GONetLog.Info($"[GONetLocal] Skipping duplicate DeserializeInitAllCompleted for GONetLocal (GONetId: {gonetLocal.GONetParticipant.GONetId}) - already published from another path");
+                }
+            }
+
+            // Check all other IsMine participants (like GONet_GlobalContext) that may now be ready
+            // IMPORTANT: Only publish for IsMine participants - remote participants get this event from deserialization path
+            foreach (var gnp in gonetLocal.myEnabledGONetParticipants)
+            {
+                if (gnp != gonetLocal.GONetParticipant && gnp.IsMine && GONetMain.IsGONetReady(gnp))
+                {
+                    // Deduplication check: Only publish if not already published
+                    if (GONetMain.TryMarkDeserializeInitPublished(gnp.GONetId))
+                    {
+                        GONetLog.Info($"[GONetLocal] Participant '{gnp.name}' (GONetId: {gnp.GONetId}) is now ready after GONetLocal became available, publishing DeserializeInitAllCompleted");
+                        var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gnp);
+                        GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                    }
+                    else
+                    {
+                        GONetLog.Info($"[GONetLocal] Skipping duplicate DeserializeInitAllCompleted for '{gnp.name}' (GONetId: {gnp.GONetId}) - already published from another path");
+                    }
+                }
+            }
         }
 
         protected override void OnDestroy()
@@ -150,6 +192,26 @@ namespace GONet
                 !myEnabledGONetParticipants.Contains(gonetParticipant)) // may have already been added elsewhere
             {
                 myEnabledGONetParticipants.Add(gonetParticipant);
+
+                // Path 5: If GONetLocal is already in lookup (server/client running for a while),
+                // publish DeserializeInitAllCompleted for runtime-spawned IsMine participants
+                // This handles the case where participants spawn AFTER GONetLocal's AddToLookupOnceAuthorityIdKnown has completed
+                if (localsByAuthorityId.ContainsKey(OwnerAuthorityId) && // GONetLocal is in lookup
+                    gonetParticipant != this.gonetParticipant && // Not GONetLocal itself (handled by Path 3)
+                    GONetMain.IsGONetReady(gonetParticipant)) // Has GONetId and GONetLocal in lookup
+                {
+                    // Deduplication check: Only publish if not already published
+                    if (GONetMain.TryMarkDeserializeInitPublished(gonetParticipant.GONetId))
+                    {
+                        GONetLog.Info($"[GONetLocal] Runtime-spawned participant '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}) is ready, publishing DeserializeInitAllCompleted");
+                        var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant);
+                        GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                    }
+                    else
+                    {
+                        GONetLog.Info($"[GONetLocal] Skipping duplicate DeserializeInitAllCompleted for '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}) - already published from another path");
+                    }
+                }
             }
         }
 
