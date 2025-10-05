@@ -705,7 +705,9 @@ namespace GONet
                         }
                         else
                         {
-                            GONetLog.Error($"[GONetSceneManager] UnloadSceneAsync returned null for scene '{evt.SceneName}'");
+                            // UnloadSceneAsync can return null if the scene was already unloaded (e.g., by Unity in Single mode)
+                            // This is expected behavior, not an error
+                            GONetLog.Debug($"[GONetSceneManager] UnloadSceneAsync returned null for scene '{evt.SceneName}' - likely already unloaded by Unity");
                             scenesUnloading.Remove(evt.SceneName);
                         }
                     }
@@ -717,8 +719,10 @@ namespace GONet
                 }
                 else
                 {
-                    // Scene not found or not loaded - remove from tracking
-                    GONetLog.Warning($"[GONetSceneManager] Cannot unload scene '{evt.SceneName}' - not valid or not loaded");
+                    // Scene not found or not loaded
+                    // This is EXPECTED when LoadSceneMode.Single was used - Unity auto-unloads other scenes
+                    // The SceneUnloadEvent is still published for persistent event tracking and cleanup
+                    GONetLog.Debug($"[GONetSceneManager] Scene '{evt.SceneName}' already unloaded (expected for Single mode loads) - completing cleanup");
                     scenesUnloading.Remove(evt.SceneName);
                 }
             }
@@ -870,6 +874,9 @@ namespace GONet
 
             scenesLoadedHistory.Add(scene.name);
 
+            // Record scene load in GONetMain's scene history tracker for logging/debugging
+            GONetMain.RecordSceneLoad(scene.name);
+
             // IMPORTANT: Reset time sync AFTER scene load completes (especially for large scenes)
             // This ensures time sync is accurate after potentially long load times
             // For late-joining clients during initial connection, this is their FIRST time sync reset
@@ -878,13 +885,17 @@ namespace GONet
                 bool wasAlreadyInitialized = GONetMain.GONetClient != null && GONetMain.GONetClient.IsInitializedWithServer;
                 if (wasAlreadyInitialized)
                 {
-                    GONetLog.Info($"[TimeSync] Resetting time sync AFTER scene load completed (client already initialized): {scene.name}");
+                    // IMPORTANT: Don't reset again if we already reset BEFORE scene load!
+                    // Double-resetting causes the second reset to fail (wasAlreadyClosed=false from first reset)
+                    // leaving client in broken time sync state permanently
+                    GONetLog.Info($"[TimeSync] Skipping AFTER scene load reset - already reset BEFORE load (client initialized): {scene.name}");
                 }
                 else
                 {
+                    // Late-joining clients that weren't initialized yet: First reset happens AFTER scene loads
                     GONetLog.Info($"[TimeSync] Resetting time sync AFTER scene load completed (late-joining client - first reset): {scene.name}");
+                    GONetMain.ResetTimeSyncGap($"scene_load_complete_{scene.name}");
                 }
-                GONetMain.ResetTimeSyncGap($"scene_load_complete_{scene.name}");
             }
 
             OnSceneLoadCompleted?.Invoke(scene.name, mode);

@@ -366,6 +366,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 8643402947905904698, guid: 56c1b12035c5c034f81a7b4c212a379e,
+        type: 3}
+      propertyPath: enableMessageFlowLogging
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8643402947905904700, guid: 56c1b12035c5c034f81a7b4c212a379e,
         type: 3}
       propertyPath: m_LocalPosition.x

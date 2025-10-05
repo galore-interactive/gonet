@@ -115,6 +115,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\SyncEvent_GeneratedTypes.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\TokenFactory.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileUtils.cs" />
+    <Compile Include="Assets\GONet\Sample\ExitButtonUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\QuaternionUtils.cs" />
@@ -204,6 +205,7 @@
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\Defines.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteArrayReader.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetThreading.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Amazon\Plugins\System.Collections.Immutable.xml" />

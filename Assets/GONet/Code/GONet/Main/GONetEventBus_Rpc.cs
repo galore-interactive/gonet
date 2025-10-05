@@ -140,6 +140,44 @@ namespace GONet
         }
 
         /// <summary>
+        /// Clears all deferred RPCs for a specific GONetId when the participant is destroyed.
+        /// CRITICAL for preventing infinite defer loops when GONetIds are reused across scene changes.
+        /// Without this, persistent RPCs from Scene A targeting GONetId X will try to deliver to
+        /// a completely different participant in Scene B that reused GONetId X.
+        /// </summary>
+        internal static void ClearDeferredRpcsForGONetId(uint gonetId)
+        {
+            if (gonetId == 0) return;
+
+            // Remove from per-GONetId lookup
+            if (deferredRpcsByGoNetId.TryGetValue(gonetId, out List<DeferredRpcInfo> rpcsForId))
+            {
+                int count = rpcsForId.Count;
+                if (count > 0)
+                {
+                    GONetLog.Debug($"[RPC] Clearing {count} deferred RPC(s) for destroyed participant GONetId {gonetId} to prevent infinite defer loops");
+
+                    // Remove from main list
+                    for (int i = deferredRpcs.Count - 1; i >= 0; --i)
+                    {
+                        var deferred = deferredRpcs[i];
+                        uint targetGoNetId = deferred.IsPersistent ? deferred.PersistentRpcEvent.GONetId : deferred.RpcEvent.GONetId;
+
+                        if (targetGoNetId == gonetId)
+                        {
+                            deferred.Return(); // Return to pool
+                            deferredRpcs.RemoveAt(i);
+                        }
+                    }
+
+                    // Clear the per-GONetId list
+                    rpcsForId.Clear();
+                }
+                deferredRpcsByGoNetId.Remove(gonetId);
+            }
+        }
+
+        /// <summary>
         /// Defers an RPC for later processing when the target GONetParticipant is not yet available
         /// High-performance method using object pooling
         /// </summary>

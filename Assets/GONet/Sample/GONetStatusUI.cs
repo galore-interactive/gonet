@@ -62,7 +62,7 @@ namespace GONet.Sample
             panelRect.anchorMax = new Vector2(0, 1);
             panelRect.pivot = new Vector2(0, 1);
             panelRect.anchoredPosition = new Vector2(10, -10);
-            panelRect.sizeDelta = new Vector2(520, 225);
+            panelRect.sizeDelta = new Vector2(600, 225); // Increased width for Authority ID on same line
 
             Image panelImage = panelGO.AddComponent<Image>();
             panelImage.color = new Color(0, 0, 0, 0.7f);
@@ -71,13 +71,13 @@ namespace GONet.Sample
             headerText = CreateText(panelGO.transform, "HeaderText", "GONet Info", 56, new Vector2(10, -10), new Vector2(500, 50), FontStyle.Bold);
 
             // Create time text - consistent spacing
-            timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -70), new Vector2(500, 45));
+            timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -70), new Vector2(580, 45));
 
-            // Create role text - consistent spacing
-            roleText = CreateText(panelGO.transform, "RoleText", "Role: Unknown", 48, new Vector2(10, -125), new Vector2(500, 45));
+            // Create role text - consistent spacing (includes Authority ID on same line)
+            roleText = CreateText(panelGO.transform, "RoleText", "Role: Unknown", 48, new Vector2(10, -125), new Vector2(580, 45));
 
             // Create connection status text - consistent spacing
-            connectionStatusText = CreateText(panelGO.transform, "ConnectionStatusText", "Connection: Not Connected", 48, new Vector2(10, -180), new Vector2(500, 45));
+            connectionStatusText = CreateText(panelGO.transform, "ConnectionStatusText", "Connection: Not Connected", 48, new Vector2(10, -180), new Vector2(580, 45));
         }
 
         private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size, FontStyle fontStyle = FontStyle.Normal)
@@ -132,7 +132,23 @@ namespace GONet.Sample
                     role = "CLIENT";
                 }
 
-                roleText.text = $"Role: {role}";
+                // Include Authority ID on the same line as Role
+                ushort authorityId = GONetMain.MyAuthorityId;
+
+                if (GONetMain.IsServer)
+                {
+                    roleText.text = $"Role: {role} (Authority:{authorityId})";
+                }
+                else if (authorityId == 0)
+                {
+                    // Client hasn't received authority ID yet
+                    roleText.text = $"Role: {role} (Authority:--)";
+                }
+                else
+                {
+                    // Client with assigned authority ID
+                    roleText.text = $"Role: {role} (Authority:{authorityId})";
+                }
             }
 
             if (connectionStatusText != null)
@@ -171,9 +187,15 @@ namespace GONet.Sample
                     {
                         // Check if client is fully initialized with server
                         bool isInitialized = GONetMain.GONetClient.IsInitializedWithServer;
+
+                        // NOTE: Once IsInitializedWithServer is true, time sync has already converged to acceptable levels
+                        // The EffectiveOffsetTicks represents the total historical offset (e.g., 8 seconds if client started 8 seconds after server)
+                        // but the actual time sync error is very small (< 100ms) because it's been corrected via interpolation.
+                        // We don't have a direct API to get the "remaining sync error", so we just show initialized status.
+
                         if (isInitialized)
                         {
-                            connectionStatus = "Connected (Initialized)";
+                            connectionStatus = $"Connected (Initialized)";
                             statusColor = Color.green;
                         }
                         else

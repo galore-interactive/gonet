@@ -301,11 +301,17 @@ namespace GONet
         {
             base.Start();
 
-            // PATH 6: If added at runtime, call OnGONetReady() for ALL participants that are already ready
-            // This ensures runtime-added components (via GONetRuntimeComponentInitializer) don't miss participants
-            // that became ready before the component was added
-            if (WasAddedAtRuntime)
+            // PATH 6: Catch-up mechanism for behaviours that start AFTER participants are already ready
+            // This handles:
+            // 1. Runtime-added components (via GONetRuntimeComponentInitializer)
+            // 2. Scene-defined components when client returns to a scene (scene reload after LoadSceneMode.Single)
+            // 3. Late-joiners loading into a scene with existing participants
+            // Without this, behaviours miss OnGONetReady events for participants that became ready before the behaviour existed
+            bool shouldCatchUp = WasAddedAtRuntime || GONetMain.gonetParticipantByGONetIdMap.Count > 0;
+
+            if (shouldCatchUp)
             {
+                int caughtUpCount = 0;
                 // Call OnGONetReady for ALL ready participants, not just this component's participant
                 // This matches the behavior of OnDeserializeInitAllCompletedGNPEvent which broadcasts to all behaviours
                 foreach (var kvp in GONetMain.gonetParticipantByGONetIdMap)
@@ -315,14 +321,19 @@ namespace GONet
                     {
                         try
                         {
-                            GONetLog.Debug($"[GONetBehaviour] Runtime-added component '{GetType().Name}' receiving OnGONetReady for participant '{participant.name}' (GONetId: {participant.GONetId})");
                             OnGONetReady(participant);
+                            caughtUpCount++;
                         }
                         catch (Exception ex)
                         {
-                            GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() for runtime-added component '{GetType().Name}' on '{gameObject.name}' with participant '{participant.name}': {ex.Message}\n{ex.StackTrace}");
+                            GONetLog.Error($"[GONetBehaviour] Exception in OnGONetReady() catch-up for component '{GetType().Name}' on '{gameObject.name}' with participant '{participant.name}': {ex.Message}\n{ex.StackTrace}");
                         }
                     }
+                }
+
+                if (caughtUpCount > 0)
+                {
+                    GONetLog.Info($"[GONetBehaviour] Component '{GetType().Name}' on '{gameObject.name}' caught up on {caughtUpCount} existing participants (WasAddedAtRuntime: {WasAddedAtRuntime})");
                 }
             }
         }

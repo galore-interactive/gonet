@@ -77,6 +77,25 @@ namespace GONet
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 
+        /// <summary>
+        /// NOTE: GONetGlobal contains RUNTIME settings that affect gameplay behavior.
+        /// For EDITOR-ONLY settings (code generation, asset processing, etc.), see GONetProjectSettings.
+        /// </summary>
+        [Header("Runtime Debug Settings")]
+        [Tooltip("Enable comprehensive message flow logging for debugging network issues.\n\n" +
+                "When enabled, logs every send/receive/process event to: gonet-MessageFlow-YYYY-MM-DD.log\n\n" +
+                "⚠️ WARNING: Generates large log files. Only enable for targeted debugging sessions.\n\n" +
+                "Logs include:\n" +
+                "• [MSG-SEND] - When messages are sent (timestamp, target, channel, bytes)\n" +
+                "• [MSG-RECV] - When messages arrive (timestamp, source, latency)\n" +
+                "• [MSG-PROC] - When OnGONetReady events are broadcast\n\n" +
+                "The MessageFlow logging profile is automatically registered with:\n" +
+                "• Separate file output (gonet-MessageFlow-YYYY-MM-DD.log)\n" +
+                "• No stack traces (clean, readable output)\n" +
+                "• Info level and above\n\n" +
+                "Default: Disabled")]
+        public bool enableMessageFlowLogging = false;
+
         private readonly List<GONetParticipant> enabledGONetParticipants = new List<GONetParticipant>(1000);
         /// <summary>
         /// <para>A convenient collection of all the <see cref="GONetParticipant"/> instances that are currently enabled no matter what the value of <see cref="GONetParticipant.OwnerAuthorityId"/> value is.</para>
@@ -141,6 +160,21 @@ namespace GONet
                 return;
             }
             instance = this;
+
+            // Register the MessageFlow logging profile for comprehensive message flow debugging
+            // This profile writes to a separate file (gonet-MessageFlow-YYYY-MM-DD.log) with no stack traces
+            GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(
+                GONetMain.MessageFlowLoggingProfile,
+                outputToSeparateFile: true,
+                includeStackTraces: false,  // CRITICAL: Prevents stack trace spam
+                minimumLogLevel: GONetLog.LogLevel.Info));
+
+            // Enable message flow logging if inspector checkbox is set
+            GONetMain.EnableMessageFlowLogging = enableMessageFlowLogging;
+            if (enableMessageFlowLogging)
+            {
+                GONetLog.Info($"[GONetGlobal] Message flow logging ENABLED - output to: gonet-MessageFlow-{System.DateTime.Now:yyyy-MM-dd}.log");
+            }
 
             if (gonetLocalPrefab == null)
             {

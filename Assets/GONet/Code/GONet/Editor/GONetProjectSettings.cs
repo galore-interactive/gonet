@@ -20,6 +20,10 @@ namespace GONet.Editor
     /// <summary>
     /// Project-wide settings for GONet development and build processes.
     /// This ScriptableObject should be placed under the Assets/GONet folder.
+    ///
+    /// NOTE: GONetProjectSettings contains EDITOR-ONLY settings that affect code generation,
+    /// asset processing, and development workflow.
+    /// For RUNTIME settings (gameplay behavior, networking, logging), see GONetGlobal.
     /// </summary>
     [CreateAssetMenu(fileName = "GONetProjectSettings", menuName = "GONet/Project Settings", order = 1)]
     public class GONetProjectSettings : ScriptableObject

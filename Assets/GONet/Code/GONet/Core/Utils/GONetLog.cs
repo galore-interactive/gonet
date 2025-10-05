@@ -52,7 +52,11 @@ namespace GONet
         private const char NewLine = '\n';
         private const string SPACE = " ";
 
-        private enum LogLevel
+        /// <summary>
+        /// Log level for filtering messages.
+        /// Used by logging profiles to control which messages are output.
+        /// </summary>
+        public enum LogLevel
         {
             Verbose,
             Debug,
@@ -103,6 +107,145 @@ namespace GONet
 #else
             false;
 #endif
+
+        #endregion
+
+        #region Logging Profiles
+
+        /// <summary>
+        /// Configuration for a custom logging profile.
+        /// Allows separate log files with different settings (stack traces, log levels, etc.)
+        /// </summary>
+        public class LoggingProfile
+        {
+            /// <summary>
+            /// Name of the profile (used as part of filename if OutputToSeparateFile is true)
+            /// </summary>
+            public string ProfileName { get; set; }
+
+            /// <summary>
+            /// If true, logs to a separate file: gonet-{ProfileName}-YYYY-MM-DD.log
+            /// If false, logs to the main gonet.log file
+            /// </summary>
+            public bool OutputToSeparateFile { get; set; }
+
+            /// <summary>
+            /// If true, includes stack traces in log output (slower, more detail)
+            /// If false, excludes stack traces (faster, cleaner output)
+            /// Default: false (no stack traces)
+            /// </summary>
+            public bool IncludeStackTraces { get; set; }
+
+            /// <summary>
+            /// Minimum log level to output for this profile.
+            /// Messages below this level are ignored.
+            /// Default: LogLevel.Verbose (log everything)
+            /// </summary>
+            public LogLevel MinimumLogLevel { get; set; }
+
+            internal string FilePath { get; set; }
+            internal FileStream FileStream { get; set; }
+            internal StreamWriter StreamWriter { get; set; }
+            internal readonly object WriteLock = new object();
+
+            public LoggingProfile(string profileName, bool outputToSeparateFile = true, bool includeStackTraces = false, LogLevel minimumLogLevel = LogLevel.Verbose)
+            {
+                ProfileName = profileName;
+                OutputToSeparateFile = outputToSeparateFile;
+                IncludeStackTraces = includeStackTraces;
+                MinimumLogLevel = minimumLogLevel;
+            }
+        }
+
+        private static readonly ConcurrentDictionary<string, LoggingProfile> _loggingProfiles = new ConcurrentDictionary<string, LoggingProfile>();
+
+        /// <summary>
+        /// Registers a custom logging profile.
+        /// Example: RegisterLoggingProfile(new LoggingProfile("MessageFlow", outputToSeparateFile: true, includeStackTraces: false));
+        /// </summary>
+        public static void RegisterLoggingProfile(LoggingProfile profile)
+        {
+            if (string.IsNullOrEmpty(profile.ProfileName))
+            {
+                UnityEngine.Debug.LogError("GONetLog: Cannot register profile with null/empty name");
+                return;
+            }
+
+            if (_loggingProfiles.TryAdd(profile.ProfileName, profile))
+            {
+                if (profile.OutputToSeparateFile)
+                {
+                    InitializeProfileFileStream(profile);
+                }
+                UnityEngine.Debug.Log($"GONetLog: Registered logging profile '{profile.ProfileName}' (SeparateFile={profile.OutputToSeparateFile}, StackTraces={profile.IncludeStackTraces}, MinLevel={profile.MinimumLogLevel})");
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning($"GONetLog: Profile '{profile.ProfileName}' already registered");
+            }
+        }
+
+        /// <summary>
+        /// Unregisters a logging profile and closes its file stream.
+        /// </summary>
+        public static void UnregisterLoggingProfile(string profileName)
+        {
+            if (_loggingProfiles.TryRemove(profileName, out LoggingProfile profile))
+            {
+                CloseProfileFileStream(profile);
+                UnityEngine.Debug.Log($"GONetLog: Unregistered logging profile '{profileName}'");
+            }
+        }
+
+        private static void InitializeProfileFileStream(LoggingProfile profile)
+        {
+            try
+            {
+                // Create filename: gonet-{ProfileName}-YYYY-MM-DD.log
+                string filename = $"{LogFilePrefix}-{profile.ProfileName}-{DateTime.Now:yyyy-MM-dd}{LogFileExtension}";
+                profile.FilePath = Path.Combine(LogDirectory, filename);
+
+                // Open with FileShare.ReadWrite to allow other processes to read
+                profile.FileStream = new FileStream(profile.FilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                profile.StreamWriter = new StreamWriter(profile.FileStream, Encoding.UTF8)
+                {
+                    AutoFlush = false
+                };
+
+                UnityEngine.Debug.Log($"GONetLog: Initialized file stream for profile '{profile.ProfileName}': {profile.FilePath}");
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"GONetLog: Failed to initialize file stream for profile '{profile.ProfileName}': {ex.Message}");
+            }
+        }
+
+        private static void CloseProfileFileStream(LoggingProfile profile)
+        {
+            if (profile.StreamWriter != null)
+            {
+                try
+                {
+                    lock (profile.WriteLock)
+                    {
+                        profile.StreamWriter.Flush();
+                        profile.StreamWriter.Close();
+                        profile.StreamWriter = null;
+                    }
+                }
+                catch (Exception) { /* Ignore exceptions during cleanup */ }
+            }
+
+            if (profile.FileStream != null)
+            {
+                try
+                {
+                    profile.FileStream.Close();
+                    profile.FileStream = null;
+                }
+                catch (Exception) { /* Ignore exceptions during cleanup */ }
+            }
+        }
 
         #endregion
 
@@ -286,6 +429,12 @@ namespace GONet
                 }
 
                 UnityEngine.Debug.Log("GONetLog: Beginning shutdown sequence");
+
+                // Close all profile file streams
+                foreach (var kvp in _loggingProfiles)
+                {
+                    CloseProfileFileStream(kvp.Value);
+                }
 
                 // Signal the background thread to finish processing
                 _shutdownRequested = true;
@@ -497,6 +646,55 @@ namespace GONet
 
         #endregion
 
+        #region Profile-Based Log Methods
+
+        /// <summary>
+        /// Logs an info message using a specific logging profile.
+        /// If profile doesn't exist, falls back to default logging.
+        /// </summary>
+        public static void Info(string message, string profileName)
+        {
+            LogWithProfile(message, profileName, KeyInfo, LogType.Log, LogLevel.Info);
+        }
+
+        /// <summary>
+        /// Logs a debug message using a specific logging profile.
+        /// If profile doesn't exist, falls back to default logging.
+        /// </summary>
+        public static void Debug(string message, string profileName)
+        {
+            LogWithProfile(message, profileName, KeyDebug, LogType.Log, LogLevel.Debug);
+        }
+
+        /// <summary>
+        /// Logs a warning message using a specific logging profile.
+        /// If profile doesn't exist, falls back to default logging.
+        /// </summary>
+        public static void Warning(string message, string profileName)
+        {
+            LogWithProfile(message, profileName, KeyWarning, LogType.Warning, LogLevel.Warning);
+        }
+
+        /// <summary>
+        /// Logs an error message using a specific logging profile.
+        /// If profile doesn't exist, falls back to default logging.
+        /// </summary>
+        public static void Error(string message, string profileName)
+        {
+            LogWithProfile(message, profileName, KeyError, LogType.Error, LogLevel.Error);
+        }
+
+        /// <summary>
+        /// Logs a verbose message using a specific logging profile.
+        /// If profile doesn't exist, falls back to default logging.
+        /// </summary>
+        public static void Verbose(string message, string profileName)
+        {
+            LogWithProfile(message, profileName, KeyVerbose, LogType.Log, LogLevel.Verbose);
+        }
+
+        #endregion
+
         #region Internal Implementation
 
         private static void LogInternal(string message, string keyXxx, LogType logType, LogLevel logLevel)
@@ -528,6 +726,76 @@ namespace GONet
                 const string FRAME_POST = "s) ";
                 string logString = string.Concat(FRAME_PRE, GONetMain.Time.FrameCount, '/', GONetMain.Time.ElapsedSeconds, FRAME_POST, keyXxx, SPACE, message);
                 ProcessMessageViaLogger(logString, trace.ToString(), logType, logLevel);
+            }
+        }
+
+        /// <summary>
+        /// Logs a message using a specific logging profile.
+        /// Handles stack trace inclusion, log level filtering, and separate file output per profile settings.
+        /// </summary>
+        private static void LogWithProfile(string message, string profileName, string keyXxx, LogType logType, LogLevel logLevel)
+        {
+            // Try to get the profile
+            if (!_loggingProfiles.TryGetValue(profileName, out LoggingProfile profile))
+            {
+                // Profile doesn't exist - fall back to default logging
+                LogInternal(message, keyXxx, logType, logLevel);
+                return;
+            }
+
+            // Check log level filtering
+            if (logLevel < profile.MinimumLogLevel)
+            {
+                return; // Message is below minimum level for this profile
+            }
+
+            // Build the log message
+            const string FRAME_PRE = "(frame:";
+            const string FRAME_POST = "s) ";
+            string roleIdentifier = GetRoleIdentifier();
+            string logString = string.Concat(
+                "[", keyXxx, "]", roleIdentifier,
+                " (Thread:", Thread.CurrentThread.ManagedThreadId, ") ",
+                FRAME_PRE, GONetMain.Time.FrameCount, '/', GONetMain.Time.ElapsedSeconds, FRAME_POST,
+                message);
+
+            // Optionally include stack trace
+            string fullMessage;
+            if (profile.IncludeStackTraces)
+            {
+                StackTrace trace = new StackTrace(2, true); // Skip 2 frames (this method + caller)
+                fullMessage = string.Concat(logString, NewLine, trace.ToString(), NewLine);
+            }
+            else
+            {
+                fullMessage = string.Concat(logString, NewLine);
+            }
+
+            // Write to appropriate destination
+            if (profile.OutputToSeparateFile && profile.StreamWriter != null)
+            {
+                // Write to profile's separate file
+                try
+                {
+                    lock (profile.WriteLock)
+                    {
+                        profile.StreamWriter.Write(fullMessage);
+                        // Flush periodically for real-time viewing
+                        if (DateTime.Now.Subtract(_lastFlushTime).TotalSeconds > 1.0)
+                        {
+                            profile.StreamWriter.Flush();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    UnityEngine.Debug.LogError($"GONetLog: Failed to write to profile '{profileName}': {ex.Message}");
+                }
+            }
+            else
+            {
+                // Write to main log file (use existing queue system)
+                ProcessMessageViaLogger(logString, profile.IncludeStackTraces ? new StackTrace(2, true).ToString() : null, logType, logLevel);
             }
         }
 

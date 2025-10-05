@@ -303,7 +303,12 @@ namespace GONet
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
 
-            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
+            // CRITICAL: Objects with GONetSessionContext (GONetGlobal, GONetLocal) persist via DontDestroyOnLoad
+            // They must ALWAYS use "DontDestroyOnLoad" as SceneIdentifier, even if currently in a regular scene
+            // Otherwise SceneUnloadEvent will incorrectly cancel their spawn events when original scene unloads
+            @event.SceneIdentifier = gonetParticipant.GetComponent<GONetSessionContext>() != null
+                ? HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE
+                : GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
 
@@ -325,7 +330,12 @@ namespace GONet
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
 
-            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
+            // CRITICAL: Objects with GONetSessionContext (GONetGlobal, GONetLocal) persist via DontDestroyOnLoad
+            // They must ALWAYS use "DontDestroyOnLoad" as SceneIdentifier, even if currently in a regular scene
+            // Otherwise SceneUnloadEvent will incorrectly cancel their spawn events when original scene unloads
+            @event.SceneIdentifier = gonetParticipant.GetComponent<GONetSessionContext>() != null
+                ? HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE
+                : GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
 
@@ -352,7 +362,12 @@ namespace GONet
             @event.Position = gonetParticipant.transform.position;
             @event.Rotation = gonetParticipant.transform.rotation;
 
-            @event.SceneIdentifier = GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
+            // CRITICAL: Objects with GONetSessionContext (GONetGlobal, GONetLocal) persist via DontDestroyOnLoad
+            // They must ALWAYS use "DontDestroyOnLoad" as SceneIdentifier, even if currently in a regular scene
+            // Otherwise SceneUnloadEvent will incorrectly cancel their spawn events when original scene unloads
+            @event.SceneIdentifier = gonetParticipant.GetComponent<GONetSessionContext>() != null
+                ? HierarchyUtils.DONT_DESTROY_ON_LOAD_SCENE
+                : GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
 

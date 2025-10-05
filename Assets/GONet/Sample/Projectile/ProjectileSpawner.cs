@@ -25,6 +25,18 @@ public class ProjectileSpawner : GONetBehaviour
     private float lastCheckTime = 0f;
     const float CHECK_INTERVAL = 1f;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        GONetLog.Debug($"[ProjectileSpawner] Awake() called - registering with GONetBehaviours system. GameObject: '{gameObject.name}', Scene: '{gameObject.scene.name}'");
+    }
+
+    protected override void OnDestroy()
+    {
+        GONetLog.Debug($"[ProjectileSpawner] OnDestroy() called - unregistering from GONetBehaviours system. GameObject: '{gameObject.name}', projectiles.Count: {projectiles.Count}");
+        base.OnDestroy();
+    }
+
     public override void OnGONetReady(GONetParticipant gonetParticipant) // NOTE:  OnGONetReady is the recommended approach for v1.5+ (instead of OnGONetParticipantEnabled/Started/Etc..
     {
         base.OnGONetReady(gonetParticipant);
@@ -32,7 +44,9 @@ public class ProjectileSpawner : GONetBehaviour
         if (gonetParticipant.GetComponent<Projectile>() != null)
         {
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
+            GONetLog.Info($"[ProjectileSpawner] OnGONetReady called for projectile '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, MyAuthorityId: {GONetMain.MyAuthorityId}) - adding to projectiles list (count will be: {projectiles.Count + 1})");
             projectiles.Add(projectile);
+
             /* This was replaced in v1.1.1 with use of GONetMain.Client_InstantiateToBeRemotelyControlledByMe():
             if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
             {
@@ -57,12 +71,19 @@ public class ProjectileSpawner : GONetBehaviour
         Projectile projectile = gonetParticipant.GetComponent<Projectile>();
         if (projectile != null)
         {
-            projectiles.Remove(projectile);
+            bool removed = projectiles.Remove(projectile);
             addressableProjectiles.Remove(projectile);
+            GONetLog.Debug($"[ProjectileSpawner] OnGONetParticipantDisabled: Removed projectile '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}) from list. Was in list: {removed}, new count: {projectiles.Count}");
         }
     }
     private void Update()
     {
+        // Log projectiles list size periodically for debugging
+        if (Time.frameCount % 300 == 0 && projectiles.Count > 0)
+        {
+            GONetLog.Debug($"[ProjectileSpawner] Update: projectiles.Count = {projectiles.Count}, addressableProjectiles.Count = {addressableProjectiles.Count}");
+        }
+
         if (GONetMain.IsClient && projectilPrefab != null)
         {
             #region check keys and touches states
@@ -88,11 +109,23 @@ public class ProjectileSpawner : GONetBehaviour
                 GONetParticipant gnp =
                     GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation);
                 GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it. Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
-                InstantiateAddressablesPrefab();
+                //InstantiateAddressablesPrefab();
             }
         }
         foreach (var projectile in projectiles)
         {
+            // CRITICAL CHECK: Verify projectile is fully initialized before moving
+            if (projectile == null || projectile.GONetParticipant == null)
+            {
+                if (Time.frameCount % 300 == 0)
+                {
+                    GONetLog.Warning($"[ProjectileSpawner] Update: Found null projectile or GONetParticipant in list! Skipping...");
+                }
+                continue;
+            }
+
+            uint gonetId = projectile.GONetParticipant.GONetId;
+
             if (projectile.GONetParticipant.IsMine)
             {
                 // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);

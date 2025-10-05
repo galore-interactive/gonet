@@ -50,6 +50,223 @@ namespace GONet
             0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1,
         };
 
+        #region Scene Loading History Tracker
+
+        /// <summary>
+        /// Tracks scene loading history for debugging message flow.
+        /// Thread-safe for concurrent access from network/main threads.
+        /// Format: "GONetSample → JustAnotherScene → ProjectileTest"
+        /// </summary>
+        private static readonly List<string> sceneLoadHistory = new List<string>();
+        private static readonly object sceneHistoryLock = new object();
+
+        /// <summary>
+        /// Gets scene loading history as a single string for log prefixes.
+        /// Thread-safe. Returns empty string if no scenes loaded yet.
+        /// </summary>
+        internal static string GetSceneHistory()
+        {
+            lock (sceneHistoryLock)
+            {
+                if (sceneLoadHistory.Count == 0)
+                    return string.Empty;
+
+                return string.Join(" → ", sceneLoadHistory);
+            }
+        }
+
+        /// <summary>
+        /// Records a scene load in the history tracker.
+        /// Called automatically by GONetSceneManager when scenes load.
+        /// Thread-safe.
+        /// </summary>
+        internal static void RecordSceneLoad(string sceneName)
+        {
+            lock (sceneHistoryLock)
+            {
+                sceneLoadHistory.Add(sceneName);
+                GONetLog.Debug($"[SceneHistory] Scene loaded: {sceneName} (history now: {GetSceneHistory()})");
+            }
+        }
+
+        /// <summary>
+        /// Clears scene loading history. Used when starting new game sessions.
+        /// Thread-safe.
+        /// </summary>
+        internal static void ClearSceneHistory()
+        {
+            lock (sceneHistoryLock)
+            {
+                sceneLoadHistory.Clear();
+            }
+        }
+
+        #endregion
+
+        #region Persistent Event History Export
+
+        /// <summary>
+        /// Controls whether event history export is enabled.
+        /// Set via GONetGlobal inspector or code before initialization.
+        /// </summary>
+        public static bool EnableEventHistoryExport { get; set; } = true;
+
+        /// <summary>
+        /// If true, only server exports event history.
+        /// If false, all machines (server + clients) export their own copies.
+        /// Default: false (all machines export for maximum debugging capability)
+        /// </summary>
+        public static bool EventHistoryExport_ServerOnly { get; set; } = false;
+
+        /// <summary>
+        /// Exports the complete persistent event history to a human-readable file.
+        /// Called automatically on application quit if EnableEventHistoryExport is true.
+        /// File format: gonet-events-YYYY-MM-DD-HHmmss-[Server|ClientN].txt
+        /// </summary>
+        private static void ExportPersistentEventHistory()
+        {
+            if (!EnableEventHistoryExport)
+            {
+                GONetLog.Debug("[EventHistory] Export disabled (EnableEventHistoryExport=false)");
+                return;
+            }
+
+            if (EventHistoryExport_ServerOnly && !IsServer)
+            {
+                GONetLog.Debug("[EventHistory] Export skipped (EventHistoryExport_ServerOnly=true and this is a client)");
+                return;
+            }
+
+            try
+            {
+                // Determine role identifier for filename
+                string roleIdentifier = IsServer ? "Server" : $"Client{MyAuthorityId}";
+
+                // Create filename with timestamp
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd-HHmmss");
+                string filename = $"gonet-events-{timestamp}-{roleIdentifier}.txt";
+
+                // Use same directory as GONetLog (Application.persistentDataPath/logs)
+                string logDirectory = Path.Combine(Application.persistentDataPath, "logs");
+                Directory.CreateDirectory(logDirectory); // Ensure directory exists
+
+                string filepath = Path.Combine(logDirectory, filename);
+
+                int eventCount = persistentEventsArchive_CompleteHistory.Count;
+                GONetLog.Info($"[EventHistory] Exporting {eventCount} persistent events to: {filepath}");
+
+                using (StreamWriter writer = new StreamWriter(filepath, append: false, Encoding.UTF8))
+                {
+                    // Write header
+                    writer.WriteLine("================================================================================");
+                    writer.WriteLine($"GONet Persistent Event History Export");
+                    writer.WriteLine($"Role: {roleIdentifier}");
+                    writer.WriteLine($"Authority ID: {MyAuthorityId}");
+                    writer.WriteLine($"Session GUID: {SessionGUID}");
+                    writer.WriteLine($"Export Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
+                    writer.WriteLine($"Event Count: {eventCount}");
+                    writer.WriteLine($"Scene History: {GetSceneHistory()}");
+                    writer.WriteLine("================================================================================");
+                    writer.WriteLine();
+
+                    // Write event index for quick navigation
+                    writer.WriteLine("EVENT INDEX (for grep searching):");
+                    writer.WriteLine("  InstantiateGONetParticipantEvent - Spawns");
+                    writer.WriteLine("  SyncEvent_ValueChangeProcessed - Value changes (Note: Transient, may not appear in persistent archive)");
+                    writer.WriteLine("  SceneLoadEvent - Scene loads");
+                    writer.WriteLine("  SceneUnloadEvent - Scene unloads");
+                    writer.WriteLine();
+                    writer.WriteLine("GREP EXAMPLES:");
+                    writer.WriteLine("  grep 'GONetId=3072' gonet-events-*.txt  # All events for specific participant");
+                    writer.WriteLine("  grep 'InstantiateGONetParticipantEvent' gonet-events-*.txt  # All spawns");
+                    writer.WriteLine("  grep 'Authority1' gonet-events-*.txt  # All events involving client 1");
+                    writer.WriteLine("================================================================================");
+                    writer.WriteLine();
+
+                    // Write events in chronological order
+                    int eventIndex = 0;
+                    foreach (var persistentEvent in persistentEventsArchive_CompleteHistory)
+                    {
+                        eventIndex++;
+
+                        // Extract common properties from event
+                        string eventTypeName = persistentEvent.GetType().Name;
+                        uint gonetId = 0;
+                        ushort ownerAuthority = 0;
+                        long elapsedTicks = persistentEvent.OccurredAtElapsedTicks;
+
+                        // Try to extract GONetId and OwnerAuthorityId from common event types
+                        if (persistentEvent is InstantiateGONetParticipantEvent instantiateEvent)
+                        {
+                            gonetId = instantiateEvent.GONetId;
+                            ownerAuthority = instantiateEvent.OwnerAuthorityId;
+                        }
+                        else if (persistentEvent is SyncEvent_ValueChangeProcessed valueChangeEvent)
+                        {
+                            gonetId = valueChangeEvent.GONetId;
+                        }
+
+                        // Format timestamp
+                        double elapsedSeconds = elapsedTicks / (double)Stopwatch.Frequency;
+
+                        // Write event entry
+                        writer.WriteLine($"[Event {eventIndex:D6}] Type={eventTypeName}");
+                        writer.WriteLine($"  Timestamp: Ticks={elapsedTicks} ({elapsedSeconds:F3}s)");
+
+                        if (gonetId != 0)
+                            writer.WriteLine($"  GONetId: {gonetId}");
+
+                        if (ownerAuthority != 0)
+                            writer.WriteLine($"  Owner: Authority{ownerAuthority}");
+
+                        // Add event-specific details
+                        writer.WriteLine($"  Details: {GetEventDetailsString(persistentEvent)}");
+                        writer.WriteLine();
+                    }
+
+                    writer.WriteLine("================================================================================");
+                    writer.WriteLine($"END OF EVENT HISTORY - Total Events: {eventCount}");
+                    writer.WriteLine("================================================================================");
+                }
+
+                GONetLog.Info($"[EventHistory] Export complete: {filepath} ({eventCount} events)");
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"[EventHistory] Export failed: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// Gets a human-readable string with event-specific details.
+        /// Used for event history export.
+        /// </summary>
+        private static string GetEventDetailsString(IPersistentEvent persistentEvent)
+        {
+            try
+            {
+                // Use ToString() as base, then add type-specific details
+                string baseString = persistentEvent.ToString();
+
+                if (persistentEvent is InstantiateGONetParticipantEvent instantiateEvent)
+                {
+                    return $"{baseString} | DesignTimeLocation={instantiateEvent.DesignTimeLocation} | Position={instantiateEvent.Position} | Rotation={instantiateEvent.Rotation}";
+                }
+                else if (persistentEvent is SyncEvent_ValueChangeProcessed valueChangeEvent)
+                {
+                    return $"{baseString} | SyncMemberIndex={valueChangeEvent.SyncMemberIndex} | GONetId={valueChangeEvent.GONetId}";
+                }
+
+                return baseString;
+            }
+            catch (Exception ex)
+            {
+                return $"[Error getting details: {ex.Message}]";
+            }
+        }
+
+        #endregion
+
         public static GONetGlobal Global { get; private set; }
 
         /// <summary>
@@ -220,6 +437,9 @@ namespace GONet
         private static void Application_quitting_TakeNote()
         {
             IsApplicationQuitting = true;
+
+            // Export persistent event history before shutdown
+            ExportPersistentEventHistory();
         }
 
         /// <summary>
@@ -581,13 +801,18 @@ namespace GONet
 
         private static void Client_gonetClient_InitializedWithServer(GONetClient client)
         {
-            GONetLog.Info($"[INIT] Client_gonetClient_InitializedWithServer() called - about to instantiate GONetLocal prefab");
+            GONetLog.Info($"[INIT] Client_gonetClient_InitializedWithServer() called - MyAuthorityId={MyAuthorityId}");
+
             MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
+
+            // CRITICAL: Set OwnerAuthorityId AFTER instantiation but BEFORE Start() is called
+            // The GONetParticipant.Start() sends spawn event, so OwnerAuthorityId must be correct by then
+            MyLocal.GONetParticipant.OwnerAuthorityId = MyAuthorityId;
 
             // CRITICAL: Move GONetLocal to DontDestroyOnLoad scene IMMEDIATELY after instantiation
             // This prevents it from being incorrectly recorded as "defined in scene" if a scene load is in progress
             UnityEngine.Object.DontDestroyOnLoad(MyLocal.gameObject);
-            GONetLog.Info($"[INIT] GONetLocal instantiated and moved to DontDestroyOnLoad scene - MyLocal GONetId: {(MyLocal?.GONetParticipant?.GONetId ?? 0)}");
+            GONetLog.Info($"[INIT] GONetLocal instantiated and moved to DontDestroyOnLoad scene - MyLocal GONetId: {(MyLocal?.GONetParticipant?.GONetId ?? 0)}, OwnerAuthorityId: {MyLocal?.GONetParticipant?.OwnerAuthorityId ?? 0}");
 
             while (client.incomingNetworkData_mustProcessAfterClientInitialized.Count > 0)
             {
@@ -817,6 +1042,38 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// DEBUG: Handler for Transform.position sync events to trace what's actually being synced
+        /// </summary>
+        private static void OnTransformPositionChanged_Debug(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+        {
+            GONetParticipant gnp = eventEnvelope.GONetParticipant;
+            SyncEvent_ValueChangeProcessed @event = eventEnvelope.Event;
+
+            string machineName = IsServer ? "Server" : $"Client:{MyAuthorityId}";
+            string valuePrev = @event.ValuePrevious.UnityEngine_Vector3.ToString("F3");
+            string valueNew = @event.ValueNew.UnityEngine_Vector3.ToString("F3");
+
+            GONetLog.Info($"[{machineName}] [SYNC-DEBUG] Transform.position changed - GONetId: {gnp.GONetId}, Name: '{gnp.name}', IsMine: {gnp.IsMine}, Owner: {gnp.OwnerAuthorityId}, Prev: {valuePrev}, New: {valueNew}, IsRemote: {eventEnvelope.IsSourceRemote}");
+        }
+
+        /// <summary>
+        /// DEBUG: Handler for Transform.rotation sync events to trace what's actually being synced
+        /// </summary>
+        private static void OnTransformRotationChanged_Debug(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+        {
+            GONetParticipant gnp = eventEnvelope.GONetParticipant;
+            SyncEvent_ValueChangeProcessed @event = eventEnvelope.Event;
+
+            string machineName = IsServer ? "Server" : $"Client:{MyAuthorityId}";
+            UnityEngine.Quaternion prevQuat = @event.ValuePrevious.UnityEngine_Quaternion;
+            UnityEngine.Quaternion newQuat = @event.ValueNew.UnityEngine_Quaternion;
+            string valuePrev = $"({prevQuat.x:F3}, {prevQuat.y:F3}, {prevQuat.z:F3}, {prevQuat.w:F3})";
+            string valueNew = $"({newQuat.x:F3}, {newQuat.y:F3}, {newQuat.z:F3}, {newQuat.w:F3})";
+
+            GONetLog.Info($"[{machineName}] [SYNC-DEBUG] Transform.rotation changed - GONetId: {gnp.GONetId}, Name: '{gnp.name}', IsMine: {gnp.IsMine}, Owner: {gnp.OwnerAuthorityId}, Prev: {valuePrev}, New: {valueNew}, IsRemote: {eventEnvelope.IsSourceRemote}");
+        }
+
         internal static void OnGONetIdAboutToBeSet(uint gonetId_new, uint gonetId_raw_new, ushort ownerAuthorityId_new, GONetParticipant gonetParticipant)
         {
             if (gonetId_new == gonetParticipant.GONetIdAtInstantiation)
@@ -979,6 +1236,10 @@ namespace GONet
 
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_GONetId, OnGONetIdChanged);
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, OnOwnerAuthorityIdChanged);
+
+            // DEBUG: Subscribe to position/rotation sync events to trace what's actually being synced
+            EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnTransformPositionChanged_Debug);
+            EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_rotation, OnTransformRotationChanged_Debug);
 
             EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
             
@@ -1343,17 +1604,37 @@ namespace GONet
                 GlobalSessionContext.StartCoroutine(OnInstantiationEvent_Remote_HideDuringBufferLeadTime(instance));
             }
 
+            // CRITICAL: Start monitoring for auto-magical value sync on remote spawns
+            // This was previously missing, causing remote spawns (especially server-owned projectiles from client spawn requests)
+            // to not have their transform/value changes propagated over the network
+            // The comment in Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL said "remote source is processed like this elsewhere"
+            // but there was no "elsewhere" - this is it!
+            //
+            // IMPORTANT: Force monitoring even if DidStartMonitoringForAutoMagicalNetworking is already true
+            // Remote spawns may have had monitoring started elsewhere but it needs to happen on THIS machine (server)
+            bool wasAlreadyMonitoring = instance.DidStartMonitoringForAutoMagicalNetworking;
+            if (wasAlreadyMonitoring)
+            {
+                // Reset flag to allow monitoring to start
+                //instance.DidStartMonitoringForAutoMagicalNetworking = false;
+                GONetLog.Debug($"[SPAWN_SYNC] Forcing monitoring restart for remote spawn '{instance.name}' (GONetId: {instance.GONetId}) - was already marked as monitoring");
+            }
+            OnWasInstantiatedKnown_StartMonitoringForAutoMagicalNetworking(instance);
+            GONetLog.Debug($"[SPAWN_SYNC] Started monitoring for remote spawn '{instance.name}' (GONetId: {instance.GONetId}, wasAlreadyMonitoring: {wasAlreadyMonitoring})");
+
             // PATH 7: Remote runtime-spawned participants - publish DeserializeInitAllCompleted after spawn completes
             // This handles projectiles/objects spawned by remote players that don't go through DeserializeBody_AllValuesBundle
-            // The GONetId was set during Instantiate_Remote, so the participant is now fully ready
-            if (IsGONetReady(instance))
+            // The GONetId was set during Instantiate_Remote, so the participant is now fully ready from this client's perspective
+            // NOTE: isRelatedLocalContentRequired=false because remote spawns are ready immediately on receiving client
+            // The owner's GONetLocal may not exist yet on this client, but that's OK - the spawn itself is what matters
+            if (instance.GONetId != 0) // Only require GONetId to be assigned
             {
                 // Deduplication check: Only publish if not already published
                 if (TryMarkDeserializeInitPublished(instance.GONetId))
                 {
                     GONetLog.Info($"[GONet] Publishing DeserializeInitAllCompleted for remote spawn '{instance.name}' (GONetId: {instance.GONetId}, IsMine: {instance.IsMine}) from CompleteRemoteInstantiation");
                     var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(instance);
-                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, instance, isRelatedLocalContentRequired: true);
+                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, instance, isRelatedLocalContentRequired: false);
                 }
                 else
                 {
@@ -1362,7 +1643,7 @@ namespace GONet
             }
             else
             {
-                GONetLog.Warning($"[GONet] Remote spawn '{instance.name}' (GONetId: {instance.GONetId}) NOT ready in CompleteRemoteInstantiation - this should not happen!");
+                GONetLog.Error($"[GONet] Remote spawn '{instance.name}' has no GONetId in CompleteRemoteInstantiation - this should never happen!");
             }
         }
 
@@ -1437,6 +1718,11 @@ namespace GONet
 
             // Broadcast OnGONetReady to ALL GONetBehaviours after deserialization is complete
             // This ensures every behaviour gets notified about every participant that becomes ready
+
+            // COMPREHENSIVE LOGGING - Track OnGONetReady broadcast
+            int behaviourCount = allGONetBehaviours.Count;
+            LogEventProcess(gonetParticipant, behaviourCount);
+
             using (var en = allGONetBehaviours.GetEnumerator())
             {
                 while (en.MoveNext())
@@ -1721,6 +2007,189 @@ namespace GONet
             return singleProducerQueues;
         }
 
+        #region Comprehensive Message Flow Logging
+
+        /// <summary>
+        /// Logging profile name for message flow logging.
+        /// Profile must be registered before logging can occur.
+        /// Example:
+        ///   GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(
+        ///       GONetMain.MessageFlowLoggingProfile,
+        ///       outputToSeparateFile: true,
+        ///       includeStackTraces: false,
+        ///       minimumLogLevel: GONetLog.LogLevel.Info));
+        /// </summary>
+        public const string MessageFlowLoggingProfile = "MessageFlow";
+
+        /// <summary>
+        /// Controls whether comprehensive message flow logging is enabled.
+        /// WARNING: Generates large log output even without stack traces.
+        /// Default: false (disabled) - enable only for targeted debugging sessions.
+        /// NOTE: Profile must be registered separately via GONetLog.RegisterLoggingProfile()
+        /// </summary>
+        public static bool EnableMessageFlowLogging { get; set; } = false;
+
+        /// <summary>
+        /// Extracts metadata from message bytes for logging purposes.
+        /// Thread-safe. Returns partial data if deserialization fails.
+        /// </summary>
+        private static string ExtractMessageMetadata(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId)
+        {
+            try
+            {
+                // Try to extract messageID and type from the bytes
+                if (bytesUsedCount >= 4 && GONetChannel.IsGONetCoreChannel(channelId))
+                {
+                    using (var bitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(messageBytes, bytesUsedCount))
+                    {
+                        uint messageID;
+                        bitStream.ReadUInt(out messageID);
+
+                        Type messageType;
+                        if (messageTypeByMessageIDMap.TryGetValue(messageID, out messageType))
+                        {
+                            long elapsedTicksAtSend;
+                            bitStream.ReadLong(out elapsedTicksAtSend);
+
+                            // Try to extract GONetId if this is an event that has one
+                            string gonetIdInfo = string.Empty;
+                            if (messageType == typeof(InstantiateGONetParticipantEvent) ||
+                                messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
+                                messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
+                            {
+                                try
+                                {
+                                    // These message types should have GONetId in their payload
+                                    // We'll just note it exists rather than fully parse to avoid side effects
+                                    gonetIdInfo = " [ContainsGONetIds]";
+                                }
+                                catch
+                                {
+                                    // Ignore extraction failures
+                                }
+                            }
+
+                            return $"MsgType={messageType.Name}, MsgID={messageID}, SentTicks={elapsedTicksAtSend}{gonetIdInfo}";
+                        }
+
+                        return $"MsgID={messageID} [TypeUnknown]";
+                    }
+                }
+                else if (channelId == GONetChannel.EventSingles_Reliable || channelId == GONetChannel.EventSingles_Unreliable || channelId == GONetChannel.ClientInitialization_EventSingles_Reliable)
+                {
+                    return $"EventSingle [Channel={channelId}]";
+                }
+                else
+                {
+                    return $"CustomChannel={channelId}";
+                }
+            }
+            catch (Exception e)
+            {
+                return $"[MetadataExtractionFailed: {e.Message}]";
+            }
+        }
+
+        /// <summary>
+        /// Logs comprehensive send-side metadata for message flow debugging.
+        /// Thread-safe. Called from background send thread.
+        /// NOTE: Disabled by default - set EnableMessageFlowLogging = true to enable
+        /// </summary>
+        private static void LogMessageSend(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId, GONetConnection targetConnection, bool isServerBroadcast)
+        {
+            if (!EnableMessageFlowLogging) return; // Exit early if disabled
+
+            try
+            {
+                long sendTimestamp = Time.ElapsedTicks;
+                string sceneHistory = GetSceneHistory();
+                string metadata = ExtractMessageMetadata(messageBytes, bytesUsedCount, channelId);
+
+                string target;
+                if (isServerBroadcast)
+                {
+                    target = "ALL_CLIENTS";
+                }
+                else if (targetConnection != null)
+                {
+                    ushort targetAuthority = targetConnection is GONetConnection_ServerToClient serverToClient
+                        ? serverToClient.OwnerAuthorityId
+                        : (ushort)0;
+                    target = $"Authority{targetAuthority}";
+                }
+                else
+                {
+                    target = "SERVER";
+                }
+
+                // Use logging profile (no stack traces if profile configured that way)
+                string logMessage = $"[MSG-SEND] {sceneHistory} | SendTicks={sendTimestamp} | Source=Authority{MyAuthorityId} | Target={target} | Ch={channelId} | Bytes={bytesUsedCount} | {metadata}";
+                GONetLog.Info(logMessage, MessageFlowLoggingProfile);
+            }
+            catch (Exception e)
+            {
+                GONetLog.Error($"[MSG-SEND] Logging failed: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Logs comprehensive receive-side metadata for message flow debugging.
+        /// Thread-safe. Called from main thread during message processing.
+        /// NOTE: Disabled by default - set EnableMessageFlowLogging = true to enable
+        /// </summary>
+        private static void LogMessageReceive(byte[] messageBytes, int bytesUsedCount, GONetChannelId channelId, GONetConnection sourceConnection, long elapsedTicksAtSend)
+        {
+            if (!EnableMessageFlowLogging) return; // Exit early if disabled
+
+            try
+            {
+                long receiveTimestamp = Time.ElapsedTicks;
+                long latencyTicks = receiveTimestamp - elapsedTicksAtSend;
+                double latencyMs = (latencyTicks / (double)Stopwatch.Frequency) * 1000.0;
+
+                string sceneHistory = GetSceneHistory();
+                string metadata = ExtractMessageMetadata(messageBytes, bytesUsedCount, channelId);
+
+                ushort sourceAuthority = sourceConnection is GONetConnection_ServerToClient serverToClient
+                    ? serverToClient.OwnerAuthorityId
+                    : (ushort)0;
+
+                // Use logging profile (no stack traces if profile configured that way)
+                string logMessage = $"[MSG-RECV] {sceneHistory} | RecvTicks={receiveTimestamp} | Source=Authority{sourceAuthority} | Target=Authority{MyAuthorityId} | Ch={channelId} | Bytes={bytesUsedCount} | Latency={latencyMs:F2}ms | {metadata}";
+                GONetLog.Info(logMessage, MessageFlowLoggingProfile);
+            }
+            catch (Exception e)
+            {
+                GONetLog.Error($"[MSG-RECV] Logging failed: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Logs comprehensive process-side metadata for OnGONetReady event broadcasting.
+        /// Thread-safe. Called from main thread during event publishing.
+        /// NOTE: Disabled by default - set EnableMessageFlowLogging = true to enable
+        /// </summary>
+        private static void LogEventProcess(GONetParticipant participant, int behaviourCount)
+        {
+            if (!EnableMessageFlowLogging) return; // Exit early if disabled
+
+            try
+            {
+                long processTimestamp = Time.ElapsedTicks;
+                string sceneHistory = GetSceneHistory();
+
+                // Use logging profile (no stack traces if profile configured that way)
+                string logMessage = $"[MSG-PROC] {sceneHistory} | ProcTicks={processTimestamp} | Event=OnGONetReady | GONetId={participant.GONetId} | Name={participant.name} | IsMine={participant.IsMine} | Owner=Authority{participant.OwnerAuthorityId} | BehaviourCount={behaviourCount}";
+                GONetLog.Info(logMessage, MessageFlowLoggingProfile);
+            }
+            catch (Exception e)
+            {
+                GONetLog.Error($"[MSG-PROC] Logging failed: {e.Message}");
+            }
+        }
+
+        #endregion
+
         internal static ulong tickCount_endOfTheLineSendAndSave_Thread;
         private static volatile bool isRunning_endOfTheLineSendAndSave_Thread;
         private static void SendBytes_EndOfTheLine_AllSendsAndSavesMUSTComeHere_SeparateThread()
@@ -1750,6 +2219,9 @@ namespace GONet
                                         {
                                            //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                             _gonetServer.SendBytesToAllClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+
+                                            // COMPREHENSIVE LOGGING - Send to all clients
+                                            LogMessageSend(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, null, isServerBroadcast: true);
                                         }
                                     }
                                     else
@@ -1768,6 +2240,9 @@ namespace GONet
                                             {
                                                 //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                                 GONetClient.SendBytesToServer(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+
+                                                // COMPREHENSIVE LOGGING - Client to server
+                                                LogMessageSend(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, null, isServerBroadcast: false);
                                             }
                                         }
                                     }
@@ -1776,6 +2251,9 @@ namespace GONet
                                 {
                                     //GONetLog.Debug("sending something....my seconds: " + Time.ElapsedSeconds + " size: " + networkData.bytesUsedCount);
                                     networkData.relatedConnection.SendMessageOverChannel(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId);
+
+                                    // COMPREHENSIVE LOGGING - Targeted send
+                                    LogMessageSend(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, networkData.relatedConnection, isServerBroadcast: false);
                                 }
 
                                 { // set things up so the byte[] on networkData can be returned to the proper pool AND on the proper thread on which is was initially borrowed!
@@ -2188,6 +2666,13 @@ namespace GONet
         static void Client_SyncTimeWithServer_SendRequest(long baseTicks)
         {
             RequestMessage timeSync = new RequestMessage(Time.RawElapsedTicks + (baseTicks % 1000));
+
+            if (timeSync.UID == 0)
+            {
+                GONetLog.Error($"[TimeSync] CRITICAL BUG: Generated RequestMessage has UID=0! This will cause time sync to fail. OccurredAtElapsedTicks: {timeSync.OccurredAtElapsedTicks}");
+            }
+
+            GONetLog.Info($"[TimeSync] CLIENT: Sending time sync request - UID: {timeSync.UID}, OccurredAt: {timeSync.OccurredAtElapsedTicks}");
             client_lastFewTimeSyncsSentByUID[timeSync.UID] = timeSync;
             if (client_lastFewTimeSyncsSentByUID.Count > CLIENT_TIME_SYNCS_SENT_HISTORY_SIZE)
             {
@@ -3015,25 +3500,33 @@ namespace GONet
                 bool forceAdjustment = false)
             {
                 if (requestMessage == null || timeAuthority == null || serverElapsedTicksAtResponse <= 0)
+                {
+                    GONetLog.Warning($"[TimeSync] ProcessTimeSync EARLY EXIT - requestMessage null: {requestMessage == null}, timeAuthority null: {timeAuthority == null}, serverElapsedTicksAtResponse: {serverElapsedTicksAtResponse}");
                     return;
+                }
 
                 long t0 = requestMessage.OccurredAtElapsedTicks;  // raw
                 long t1 = serverElapsedTicksAtResponse;
                 long t2 = timeAuthority.RawElapsedTicks;  // raw at receive
                 long rtt_ticks = t2 - t0;
+
+                GONetLog.Info($"[TimeSync] ProcessTimeSync - UID: {requestUID}, t0: {t0}, t1: {t1}, t2: {t2}, RTT_ticks: {rtt_ticks}, RTT_ms: {rtt_ticks / 10_000}ms, forceAdjustment: {forceAdjustment}");
+
                 if (rtt_ticks < 0 || rtt_ticks > MAX_RTT_TICKS)
                 {
-                    GONetLog.Warning($"Invalid RTT detected: {rtt_ticks / 10_000}ms, skipping sync");
+                    GONetLog.Warning($"[TimeSync] Invalid RTT detected: {rtt_ticks / 10_000}ms, skipping sync");
                     return;
                 }
 
                 // Update minimum RTT if this sample is within the cutoff and lower
                 long nowTicks = t2;
                 long cutoff = nowTicks - FAST_MIN_RTT_CUTOFF_TICKS;
+                bool updatedMinRtt = false;
                 if (minRttState.MinTimeTicks < cutoff || rtt_ticks < minRttState.MinRttTicks)
                 {
                     minRttState.MinRttTicks = rtt_ticks;
                     minRttState.MinTimeTicks = nowTicks;
+                    updatedMinRtt = true;
                 }
 
                 long minRtt = minRttState.MinRttTicks;
@@ -3043,8 +3536,12 @@ namespace GONet
                 long clientTimeNowTicks = t2;
                 long currentDifferenceTicks = serverTimeNowTicks - clientTimeNowTicks;
                 long targetTimeTicks = clientTimeNowTicks + currentDifferenceTicks;
-                
+
+                GONetLog.Info($"[TimeSync] Calculations - minRtt: {minRtt} ticks ({minRtt / 10_000}ms), oneWayDelay: {oneWayDelayTicks / 10_000}ms, currentDifference: {currentDifferenceTicks / 10_000}ms, updatedMinRtt: {updatedMinRtt}");
+
                 timeAuthority.SetFromAuthority(targetTimeTicks, forceAdjustment);
+
+                GONetLog.Info($"[TimeSync] SetFromAuthority called - targetTimeTicks: {targetTimeTicks}, forceAdjustment: {forceAdjustment}");
             }
 
             /// <summary>
@@ -3126,21 +3623,36 @@ namespace GONet
         {
             using (var enumerator = singleProducerReceiveQueuesByThread.GetEnumerator())
             {
+                int threadQueueIndex = 0;
                 while (enumerator.MoveNext())
                 {
+                    threadQueueIndex++;
                     SingleProducerQueues singleProducerReceiveQueues = enumerator.Current.Value;
                     ConcurrentQueue<NetworkData> incomingNetworkData = singleProducerReceiveQueues.queueForWork;
                     NetworkData networkData;
                     int readyCount = incomingNetworkData.Count;
+
+                    // DEBUG: Log queue stats
+                    if (readyCount > 0 && IsClient)
+                    {
+                        GONetLog.Info($"[DEBUG] Processing thread queue #{threadQueueIndex} - {readyCount} messages ready");
+                    }
                     int processedCount = 0;
                     while (processedCount < readyCount && incomingNetworkData.TryDequeue(out networkData))
                     {
                         ++processedCount;
+
+                        // DEBUG: Log EVERY dequeued message on Channel 9
+                        if (networkData.channelId == 9)
+                        {
+                            GONetLog.Info($"[DEBUG] DEQUEUED - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, ProcessedCount: {processedCount}/{readyCount}");
+                        }
+
                         try
                         {
                             // IMPORTANT: This check must come first as it exits early if condition met!
                             bool shouldQueueForProcessingAfterInitialization =
-                                !IsChannelClientInitializationRelated(networkData.channelId) && IsClient && !_gonetClient.IsInitializedWithServer;
+                                !IsChannelClientInitializationRelated(networkData.channelId) && IsClient && _gonetClient != null && !_gonetClient.IsInitializedWithServer;
 
                             if (IsClient)
                             {
@@ -3151,8 +3663,29 @@ namespace GONet
 
                             if (shouldQueueForProcessingAfterInitialization)
                             {
-                                GONetLog.Debug($"[MSG] QUEUING message for later (client not initialized yet)");
+                                // Try to identify the message type being queued
+                                string messageInfo = "unknown";
+                                try
+                                {
+                                    if (GONetChannel.IsGONetCoreChannel(networkData.channelId) && networkData.bytesUsedCount >= 4)
+                                    {
+                                        using (var tempStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(networkData.messageBytes, networkData.bytesUsedCount))
+                                        {
+                                            uint msgID;
+                                            tempStream.ReadUInt(out msgID);
+                                            if (messageTypeByMessageIDMap.TryGetValue(msgID, out Type msgType))
+                                            {
+                                                messageInfo = msgType.Name;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch { }
+
+                                GONetLog.Warning($"[MSG] QUEUING message for later (client not initialized yet) - Channel: {networkData.channelId}, MessageType: {messageInfo}, IsInitRelated: {IsChannelClientInitializationRelated(networkData.channelId)}");
                                 GONetClient.incomingNetworkData_mustProcessAfterClientInitialized.Enqueue(networkData);
+                                // NOTE: We intentionally DON'T return the byte array to pool here - it's queued for later processing
+                                // The byte array will be returned when the queued message is eventually processed
                                 continue;
                             }
                         }
@@ -3175,15 +3708,40 @@ namespace GONet
         /// </summary>
         private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData, bool isProcessingFromQueue = false)
         {
+            // DEBUG: Log EVERY message that enters this function
+            if (networkData.channelId == 9) // ClientInitialization_CustomSerialization_Reliable
+            {
+                GONetLog.Info($"[DEBUG] ProcessIncomingBytes ENTRY - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, isProcessingFromQueue: {isProcessingFromQueue}, _gonetClient null: {_gonetClient == null}, IsClient: {IsClient}");
+            }
+
             bool shouldReturnToPool = true; // Track whether message should be returned to pool (false if queued elsewhere)
             try
             {
                 if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
                 {
+                    // COMPREHENSIVE LOGGING - Receive EventSingle
+                    LogMessageReceive(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, networkData.relatedConnection, 0);
+
                     DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
                 }
                 else if (GONetChannel.IsGONetCoreChannel(networkData.channelId))
                 {
+                    // IMPORTANT: Extract elapsedTicksAtSend for logging BEFORE creating the main processing bitStream
+                    // because LogMessageReceive uses the same thread-local builder and would reset the position!
+                    long elapsedTicksAtSend = 0;
+                    if (networkData.bytesUsedCount >= 12) // Ensure we have at least messageID (4) + timestamp (8)
+                    {
+                        using (var tempStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(networkData.messageBytes, networkData.bytesUsedCount))
+                        {
+                            uint tempMsgId;
+                            tempStream.ReadUInt(out tempMsgId);
+                            tempStream.ReadLong(out elapsedTicksAtSend);
+                        }
+                    }
+
+                    // COMPREHENSIVE LOGGING - Receive GONet core channel message (BEFORE main processing to avoid position reset)
+                    LogMessageReceive(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, networkData.relatedConnection, elapsedTicksAtSend);
+
                     using (var bitStream = BitByBitByteArrayBuilder.GetBuilder_WithNewData(networkData.messageBytes, networkData.bytesUsedCount))
                     {
                         Type messageType;
@@ -3193,9 +3751,20 @@ namespace GONet
                         bitStream.ReadUInt(out messageID);
                         messageType = messageTypeByMessageIDMap[messageID];
 
-                        long elapsedTicksAtSend;
                         bitStream.ReadLong(out elapsedTicksAtSend);
+
+                        // DEBUG: Log position after reading header for OwnerAuthorityIdAssignmentEvent
+                        if (messageType == typeof(OwnerAuthorityIdAssignmentEvent))
+                        {
+                            GONetLog.Info($"[INIT] CLIENT: After reading header - MessageID: {messageID}, ElapsedTicks: {elapsedTicksAtSend}, BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
+                        }
                         ////////////////////////////////////////////////////////////////////////////
+
+                        // DEBUG: Log every message type received
+                        if (messageType == typeof(OwnerAuthorityIdAssignmentEvent) || messageType == typeof(ServerSaysClientInitializationCompletion))
+                        {
+                            GONetLog.Info($"[INIT] Received {messageType.Name} - MessageID: {messageID}, Channel: {networkData.channelId}, IsServer: {IsServer}, MyAuthorityId: {MyAuthorityId}");
+                        }
 
                         //GONetLog.Debug($"received something....networkData.bytesUsedCount: {networkData.bytesUsedCount}, messageType: {messageType.Name}, IsServer? {IsServer} (isServerOverride: {isServerOverride}, MyAuthorityId: {MyAuthorityId}/Server: {OwnerAuthorityId_Server}), IsClient? {IsClient}");
                         
@@ -3222,6 +3791,13 @@ namespace GONet
                                 long requestUID;
                                 bitStream.ReadLong(out requestUID);
 
+                                GONetLog.Info($"[TimeSync] SERVER: Received time sync request - UID: {requestUID}, elapsedTicksAtSend: {elapsedTicksAtSend}");
+
+                                if (requestUID == 0)
+                                {
+                                    GONetLog.Error($"[TimeSync] SERVER: CRITICAL - Received RequestMessage with UID=0! elapsedTicksAtSend: {elapsedTicksAtSend}, bitStream position: {bitStream.Position_Bytes}");
+                                }
+
                                 Server_SyncTimeWithClient_Respond(requestUID, networkData.relatedConnection);
                             }
                             else if (messageType == typeof(ResponseMessage))
@@ -3233,19 +3809,30 @@ namespace GONet
                             }
                             else if (messageType == typeof(OwnerAuthorityIdAssignmentEvent)) // this should be the first message ever received....but since only sent once per client, do not put it first in the if statements list of message type check
                             {
+                                // Dump the raw bytes received
+                                string hex = System.BitConverter.ToString(networkData.messageBytes, 0, networkData.bytesUsedCount);
+                                GONetLog.Info($"[INIT] CLIENT: Received message - Bytes: {hex}");
+
+                                // Show bytes 12-14 where OwnerAuthorityId should be
+                                string authBytes = System.BitConverter.ToString(networkData.messageBytes, 12, 3);
+                                GONetLog.Info($"[INIT] CLIENT: Bytes 12-14 (where AuthorityId should be): {authBytes}");
+
+                                GONetLog.Info($"[INIT] CLIENT: About to read OwnerAuthorityId - BitCount: {GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED}, BitStream Position Before: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits, TotalBytes: {networkData.bytesUsedCount}");
+
                                 ushort ownerAuthorityId;
                                 bitStream.ReadUShort(out ownerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
+                                GONetLog.Info($"[INIT] CLIENT: After read OwnerAuthorityId - Value: {ownerAuthorityId}, BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
 
                                 long sessionGUIDremote;
                                 bitStream.ReadLong(out sessionGUIDremote);
+                                GONetLog.Info($"[INIT] CLIENT: After read SessionGUID - Value: {sessionGUIDremote}, BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
                                 SessionGUID = sessionGUIDremote;
 
                                 if (!IsServer) // this only applied to clients....should NEVER happen on server
                                 {
-                                    const string REC = " ***************************** this client received from server my assigned ownerAuthorityId: ";
-                                    GONetLog.Debug(string.Concat(REC, ownerAuthorityId));
-
+                                    GONetLog.Info($"[INIT] Client received OwnerAuthorityIdAssignmentEvent - assigned AuthorityId: {ownerAuthorityId}");
                                     MyAuthorityId = ownerAuthorityId;
+                                    GONetLog.Info($"[INIT] After setting MyAuthorityId field - MyAuthorityId is now: {MyAuthorityId}");
                                 } // else log warning?
                             }
                             else if (messageType == typeof(AutoMagicalSync_AllCurrentValues_Message))
@@ -3334,9 +3921,10 @@ namespace GONet
                             {
                                 if (IsClient)
                                 {
-                                    GONetLog.Debug($"[INIT] Client received ServerSaysClientInitializationCompletion - setting IsInitializedWithServer = true");
+                                    GONetLog.Info($"[INIT] Client received ServerSaysClientInitializationCompletion - MyAuthorityId is currently: {MyAuthorityId}");
+                                    GONetLog.Debug($"[INIT] Setting IsInitializedWithServer = true (this will fire InitializedWithServer event)");
                                     GONetClient.IsInitializedWithServer = true;
-                                    GONetLog.Debug($"[INIT] Client is now initialized with server - will instantiate GONetLocal");
+                                    GONetLog.Debug($"[INIT] Client is now initialized with server - GONetLocal should be instantiated");
 
                                     // IMPORTANT: Log registered sync companions for debugging
                                     int totalCompanions = 0;
@@ -3691,19 +4279,8 @@ namespace GONet
                 // Check if this is a spawn event with scene information
                 else if (persistentEvent is InstantiateGONetParticipantEvent spawnEvent)
                 {
-                    // IMPORTANT: Always include GONetLocal spawns - these are client-specific and must be sent to all connecting clients
-                    // GONetLocal is essential for client initialization and exists per-client regardless of scenes
-                    bool isGONetLocal = spawnEvent.DesignTimeLocation != null &&
-                                       spawnEvent.DesignTimeLocation.Contains("GONet_LocalContext");
-
-                    if (isGONetLocal)
-                    {
-                        shouldInclude = true;
-                        gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
-                        GONetLog.Debug($"[SPAWN_SYNC] Including GONetLocal spawn (GONetId {spawnEvent.GONetId}) - always sent to new clients");
-                    }
                     // Only include spawns from currently loaded scenes
-                    else if (!string.IsNullOrEmpty(spawnEvent.SceneIdentifier))
+                    if (!string.IsNullOrEmpty(spawnEvent.SceneIdentifier))
                     {
                         shouldInclude = loadedScenes.Contains(spawnEvent.SceneIdentifier);
                         if (shouldInclude)
@@ -3738,6 +4315,11 @@ namespace GONet
                         GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING ExpiredBaseline for GONetId {gonetId} - spawn not being sent");
                     }
                 }
+                // NOTE: Persistent RPCs are NOT filtered here because:
+                // - GONet_GlobalContext is used as a "bucket" for RPCs without specific participant context
+                // - Scene-specific components can be added to GONet_GlobalContext via GONetRuntimeComponentInitializer
+                // - Filtering would break legitimate global RPCs
+                // - Component-not-ready exceptions will defer RPCs until timeout (handled by deferred RPC system)
                 // All other persistent events (OwnerAuthorityIdAssignment, etc.) are always included
 
                 if (shouldInclude)
@@ -3792,13 +4374,23 @@ namespace GONet
                 }
 
                 { // body
+                    GONetLog.Info($"[INIT] SERVER: About to write OwnerAuthorityId - Value: {connectionToClient.OwnerAuthorityId}, BitCount: {GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED}, BitStream Position Before: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
                     bitStream.WriteUShort(connectionToClient.OwnerAuthorityId, GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_USED);
+                    GONetLog.Info($"[INIT] SERVER: After write OwnerAuthorityId - BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
                     bitStream.WriteLong(SessionGUID);
+                    GONetLog.Info($"[INIT] SERVER: After write SessionGUID - BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
                 }
 
+                GONetLog.Info($"[INIT] SERVER: About to WriteCurrentPartialByte - BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits");
                 bitStream.WriteCurrentPartialByte();
+                GONetLog.Info($"[INIT] SERVER: After WriteCurrentPartialByte - BitStream Position: {bitStream.Position_Bytes} bytes {bitStream.Position_Bits} bits, TotalBytes: {bitStream.Length_WrittenBytes}");
 
-                SendBytesToRemoteConnection(connectionToClient, bitStream.GetBuffer(), bitStream.Length_WrittenBytes, GONetChannel.ClientInitialization_CustomSerialization_Reliable);
+                // Dump the raw bytes being sent
+                byte[] buffer = bitStream.GetBuffer();
+                string hex = System.BitConverter.ToString(buffer, 0, bitStream.Length_WrittenBytes);
+                GONetLog.Info($"[INIT] SERVER: Sending message - Bytes: {hex}");
+
+                SendBytesToRemoteConnection(connectionToClient, buffer, bitStream.Length_WrittenBytes, GONetChannel.ClientInitialization_CustomSerialization_Reliable);
             }
         }
 
@@ -4603,6 +5195,8 @@ namespace GONet
             // PATH 8: Client spawns remotely-controlled object (projectiles with server authority)
             // These participants have OwnerAuthorityId = server, so they won't be caught by Path 5 (IsRelatedToThisLocality fails)
             // The spawning client needs OnGONetReady even though they don't own it
+            // CRITICAL: Require server's GONetLocal to be present - this ensures proper initialization synchronization
+            // The server's GONetLocal is now properly sent to all clients via FilterPersistentEventsByLoadedScenes fix
             if (IsClient &&
                 GONetSpawnSupport_Runtime.IsMarkedToBeRemotelyControlled(gonetParticipant) &&
                 IsGONetReady(gonetParticipant))
@@ -4612,7 +5206,7 @@ namespace GONet
                 {
                     GONetLog.Info($"[GONet] Publishing DeserializeInitAllCompleted for client-spawned remotely-controlled '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}) from Start path");
                     var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant);
-                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, gonetParticipant, isRelatedLocalContentRequired: true);
+                    PublishEventAsSoonAsSufficientInfoAvailable(deserializeInitEvent, gonetParticipant, isRelatedLocalContentRequired: true); // Wait for server GONetLocal - required for proper initialization
                 }
                 else
                 {
@@ -4718,8 +5312,8 @@ namespace GONet
             // TODO [PERF] don't create a coroutine per event like this...just throw in a collection and check/process on a frequency elsewhere
             GONetParticipant mappedGNP;
             while (
-                !gonetParticipant.DoesGONetIdContainAllComponents() || 
-                !gonetParticipantByGONetIdMap.TryGetValue(gonetParticipant.GONetId, out mappedGNP) || 
+                !gonetParticipant.DoesGONetIdContainAllComponents() ||
+                !gonetParticipantByGONetIdMap.TryGetValue(gonetParticipant.GONetId, out mappedGNP) ||
                 mappedGNP != gonetParticipant ||
                 (isRelatedLocalContentRequired && GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId] == default))
             {
@@ -6438,6 +7032,9 @@ namespace GONet
 
                 // Cleanup: Remove from deduplication tracking to allow GONetId reuse
                 deserializeInitPublishedGONetIds.Remove(gonetParticipant.GONetId);
+
+                // Cleanup: Clear any deferred RPCs for this GONetId to prevent infinite defer loops on GONetId reuse
+                GONetEventBus.ClearDeferredRpcsForGONetId(gonetParticipant.GONetId);
             }
         }
 
