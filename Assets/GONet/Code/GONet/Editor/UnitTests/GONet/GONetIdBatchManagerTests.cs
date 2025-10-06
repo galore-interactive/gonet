@@ -1,0 +1,752 @@
+/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential, email: contactus@galoreinteractive.com
+ *
+ *
+ * Authorized use is explicitly limited to the following:
+ * -The ability to view and reference source code without changing it
+ * -The ability to enhance debugging with source code access
+ * -The ability to distribute products based on original sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on original source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
+ * -The ability to modify source code for local use only
+ * -The ability to distribute products based on modified sources for non-commercial purposes, whereas this license must be included if source code provided in said products
+ * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
+ */
+
+using NUnit.Framework;
+using UnityEngine;
+
+namespace GONet
+{
+    /// <summary>
+    /// Unit tests for GONetIdBatchManager - the production-grade batch allocation system
+    /// for client-spawned, server-controlled objects.
+    ///
+    /// These tests ensure bulletproof operation across:
+    /// - Sequential ID allocation
+    /// - Batch exhaustion and removal
+    /// - Scene change state resets
+    /// - Low batch threshold triggering
+    /// - Validation and error handling
+    /// </summary>
+    [TestFixture]
+    public class GONetIdBatchManagerTests
+    {
+        [SetUp]
+        public void Setup()
+        {
+            // Reset all state before each test
+            GONetIdBatchManager.Server_ResetAllBatches();
+            GONetIdBatchManager.Client_ResetAllBatches();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up after each test
+            GONetIdBatchManager.Server_ResetAllBatches();
+            GONetIdBatchManager.Client_ResetAllBatches();
+        }
+
+        #region Server Tests
+
+        [Test]
+        public void Server_AllocateNewBatch_ReturnsSequentialBatches()
+        {
+            // Arrange
+            uint lastId = 1000;
+
+            // Act
+            uint batch1 = GONetIdBatchManager.Server_AllocateNewBatch(lastId);
+            uint batch2 = GONetIdBatchManager.Server_AllocateNewBatch(batch1 + 99);
+
+            // Assert
+            Assert.AreEqual(1001, batch1, "First batch should start at lastId + 1");
+            Assert.AreEqual(1101, batch2, "Second batch should start at previous batch end + 1");
+        }
+
+        [Test]
+        public void Server_IsIdInAnyBatch_ChecksSingleBatch()
+        {
+            // Arrange
+            uint batchStart = GONetIdBatchManager.Server_AllocateNewBatch(1000);
+
+            // Assert - IDs within batch
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart), "Batch start should be in batch");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart + 50), "Middle of batch should be in batch");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart + 99), "Batch end should be in batch");
+
+            // Assert - IDs outside batch
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart - 1), "ID before batch should not be in batch");
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart + 100), "ID after batch should not be in batch");
+        }
+
+        [Test]
+        public void Server_IsIdInAnyBatch_ChecksMultipleBatches()
+        {
+            // Arrange
+            uint batch1 = GONetIdBatchManager.Server_AllocateNewBatch(1000);
+            uint batch2 = GONetIdBatchManager.Server_AllocateNewBatch(2000);
+            uint batch3 = GONetIdBatchManager.Server_AllocateNewBatch(3000);
+
+            // Assert - all batches recognized
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch1 + 10), "ID in first batch");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch2 + 10), "ID in second batch");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch3 + 10), "ID in third batch");
+
+            // Assert - gaps between batches not recognized
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(1500), "ID between batches should not be in any batch");
+        }
+
+        [Test]
+        public void Server_ReleaseBatch_RemovesBatchFromTracking()
+        {
+            // Arrange
+            uint batchStart = GONetIdBatchManager.Server_AllocateNewBatch(1000);
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart + 10), "Batch should exist before release");
+
+            // Act
+            GONetIdBatchManager.Server_ReleaseBatch(batchStart);
+
+            // Assert
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batchStart + 10), "Batch should not exist after release");
+        }
+
+        [Test]
+        public void Server_ResetAllBatches_ClearsAllAllocations()
+        {
+            // Arrange
+            uint batch1 = GONetIdBatchManager.Server_AllocateNewBatch(1000);
+            uint batch2 = GONetIdBatchManager.Server_AllocateNewBatch(2000);
+
+            // Act
+            GONetIdBatchManager.Server_ResetAllBatches();
+
+            // Assert
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batch1 + 10), "First batch should be cleared");
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batch2 + 10), "Second batch should be cleared");
+        }
+
+        #endregion
+
+        #region Client Tests
+
+        [Test]
+        public void Client_AddBatch_StoresBatchCorrectly()
+        {
+            // Act
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Assert
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(5000), "Batch start should be in active batch");
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(5099), "Batch end should be in active batch");
+        }
+
+        [Test]
+        public void Client_AddBatch_IgnoresDuplicates()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - add duplicate
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Assert - should still work correctly (no crash, consistent state)
+            uint id;
+            bool shouldRequest;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            Assert.IsTrue(success, "Should still allocate after duplicate add");
+            Assert.AreEqual(5000, id, "Should allocate from first (not duplicated) batch");
+        }
+
+        [Test]
+        public void Client_TryAllocateNextId_ReturnsSequentialIds()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act
+            uint id1, id2, id3;
+            bool shouldRequest1, shouldRequest2, shouldRequest3;
+            bool success1 = GONetIdBatchManager.Client_TryAllocateNextId(out id1, out shouldRequest1);
+            bool success2 = GONetIdBatchManager.Client_TryAllocateNextId(out id2, out shouldRequest2);
+            bool success3 = GONetIdBatchManager.Client_TryAllocateNextId(out id3, out shouldRequest3);
+
+            // Assert
+            Assert.IsTrue(success1, "First allocation should succeed");
+            Assert.IsTrue(success2, "Second allocation should succeed");
+            Assert.IsTrue(success3, "Third allocation should succeed");
+            Assert.AreEqual(5000, id1, "First ID should be batch start");
+            Assert.AreEqual(5001, id2, "Second ID should be batch start + 1");
+            Assert.AreEqual(5002, id3, "Third ID should be batch start + 2");
+            Assert.IsFalse(shouldRequest1, "Should not request new batch yet");
+            Assert.IsFalse(shouldRequest2, "Should not request new batch yet");
+            Assert.IsFalse(shouldRequest3, "Should not request new batch yet");
+        }
+
+        [Test]
+        public void Client_TryAllocateNextId_RequestsNewBatchWhenLow()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Consume 80 IDs (100 - 80 = 20 remaining, at threshold)
+            for (int i = 0; i < 80; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                Assert.IsFalse(shouldRequest, $"Should not request at ID {i} (still have {100 - i} remaining)");
+            }
+
+            // Act - 81st allocation should trigger request (19 remaining, below threshold of 20)
+            uint triggerId;
+            bool shouldRequestNow;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out triggerId, out shouldRequestNow);
+
+            // Assert
+            Assert.IsTrue(success, "Allocation should succeed");
+            Assert.AreEqual(5080, triggerId, "Should allocate correct ID");
+            Assert.IsTrue(shouldRequestNow, "Should request new batch when remaining drops below 20");
+        }
+
+        [Test]
+        public void Client_TryAllocateNextId_FailsWhenNoBatchesAvailable()
+        {
+            // Arrange - no batches added
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+
+            // Act
+            uint id;
+            bool shouldRequest;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+
+            // Assert
+            Assert.IsFalse(success, "Should fail when no batches available");
+            Assert.AreEqual(GONetParticipant.GONetIdRaw_Unset, id, "Should return unset ID on failure");
+        }
+
+        [Test]
+        public void Client_TryAllocateNextId_RemovesExhaustedBatch()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - exhaust entire batch (100 IDs)
+            for (int i = 0; i < 100; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                Assert.IsTrue(success, $"Allocation {i} should succeed");
+                Assert.AreEqual(5000 + i, id, $"ID {i} should match expected value");
+            }
+
+            // Assert - batch should be exhausted and removed
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+            uint nextId;
+            bool shouldRequestNext;
+            bool successNext = GONetIdBatchManager.Client_TryAllocateNextId(out nextId, out shouldRequestNext);
+            Assert.IsFalse(successNext, "Should fail after batch exhausted");
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(5050), "Exhausted batch should be removed");
+        }
+
+        [Test]
+        public void Client_TryAllocateNextId_WorksAcrossMultipleBatches()
+        {
+            // Arrange - add 3 batches
+            GONetIdBatchManager.Client_AddBatch(5000);
+            GONetIdBatchManager.Client_AddBatch(6000);
+            GONetIdBatchManager.Client_AddBatch(7000);
+
+            // Act - exhaust first batch
+            for (int i = 0; i < 100; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Get first ID from second batch
+            uint nextId;
+            bool shouldRequestNext;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out nextId, out shouldRequestNext);
+
+            // Assert
+            Assert.IsTrue(success, "Should allocate from second batch");
+            Assert.AreEqual(6000, nextId, "Should start from second batch");
+        }
+
+        [Test]
+        public void Client_IsIdInActiveBatch_ValidatesCorrectly()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Assert - within batch
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(5000), "Batch start");
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(5050), "Batch middle");
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(5099), "Batch end");
+
+            // Assert - outside batch
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(4999), "Before batch");
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(5100), "After batch");
+        }
+
+        [Test]
+        public void Client_ResetAllBatches_ClearsAllState()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+            GONetIdBatchManager.Client_AddBatch(6000);
+
+            // Allocate some IDs
+            uint id1, id2;
+            bool shouldRequest1, shouldRequest2;
+            GONetIdBatchManager.Client_TryAllocateNextId(out id1, out shouldRequest1);
+            GONetIdBatchManager.Client_TryAllocateNextId(out id2, out shouldRequest2);
+
+            // Act
+            GONetIdBatchManager.Client_ResetAllBatches();
+
+            // Assert
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+            uint nextId;
+            bool shouldRequestNext;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out nextId, out shouldRequestNext);
+            Assert.IsFalse(success, "Should have no batches after reset");
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(5000), "First batch should be cleared");
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(6000), "Second batch should be cleared");
+        }
+
+        [Test]
+        public void Client_GetDiagnostics_ReturnsAccurateInfo()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+            GONetIdBatchManager.Client_AddBatch(6000);
+
+            // Allocate 10 IDs
+            for (int i = 0; i < 10; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Act
+            string diagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+
+            // Assert
+            Assert.IsTrue(diagnostics.Contains("Batches: 2"), "Should show 2 batches");
+            Assert.IsTrue(diagnostics.Contains("Allocated: 200"), "Should show 200 total IDs");
+            Assert.IsTrue(diagnostics.Contains("Used: 10"), "Should show 10 used IDs");
+            Assert.IsTrue(diagnostics.Contains("Remaining: 190"), "Should show 190 remaining IDs");
+        }
+
+        #endregion
+
+        #region Integration & Scene Change Tests
+
+        [Test]
+        public void SceneChange_Simulation_ServerAndClientResetCorrectly()
+        {
+            // Arrange - simulate first scene
+            uint serverBatch1 = GONetIdBatchManager.Server_AllocateNewBatch(1000);
+            GONetIdBatchManager.Client_AddBatch(serverBatch1);
+
+            uint id1;
+            bool shouldRequest1;
+            GONetIdBatchManager.Client_TryAllocateNextId(out id1, out shouldRequest1);
+            Assert.AreEqual(serverBatch1, id1, "Should allocate from first batch");
+
+            // Act - simulate scene change
+            GONetIdBatchManager.Server_ResetAllBatches();
+            GONetIdBatchManager.Client_ResetAllBatches();
+
+            // Arrange - simulate second scene
+            uint serverBatch2 = GONetIdBatchManager.Server_AllocateNewBatch(2000);
+            GONetIdBatchManager.Client_AddBatch(serverBatch2);
+
+            uint id2;
+            bool shouldRequest2;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id2, out shouldRequest2);
+
+            // Assert
+            Assert.IsTrue(success, "Should allocate successfully in new scene");
+            Assert.AreEqual(serverBatch2, id2, "Should allocate from new batch");
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(serverBatch1), "Old server batch should be cleared");
+            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(serverBatch1), "Old client batch should be cleared");
+        }
+
+        [Test]
+        public void MultipleSceneChanges_MaintainIntegrity()
+        {
+            // Simulate 6 scene changes (matching the user's test scenario)
+            for (int scene = 0; scene < 6; scene++)
+            {
+                uint batchStart = (uint)(scene * 1000);
+                uint serverBatch = GONetIdBatchManager.Server_AllocateNewBatch(batchStart);
+                GONetIdBatchManager.Client_AddBatch(serverBatch);
+
+                // Spawn some objects
+                for (int spawn = 0; spawn < 10; spawn++)
+                {
+                    uint id;
+                    bool shouldRequest;
+                    bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                    Assert.IsTrue(success, $"Scene {scene}, spawn {spawn} should succeed");
+                }
+
+                // Scene change
+                GONetIdBatchManager.Server_ResetAllBatches();
+                GONetIdBatchManager.Client_ResetAllBatches();
+            }
+
+            // After 6 scene changes, system should still be clean
+            uint finalBatch = GONetIdBatchManager.Server_AllocateNewBatch(6000);
+            GONetIdBatchManager.Client_AddBatch(finalBatch);
+
+            uint finalId;
+            bool shouldRequestFinal;
+            bool finalSuccess = GONetIdBatchManager.Client_TryAllocateNextId(out finalId, out shouldRequestFinal);
+
+            Assert.IsTrue(finalSuccess, "Should still work after 6 scene changes");
+            Assert.AreEqual(finalBatch, finalId, "Should allocate from clean batch");
+        }
+
+        [Test]
+        public void ValidateBatchIntegrity_DetectsValidState()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+            GONetIdBatchManager.Client_AddBatch(6000);
+
+            // Allocate some IDs
+            for (int i = 0; i < 10; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Act
+            string errorMessage;
+            bool isValid = GONetIdBatchManager.ValidateBatchIntegrity(out errorMessage);
+
+            // Assert
+            Assert.IsTrue(isValid, "Batch integrity should be valid");
+            Assert.IsNull(errorMessage, "Should have no error message when valid");
+        }
+
+        #endregion
+
+        #region Batch Exhaustion and Request Tests
+
+        [Test]
+        public void Client_ExhaustSingleBatch_TriggersRequestAtThreshold()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - consume until we hit the low threshold (< 20 remaining)
+            // 100 IDs in batch, so allocate 81 to get to 19 remaining
+            bool shouldRequestBatch = false;
+            for (int i = 0; i < 81; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                if (shouldRequest)
+                {
+                    shouldRequestBatch = true;
+                }
+            }
+
+            // Assert
+            Assert.IsTrue(shouldRequestBatch, "Should have triggered batch request when dropping below 20 IDs");
+        }
+
+        [Test]
+        public void Client_CompletelyExhaustBatch_FailsNextAllocation()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - exhaust all 100 IDs
+            for (int i = 0; i < 100; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Try to allocate one more (should fail)
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+            uint failedId;
+            bool shouldRequestNow;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out failedId, out shouldRequestNow);
+
+            // Assert
+            Assert.IsFalse(success, "Should fail when all batches exhausted");
+            Assert.AreEqual(GONetParticipant.GONetIdRaw_Unset, failedId, "Should return unset ID on failure");
+        }
+
+        [Test]
+        public void Client_ReceiveNewBatch_WhileExistingBatchActive()
+        {
+            // Arrange - simulate client getting initial batch
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - consume 85 IDs (leaving 15, which triggers request at 81)
+            for (int i = 0; i < 85; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Simulate server sending new batch before old one exhausted
+            GONetIdBatchManager.Client_AddBatch(6000);
+
+            // Continue allocating - should use remaining from first batch, then second
+            uint id1, id2, id3;
+            bool req1, req2, req3;
+            GONetIdBatchManager.Client_TryAllocateNextId(out id1, out req1); // Should get 5085 (from first batch)
+
+            // Exhaust rest of first batch (15 remaining -> 14 allocations to exhaust)
+            for (int i = 0; i < 14; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            GONetIdBatchManager.Client_TryAllocateNextId(out id2, out req2); // Should get 6000 (from second batch)
+            GONetIdBatchManager.Client_TryAllocateNextId(out id3, out req3); // Should get 6001 (from second batch)
+
+            // Assert
+            Assert.AreEqual(5085, id1, "Should allocate from first batch first");
+            Assert.AreEqual(6000, id2, "Should switch to second batch after first exhausted");
+            Assert.AreEqual(6001, id3, "Should continue from second batch");
+        }
+
+        [Test]
+        public void Client_MultipleSceneChanges_ResetsAndReallocates()
+        {
+            // Arrange - simulate scene 1
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Allocate some IDs
+            for (int i = 0; i < 50; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Act - scene change (reset)
+            GONetIdBatchManager.Client_ResetAllBatches();
+
+            // Simulate scene 2 - new batch
+            GONetIdBatchManager.Client_AddBatch(7000);
+
+            uint firstIdAfterReset;
+            bool shouldReq;
+            bool success = GONetIdBatchManager.Client_TryAllocateNextId(out firstIdAfterReset, out shouldReq);
+
+            // Assert
+            Assert.IsTrue(success, "Should successfully allocate after reset");
+            Assert.AreEqual(7000, firstIdAfterReset, "Should allocate from new batch, not old one");
+        }
+
+        [Test]
+        public void Client_ExhaustMultipleBatches_InSequence()
+        {
+            // Arrange - add 3 batches
+            GONetIdBatchManager.Client_AddBatch(5000); // 100 IDs
+            GONetIdBatchManager.Client_AddBatch(6000); // 100 IDs
+            GONetIdBatchManager.Client_AddBatch(7000); // 100 IDs
+            // Total: 300 IDs available
+
+            // Act - exhaust all 300 IDs
+            uint lastId = 0;
+            for (int i = 0; i < 300; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                Assert.IsTrue(success, $"Allocation {i} should succeed");
+                lastId = id;
+            }
+
+            // Try one more (should fail)
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+            uint failedId;
+            bool shouldReqNow;
+            bool finalSuccess = GONetIdBatchManager.Client_TryAllocateNextId(out failedId, out shouldReqNow);
+
+            // Assert
+            Assert.AreEqual(7099, lastId, "Last successful ID should be end of third batch");
+            Assert.IsFalse(finalSuccess, "Should fail after all batches exhausted");
+        }
+
+        [Test]
+        public void Client_LowThreshold_TriggersOnlyOnce()
+        {
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - consume to exactly threshold (81 allocated = 19 remaining)
+            int requestCount = 0;
+            for (int i = 0; i < 85; i++) // Allocate 85 to be well past threshold
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                if (shouldRequest)
+                {
+                    requestCount++;
+                }
+            }
+
+            // Assert - should only request once when crossing threshold
+            Assert.AreEqual(1, requestCount, "Should only trigger request once when crossing threshold");
+        }
+
+        #endregion
+
+        #region Regression Tests
+
+        [Test]
+        public void Client_AllocateExactly100Ids_ExhaustsOneBatchCorrectly()
+        {
+            // This test catches the double-counting bug where allocating 100 IDs
+            // would incorrectly report batch exhausted at ID 99 instead of 100
+
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - allocate exactly 100 IDs (full batch)
+            uint[] allocatedIds = new uint[100];
+            bool[] shouldRequestFlags = new bool[100];
+
+            for (int i = 0; i < 100; i++)
+            {
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out allocatedIds[i], out shouldRequestFlags[i]);
+                Assert.IsTrue(success, $"Allocation {i} should succeed (ID {allocatedIds[i]})");
+            }
+
+            // Assert - all 100 IDs should be sequential from the batch
+            Assert.AreEqual(5000, allocatedIds[0], "First ID should be start of batch");
+            Assert.AreEqual(5099, allocatedIds[99], "Last ID should be end of batch");
+
+            // Verify all IDs are unique and sequential
+            for (int i = 0; i < 99; i++)
+            {
+                Assert.AreEqual(allocatedIds[i] + 1, allocatedIds[i + 1],
+                    $"IDs should be sequential: {allocatedIds[i]} -> {allocatedIds[i + 1]}");
+            }
+
+            // Next allocation should fail (batch exhausted)
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error,
+                new System.Text.RegularExpressions.Regex(".*CLIENT has NO available batch IDs.*"));
+            uint failId;
+            bool shouldReq;
+            bool nextSuccess = GONetIdBatchManager.Client_TryAllocateNextId(out failId, out shouldReq);
+            Assert.IsFalse(nextSuccess, "101st allocation should fail - batch exhausted");
+        }
+
+        [Test]
+        public void Client_AllocateThenCheckRemaining_CountsCorrectly()
+        {
+            // This test verifies the batch manager's internal counters are accurate
+            // Previously: allocate + retrieve = double count, counters off by 1 each time
+
+            // Arrange
+            GONetIdBatchManager.Client_AddBatch(5000);
+            string initialDiagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+
+            // Should show: Allocated=100, Used=0, Remaining=100
+            Assert.IsTrue(initialDiagnostics.Contains("Allocated: 100"), "Should have 100 allocated");
+            Assert.IsTrue(initialDiagnostics.Contains("Used: 0"), "Should have 0 used initially");
+            Assert.IsTrue(initialDiagnostics.Contains("Remaining: 100"), "Should have 100 remaining");
+
+            // Act - allocate 10 IDs
+            for (int i = 0; i < 10; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Assert - diagnostics should show correct counts
+            string afterDiagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+            Assert.IsTrue(afterDiagnostics.Contains("Allocated: 100"), "Should still have 100 allocated");
+            Assert.IsTrue(afterDiagnostics.Contains("Used: 10"), "Should have 10 used");
+            Assert.IsTrue(afterDiagnostics.Contains("Remaining: 90"), "Should have 90 remaining");
+
+            // Act - allocate 90 more (total 100)
+            for (int i = 0; i < 90; i++)
+            {
+                uint id;
+                bool shouldRequest;
+                GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+            }
+
+            // Assert - all IDs consumed
+            string finalDiagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+            Assert.IsTrue(finalDiagnostics.Contains("Allocated: 100"), "Should still have 100 allocated");
+            Assert.IsTrue(finalDiagnostics.Contains("Used: 100"), "Should have 100 used");
+            Assert.IsTrue(finalDiagnostics.Contains("Remaining: 0"), "Should have 0 remaining");
+        }
+
+        #endregion
+
+        #region Edge Case Tests
+
+        [Test]
+        public void Client_TryAllocateNextId_HandlesRapidConsumption()
+        {
+            // Arrange - simulate rapid spawning (like user's "rapid-fire spawn test")
+            GONetIdBatchManager.Client_AddBatch(5000);
+
+            // Act - allocate 6 IDs with zero delay (matching test scenario)
+            uint[] ids = new uint[6];
+            for (int i = 0; i < 6; i++)
+            {
+                bool shouldRequest;
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out ids[i], out shouldRequest);
+                Assert.IsTrue(success, $"Rapid allocation {i} should succeed");
+            }
+
+            // Assert - all IDs should be unique and sequential
+            for (int i = 0; i < 6; i++)
+            {
+                Assert.AreEqual(5000 + i, ids[i], $"ID {i} should be sequential");
+
+                // Verify no duplicates
+                for (int j = i + 1; j < 6; j++)
+                {
+                    Assert.AreNotEqual(ids[i], ids[j], $"IDs {i} and {j} should be unique");
+                }
+            }
+        }
+
+        [Test]
+        public void Server_AllocateNewBatch_HandlesLargeIdValues()
+        {
+            // Arrange - near max value
+            uint nearMax = GONetParticipant.GONetId_Raw_MaxValue - 500;
+
+            // Act
+            uint batch = GONetIdBatchManager.Server_AllocateNewBatch(nearMax);
+
+            // Assert
+            Assert.AreEqual(nearMax + 1, batch, "Should allocate batch even near max value");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch + 50), "Batch should be trackable");
+        }
+
+        #endregion
+    }
+}

@@ -392,6 +392,21 @@ namespace GONet
 
         private static void OnSceneLoadCompleted_ProcessDeferredSpawns(string sceneName, LoadSceneMode mode)
         {
+            // CRITICAL: Reset GONetId batch state on scene change to prevent stale ID reuse
+            if (mode == LoadSceneMode.Single)
+            {
+                if (IsServer)
+                {
+                    GONetIdBatchManager.Server_ResetAllBatches();
+                }
+                if (IsClient)
+                {
+                    GONetIdBatchManager.Client_ResetAllBatches();
+                    client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
+                }
+                GONetLog.Info($"[GONetIdBatch] Reset all batch state on scene change (LoadSceneMode.Single): {sceneName}");
+            }
+
             // When a scene loads, process any deferred spawns that were waiting for it
             ProcessDeferredSpawnsForScene(sceneName);
         }
@@ -1242,8 +1257,9 @@ namespace GONet
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_rotation, OnTransformRotationChanged_Debug);
 
             EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
-            
+
             EventBus.Subscribe<ClientRemotelyControlledGONetIdServerBatchAssignmentEvent>(Client_AssignNewClientGONetIdRawBatch);
+            EventBus.Subscribe<ClientRemotelyControlledGONetIdServerBatchRequestEvent>(Server_HandleClientBatchRequest);
 
             EventBus.InitializeRpcSystem();
         }
@@ -4486,12 +4502,11 @@ namespace GONet
         private static void Server_AssignNewClientGONetIdRawBatch(GONetConnection_ServerToClient connectionToClient)
         {
             var @event = new ClientRemotelyControlledGONetIdServerBatchAssignmentEvent();
-            uint batchStart = lastAssignedGONetIdRaw + 1;
+            uint batchStart = GONetIdBatchManager.Server_AllocateNewBatch(lastAssignedGONetIdRaw);
             @event.GONetIdRawBatchStart = batchStart;
-            
-            client_finalServerGONetIdForRemoteControl_batchStartValues.Add(batchStart);
-            lastAssignedGONetIdRaw += CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
-            
+
+            lastAssignedGONetIdRaw = batchStart + 99; // Batch is 100 IDs, so last ID is +99
+
             EventBus.Publish(@event, targetClientAuthorityId: connectionToClient.OwnerAuthorityId);
         }
 
@@ -4500,7 +4515,64 @@ namespace GONet
         {
             if (IsClient)
             {
-                client_finalServerGONetIdForRemoteControl_batchStartValues.Add(eventEnvelope.Event.GONetIdRawBatchStart);
+                GONetIdBatchManager.Client_AddBatch(eventEnvelope.Event.GONetIdRawBatchStart);
+            }
+        }
+
+        /// <summary>
+        /// CLIENT: Requests a new GONetId batch from the server when running low on IDs.
+        /// Called automatically when remaining IDs drop below threshold (< 20).
+        /// </summary>
+        private static void Client_RequestNewGONetIdBatch()
+        {
+            if (!IsClient || GONetClient == null || GONetClient.connectionToServer == null)
+            {
+                GONetLog.Error("[GONetIdBatch] CLIENT: Cannot request new batch - not connected to server");
+                return;
+            }
+
+            GONetLog.Info("[GONetIdBatch] CLIENT requesting new batch from server due to low ID count");
+
+            // Create request event to send to server
+            var requestEvent = new ClientRemotelyControlledGONetIdServerBatchRequestEvent();
+            EventBus.Publish(requestEvent, targetClientAuthorityId: OwnerAuthorityId_Server);
+        }
+
+        /// <summary>
+        /// SERVER: Handles client request for additional GONetId batch when running low.
+        /// </summary>
+        private static void Server_HandleClientBatchRequest(
+            GONetEventEnvelope<ClientRemotelyControlledGONetIdServerBatchRequestEvent> eventEnvelope)
+        {
+            if (!IsServer || _gonetServer == null)
+            {
+                return; // Ignore if not server
+            }
+
+            ushort requestingClientAuthorityId = eventEnvelope.SourceAuthorityId;
+            GONetLog.Info($"[GONetIdBatch] SERVER received batch request from client {requestingClientAuthorityId}");
+
+            // Find the connection for this client
+            GONetConnection_ServerToClient connectionToClient = null;
+            uint count = _gonetServer.numConnections;
+
+            for (int i = 0; i < count; ++i)
+            {
+                GONetConnection_ServerToClient connection = _gonetServer.remoteClients[i].ConnectionToClient;
+                if (connection.OwnerAuthorityId == requestingClientAuthorityId)
+                {
+                    connectionToClient = connection;
+                    break;
+                }
+            }
+
+            if (connectionToClient != null)
+            {
+                Server_AssignNewClientGONetIdRawBatch(connectionToClient);
+            }
+            else
+            {
+                GONetLog.Error($"[GONetIdBatch] SERVER could not find connection for client {requestingClientAuthorityId}");
             }
         }
 
@@ -4509,10 +4581,8 @@ namespace GONet
         #region what once was GONetAutoMagicalSyncManager
 
         static uint lastAssignedGONetIdRaw = GONetParticipant.GONetIdRaw_Unset;
-        static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
-        static readonly List<uint> client_finalServerGONetIdForRemoteControl_batchStartValues = new List<uint>();
-        static readonly Stack<int> client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack = new Stack<int>();
-        const int CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE = 100;
+        static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset; // Used in GetNextAvailableGONetIdRaw for legacy flow
+        // NOTE: Batch management now handled by GONetIdBatchManager
 
         /// <summary>
         /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
@@ -5307,60 +5377,14 @@ namespace GONet
         /// <summary>
         /// PRE: Already known that <paramref name="gonetParticipant"/> has <see cref="GONetParticipant.IsMine_ToRemotelyControl"/> true.
         /// PRE: <see cref="MyAuthorityId"/> is set to final value and is not <see cref="OwnerAuthorityId_Unset"/> in case it is needed as a fallback (i.e., when not enough values in id batch from server).
-        /// 
+        ///
         /// TODO: look into calling this method inside of <see cref="Client_InstantiateToBeRemotelyControlledByMe(GONetParticipant, Vector3, Quaternion)"/> instead of where it is called from now...this would allow for the final GONetId to be set/known immediately!
         /// </summary>
         private static void Client_DoAutoPropogateInstantiationPrep_RemotelyControlled(GONetParticipant gonetParticipant)
         {
-            uint nextRemoteControlIdFromServer = client_lastServerGONetIdRawForRemoteControl == GONetParticipant.GONetIdRaw_Unset ? GONetParticipant.GONetIdRaw_Unset : client_lastServerGONetIdRawForRemoteControl + 1;
-            int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
-            for (int i = 0; i < count; ++i)
-            {
-                uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
-                if (nextRemoteControlIdFromServer == GONetParticipant.GONetIdRaw_Unset)
-                {
-                    nextRemoteControlIdFromServer = min_inclusive;
-                }
-                else
-                {
-                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
-                    if (nextRemoteControlIdFromServer >= min_inclusive && nextRemoteControlIdFromServer < max_exclusive)
-                    {
-                        // good to go within the limits/range of this batch, nothing left to do/look for here
-                        break;
-                    }
-                    else if (nextRemoteControlIdFromServer == max_exclusive) // if just/already assigned end of range of this batch
-                    {
-                        // reset next and mark this batch for removal since we used all the items inside it at this point
-                        client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Push(i);
-                        nextRemoteControlIdFromServer = GONetParticipant.GONetIdRaw_Unset;
-                    }
-                    else
-                    {
-                        // this condition should not be possible
-                        GONetLog.Error("Not possible....guess it was.  oops....figure this one out!");
-                    }
-                }
-            }
-
-            count = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Count;
-            for (int i = 0; i < count; ++i)
-            {
-                int index = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Pop();
-                client_finalServerGONetIdForRemoteControl_batchStartValues.RemoveAt(index);
-            }
-
-            if (nextRemoteControlIdFromServer != GONetParticipant.GONetIdRaw_Unset)
-            {
-                gonetParticipant.OwnerAuthorityId = OwnerAuthorityId_Server;
-                client_lastServerGONetIdRawForRemoteControl = nextRemoteControlIdFromServer;
-            }
-            else
-            {
-                //GONetLog.Warning($"Client instantiating something to remotely control, but no enough server assigned GONetIdRaw values to use.  Will default to client owned initially and auto-switch to server once server side.");
-                gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
-                client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
-            }
+            // Just set the authority - the actual ID allocation happens in GetNextAvailableGONetIdRaw
+            // to avoid double-counting (allocating here and using there)
+            gonetParticipant.OwnerAuthorityId = OwnerAuthorityId_Server;
         }
 
         /// <summary>
@@ -5433,30 +5457,39 @@ namespace GONet
 
         private static uint GetNextAvailableGONetIdRaw(GONetParticipant gonetParticipant)
         {
-            ++lastAssignedGONetIdRaw;
-            
-            if (IsServer)
+            // CLIENT: Use batch manager for remotely-controlled spawns
+            if (IsClient && gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Server)
             {
-                int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
-                for (int i = 0; i < count; ++i)
+                uint batchId;
+                bool shouldRequestNewBatch;
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out batchId, out shouldRequestNewBatch);
+
+                if (success)
                 {
-                    uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
-                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
-                    bool isNewValueInBatch = lastAssignedGONetIdRaw >= min_inclusive && lastAssignedGONetIdRaw < max_exclusive;
-                    if (isNewValueInBatch)
+                    if (shouldRequestNewBatch)
                     {
-                        // if it was in a batch set it to the value just after the current batch
-                        lastAssignedGONetIdRaw = max_exclusive;
+                        Client_RequestNewGONetIdBatch();
                     }
+                    return batchId;
+                }
+                else
+                {
+                    // Fallback if no batch available - use regular ID assignment
+                    GONetLog.Warning("[GONetIdBatch] No batch IDs available, falling back to regular ID assignment");
+                    ++lastAssignedGONetIdRaw;
+                    return lastAssignedGONetIdRaw;
                 }
             }
-            else
+
+            // SERVER or CLIENT (non-remotely-controlled): Regular ID assignment
+            ++lastAssignedGONetIdRaw;
+
+            if (IsServer)
             {
-                bool isForRemotelyControlledOnClient = IsClient && gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Server;
-                if (isForRemotelyControlledOnClient && client_lastServerGONetIdRawForRemoteControl != GONetParticipant.GONetIdRaw_Unset)
+                // Skip any IDs that fall within client batches
+                while (GONetIdBatchManager.Server_IsIdInAnyBatch(lastAssignedGONetIdRaw))
                 {
-                    --lastAssignedGONetIdRaw; // undo the now unwanted action we did above in method
-                    return client_lastServerGONetIdRawForRemoteControl;
+                    ++lastAssignedGONetIdRaw;
                 }
             }
 

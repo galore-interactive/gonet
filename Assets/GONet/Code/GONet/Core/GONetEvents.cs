@@ -141,6 +141,16 @@ namespace GONet
         public uint GONetIdRawBatchStart { get; set; }
     }
 
+    [MemoryPackable]
+    public partial class ClientRemotelyControlledGONetIdServerBatchRequestEvent : ITransientEvent
+    {
+        [MemoryPackIgnore]
+        public bool IsSingularRecipientOnly => true;
+
+        [MemoryPackIgnore]
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+    }
+
     /// <summary>
     /// Fired locally-only when any <see cref="GONetParticipant"/> finished having its OnEnable() method called.
     /// IMPORTANT: This is not the proper time to indicate it is ready for use by other game logic, for that use <see cref="GONetParticipantStartedEvent"/> instead to be certain.
