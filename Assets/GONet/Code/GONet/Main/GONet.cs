@@ -1334,21 +1334,42 @@ namespace GONet
 
         private static void OnPersistentEventsBundle_ProcessAll_Remote(GONetEventEnvelope<PersistentEvents_Bundle> eventEnvelope)
         {
-            GONetLog.Debug("******received persistent events bundle from remote source");
+            int eventCount = eventEnvelope.Event.PersistentEvents.Count;
+            GONetLog.Warning($"[SPAWN_SYNC] CLIENT: OnPersistentEventsBundle_ProcessAll_Remote - Processing bundle with {eventCount} events from AuthorityId {eventEnvelope.SourceAuthorityId}");
+
+            int sceneLoadCount = 0;
+            int spawnCount = 0;
+            int otherCount = 0;
 
             foreach (var item in eventEnvelope.Event.PersistentEvents)
             {
-                //GONetLog.Debug($"\t-persistent event in bundle, type: {item.GetType().FullName}");
+                if (item is SceneLoadEvent sceneLoad)
+                {
+                    sceneLoadCount++;
+                    GONetLog.Warning($"[SPAWN_SYNC] CLIENT: - Processing SceneLoadEvent: '{sceneLoad.SceneName}', Mode: {sceneLoad.Mode}");
+                }
+                else if (item is InstantiateGONetParticipantEvent spawn)
+                {
+                    spawnCount++;
+                    GONetLog.Debug($"[SPAWN_SYNC] CLIENT: - Processing spawn: GONetId {spawn.GONetId}, Scene: '{spawn.SceneIdentifier}'");
+                }
+                else
+                {
+                    otherCount++;
+                }
+
                 persistentEventsThisSession.AddLast(item);
 
                 // Publish the persistent event to the event bus so all registered handlers can process it
                 // This replaces the old piecemeal approach and ensures extensibility for new persistent event types
                 EventBus.Publish(
                     item,
-                    remoteSourceAuthorityId: eventEnvelope.SourceAuthorityId, 
+                    remoteSourceAuthorityId: eventEnvelope.SourceAuthorityId,
                     targetClientAuthorityId: MyAuthorityId, // this is required to ensure my handlers are invoked and that is it
                     shouldPublishReliably: true); // probably redundant as none of this should go back over the wire at all
             }
+
+            GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Bundle processing complete - SceneLoad: {sceneLoadCount}, Spawn: {spawnCount}, Other: {otherCount}");
         }
 
         /// <summary>
@@ -1528,9 +1549,17 @@ namespace GONet
             if (count == 0)
             {
                 persistentEventsThisSession.AddLast(eventEnvelope.Event);
+                if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
+                {
+                    GONetLog.Warning($"[DESPAWN_SYNC] Added DespawnGONetParticipantEvent to persistentEventsThisSession (no events cancelled) - GONetId: {despawn.GONetId}");
+                }
             }
             else
             {
+                if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
+                {
+                    GONetLog.Warning($"[DESPAWN_SYNC] DespawnGONetParticipantEvent cancelled out {count} events for GONetId {despawn.GONetId} - despawn event NOT added to persistentEventsThisSession (correct: object no longer exists)");
+                }
                 for (int i = 0; i < count; ++i)
                 {
                     IPersistentEvent cancelledEvent = persistentEventsCancelledOut[i];
@@ -1769,6 +1798,8 @@ namespace GONet
         {
             uint gonetId = eventEnvelope.Event.GONetId;
 
+            GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: OnDespawnGNPEvent_Remote - Received despawn for GONetId {gonetId} from AuthorityId {eventEnvelope.SourceAuthorityId}");
+
             // IMPORTANT: If this GONetId has a deferred spawn, defer the despawn too!
             // Otherwise we process despawn before spawn completes, leaving a ghost object.
             bool hasDeferredSpawn = deferredSpawnEvents.Exists(spawnEvent => spawnEvent.GONetId == gonetId);
@@ -1791,15 +1822,13 @@ namespace GONet
                 }
                 else
                 {
-                    //GONetLog.Debug($"Received remote notification to despawn a GNP. GONetId: {gonetParticipant.GONetId}");
-
+                    GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: Destroying GameObject '{gonetParticipant.gameObject.name}' for GONetId {gonetParticipant.GONetId}");
                     UnityEngine.Object.Destroy(gonetParticipant.gameObject);
                 }
             }
             else
             {
-                const string DGNP = "Despawn GONetParticipant event received from remote source, but we have no record of this to despawn it. GONetId: ";
-                GONetLog.Warning(string.Concat(DGNP, gonetId));
+                GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: Despawn event received for GONetId {gonetId}, but no matching GONetParticipant found in map (may have already been destroyed or never spawned)");
             }
         }
 
@@ -2629,6 +2658,19 @@ namespace GONet
 
             // Send initial barrage (same as connection)
             Client_SyncTimeWithServer_SendInitialBarrage();
+        }
+        /// <summary>
+        /// Requests more frequent time synchronization after scene changes WITHOUT resetting the gap.
+        /// This ensures good client-server time sync without blocking messages like ResetTimeSyncGap() does.
+        /// Aggressive mode lasts for 10 seconds with 1-second sync intervals (instead of normal 5-second intervals).
+        /// </summary>
+        /// <param name="reason">Reason for requesting aggressive sync (for logging)</param>
+        public static void RequestAggressiveTimeSync(string reason = "unknown")
+        {
+            if (!IsClient) return;
+
+            GONetLog.Info($"[TimeSync] CLIENT: Requesting aggressive time sync - Reason: {reason}");
+            TimeSyncScheduler.EnableAggressiveMode(reason);
         }
 
         /// <summary>
@@ -3566,11 +3608,27 @@ namespace GONet
         {
             private static long lastSyncTimeTicks = 0;
             private static readonly long SYNC_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 5;
+            private static readonly long AGGRESSIVE_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 1; // 1 second for aggressive mode
             private static readonly long MIN_INTERVAL_TICKS = TimeSpan.TicksPerSecond;
+
+            // Aggressive mode state
+            private static long aggressiveModeEndTicks = 0;
+            private static readonly long AGGRESSIVE_MODE_DURATION_TICKS = TimeSpan.TicksPerSecond * 10; // 10 seconds
 
             public static void ResetOnConnection()
             {
                 lastSyncTimeTicks = Time.ElapsedTicks;
+            }
+
+            /// <summary>
+            /// Temporarily increases time sync frequency without resetting gap.
+            /// Used after scene changes to ensure good synchronization without blocking messages.
+            /// </summary>
+            public static void EnableAggressiveMode(string reason)
+            {
+                long now = Time.ElapsedTicks;
+                aggressiveModeEndTicks = now + AGGRESSIVE_MODE_DURATION_TICKS;
+                GONetLog.Info($"[TimeSync] Aggressive mode enabled for {TimeSpan.FromTicks(AGGRESSIVE_MODE_DURATION_TICKS).TotalSeconds}s - Reason: {reason}");
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3580,7 +3638,12 @@ namespace GONet
                 long lastSync = Volatile.Read(ref lastSyncTimeTicks);
                 long elapsed = now - lastSync;
                 if (elapsed < MIN_INTERVAL_TICKS) return false;
-                if (elapsed < SYNC_INTERVAL_TICKS) return false;
+
+                // Check if we're in aggressive mode
+                bool isAggressiveMode = now < Volatile.Read(ref aggressiveModeEndTicks);
+                long targetInterval = isAggressiveMode ? AGGRESSIVE_INTERVAL_TICKS : SYNC_INTERVAL_TICKS;
+
+                if (elapsed < targetInterval) return false;
                 return Interlocked.CompareExchange(ref lastSyncTimeTicks, now, lastSync) == lastSync;
             }
         }
@@ -3721,6 +3784,11 @@ namespace GONet
                 {
                     // COMPREHENSIVE LOGGING - Receive EventSingle
                     LogMessageReceive(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, networkData.relatedConnection, 0);
+
+                    if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable)
+                    {
+                        GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Received message on ClientInitialization_EventSingles_Reliable - Size: {networkData.bytesUsedCount} bytes, From: AuthorityId {networkData.relatedConnection.OwnerAuthorityId}");
+                    }
 
                     DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
                 }
@@ -3968,10 +4036,25 @@ namespace GONet
 
         private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
-            IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
-            EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
-            // SPAM: Commented out - creates 2,777+ log entries during stress testing, mostly ValueMonitoringSupport events
-            //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
+            try
+            {
+                IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
+
+                // Log PersistentEvents_Bundle specifically
+                if (@event is PersistentEvents_Bundle bundle)
+                {
+                    GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Deserialized PersistentEvents_Bundle - Events: {bundle.PersistentEvents.Count}, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
+                }
+
+                EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
+                // SPAM: Commented out - creates 2,777+ log entries during stress testing, mostly ValueMonitoringSupport events
+                //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[SPAWN_SYNC] CLIENT: FAILED to deserialize EventSingle - Size: {messageBytes.Length} bytes, From: AuthorityId {relatedConnection.OwnerAuthorityId}, Error: {ex.Message}");
+                throw;
+            }
         }
 
         static bool isCurrentlyProcessingInstantiateGNPEvent;
@@ -4200,7 +4283,13 @@ namespace GONet
                     int returnBytesUsedCount;
 
                     byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount, out bool doesNeedToReturn); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MemoryPack.MemoryPackUnion] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
+
+                    GONetLog.Warning($"[SPAWN_SYNC] SERVER: Serialized PersistentEvents_Bundle - Size: {returnBytesUsedCount} bytes, Events: {filteredCount}, Channel: {GONetChannel.ClientInitialization_EventSingles_Reliable}, Target: AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
+
                     SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
+
+                    GONetLog.Warning($"[SPAWN_SYNC] SERVER: PersistentEvents_Bundle SENT to AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
+
                     if (doesNeedToReturn)
                     {
                         SerializationUtils.ReturnByteArray(bytes);
@@ -5549,6 +5638,7 @@ namespace GONet
             }
 
             DespawnGONetParticipantEvent @event = new DespawnGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
+            GONetLog.Warning($"[DESPAWN_SYNC] Publishing DespawnGONetParticipantEvent for GONetId {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}'");
             EventBus.Publish(@event);
         }
 
