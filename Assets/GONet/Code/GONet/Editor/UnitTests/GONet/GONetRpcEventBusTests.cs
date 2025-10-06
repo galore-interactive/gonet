@@ -256,15 +256,7 @@ namespace GONet.Tests
             Assert.IsTrue(stats.Contains("Currently Pending: 0"));
         }
 
-        [Test]
-        public void OnGONetParticipantRegistered_ValidId_CompletesWithoutError()
-        {
-            // Arrange
-            uint testId = 12345;
-
-            // Act & Assert
-            Assert.DoesNotThrow(() => GONetEventBus.OnGONetParticipantRegistered(testId));
-        }
+        // Test removed - OnGONetParticipantRegistered no longer exists (frame-based retry system now)
 
         [Test]
         public async Task DeferredRpcProcessing_ParticipantBecomesAvailable_ProcessesRpc()
@@ -275,10 +267,7 @@ namespace GONet.Tests
             // Arrange
             uint participantId = 12345;
 
-            // Act - simulate participant registration
-            GONetEventBus.OnGONetParticipantRegistered(participantId);
-
-            // Process any deferred RPCs
+            // Act - Process deferred RPCs (frame-based retry system)
             GONetEventBus.ProcessDeferredRpcs();
 
             // Assert - should complete without error
@@ -522,7 +511,6 @@ namespace GONet.Tests
             for (int i = 0; i < 10; i++)
             {
                 GONetEventBus.ProcessDeferredRpcs();
-                GONetEventBus.OnGONetParticipantRegistered((uint)(1000 + i));
             }
 
             var stats2 = GONetEventBus.GetDeferredRpcStats();

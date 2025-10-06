@@ -1130,8 +1130,7 @@ namespace GONet
                 gonetParticipantByGONetIdAtInstantiationMap[gonetParticipant.GONetIdAtInstantiation] = gonetParticipant;
                 gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant;
 
-                // Notify deferred RPC system that this participant is now available
-                GONetEventBus.OnGONetParticipantRegistered(gonetId_new);
+                // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
             }
             else
             {
@@ -1149,8 +1148,7 @@ namespace GONet
                     gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                     gonetParticipantByGONetIdMap[gonetId_new] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
 
-                    // Notify deferred RPC system that this participant is now available
-                    GONetEventBus.OnGONetParticipantRegistered(gonetId_new);
+                    // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
                 }
             }
         }
@@ -1203,8 +1201,7 @@ namespace GONet
                 {
                     gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant;
 
-                    // Notify deferred RPC system that this participant is now available
-                    GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
+                    // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
                 }
                 else
                 {
@@ -1222,8 +1219,7 @@ namespace GONet
                         gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetIdAtInstantiation);
                         gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // TODO first check for collision/overwrite and throw exception....or warning at least!
 
-                        // Notify deferred RPC system that this participant is now available
-                        GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
+                        // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
                     }
                 }
             }
@@ -5471,8 +5467,7 @@ namespace GONet
                 {
                     gonetParticipantByGONetIdMap[gonetParticipant.GONetId] = gonetParticipant; // be doubly sure we have this (the case where it would not already is if gnp was started-disabled-enabled
 
-                    // Notify deferred RPC system that this participant is now available
-                    GONetEventBus.OnGONetParticipantRegistered(gonetParticipant.GONetId);
+                    // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
                 }
 
                 uint gonetIdThatIsGoingToBePopulated = isCurrentlyProcessingInstantiateGNPEvent ? currentlyProcessingInstantiateGNPEvent.GONetId : gonetParticipant.GONetId;

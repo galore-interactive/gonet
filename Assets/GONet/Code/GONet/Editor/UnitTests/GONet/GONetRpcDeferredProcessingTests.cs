@@ -86,8 +86,7 @@ namespace GONet.Tests
 
                 Participants.TryAdd(participant.GONetId, participant);
 
-                // Notify the RPC system that this participant is now available
-                GONetEventBus.OnGONetParticipantRegistered(participant.GONetId);
+                // Deferred RPC system will automatically retry via ProcessDeferredRpcs() running every frame
             }
 
             public async Task ReceiveRpc(RpcEvent rpcEvent)
@@ -213,16 +212,8 @@ namespace GONet.Tests
                 deferredDict.Clear();
             }
 
-            // Reset circuit breaker state (NEW)
-            var gonetIdsBeingProcessedField = typeof(GONetEventBus).GetField("gonetIdsBeingProcessed",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            if (gonetIdsBeingProcessedField?.GetValue(null) is HashSet<uint> beingProcessed)
-            {
-                beingProcessed.Clear();
-            }
-
             // Reset counters
-            var counters = new[] { "totalDeferredRpcs", "successfulDeferredRpcs", "timedOutDeferredRpcs", "circuitBreakerTriggered" };
+            var counters = new[] { "totalDeferredRpcs", "successfulDeferredRpcs", "timedOutDeferredRpcs" };
             foreach (var counter in counters)
             {
                 var field = typeof(GONetEventBus).GetField(counter, BindingFlags.NonPublic | BindingFlags.Static);
@@ -557,10 +548,7 @@ namespace GONet.Tests
                 // Spawn participant
                 await server.SpawnParticipantAsync(participantId, 1);
 
-                // Notify system
-                GONetEventBus.OnGONetParticipantRegistered(participantId);
-
-                // Process any deferred RPCs
+                // Process any deferred RPCs (frame-based retry system)
                 GONetEventBus.ProcessDeferredRpcs();
 
                 // Small delay to simulate real timing
@@ -579,7 +567,6 @@ namespace GONet.Tests
             // Test system's resilience to null/invalid inputs
             // Assert - system should handle edge cases gracefully
             Assert.DoesNotThrow(() => GONetEventBus.ProcessDeferredRpcs());
-            Assert.DoesNotThrow(() => GONetEventBus.OnGONetParticipantRegistered(0));
 
             var stats = GONetEventBus.GetDeferredRpcStats();
             Assert.IsNotNull(stats);
@@ -610,7 +597,6 @@ namespace GONet.Tests
                         for (int i = 0; i < rpcsPerThread; i++)
                         {
                             GONetEventBus.ProcessDeferredRpcs();
-                            GONetEventBus.OnGONetParticipantRegistered((uint)(90000 + currentThreadId * 1000 + i));
 
                             if (i % 5 == 0) await Task.Delay(1); // Occasional context switch
                         }
@@ -629,265 +615,6 @@ namespace GONet.Tests
 
             var finalStats = GONetEventBus.GetDeferredRpcStats();
             Assert.IsNotNull(finalStats);
-        }
-
-        #endregion
-
-        #region Circuit Breaker Tests (Infinite Loop Prevention)
-
-        [Test]
-        public void CircuitBreaker_PreventsDuplicateProcessing_WhenComponentNotReady()
-        {
-            // This test verifies the fix for the infinite loop bug where OnGONetParticipantRegistered
-            // was being called recursively when ComponentNotReadyException caused re-deferral
-
-            // Arrange
-            uint participantId = 99999;
-            int processAttempts = 0;
-
-            // Reset the circuit breaker state
-            var gonetIdsBeingProcessedField = typeof(GONetEventBus).GetField("gonetIdsBeingProcessed",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            if (gonetIdsBeingProcessedField?.GetValue(null) is HashSet<uint> beingProcessed)
-            {
-                beingProcessed.Clear();
-            }
-
-            // Register a handler that tracks process attempts
-            eventBus.RegisterRpcHandler(0x99999999, async (envelope) =>
-            {
-                processAttempts++;
-
-                // Simulate component not ready on first few attempts
-                if (processAttempts < 3)
-                {
-                    throw new GONetEventBus.RpcComponentNotReadyException(participantId, 0x99999999);
-                }
-
-                await Task.CompletedTask;
-            });
-
-            // Act: Call OnGONetParticipantRegistered multiple times rapidly (simulating multiple components calling OnGONetReady)
-            GONetEventBus.OnGONetParticipantRegistered(participantId);
-            GONetEventBus.OnGONetParticipantRegistered(participantId); // Should be blocked by circuit breaker
-            GONetEventBus.OnGONetParticipantRegistered(participantId); // Should be blocked by circuit breaker
-
-            // Assert: Circuit breaker should prevent duplicate processing
-            // Without the fix, this would cause infinite recursion/busy-wait
-            var stats = GONetEventBus.GetDeferredRpcStats();
-            Assert.IsNotNull(stats);
-
-            // Verify circuit breaker was triggered
-            Assert.IsTrue(stats.Contains("Circuit Breaker"), "Circuit breaker should have been triggered");
-
-            // System should remain stable
-            Assert.DoesNotThrow(() => GONetEventBus.ProcessDeferredRpcs());
-        }
-
-        [Test]
-        public async Task CircuitBreaker_PreventsReDeferralDuringImmediateProcessing()
-        {
-            // This test verifies that RPCs don't get re-deferred while OnGONetParticipantRegistered is processing them
-
-            // Arrange
-            uint participantId = 88888;
-            int deferralAttempts = 0;
-
-            // Track deferral attempts via reflection
-            var originalDeferredCount = 0;
-            var deferredRpcsField = typeof(GONetEventBus).GetField("deferredRpcs",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            if (deferredRpcsField?.GetValue(null) is System.Collections.IList deferredList)
-            {
-                originalDeferredCount = deferredList.Count;
-            }
-
-            // Create a deferred RPC
-            var rpcEvent = RpcEvent.Borrow();
-            rpcEvent.GONetId = participantId;
-            rpcEvent.RpcId = 0x88888888;
-            rpcEvent.OccurredAtElapsedTicks = DateTime.UtcNow.Ticks;
-
-            // Register handler that throws ComponentNotReady
-            bool handlerCalled = false;
-            eventBus.RegisterRpcHandler(rpcEvent.RpcId, async (envelope) =>
-            {
-                handlerCalled = true;
-                throw new GONetEventBus.RpcComponentNotReadyException(participantId, rpcEvent.RpcId);
-            });
-
-            // Manually defer the RPC (simulating it arriving before participant spawned)
-            var deferMethod = typeof(GONetEventBus).GetMethod("DeferRpcForLater",
-                BindingFlags.NonPublic | BindingFlags.Static);
-
-            if (deferMethod != null)
-            {
-                deferMethod.Invoke(null, new object[] { rpcEvent, (uint)1, (uint)1, null, false, null });
-            }
-
-            // Act: Trigger immediate processing (simulates OnGONetReady being called)
-            GONetEventBus.OnGONetParticipantRegistered(participantId);
-
-            await Task.Delay(50); // Allow async processing
-
-            // Get final deferred count
-            var finalDeferredCount = 0;
-            if (deferredRpcsField?.GetValue(null) is System.Collections.IList finalList)
-            {
-                finalDeferredCount = finalList.Count;
-            }
-
-            // Assert: Circuit breaker should prevent the RPC from being re-deferred during processing
-            // Without the fix, the deferred count would keep growing
-            Assert.LessOrEqual(finalDeferredCount, originalDeferredCount + 1,
-                "Circuit breaker should prevent infinite re-deferral loop");
-
-            var stats = GONetEventBus.GetDeferredRpcStats();
-            Assert.IsNotNull(stats);
-        }
-
-        [Test]
-        public void CircuitBreaker_AllowsRetryOnNextFrame()
-        {
-            // This test verifies that even though we block re-deferral during immediate processing,
-            // the RPC can still be retried on the next frame via ProcessDeferredRpcs()
-
-            // Arrange
-            uint participantId = 77777;
-            int handlerCallCount = 0;
-
-            // Create a persistent RPC that will need retrying
-            var persistentRpc = new PersistentRpcEvent();
-            persistentRpc.GONetId = participantId;
-            persistentRpc.RpcId = 0x77777777;
-            persistentRpc.OccurredAtElapsedTicks = DateTime.UtcNow.Ticks;
-
-            eventBus.RegisterRpcHandler(persistentRpc.RpcId, async (envelope) =>
-            {
-                handlerCallCount++;
-
-                // Component ready after 2nd attempt
-                if (handlerCallCount < 2)
-                {
-                    throw new GONetEventBus.RpcComponentNotReadyException(participantId, persistentRpc.RpcId);
-                }
-
-                await Task.CompletedTask;
-            });
-
-            // Act: Process via OnGONetParticipantRegistered (will trigger circuit breaker)
-            GONetEventBus.OnGONetParticipantRegistered(participantId);
-
-            // Then process via normal frame processing (should allow retry)
-            GONetEventBus.ProcessDeferredRpcs();
-
-            // Assert: System should eventually process the RPC successfully
-            var stats = GONetEventBus.GetDeferredRpcStats();
-            Assert.IsNotNull(stats);
-            Assert.DoesNotThrow(() => GONetEventBus.ProcessDeferredRpcs());
-        }
-
-        [Test]
-        public async Task CircuitBreaker_StressTest_MultipleComponentsOnSameParticipant()
-        {
-            // This test simulates the real-world scenario that caused the bug:
-            // A participant with multiple GONetBehaviour components, each calling OnGONetReady()
-            // which triggers OnComponentReadyToReceiveRpcs() -> OnGONetParticipantRegistered()
-
-            // Arrange
-            uint participantId = 66666;
-            const int componentCount = 5; // Simulate 5 components on same participant
-            int totalHandlerCalls = 0;
-            var callTimestamps = new ConcurrentBag<DateTime>();
-
-            // Register handler
-            eventBus.RegisterRpcHandler(0x66666666, async (envelope) =>
-            {
-                Interlocked.Increment(ref totalHandlerCalls);
-                callTimestamps.Add(DateTime.UtcNow);
-                await Task.CompletedTask;
-            });
-
-            // Create some deferred RPCs for this participant
-            for (int i = 0; i < 3; i++)
-            {
-                var rpcEvent = RpcEvent.Borrow();
-                rpcEvent.GONetId = participantId;
-                rpcEvent.RpcId = 0x66666666;
-                rpcEvent.OccurredAtElapsedTicks = DateTime.UtcNow.Ticks;
-
-                var deferMethod = typeof(GONetEventBus).GetMethod("DeferRpcForLater",
-                    BindingFlags.NonPublic | BindingFlags.Static);
-
-                if (deferMethod != null)
-                {
-                    deferMethod.Invoke(null, new object[] { rpcEvent, (uint)1, (uint)1, null, false, null });
-                }
-            }
-
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-            // Act: Simulate multiple components calling OnGONetReady simultaneously
-            var tasks = new List<Task>();
-            for (int i = 0; i < componentCount; i++)
-            {
-                tasks.Add(Task.Run(() =>
-                {
-                    GONetEventBus.OnGONetParticipantRegistered(participantId);
-                }));
-            }
-
-            await Task.WhenAll(tasks);
-            stopwatch.Stop();
-
-            // Assert: Without circuit breaker, this would create a busy-wait loop taking many seconds
-            // With circuit breaker, it should complete almost immediately
-            Assert.Less(stopwatch.ElapsedMilliseconds, 1000,
-                "Circuit breaker should prevent infinite loop - test should complete in < 1 second");
-
-            // Verify circuit breaker was triggered
-            var stats = GONetEventBus.GetDeferredRpcStats();
-            Assert.IsNotNull(stats);
-
-            // Check if timestamps show rapid consecutive calls (would indicate infinite loop)
-            if (callTimestamps.Count > 1)
-            {
-                var timestamps = callTimestamps.OrderBy(t => t).ToList();
-                for (int i = 1; i < timestamps.Count; i++)
-                {
-                    var delta = timestamps[i] - timestamps[i - 1];
-                    // If calls are happening within 1ms of each other repeatedly, it's a busy-wait loop
-                    // Circuit breaker should prevent this
-                }
-            }
-
-            // System should remain stable
-            Assert.DoesNotThrow(() => GONetEventBus.ProcessDeferredRpcs());
-        }
-
-        [Test]
-        public void CircuitBreaker_CounterIncrementsCorrectly()
-        {
-            // Verify the circuit breaker counter is working
-
-            // Arrange - Get initial count
-            var statsInitial = GONetEventBus.GetDeferredRpcStats();
-            var initialMatch = System.Text.RegularExpressions.Regex.Match(statsInitial, @"Circuit Breaker Triggered: (\d+)");
-            int initialCount = initialMatch.Success ? int.Parse(initialMatch.Groups[1].Value) : 0;
-
-            uint participantId = 55555;
-
-            // Act: Trigger circuit breaker by calling OnGONetParticipantRegistered twice for same ID
-            GONetEventBus.OnGONetParticipantRegistered(participantId);
-            GONetEventBus.OnGONetParticipantRegistered(participantId); // Should trigger circuit breaker
-
-            // Assert: Counter should increment
-            var statsFinal = GONetEventBus.GetDeferredRpcStats();
-            var finalMatch = System.Text.RegularExpressions.Regex.Match(statsFinal, @"Circuit Breaker Triggered: (\d+)");
-            int finalCount = finalMatch.Success ? int.Parse(finalMatch.Groups[1].Value) : 0;
-
-            Assert.GreaterOrEqual(finalCount, initialCount,
-                "Circuit breaker counter should increment when duplicate processing is prevented");
         }
 
         #endregion
