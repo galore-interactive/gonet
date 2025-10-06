@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;
 
 namespace GONet.Sample
 {
@@ -12,22 +13,22 @@ namespace GONet.Sample
     public class SceneSelectionUI : MonoBehaviour
     {
         [Header("UI References (Auto-created if null)")]
-        [SerializeField] private Text statusText;
-        [SerializeField] private Text instructionsText;
-        [SerializeField] private Text titleText;
+        [SerializeField] private TextMeshProUGUI statusText;
+        [SerializeField] private TextMeshProUGUI instructionsText;
+        [SerializeField] private TextMeshProUGUI titleText;
         [SerializeField] private Button projectileTestButton;
         [SerializeField] private Button rpcPlaygroundButton;
         [SerializeField] private Button backToMenuButton;
 
         // Server approval UI
         private GameObject approvalPanel;
-        private Text approvalMessageText;
+        private TextMeshProUGUI approvalMessageText;
         private Button approveButton;
         private Button denyButton;
 
         // Client waiting/response UI
         private GameObject clientResponsePanel;
-        private Text clientResponseMessageText;
+        private TextMeshProUGUI clientResponseMessageText;
         private Button clientResponseCloseButton;
         private bool isAwaitingResponse = false; // Track if THIS client is waiting for a response
 
@@ -118,19 +119,19 @@ namespace GONet.Sample
             BuildClientResponsePanel(canvas);
 
             // Title
-            titleText = CreateText(panel.transform, "Title", "GONet Scene Management Demo", 24, TextAnchor.UpperCenter);
+            titleText = CreateText(panel.transform, "Title", "GONet Scene Management Demo", 24, TextAlignmentOptions.Top);
             RectTransform titleRect = titleText.GetComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0.1f, 0.85f);
             titleRect.anchorMax = new Vector2(0.9f, 0.95f);
 
             // Status text
-            statusText = CreateText(panel.transform, "Status", "Connecting...", 16, TextAnchor.UpperLeft);
+            statusText = CreateText(panel.transform, "Status", "Connecting...", 16, TextAlignmentOptions.TopLeft);
             RectTransform statusRect = statusText.GetComponent<RectTransform>();
             statusRect.anchorMin = new Vector2(0.1f, 0.65f);
             statusRect.anchorMax = new Vector2(0.9f, 0.8f);
 
             // Instructions text
-            instructionsText = CreateText(panel.transform, "Instructions", "Select a scene to load:", 14, TextAnchor.MiddleLeft);
+            instructionsText = CreateText(panel.transform, "Instructions", "Select a scene to load:", 14, TextAlignmentOptions.MidlineLeft);
             RectTransform instrRect = instructionsText.GetComponent<RectTransform>();
             instrRect.anchorMin = new Vector2(0.1f, 0.52f);
             instrRect.anchorMax = new Vector2(0.9f, 0.62f);
@@ -141,16 +142,15 @@ namespace GONet.Sample
             backToMenuButton = CreateButton(panel.transform, "BackButton", "Back to Menu", 0.1f);
         }
 
-        private Text CreateText(Transform parent, string name, string text, int fontSize, TextAnchor alignment)
+        private TextMeshProUGUI CreateText(Transform parent, string name, string text, int fontSize, TextAlignmentOptions alignment)
         {
             GameObject go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            Text textComp = go.AddComponent<Text>();
+            TextMeshProUGUI textComp = go.AddComponent<TextMeshProUGUI>();
             textComp.text = text;
             textComp.fontSize = fontSize;
             textComp.alignment = alignment;
             textComp.color = Color.white;
-            textComp.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return textComp;
         }
 
@@ -184,12 +184,11 @@ namespace GONet.Sample
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
 
-            Text label = labelGO.AddComponent<Text>();
+            TextMeshProUGUI label = labelGO.AddComponent<TextMeshProUGUI>();
             label.text = labelText;
             label.fontSize = 18;
-            label.alignment = TextAnchor.MiddleCenter;
+            label.alignment = TextAlignmentOptions.Center;
             label.color = Color.white;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             return button;
         }
@@ -208,13 +207,13 @@ namespace GONet.Sample
             approvalImage.color = new Color(0.15f, 0.15f, 0.2f, 0.95f);
 
             // Approval title
-            Text titleText = CreateText(approvalPanel.transform, "ApprovalTitle", "Scene Change Request", 20, TextAnchor.UpperCenter);
+            TextMeshProUGUI titleText = CreateText(approvalPanel.transform, "ApprovalTitle", "Scene Change Request", 20, TextAlignmentOptions.Top);
             RectTransform titleRect = titleText.GetComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0.1f, 0.75f);
             titleRect.anchorMax = new Vector2(0.9f, 0.9f);
 
             // Approval message
-            approvalMessageText = CreateText(approvalPanel.transform, "ApprovalMessage", "Client requesting scene change...", 16, TextAnchor.MiddleCenter);
+            approvalMessageText = CreateText(approvalPanel.transform, "ApprovalMessage", "Client requesting scene change...", 16, TextAlignmentOptions.Center);
             RectTransform msgRect = approvalMessageText.GetComponent<RectTransform>();
             msgRect.anchorMin = new Vector2(0.1f, 0.4f);
             msgRect.anchorMax = new Vector2(0.9f, 0.7f);
@@ -253,7 +252,7 @@ namespace GONet.Sample
             responseImage.color = new Color(0.15f, 0.15f, 0.2f, 0.95f);
 
             // Response message (leave more room at bottom for button)
-            clientResponseMessageText = CreateText(clientResponsePanel.transform, "ResponseMessage", "Awaiting server approval...", 16, TextAnchor.MiddleCenter);
+            clientResponseMessageText = CreateText(clientResponsePanel.transform, "ResponseMessage", "Awaiting server approval...", 16, TextAlignmentOptions.Center);
             RectTransform msgRect = clientResponseMessageText.GetComponent<RectTransform>();
             msgRect.anchorMin = new Vector2(0.1f, 0.35f);
             msgRect.anchorMax = new Vector2(0.9f, 0.85f);
@@ -267,12 +266,12 @@ namespace GONet.Sample
             clientResponseCloseButton.onClick.AddListener(OnClientResponseCloseClicked);
 
             // Enable Best Fit on the button text
-            Text buttonText = clientResponseCloseButton.GetComponentInChildren<Text>();
+            TextMeshProUGUI buttonText = clientResponseCloseButton.GetComponentInChildren<TextMeshProUGUI>();
             if (buttonText != null)
             {
-                buttonText.resizeTextForBestFit = true;
-                buttonText.resizeTextMinSize = 10;
-                buttonText.resizeTextMaxSize = 20;
+                buttonText.enableAutoSizing = true;
+                buttonText.fontSizeMin = 10;
+                buttonText.fontSizeMax = 20;
             }
 
             // Initially hide the close button (only show for denials)

@@ -872,6 +872,79 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!1 &1829436489
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1829436492}
+  - component: {fileID: 1829436491}
+  - component: {fileID: 1829436490}
+  m_Layer: 0
+  m_Name: TestBeaconController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1829436490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1829436489}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2909317b3393c984ea6eedcb9d05eace, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  beaconPrefab: {fileID: 2604101842022887261, guid: ed363b3c8191b064fa74c62efdad0f4c,
+    type: 3}
+  spawnCooldown: 0.3
+  showInstructions: 1
+--- !u!114 &1829436491
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1829436489}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  UnityGuid: 
+  animatorSyncSupport:
+    keys: []
+    values: []
+  RemotelyControlledByAuthorityId: 0
+  IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
+  AutoDontDestroyOnLoad: 0
+  IsPositionSyncd: 0
+  IsRotationSyncd: 0
+  wasInstantiatedForce: 0
+--- !u!4 &1829436492
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1829436489}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -882,3 +955,4 @@ SceneRoots:
   - {fileID: 456006515}
   - {fileID: 1305130307}
   - {fileID: 871935232}
+  - {fileID: 1829436492}

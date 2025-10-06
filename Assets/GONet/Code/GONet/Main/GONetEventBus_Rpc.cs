@@ -72,6 +72,7 @@ namespace GONet
             public int RetryCount;
             public bool IsPersistent;
             public GONetParticipant SourceGONetParticipant;
+            public bool IsBeingProcessed; // Circuit breaker: prevents re-deferral during immediate processing
 
             private static readonly ConcurrentBag<DeferredRpcInfo> pool = new ConcurrentBag<DeferredRpcInfo>();
             private static readonly object poolLock = new object();
@@ -94,6 +95,7 @@ namespace GONet
                 DeferredAtTime = 0;
                 RetryCount = 0;
                 IsPersistent = false;
+                IsBeingProcessed = false;
                 SourceAuthorityId = 0;
                 TargetClientAuthorityId = 0;
 
@@ -105,6 +107,10 @@ namespace GONet
         private static readonly List<DeferredRpcInfo> deferredRpcs = new List<DeferredRpcInfo>(32);
         private static readonly Dictionary<uint, List<DeferredRpcInfo>> deferredRpcsByGoNetId = new Dictionary<uint, List<DeferredRpcInfo>>(16);
 
+        // Circuit breaker: Track which GONetIds are currently having their deferred RPCs processed
+        // This prevents infinite loops from re-deferral during immediate processing
+        private static readonly HashSet<uint> gonetIdsBeingProcessed = new HashSet<uint>();
+
         // Configuration constants
         private const float RPC_DEFER_TIMEOUT = 1.0f; // 1 second timeout
         private const int MAX_RETRY_COUNT = 60; // ~60 frames at 60fps = 1 second
@@ -113,6 +119,7 @@ namespace GONet
         private static int totalDeferredRpcs = 0;
         private static int successfulDeferredRpcs = 0;
         private static int timedOutDeferredRpcs = 0;
+        private static int circuitBreakerTriggered = 0; // Count how many times we prevented infinite loops
 
         /// <summary>
         /// Public API for generated RPC handlers to defer an RPC when the component doesn't exist yet.
@@ -180,9 +187,22 @@ namespace GONet
         /// <summary>
         /// Defers an RPC for later processing when the target GONetParticipant is not yet available
         /// High-performance method using object pooling
+        ///
+        /// CIRCUIT BREAKER: If the GONetId is currently being processed by OnGONetParticipantRegistered(),
+        /// we DO NOT re-defer to prevent infinite loops. The RPC will be retried on the next frame via ProcessDeferredRpcs().
         /// </summary>
         private static void DeferRpcForLater(RpcEvent rpcEvent, uint sourceAuthorityId, uint targetClientAuthorityId, GONetParticipant sourceGONetParticipant, bool isPersistent = false, PersistentRpcEvent persistentRpcEvent = null)
         {
+            uint targetGoNetId = isPersistent ? persistentRpcEvent.GONetId : rpcEvent.GONetId;
+
+            // CIRCUIT BREAKER: Prevent re-deferral during immediate processing to avoid infinite loops
+            if (gonetIdsBeingProcessed.Contains(targetGoNetId))
+            {
+                circuitBreakerTriggered++;
+                GONetLog.Debug($"[CIRCUIT BREAKER] Prevented re-deferral of RPC 0x{(isPersistent ? persistentRpcEvent.RpcId : rpcEvent.RpcId):X8} for GONetId {targetGoNetId} during immediate processing (will retry next frame)");
+                return;
+            }
+
             var deferredInfo = DeferredRpcInfo.Borrow();
             deferredInfo.RpcEvent = rpcEvent;
             deferredInfo.PersistentRpcEvent = persistentRpcEvent;
@@ -192,8 +212,6 @@ namespace GONet
             deferredInfo.RetryCount = 0;
             deferredInfo.IsPersistent = isPersistent;
             deferredInfo.SourceGONetParticipant = sourceGONetParticipant;
-
-            uint targetGoNetId = isPersistent ? persistentRpcEvent.GONetId : rpcEvent.GONetId;
 
             deferredRpcs.Add(deferredInfo);
 
@@ -299,9 +317,19 @@ namespace GONet
         /// <summary>
         /// Called when a new GONetParticipant is registered to immediately process any deferred RPCs
         /// This provides the fastest path to processing once the participant becomes available
+        ///
+        /// CIRCUIT BREAKER PROTECTION: Uses gonetIdsBeingProcessed HashSet to prevent infinite loops
+        /// when component-not-ready exceptions cause re-deferral during immediate processing.
         /// </summary>
         public static void OnGONetParticipantRegistered(uint gonetId)
         {
+            // CIRCUIT BREAKER: Prevent duplicate/recursive processing of the same GONetId
+            if (gonetIdsBeingProcessed.Contains(gonetId))
+            {
+                GONetLog.Debug($"[CIRCUIT BREAKER] GONetId {gonetId} is already being processed - skipping duplicate call to prevent infinite loop");
+                return;
+            }
+
             if (deferredRpcsByGoNetId.TryGetValue(gonetId, out var deferredList))
             {
                 GONetLog.Debug($"GONet ID {gonetId} registered - immediately processing {deferredList.Count} deferred RPCs");
@@ -310,33 +338,44 @@ namespace GONet
                 var gnp = GONetMain.GetGONetParticipantById(gonetId);
                 if (gnp != null)
                 {
-                    // Create copy of list since we'll be modifying the original
-                    var listCopy = new List<DeferredRpcInfo>(deferredList);
+                    // CIRCUIT BREAKER: Mark this GONetId as being processed
+                    gonetIdsBeingProcessed.Add(gonetId);
 
-                    foreach (var deferred in listCopy)
+                    try
                     {
-                        successfulDeferredRpcs++;
-                        if (deferred.IsPersistent)
-                        {
-                            var envelope = GONetEventEnvelope<PersistentRpcEvent>.Borrow(deferred.PersistentRpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
-                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
-                            Instance.HandlePersistentRpcForMe_Immediate(envelope);
-                        }
-                        else
-                        {
-                            var envelope = GONetEventEnvelope<RpcEvent>.Borrow(deferred.RpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
-                            envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
-                            Instance.HandleRpcForMe_Immediate(envelope);
-                        }
-                    }
+                        // Create copy of list since we'll be modifying the original
+                        var listCopy = new List<DeferredRpcInfo>(deferredList);
 
-                    // Clear all deferred RPCs for this GONet ID
-                    foreach (var deferred in listCopy)
-                    {
-                        deferredRpcs.Remove(deferred);
-                        deferred.Return();
+                        foreach (var deferred in listCopy)
+                        {
+                            successfulDeferredRpcs++;
+                            if (deferred.IsPersistent)
+                            {
+                                var envelope = GONetEventEnvelope<PersistentRpcEvent>.Borrow(deferred.PersistentRpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                                envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                                Instance.HandlePersistentRpcForMe_Immediate(envelope);
+                            }
+                            else
+                            {
+                                var envelope = GONetEventEnvelope<RpcEvent>.Borrow(deferred.RpcEvent, (ushort)deferred.SourceAuthorityId, gnp, (ushort)deferred.SourceAuthorityId);
+                                envelope.TargetClientAuthorityId = (ushort)deferred.TargetClientAuthorityId;
+                                Instance.HandleRpcForMe_Immediate(envelope);
+                            }
+                        }
+
+                        // Clear all deferred RPCs for this GONet ID
+                        foreach (var deferred in listCopy)
+                        {
+                            deferredRpcs.Remove(deferred);
+                            deferred.Return();
+                        }
+                        deferredRpcsByGoNetId.Remove(gonetId);
                     }
-                    deferredRpcsByGoNetId.Remove(gonetId);
+                    finally
+                    {
+                        // CIRCUIT BREAKER: Always clear the flag, even if exception occurs
+                        gonetIdsBeingProcessed.Remove(gonetId);
+                    }
                 }
             }
         }
@@ -346,7 +385,7 @@ namespace GONet
         /// </summary>
         public static string GetDeferredRpcStats()
         {
-            return $"Deferred RPCs - Total: {totalDeferredRpcs}, Successful: {successfulDeferredRpcs}, Timed Out: {timedOutDeferredRpcs}, Currently Pending: {deferredRpcs.Count}";
+            return $"Deferred RPCs - Total: {totalDeferredRpcs}, Successful: {successfulDeferredRpcs}, Timed Out: {timedOutDeferredRpcs}, Currently Pending: {deferredRpcs.Count}, Circuit Breaker Triggered: {circuitBreakerTriggered}";
         }
 
         #endregion

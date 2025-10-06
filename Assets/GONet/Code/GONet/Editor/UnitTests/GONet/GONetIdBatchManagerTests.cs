@@ -349,7 +349,7 @@ namespace GONet
         #region Integration & Scene Change Tests
 
         [Test]
-        public void SceneChange_Simulation_ServerAndClientResetCorrectly()
+        public void SceneChange_Simulation_ServerResetsClientPreserves()
         {
             // Arrange - simulate first scene
             uint serverBatch1 = GONetIdBatchManager.Server_AllocateNewBatch(1000);
@@ -361,58 +361,82 @@ namespace GONet
             Assert.AreEqual(serverBatch1, id1, "Should allocate from first batch");
 
             // Act - simulate scene change
+            // SERVER resets batches (to reclaim ID space)
+            // CLIENT does NOT reset (batches are global, persist across scenes)
             GONetIdBatchManager.Server_ResetAllBatches();
-            GONetIdBatchManager.Client_ResetAllBatches();
+            // GONetIdBatchManager.Client_ResetAllBatches(); // NO LONGER CALLED!
 
-            // Arrange - simulate second scene
+            // Arrange - server allocates new batch for second scene
             uint serverBatch2 = GONetIdBatchManager.Server_AllocateNewBatch(2000);
-            GONetIdBatchManager.Client_AddBatch(serverBatch2);
+            // Client does NOT receive new batch - continues using existing batch
 
+            // Client continues allocating from existing batch
             uint id2;
             bool shouldRequest2;
             bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id2, out shouldRequest2);
 
             // Assert
-            Assert.IsTrue(success, "Should allocate successfully in new scene");
-            Assert.AreEqual(serverBatch2, id2, "Should allocate from new batch");
+            Assert.IsTrue(success, "Should allocate successfully in new scene from existing batch");
+            Assert.AreEqual(serverBatch1 + 1, id2, "Should continue from existing batch (1001 + 1 = 1002)");
             Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(serverBatch1), "Old server batch should be cleared");
-            Assert.IsFalse(GONetIdBatchManager.Client_IsIdInActiveBatch(serverBatch1), "Old client batch should be cleared");
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(serverBatch1), "Client batch should PERSIST across scene change");
         }
 
         [Test]
-        public void MultipleSceneChanges_MaintainIntegrity()
+        public void MultipleSceneChanges_ClientBatchPersists()
         {
-            // Simulate 6 scene changes (matching the user's test scenario)
-            for (int scene = 0; scene < 6; scene++)
-            {
-                uint batchStart = (uint)(scene * 1000);
-                uint serverBatch = GONetIdBatchManager.Server_AllocateNewBatch(batchStart);
-                GONetIdBatchManager.Client_AddBatch(serverBatch);
+            // Simulate multiple scene changes - client should keep initial batch
+            // (matching the user's test scenario where scene changes occurred)
 
-                // Spawn some objects
+            // Arrange - client receives initial batch
+            uint initialBatch = GONetIdBatchManager.Server_AllocateNewBatch(5000);
+            GONetIdBatchManager.Client_AddBatch(initialBatch);
+
+            // Allocate 10 IDs in first scene
+            for (int spawn = 0; spawn < 10; spawn++)
+            {
+                uint id;
+                bool shouldRequest;
+                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
+                Assert.IsTrue(success, $"Initial scene, spawn {spawn} should succeed");
+                Assert.AreEqual(initialBatch + (uint)spawn, id, $"ID {spawn} should be sequential from initial batch");
+            }
+
+            // Simulate 5 scene changes
+            for (int scene = 1; scene <= 5; scene++)
+            {
+                // Server resets (reclaims ID space)
+                GONetIdBatchManager.Server_ResetAllBatches();
+
+                // Client does NOT reset - batches persist!
+                // GONetIdBatchManager.Client_ResetAllBatches(); // NO LONGER CALLED!
+
+                // Server allocates new batch for tracking (but client doesn't need it yet)
+                uint serverBatch = GONetIdBatchManager.Server_AllocateNewBatch((uint)(scene * 10000));
+
+                // Client continues using initial batch
                 for (int spawn = 0; spawn < 10; spawn++)
                 {
                     uint id;
                     bool shouldRequest;
                     bool success = GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
-                    Assert.IsTrue(success, $"Scene {scene}, spawn {spawn} should succeed");
-                }
+                    Assert.IsTrue(success, $"Scene {scene}, spawn {spawn} should succeed from persisted batch");
 
-                // Scene change
-                GONetIdBatchManager.Server_ResetAllBatches();
-                GONetIdBatchManager.Client_ResetAllBatches();
+                    // Should continue from where we left off in initial batch
+                    uint expectedId = initialBatch + 10 + (uint)((scene - 1) * 10) + (uint)spawn;
+                    Assert.AreEqual(expectedId, id, $"Scene {scene}, spawn {spawn} should continue from initial batch");
+                }
             }
 
-            // After 6 scene changes, system should still be clean
-            uint finalBatch = GONetIdBatchManager.Server_AllocateNewBatch(6000);
-            GONetIdBatchManager.Client_AddBatch(finalBatch);
+            // After 6 scene changes (1 initial + 5 more), verify batch state
+            string diagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+            Assert.IsTrue(diagnostics.Contains("Batches: 1"), "Should still have only the initial batch");
+            Assert.IsTrue(diagnostics.Contains("Used: 60"), "Should have used 60 IDs (10 per scene × 6 scenes)");
+            Assert.IsTrue(diagnostics.Contains("Remaining: 40"), "Should have 40 IDs remaining in initial batch");
 
-            uint finalId;
-            bool shouldRequestFinal;
-            bool finalSuccess = GONetIdBatchManager.Client_TryAllocateNextId(out finalId, out shouldRequestFinal);
-
-            Assert.IsTrue(finalSuccess, "Should still work after 6 scene changes");
-            Assert.AreEqual(finalBatch, finalId, "Should allocate from clean batch");
+            // Verify initial batch is still active
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(initialBatch + 50),
+                "Initial batch should still be active after multiple scene changes");
         }
 
         [Test]
@@ -532,9 +556,12 @@ namespace GONet
         }
 
         [Test]
-        public void Client_MultipleSceneChanges_ResetsAndReallocates()
+        public void Client_ManualReset_ClearsAndReallocates()
         {
-            // Arrange - simulate scene 1
+            // This tests MANUAL reset (e.g., disconnect/reconnect), NOT automatic scene change behavior
+            // NOTE: Scene changes do NOT automatically reset client batches (they persist)
+
+            // Arrange
             GONetIdBatchManager.Client_AddBatch(5000);
 
             // Allocate some IDs
@@ -545,10 +572,10 @@ namespace GONet
                 GONetIdBatchManager.Client_TryAllocateNextId(out id, out shouldRequest);
             }
 
-            // Act - scene change (reset)
+            // Act - MANUAL reset (e.g., client disconnect/reconnect scenario)
             GONetIdBatchManager.Client_ResetAllBatches();
 
-            // Simulate scene 2 - new batch
+            // Simulate receiving new batch after reset
             GONetIdBatchManager.Client_AddBatch(7000);
 
             uint firstIdAfterReset;
@@ -556,7 +583,7 @@ namespace GONet
             bool success = GONetIdBatchManager.Client_TryAllocateNextId(out firstIdAfterReset, out shouldReq);
 
             // Assert
-            Assert.IsTrue(success, "Should successfully allocate after reset");
+            Assert.IsTrue(success, "Should successfully allocate after manual reset");
             Assert.AreEqual(7000, firstIdAfterReset, "Should allocate from new batch, not old one");
         }
 
@@ -699,6 +726,59 @@ namespace GONet
             Assert.IsTrue(finalDiagnostics.Contains("Allocated: 100"), "Should still have 100 allocated");
             Assert.IsTrue(finalDiagnostics.Contains("Used: 100"), "Should have 100 used");
             Assert.IsTrue(finalDiagnostics.Contains("Remaining: 0"), "Should have 0 remaining");
+        }
+
+        [Test]
+        public void Client_SceneChange_PreservesBatchesAcrossScenes()
+        {
+            // REGRESSION TEST: Clients must NOT clear batches on scene change
+            // Bug: Client received batch [4-103], scene changed, batch was cleared,
+            //      spawns failed with "NO available batch IDs", fell back to regular
+            //      ID assignment causing GONetId collisions (e.g., 4095 collision)
+            //
+            // Expected: Client batches persist across scenes since batch IDs are
+            //           global and not scene-specific
+
+            // Arrange - simulate client receiving initial batch in scene 1
+            GONetIdBatchManager.Client_AddBatch(6000); // Batch [6000-6099]
+
+            // Allocate some IDs in scene 1
+            uint id1, id2, id3;
+            bool req1, req2, req3;
+            bool success1 = GONetIdBatchManager.Client_TryAllocateNextId(out id1, out req1);
+            bool success2 = GONetIdBatchManager.Client_TryAllocateNextId(out id2, out req2);
+            bool success3 = GONetIdBatchManager.Client_TryAllocateNextId(out id3, out req3);
+
+            Assert.IsTrue(success1 && success2 && success3, "Should allocate successfully in scene 1");
+            Assert.AreEqual(6000, id1, "First ID should be 6000");
+            Assert.AreEqual(6001, id2, "Second ID should be 6001");
+            Assert.AreEqual(6002, id3, "Third ID should be 6002");
+
+            // Act - simulate scene change (DO NOT reset client batches)
+            // NOTE: In the bug, Client_ResetAllBatches() was called here, which was wrong!
+            // Now we verify that NOT calling it preserves the batch correctly
+
+            // In scene 2, try to allocate more IDs from the SAME batch
+            uint id4, id5;
+            bool req4, req5;
+            bool success4 = GONetIdBatchManager.Client_TryAllocateNextId(out id4, out req4);
+            bool success5 = GONetIdBatchManager.Client_TryAllocateNextId(out id5, out req5);
+
+            // Assert - should continue allocating from existing batch
+            Assert.IsTrue(success4, "Should allocate successfully in scene 2 from existing batch");
+            Assert.IsTrue(success5, "Should continue allocating in scene 2");
+            Assert.AreEqual(6003, id4, "Fourth ID should be 6003 (continuing from scene 1)");
+            Assert.AreEqual(6004, id5, "Fifth ID should be 6004 (sequential)");
+
+            // Verify batch is still active
+            Assert.IsTrue(GONetIdBatchManager.Client_IsIdInActiveBatch(6050),
+                "Batch should still be active after scene change");
+
+            // Verify diagnostics show batch persisted
+            string diagnostics = GONetIdBatchManager.Client_GetDiagnostics();
+            Assert.IsTrue(diagnostics.Contains("Batches: 1"), "Should still have 1 batch");
+            Assert.IsTrue(diagnostics.Contains("Used: 5"), "Should have 5 used IDs (3 from scene 1 + 2 from scene 2)");
+            Assert.IsTrue(diagnostics.Contains("Remaining: 95"), "Should have 95 remaining IDs");
         }
 
         #endregion

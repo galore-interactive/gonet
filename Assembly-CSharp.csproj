@@ -93,6 +93,7 @@
   <ItemGroup>
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetEventBus_Rpc.cs" />
     <Compile Include="Assets\GONet\Sample\GONetMouseEventRelay.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\SpawnTestBeacon.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\NumericValueChangeSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\BitConverter.cs" />
@@ -106,12 +107,14 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodePacket.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ByteBuffer.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\LockFreeQueue.cs" />
+    <Compile Include="Assets\GONet\Sample\TestInstructionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetServer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\DesignTimeMetadata.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetRuntimeComponentInitializer.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Sample\CircularMotion.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetTestScriptExecutor.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\SyncEvent_GeneratedTypes.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\TokenFactory.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileUtils.cs" />
@@ -134,9 +137,11 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\HighResolutionTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\EncryptionManager.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ObjectPool.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetTestLogger.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleClientOrServer.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\SmoothingValuesModifiersUI.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\ByteArrayReader.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\SpawnTestController.cs" />
     <Compile Include="Assets\GONet\Sample\RandomMoveToTarget.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\GONetSyncableValues.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\GONetParticipant.cs" />
@@ -144,6 +149,7 @@
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe32.Dirty.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe64.Dirty.cs" />
     <Compile Include="Assets\GONet\Sample\SceneSelectionUI.cs" />
+    <Compile Include="Assets\GONet\Sample\TestSelectionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAddressablesHelper.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Tests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CRC32.cs" />
@@ -189,6 +195,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\NetworkUtils.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeReference.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Safe32.Dirty.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetIdBatchManager.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\DateTimeUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAutoMagicalSyncSettings_ProfileTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ValueBlendUtils.cs" />
@@ -198,6 +205,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetGlobal.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\MessageChannel.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetTestScript.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ArrayPool.cs" />
@@ -343,6 +351,7 @@
     <None Include="Assets\Packages\System.IO.Pipelines.9.0.0\THIRD-PARTY-NOTICES.TXT" />
     <None Include="Assets\Packages\System.IO.Pipelines.9.0.0\useSharedDesignerContext.txt" />
     <None Include="Assets\Packages\System.Composition.Runtime.9.0.0\lib\netstandard2.0\System.Composition.Runtime.dll" />
+    <None Include="Assets\GONet\Sample\Resources\Tests\SpawnSyncBugTest.txt" />
     <None Include="Assets\Amazon\Plugins\AWSSDK.Core.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\Packages\System.Composition.AttributedModel.9.0.0\THIRD-PARTY-NOTICES.TXT" />

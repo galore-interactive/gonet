@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 namespace GONet.Sample
 {
@@ -19,13 +20,13 @@ namespace GONet.Sample
         private GameObject buttonContainer;
         private Button exitButton;
         private GameObject clientResponsePanel;
-        private Text clientResponseMessageText;
+        private TextMeshProUGUI clientResponseMessageText;
         private Button clientResponseCloseButton;
         private bool isAwaitingResponse = false;
 
         // Server approval UI (for when SceneSelectionUI isn't present)
         private GameObject approvalPanel;
-        private Text approvalMessageText;
+        private TextMeshProUGUI approvalMessageText;
         private Button approveButton;
         private Button denyButton;
 
@@ -250,12 +251,11 @@ namespace GONet.Sample
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
 
-            Text label = labelGO.AddComponent<Text>();
+            TextMeshProUGUI label = labelGO.AddComponent<TextMeshProUGUI>();
             label.text = "Exit";
             label.fontSize = 18;
-            label.alignment = TextAnchor.MiddleCenter;
+            label.alignment = TextAlignmentOptions.Center;
             label.color = Color.white;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // Build server approval panel
             BuildApprovalPanel();
@@ -289,15 +289,14 @@ namespace GONet.Sample
             msgRect.offsetMin = Vector2.zero;
             msgRect.offsetMax = Vector2.zero;
 
-            clientResponseMessageText = msgGO.AddComponent<Text>();
+            clientResponseMessageText = msgGO.AddComponent<TextMeshProUGUI>();
             clientResponseMessageText.text = "Awaiting server approval...";
             clientResponseMessageText.fontSize = 24;
-            clientResponseMessageText.alignment = TextAnchor.MiddleCenter;
+            clientResponseMessageText.alignment = TextAlignmentOptions.Center;
             clientResponseMessageText.color = Color.white;
-            clientResponseMessageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            clientResponseMessageText.resizeTextForBestFit = true;
-            clientResponseMessageText.resizeTextMinSize = 16;
-            clientResponseMessageText.resizeTextMaxSize = 28;
+            clientResponseMessageText.enableAutoSizing = true;
+            clientResponseMessageText.fontSizeMin = 16;
+            clientResponseMessageText.fontSizeMax = 28;
 
             // Close button
             GameObject closeButtonGO = new GameObject("CloseButton");
@@ -330,15 +329,14 @@ namespace GONet.Sample
             closeLabelRect.offsetMin = Vector2.zero;
             closeLabelRect.offsetMax = Vector2.zero;
 
-            Text closeLabel = closeLabelGO.AddComponent<Text>();
+            TextMeshProUGUI closeLabel = closeLabelGO.AddComponent<TextMeshProUGUI>();
             closeLabel.text = "Close";
             closeLabel.fontSize = 18;
-            closeLabel.alignment = TextAnchor.MiddleCenter;
+            closeLabel.alignment = TextAlignmentOptions.Center;
             closeLabel.color = Color.white;
-            closeLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            closeLabel.resizeTextForBestFit = true;
-            closeLabel.resizeTextMinSize = 10;
-            closeLabel.resizeTextMaxSize = 20;
+            closeLabel.enableAutoSizing = true;
+            closeLabel.fontSizeMin = 10;
+            closeLabel.fontSizeMax = 20;
 
             // Initially hide close button (only show for denials)
             clientResponseCloseButton.gameObject.SetActive(false);
@@ -468,12 +466,11 @@ namespace GONet.Sample
             titleRect.anchorMax = new Vector2(0.9f, 0.9f);
             titleRect.offsetMin = Vector2.zero;
             titleRect.offsetMax = Vector2.zero;
-            Text titleText = titleGO.AddComponent<Text>();
+            TextMeshProUGUI titleText = titleGO.AddComponent<TextMeshProUGUI>();
             titleText.text = "Scene Change Request";
             titleText.fontSize = 24;
-            titleText.alignment = TextAnchor.MiddleCenter;
+            titleText.alignment = TextAlignmentOptions.Center;
             titleText.color = Color.white;
-            titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // Message
             GameObject msgGO = new GameObject("Message");
@@ -483,15 +480,14 @@ namespace GONet.Sample
             msgRect.anchorMax = new Vector2(0.9f, 0.7f);
             msgRect.offsetMin = Vector2.zero;
             msgRect.offsetMax = Vector2.zero;
-            approvalMessageText = msgGO.AddComponent<Text>();
+            approvalMessageText = msgGO.AddComponent<TextMeshProUGUI>();
             approvalMessageText.text = "Client requesting scene change...";
             approvalMessageText.fontSize = 20;
-            approvalMessageText.alignment = TextAnchor.MiddleCenter;
+            approvalMessageText.alignment = TextAlignmentOptions.Center;
             approvalMessageText.color = Color.white;
-            approvalMessageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            approvalMessageText.resizeTextForBestFit = true;
-            approvalMessageText.resizeTextMinSize = 14;
-            approvalMessageText.resizeTextMaxSize = 24;
+            approvalMessageText.enableAutoSizing = true;
+            approvalMessageText.fontSizeMin = 14;
+            approvalMessageText.fontSizeMax = 24;
 
             // Approve button (left side)
             GameObject approveGO = new GameObject("ApproveButton");
@@ -513,12 +509,11 @@ namespace GONet.Sample
             approveLabelRect.anchorMax = Vector2.one;
             approveLabelRect.offsetMin = Vector2.zero;
             approveLabelRect.offsetMax = Vector2.zero;
-            Text approveLabel = approveLabelGO.AddComponent<Text>();
+            TextMeshProUGUI approveLabel = approveLabelGO.AddComponent<TextMeshProUGUI>();
             approveLabel.text = "APPROVE";
             approveLabel.fontSize = 20;
-            approveLabel.alignment = TextAnchor.MiddleCenter;
+            approveLabel.alignment = TextAlignmentOptions.Center;
             approveLabel.color = Color.white;
-            approveLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // Deny button (right side)
             GameObject denyGO = new GameObject("DenyButton");
@@ -540,12 +535,11 @@ namespace GONet.Sample
             denyLabelRect.anchorMax = Vector2.one;
             denyLabelRect.offsetMin = Vector2.zero;
             denyLabelRect.offsetMax = Vector2.zero;
-            Text denyLabel = denyLabelGO.AddComponent<Text>();
+            TextMeshProUGUI denyLabel = denyLabelGO.AddComponent<TextMeshProUGUI>();
             denyLabel.text = "DENY";
             denyLabel.fontSize = 20;
-            denyLabel.alignment = TextAnchor.MiddleCenter;
+            denyLabel.alignment = TextAlignmentOptions.Center;
             denyLabel.color = Color.white;
-            denyLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // Start hidden
             approvalPanel.SetActive(false);

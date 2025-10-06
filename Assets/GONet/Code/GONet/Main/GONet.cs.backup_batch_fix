@@ -392,25 +392,6 @@ namespace GONet
 
         private static void OnSceneLoadCompleted_ProcessDeferredSpawns(string sceneName, LoadSceneMode mode)
         {
-            // CRITICAL: Reset GONetId batch state on scene change to prevent stale ID reuse
-            // NOTE: Only reset SERVER batches - clients keep their batches across scenes since
-            // batch IDs are global and don't need to be scene-specific
-            if (mode == LoadSceneMode.Single)
-            {
-                if (IsServer)
-                {
-                    GONetIdBatchManager.Server_ResetAllBatches();
-                    GONetLog.Info($"[GONetIdBatch] SERVER reset batch state on scene change (LoadSceneMode.Single): {sceneName}");
-                }
-                if (IsClient)
-                {
-                    // DO NOT reset client batches - they persist across scenes
-                    // GONetIdBatchManager.Client_ResetAllBatches();
-                    client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
-                    GONetLog.Info($"[GONetIdBatch] CLIENT kept batches on scene change (LoadSceneMode.Single): {sceneName}");
-                }
-            }
-
             // When a scene loads, process any deferred spawns that were waiting for it
             ProcessDeferredSpawnsForScene(sceneName);
         }
@@ -645,38 +626,8 @@ namespace GONet
         public static bool IsUnityApplicationEditor => Application.isEditor;
 
         /// <summary>
-        /// Late-joiner synchronization storage: "Current state" list of persistent events.
-        /// This will NOT include ALL events that implement <see cref="IPersistentEvent"/> if anything
-        /// cancelled out another/previous event (i.e., <see cref="ICancelOutOtherEvents"/>).
-        ///
-        /// ⚠️  CRITICAL DESIGN CONSTRAINT: EVENTS STORED BY REFERENCE
-        ///
-        /// This LinkedList stores DIRECT REFERENCES to persistent event objects for the entire
-        /// session duration (minutes to hours). When late-joining clients connect, these exact
-        /// references are serialized and transmitted (see Server_SendClientPersistentEventsSinceStart:4355).
-        ///
-        /// IMPLICATIONS FOR EVENT CLASSES:
-        /// Any class that goes into this list (implements IPersistentEvent) MUST NOT use object pooling.
-        /// If pooled events were stored here:
-        ///   1. Event created and added to this list by reference
-        ///   2. Event.Return() called → data cleared, returned to pool
-        ///   3. Pool reuses object → stored reference now contains WRONG data
-        ///   4. Late-joiner connects → receives corrupted data from stored reference
-        ///   5. CATASTROPHIC: Game state desynchronization, crashes, invisible bugs
-        ///
-        /// Classes that CORRECTLY avoid pooling (do NOT implement ISelfReturnEvent):
-        /// - PersistentRpcEvent (see GONetRpcs.cs:912 for detailed rationale)
-        /// - PersistentRoutedRpcEvent (TargetRpc variant)
-        /// - InstantiateGONetParticipantEvent (spawn events)
-        /// - DespawnGONetParticipantEvent (despawn with cancellation)
-        /// - SceneLoadEvent (networked scene management)
-        ///
-        /// Memory cost: ~1-10 KB per session (acceptable for data integrity guarantee)
-        ///
-        /// See also:
-        /// - OnPersistentEvent_KeepTrack() at line 1549 - where events are added to this list
-        /// - Server_SendClientPersistentEventsSinceStart() at line 4355 - where stored references are transmitted
-        /// - GONetRpcs.cs:912 - PersistentRpcEvent class documentation for full pooling rationale
+        /// IMPORTANT: This will NOT include ALL events that implement <see cref="IPersistentEvent"/> as it may sound *IF* anything cancelled out another/previous event (i.e., <see cref="ICancelOutOtherEvents"/>).
+        /// This is the "current state" list used for late-joiner synchronization - events are removed when cancelled.
         /// </summary>
         static readonly LinkedList<IPersistentEvent> persistentEventsThisSession = new LinkedList<IPersistentEvent>();
 
@@ -1291,12 +1242,8 @@ namespace GONet
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_rotation, OnTransformRotationChanged_Debug);
 
             EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
-
+            
             EventBus.Subscribe<ClientRemotelyControlledGONetIdServerBatchAssignmentEvent>(Client_AssignNewClientGONetIdRawBatch);
-            EventBus.Subscribe<ClientRemotelyControlledGONetIdServerBatchRequestEvent>(Server_HandleClientBatchRequest);
-
-            // Subscribe to chunked persistent events for reassembly
-            EventBus.Subscribe<PersistentEvents_BundleChunk>(OnPersistentEventsChunkReceived, envelope => envelope.IsSourceRemote);
 
             EventBus.InitializeRpcSystem();
         }
@@ -1576,22 +1523,6 @@ namespace GONet
 
         private static readonly List<IPersistentEvent> persistentEventsCancelledOut = new List<IPersistentEvent>(100);
 
-        /// <summary>
-        /// Stores persistent events for late-joiner synchronization and record/replay.
-        ///
-        /// ⚠️  CRITICAL: This method stores events BY REFERENCE for the entire session.
-        /// These exact references are later serialized when late-joining clients connect
-        /// (see Server_SendClientPersistentEventsSinceStart:4355).
-        ///
-        /// DESIGN REQUIREMENT:
-        /// Event classes MUST NOT use object pooling. If they did:
-        ///   eventEnvelope.Event stored here → Event.Return() clears data → Pool reuses object
-        ///   → Late-joiner receives corrupted data from stored reference → CATASTROPHIC
-        ///
-        /// This is WHY PersistentRpcEvent and other IPersistentEvent implementations
-        /// do NOT implement ISelfReturnEvent. See GONetRpcs.cs:912 and line 647 above
-        /// for detailed rationale.
-        /// </summary>
         private static void OnPersistentEvent_KeepTrack(GONetEventEnvelope<IPersistentEvent> eventEnvelope)
         {
             // RECORD AND REPLAY: Always add to complete history archive (never remove)
@@ -3727,12 +3658,6 @@ namespace GONet
         {
             //GONetLog.Debug("received something.... size: " + bytesUsedCount);
 
-            // DEBUG: Log ALL messages on Channel 8 immediately when received
-            if (channelId == 8 && IsClient)
-            {
-                GONetLog.Warning($"[CHUNK_TRACE] NETWORK ENTRY - Channel: {channelId}, Bytes: {bytesUsedCount}, Thread: {Thread.CurrentThread.ManagedThreadId}");
-            }
-
             SingleProducerQueues singleProducerReceiveQueues = ReturnSingleProducerResources_IfAppropriate(singleProducerReceiveQueuesByThread, Thread.CurrentThread);
 
             NetworkData networkData = new NetworkData()
@@ -3747,12 +3672,6 @@ namespace GONet
             Buffer.BlockCopy(messageBytes, 0, networkData.messageBytes, 0, bytesUsedCount);
 
             singleProducerReceiveQueues.queueForWork.Enqueue(networkData);
-
-            // DEBUG: Confirm enqueue
-            if (channelId == 8 && IsClient)
-            {
-                GONetLog.Warning($"[CHUNK_TRACE] ENQUEUED - Channel: {channelId}, Bytes: {bytesUsedCount}, QueueCount: {singleProducerReceiveQueues.queueForWork.Count}");
-            }
         }
 
         #endregion
@@ -3786,12 +3705,6 @@ namespace GONet
                     {
                         ++processedCount;
 
-                        // DEBUG: Log EVERY dequeued message on Channel 8 (chunk channel)
-                        if (networkData.channelId == 8)
-                        {
-                            GONetLog.Warning($"[CHUNK_TRACE] DEQUEUED - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, ProcessedCount: {processedCount}/{readyCount}");
-                        }
-
                         // DEBUG: Log EVERY dequeued message on Channel 9
                         if (networkData.channelId == 9)
                         {
@@ -3800,12 +3713,6 @@ namespace GONet
 
                         try
                         {
-                            // DEBUG: Track entry to try block for Channel 8
-                            if (networkData.channelId == 8)
-                            {
-                                GONetLog.Error($"[CHUNK_TRACE] ENTERED TRY BLOCK - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}");
-                            }
-
                             // IMPORTANT: This check must come first as it exits early if condition met!
                             bool shouldQueueForProcessingAfterInitialization =
                                 !IsChannelClientInitializationRelated(networkData.channelId) && IsClient && _gonetClient != null && !_gonetClient.IsInitializedWithServer;
@@ -3814,13 +3721,6 @@ namespace GONet
                             {
                                 bool isInitRelated = IsChannelClientInitializationRelated(networkData.channelId);
                                 bool isInitialized = _gonetClient != null && _gonetClient.IsInitializedWithServer;
-
-                                // DEBUG: Log channel 8 queueing decision
-                                if (networkData.channelId == 8)
-                                {
-                                    GONetLog.Warning($"[CHUNK_TRACE] QUEUEING DECISION - Channel: {networkData.channelId}, IsInitRelated: {isInitRelated}, IsInitialized: {isInitialized}, WillQueue: {shouldQueueForProcessingAfterInitialization}");
-                                }
-
                                 //GONetLog.Debug($"[MSG] Received message - channel: {networkData.channelId}, size: {networkData.bytesUsedCount}, isInitRelated: {isInitRelated}, isInitialized: {isInitialized}, willQueue: {shouldQueueForProcessingAfterInitialization}");
                             }
 
@@ -3857,12 +3757,6 @@ namespace GONet
                             GONetLog.Error(string.Concat("Error Message: ", e.Message, "\nError Stacktrace:\n", e.StackTrace));
                         }
 
-                        // DEBUG: Log channel 8 before calling INTERNAL
-                        if (networkData.channelId == 8)
-                        {
-                            GONetLog.Warning($"[CHUNK_TRACE] CALLING INTERNAL - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}");
-                        }
-
                         ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(networkData);
                     }
                 }
@@ -3877,12 +3771,6 @@ namespace GONet
         /// </summary>
         private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData, bool isProcessingFromQueue = false)
         {
-            // DEBUG: Log EVERY message that enters this function on Channel 8
-            if (networkData.channelId == 8) // ClientInitialization_EventSingles_Reliable
-            {
-                GONetLog.Warning($"[CHUNK_TRACE] INTERNAL ENTRY - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, isProcessingFromQueue: {isProcessingFromQueue}");
-            }
-
             // DEBUG: Log EVERY message that enters this function
             if (networkData.channelId == 9) // ClientInitialization_CustomSerialization_Reliable
             {
@@ -3892,17 +3780,17 @@ namespace GONet
             bool shouldReturnToPool = true; // Track whether message should be returned to pool (false if queued elsewhere)
             try
             {
-                if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable.Id || networkData.channelId == GONetChannel.EventSingles_Reliable.Id || networkData.channelId == GONetChannel.EventSingles_Unreliable.Id)
+                if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Reliable || networkData.channelId == GONetChannel.EventSingles_Unreliable)
                 {
                     // COMPREHENSIVE LOGGING - Receive EventSingle
                     LogMessageReceive(networkData.messageBytes, networkData.bytesUsedCount, networkData.channelId, networkData.relatedConnection, 0);
 
-                    if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable.Id)
+                    if (networkData.channelId == GONetChannel.ClientInitialization_EventSingles_Reliable)
                     {
                         GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Received message on ClientInitialization_EventSingles_Reliable - Size: {networkData.bytesUsedCount} bytes, From: AuthorityId {networkData.relatedConnection.OwnerAuthorityId}");
                     }
 
-                    DeserializeBody_EventSingle(networkData.messageBytes, networkData.bytesUsedCount, networkData.relatedConnection);
+                    DeserializeBody_EventSingle(networkData.messageBytes, networkData.relatedConnection);
                 }
                 else if (GONetChannel.IsGONetCoreChannel(networkData.channelId))
                 {
@@ -4146,41 +4034,25 @@ namespace GONet
             }
         }
 
-        private static void DeserializeBody_EventSingle(byte[] messageBytes, int bytesUsedCount, GONetConnection relatedConnection)
+        private static void DeserializeBody_EventSingle(byte[] messageBytes, GONetConnection relatedConnection)
         {
             try
             {
-                GONetLog.Info($"[SPAWN_SYNC] CLIENT: ATTEMPTING to deserialize EventSingle - Size: {bytesUsedCount} bytes (array capacity: {messageBytes.Length}), From: AuthorityId {relatedConnection.OwnerAuthorityId}");
+                IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageBytes);
 
-                // CRITICAL FIX: Use ArraySegment to deserialize only the actual message bytes, not the entire pooled array capacity
-                var messageSegment = new ArraySegment<byte>(messageBytes, 0, bytesUsedCount);
-                GONetLog.Warning($"[DESER_DEBUG] About to call DeserializeFromBytes - Segment offset: {messageSegment.Offset}, Count: {messageSegment.Count}");
-
-                IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageSegment);
-
-                GONetLog.Warning($"[DESER_DEBUG] DeserializeFromBytes returned - Event is null: {@event == null}, Event type: {@event?.GetType().Name}");
-
-                GONetLog.Info($"[SPAWN_SYNC] CLIENT: SUCCESSFULLY deserialized EventSingle - Type: {@event.GetType().Name}, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
-
-                // Log PersistentEvents_Bundle and chunks specifically
+                // Log PersistentEvents_Bundle specifically
                 if (@event is PersistentEvents_Bundle bundle)
                 {
                     GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Deserialized PersistentEvents_Bundle - Events: {bundle.PersistentEvents.Count}, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
                 }
-                else if (@event is PersistentEvents_BundleChunk chunk)
-                {
-                    GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Deserialized PersistentEvents_BundleChunk - ChunkId: {chunk.ChunkId}, Index: {chunk.ChunkIndex}/{chunk.TotalChunks}, Size: {chunk.ChunkData.Length} bytes, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
-                }
 
-                GONetLog.Warning($"[DESER_DEBUG] About to publish event to EventBus");
                 EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
-                GONetLog.Warning($"[DESER_DEBUG] EventBus.Publish completed");
                 // SPAM: Commented out - creates 2,777+ log entries during stress testing, mostly ValueMonitoringSupport events
                 //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
             }
             catch (System.Exception ex)
             {
-                GONetLog.Error($"[SPAWN_SYNC] CLIENT: FAILED to deserialize EventSingle - Size: {bytesUsedCount} bytes (array capacity: {messageBytes.Length}), From: AuthorityId {relatedConnection.OwnerAuthorityId}, Error: {ex.Message}\nStackTrace: {ex.StackTrace}");
+                GONetLog.Error($"[SPAWN_SYNC] CLIENT: FAILED to deserialize EventSingle - Size: {messageBytes.Length} bytes, From: AuthorityId {relatedConnection.OwnerAuthorityId}, Error: {ex.Message}");
                 throw;
             }
         }
@@ -4331,11 +4203,6 @@ namespace GONet
         /// </summary>
         private static void Server_SendClientSceneDefinedObjectIds(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
-            GONetLog.Warning($"[SCENE_SYNC] Server_SendClientSceneDefinedObjectIds - START for AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
-            GONetLog.Warning($"[SCENE_SYNC] definedInSceneParticipantInstanceIDs.Count: {definedInSceneParticipantInstanceIDs.Count}");
-            GONetLog.Warning($"[SCENE_SYNC] participantInstanceID_to_SpawnSceneName.Count: {participantInstanceID_to_SpawnSceneName.Count}");
-            GONetLog.Warning($"[SCENE_SYNC] gonetParticipantByGONetIdMap.Count: {gonetParticipantByGONetIdMap.Count}");
-
             // Get all currently loaded scenes
             HashSet<string> loadedScenes = new HashSet<string>();
             for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
@@ -4344,19 +4211,14 @@ namespace GONet
                 if (scene.isLoaded)
                 {
                     loadedScenes.Add(scene.name);
-                    GONetLog.Warning($"[SCENE_SYNC] Detected loaded scene: '{scene.name}'");
                 }
             }
 
             // For each loaded scene, collect scene-defined object GONetIds
             foreach (string sceneName in loadedScenes)
             {
-                GONetLog.Warning($"[SCENE_SYNC] Processing scene '{sceneName}' for scene-defined objects...");
                 List<string> designTimeLocations = new List<string>();
                 List<uint> gonetIds = new List<uint>();
-
-                int matchedInstanceIds = 0;
-                int foundParticipants = 0;
 
                 // Find all GONetParticipants that were defined in this scene
                 foreach (int instanceId in definedInSceneParticipantInstanceIDs)
@@ -4364,8 +4226,6 @@ namespace GONet
                     if (participantInstanceID_to_SpawnSceneName.TryGetValue(instanceId, out string participantScene) &&
                         participantScene == sceneName)
                     {
-                        matchedInstanceIds++;
-
                         // Find the actual participant
                         foreach (var kvp in gonetParticipantByGONetIdMap)
                         {
@@ -4376,17 +4236,13 @@ namespace GONet
                                 participant.GONetId != 0 &&
                                 !string.IsNullOrEmpty(participant.DesignTimeLocation))
                             {
-                                foundParticipants++;
                                 designTimeLocations.Add(participant.DesignTimeLocation);
                                 gonetIds.Add(participant.GONetId);
-                                GONetLog.Debug($"[SCENE_SYNC] Found scene-defined participant: GONetId {participant.GONetId}, Location: {participant.DesignTimeLocation}, Scene: {sceneName}");
                                 break;
                             }
                         }
                     }
                 }
-
-                GONetLog.Warning($"[SCENE_SYNC] Scene '{sceneName}': matchedInstanceIds={matchedInstanceIds}, foundParticipants={foundParticipants}, sending={designTimeLocations.Count}");
 
                 if (designTimeLocations.Count > 0)
                 {
@@ -4394,8 +4250,6 @@ namespace GONet
                     Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), gonetConnection_ServerToClient.OwnerAuthorityId);
                 }
             }
-
-            GONetLog.Warning($"[SCENE_SYNC] Server_SendClientSceneDefinedObjectIds - END for AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
         }
 
         private static void Server_SendClientPersistentEventsSinceStart(GONetConnection_ServerToClient gonetConnection_ServerToClient)
@@ -4405,9 +4259,7 @@ namespace GONet
             if (persistentEventsThisSession.Count > 0)
             {
                 // Filter persistent events to only those relevant to currently loaded scenes
-                GONetLog.Error($"[SPAWN_SYNC] BEFORE FilterPersistentEventsByLoadedScenes - Count: {persistentEventsThisSession.Count}");
                 LinkedList<IPersistentEvent> filteredEvents = FilterPersistentEventsByLoadedScenes(persistentEventsThisSession);
-                GONetLog.Error($"[SPAWN_SYNC] AFTER FilterPersistentEventsByLoadedScenes - Filtered count: {filteredEvents.Count}");
 
                 int totalCount = persistentEventsThisSession.Count;
                 int filteredCount = filteredEvents.Count;
@@ -4432,67 +4284,11 @@ namespace GONet
 
                     byte[] bytes = SerializationUtils.SerializeToBytes<IGONetEvent>(bundle, out returnBytesUsedCount, out bool doesNeedToReturn); // EXTREMELY important to include the <IGONetEvent> because there are multiple options for MessagePack to serialize this thing based on BobWad_Generated.cs' usage of [MemoryPack.MemoryPackUnion] for relevant interfaces this concrete class implements and the other end's call to deserialize will be to DeserializeBody_EventSingle and <IGONetEvent> will be used there too!!!
 
-                    const int MAX_SERIALIZED_CHUNK_SIZE = 12 * 1024; // 12 KB per serialized chunk - safe within 16 KB transport limit
-                    const int CHUNK_OVERHEAD_ESTIMATE = 32; // Overhead for PersistentEvents_BundleChunk wrapper (ChunkId, ChunkIndex, TotalChunks, OriginalBundleSize, MemoryPack metadata)
-                    const int MAX_CHUNK_DATA_SIZE = MAX_SERIALIZED_CHUNK_SIZE - CHUNK_OVERHEAD_ESTIMATE; // ~12,256 bytes of actual data per chunk
+                    GONetLog.Warning($"[SPAWN_SYNC] SERVER: Serialized PersistentEvents_Bundle - Size: {returnBytesUsedCount} bytes, Events: {filteredCount}, Channel: {GONetChannel.ClientInitialization_EventSingles_Reliable}, Target: AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
 
-                    if (returnBytesUsedCount > MAX_CHUNK_DATA_SIZE)
-                    {
-                        // CHUNKING PATH: Bundle too large for single message - split into chunks
-                        ushort totalChunks = (ushort)((returnBytesUsedCount + MAX_CHUNK_DATA_SIZE - 1) / MAX_CHUNK_DATA_SIZE);
-                        uint chunkId = GenerateUniqueChunkId();
+                    SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
 
-                        GONetLog.Warning(
-                            $"[SPAWN_SYNC] SERVER: Large persistent events bundle ({returnBytesUsedCount} bytes, {filteredCount} events) " +
-                            $"will be split into {totalChunks} chunks for client AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}. " +
-                            $"PERFORMANCE WARNING: Large bundles may impact network performance. " +
-                            $"Consider: 1) More aggressive scene filtering, 2) Event cleanup on scene changes, 3) Shorter session duration.");
-
-                        for (ushort chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++)
-                        {
-                            int offset = chunkIndex * MAX_CHUNK_DATA_SIZE;
-                            int chunkDataSize = System.Math.Min(MAX_CHUNK_DATA_SIZE, returnBytesUsedCount - offset);
-
-                            byte[] chunkData = new byte[chunkDataSize];
-                            System.Buffer.BlockCopy(bytes, offset, chunkData, 0, chunkDataSize);
-
-                            var chunkEvent = new PersistentEvents_BundleChunk(chunkId, chunkIndex, totalChunks, chunkData, returnBytesUsedCount);
-
-                            int chunkBytesUsedCount;
-                            // CRITICAL: Must include <IGONetEvent> type parameter to ensure MemoryPack union type tag is serialized!
-                            // Without this, deserialization will fail or deserialize as wrong type (see line 4361 comment)
-                            byte[] chunkBytes = SerializationUtils.SerializeToBytes<IGONetEvent>(chunkEvent, out chunkBytesUsedCount, out bool doesNeedToReturnChunk);
-
-                            // Validate chunk size is within limits
-                            if (chunkBytesUsedCount > MAX_SERIALIZED_CHUNK_SIZE)
-                            {
-                                GONetLog.Error($"[SPAWN_SYNC] CRITICAL: Serialized chunk {chunkIndex + 1}/{totalChunks} exceeds MAX_SERIALIZED_CHUNK_SIZE! " +
-                                    $"Actual: {chunkBytesUsedCount} bytes, Max: {MAX_SERIALIZED_CHUNK_SIZE} bytes. " +
-                                    $"ChunkDataSize: {chunkDataSize}, Overhead: {chunkBytesUsedCount - chunkDataSize}. " +
-                                    $"This will likely cause message corruption or delivery failure.");
-                            }
-
-                            GONetLog.Info($"[SPAWN_SYNC] SERVER: Sending chunk {chunkIndex + 1}/{totalChunks} ({chunkBytesUsedCount} bytes, {chunkDataSize} data + {chunkBytesUsedCount - chunkDataSize} overhead) to AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
-
-                            SendBytesToRemoteConnection(gonetConnection_ServerToClient, chunkBytes, chunkBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
-
-                            if (doesNeedToReturnChunk)
-                            {
-                                SerializationUtils.ReturnByteArray(chunkBytes);
-                            }
-                        }
-
-                        GONetLog.Warning($"[SPAWN_SYNC] SERVER: All {totalChunks} chunks SENT to AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId} (ChunkId: {chunkId})");
-                    }
-                    else
-                    {
-                        // NORMAL PATH: Bundle fits in single message (< ~12 KB)
-                        GONetLog.Warning($"[SPAWN_SYNC] SERVER: Serialized PersistentEvents_Bundle - Size: {returnBytesUsedCount} bytes, Events: {filteredCount}, Channel: {GONetChannel.ClientInitialization_EventSingles_Reliable}, Target: AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
-
-                        SendBytesToRemoteConnection(gonetConnection_ServerToClient, bytes, returnBytesUsedCount, GONetChannel.ClientInitialization_EventSingles_Reliable);
-
-                        GONetLog.Warning($"[SPAWN_SYNC] SERVER: PersistentEvents_Bundle SENT to AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
-                    }
+                    GONetLog.Warning($"[SPAWN_SYNC] SERVER: PersistentEvents_Bundle SENT to AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
 
                     if (doesNeedToReturn)
                     {
@@ -4690,11 +4486,12 @@ namespace GONet
         private static void Server_AssignNewClientGONetIdRawBatch(GONetConnection_ServerToClient connectionToClient)
         {
             var @event = new ClientRemotelyControlledGONetIdServerBatchAssignmentEvent();
-            uint batchStart = GONetIdBatchManager.Server_AllocateNewBatch(lastAssignedGONetIdRaw);
+            uint batchStart = lastAssignedGONetIdRaw + 1;
             @event.GONetIdRawBatchStart = batchStart;
-
-            lastAssignedGONetIdRaw = batchStart + 99; // Batch is 100 IDs, so last ID is +99
-
+            
+            client_finalServerGONetIdForRemoteControl_batchStartValues.Add(batchStart);
+            lastAssignedGONetIdRaw += CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+            
             EventBus.Publish(@event, targetClientAuthorityId: connectionToClient.OwnerAuthorityId);
         }
 
@@ -4703,64 +4500,7 @@ namespace GONet
         {
             if (IsClient)
             {
-                GONetIdBatchManager.Client_AddBatch(eventEnvelope.Event.GONetIdRawBatchStart);
-            }
-        }
-
-        /// <summary>
-        /// CLIENT: Requests a new GONetId batch from the server when running low on IDs.
-        /// Called automatically when remaining IDs drop below threshold (< 20).
-        /// </summary>
-        private static void Client_RequestNewGONetIdBatch()
-        {
-            if (!IsClient || GONetClient == null || GONetClient.connectionToServer == null)
-            {
-                GONetLog.Error("[GONetIdBatch] CLIENT: Cannot request new batch - not connected to server");
-                return;
-            }
-
-            GONetLog.Info("[GONetIdBatch] CLIENT requesting new batch from server due to low ID count");
-
-            // Create request event to send to server
-            var requestEvent = new ClientRemotelyControlledGONetIdServerBatchRequestEvent();
-            EventBus.Publish(requestEvent, targetClientAuthorityId: OwnerAuthorityId_Server);
-        }
-
-        /// <summary>
-        /// SERVER: Handles client request for additional GONetId batch when running low.
-        /// </summary>
-        private static void Server_HandleClientBatchRequest(
-            GONetEventEnvelope<ClientRemotelyControlledGONetIdServerBatchRequestEvent> eventEnvelope)
-        {
-            if (!IsServer || _gonetServer == null)
-            {
-                return; // Ignore if not server
-            }
-
-            ushort requestingClientAuthorityId = eventEnvelope.SourceAuthorityId;
-            GONetLog.Info($"[GONetIdBatch] SERVER received batch request from client {requestingClientAuthorityId}");
-
-            // Find the connection for this client
-            GONetConnection_ServerToClient connectionToClient = null;
-            uint count = _gonetServer.numConnections;
-
-            for (int i = 0; i < count; ++i)
-            {
-                GONetConnection_ServerToClient connection = _gonetServer.remoteClients[i].ConnectionToClient;
-                if (connection.OwnerAuthorityId == requestingClientAuthorityId)
-                {
-                    connectionToClient = connection;
-                    break;
-                }
-            }
-
-            if (connectionToClient != null)
-            {
-                Server_AssignNewClientGONetIdRawBatch(connectionToClient);
-            }
-            else
-            {
-                GONetLog.Error($"[GONetIdBatch] SERVER could not find connection for client {requestingClientAuthorityId}");
+                client_finalServerGONetIdForRemoteControl_batchStartValues.Add(eventEnvelope.Event.GONetIdRawBatchStart);
             }
         }
 
@@ -4769,149 +4509,10 @@ namespace GONet
         #region what once was GONetAutoMagicalSyncManager
 
         static uint lastAssignedGONetIdRaw = GONetParticipant.GONetIdRaw_Unset;
-        static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset; // Used in GetNextAvailableGONetIdRaw for legacy flow
-        // NOTE: Batch management now handled by GONetIdBatchManager
-
-        /// <summary>
-        /// Counter for generating unique chunk IDs for multi-chunk messages.
-        /// Used by PersistentEvents_BundleChunk to identify which chunks belong together.
-        /// </summary>
-        static int lastAssignedChunkId = 0;
-
-        /// <summary>
-        /// Generates a unique chunk ID for identifying multi-chunk messages.
-        /// Thread-safe for use across multiple connections.
-        /// </summary>
-        private static uint GenerateUniqueChunkId()
-        {
-            return (uint)System.Threading.Interlocked.Increment(ref lastAssignedChunkId);
-        }
-
-        /// <summary>
-        /// Tracks in-progress chunk reassembly for large persistent events bundles.
-        /// Key: ChunkId, Value: Reassembly state tracking
-        /// </summary>
-        private class ChunkReassemblyState
-        {
-            public byte[] CompleteData;
-            public bool[] ReceivedChunks;
-            public ushort TotalChunks;
-            public int ReceivedCount;
-            public double TimeStarted;
-            public int OriginalSize;
-        }
-
-        static readonly System.Collections.Generic.Dictionary<uint, ChunkReassemblyState> pendingChunkReassembly = new System.Collections.Generic.Dictionary<uint, ChunkReassemblyState>();
-
-        /// <summary>
-        /// CLIENT: Handles incoming chunk of a large persistent events bundle.
-        /// Reassembles chunks and processes the complete bundle when all chunks received.
-        /// </summary>
-        private static void OnPersistentEventsChunkReceived(GONetEventEnvelope<PersistentEvents_BundleChunk> envelope)
-        {
-            if (!IsClient)
-            {
-                return; // Only clients receive chunks from server
-            }
-
-            var chunk = envelope.Event;
-            uint chunkId = chunk.ChunkId;
-
-            GONetLog.Info($"[SPAWN_SYNC] CLIENT: Received chunk {chunk.ChunkIndex + 1}/{chunk.TotalChunks} (ChunkId: {chunkId}, Size: {chunk.ChunkData.Length} bytes)");
-
-            ChunkReassemblyState reassembly;
-            if (!pendingChunkReassembly.TryGetValue(chunkId, out reassembly))
-            {
-                // First chunk for this message - initialize reassembly state
-                reassembly = new ChunkReassemblyState
-                {
-                    CompleteData = new byte[chunk.OriginalBundleSize],
-                    ReceivedChunks = new bool[chunk.TotalChunks],
-                    TotalChunks = chunk.TotalChunks,
-                    ReceivedCount = 0,
-                    TimeStarted = Time.ElapsedSeconds,
-                    OriginalSize = chunk.OriginalBundleSize
-                };
-                pendingChunkReassembly[chunkId] = reassembly;
-
-                GONetLog.Info($"[SPAWN_SYNC] CLIENT: Started reassembly for ChunkId {chunkId} ({chunk.TotalChunks} total chunks, {chunk.OriginalBundleSize} bytes)");
-            }
-
-            // Validate chunk consistency
-            if (chunk.TotalChunks != reassembly.TotalChunks)
-            {
-                GONetLog.Error($"[SPAWN_SYNC] CLIENT: Chunk TotalChunks mismatch! Expected {reassembly.TotalChunks}, got {chunk.TotalChunks}. ChunkId: {chunkId}");
-                pendingChunkReassembly.Remove(chunkId); // Abort this reassembly
-                return;
-            }
-
-            if (chunk.OriginalBundleSize != reassembly.OriginalSize)
-            {
-                GONetLog.Error($"[SPAWN_SYNC] CLIENT: Chunk OriginalSize mismatch! Expected {reassembly.OriginalSize}, got {chunk.OriginalBundleSize}. ChunkId: {chunkId}");
-                pendingChunkReassembly.Remove(chunkId);
-                return;
-            }
-
-            // Check for duplicate chunk
-            if (reassembly.ReceivedChunks[chunk.ChunkIndex])
-            {
-                GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Duplicate chunk {chunk.ChunkIndex} received for ChunkId {chunkId} - ignoring");
-                return;
-            }
-
-            // Copy chunk data into complete buffer
-            // CRITICAL FIX: Must match server's MAX_CHUNK_DATA_SIZE calculation!
-            // Server uses: MAX_SERIALIZED_CHUNK_SIZE (12KB) - CHUNK_OVERHEAD_ESTIMATE (32 bytes) = 12,256 bytes per chunk
-            // Old code used 12,288 bytes (12KB), causing 32-byte misalignment that corrupted reassembled data!
-            const int MAX_CHUNK_DATA_SIZE = (12 * 1024) - 32; // 12,256 bytes - MUST match server's chunking logic
-            int offset = chunk.ChunkIndex * MAX_CHUNK_DATA_SIZE;
-
-            System.Buffer.BlockCopy(chunk.ChunkData, 0, reassembly.CompleteData, offset, chunk.ChunkData.Length);
-
-            // Mark chunk as received
-            reassembly.ReceivedChunks[chunk.ChunkIndex] = true;
-            reassembly.ReceivedCount++;
-
-            GONetLog.Info($"[SPAWN_SYNC] CLIENT: Reassembly progress: {reassembly.ReceivedCount}/{reassembly.TotalChunks} chunks received (ChunkId: {chunkId})");
-
-            // Check if reassembly complete
-            if (reassembly.ReceivedCount == reassembly.TotalChunks)
-            {
-                double reassemblyTime = Time.ElapsedSeconds - reassembly.TimeStarted;
-                GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Reassembly COMPLETE for ChunkId {chunkId} ({reassembly.TotalChunks} chunks, {reassembly.OriginalSize} bytes, {reassemblyTime:F2}s)");
-
-                // Deserialize the complete bundle
-                // CRITICAL: Must deserialize as IGONetEvent (matching server's serialization on line 4369)
-                // then cast to PersistentEvents_Bundle, because the original bundle was serialized with union type tags
-                try
-                {
-                    IGONetEvent deserializedEvent = SerializationUtils.DeserializeFromBytes<IGONetEvent>(reassembly.CompleteData);
-
-                    if (deserializedEvent is PersistentEvents_Bundle completeBundle)
-                    {
-                        GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Successfully deserialized reassembled bundle ({completeBundle.PersistentEvents.Count} events)");
-
-                        // Process the complete bundle through the normal persistent events handler
-                        var bundleEnvelope = GONetEventEnvelope<PersistentEvents_Bundle>.Borrow(completeBundle, envelope.SourceAuthorityId, null);
-                        OnPersistentEventsBundle_ProcessAll_Remote(bundleEnvelope);
-                        GONetEventEnvelope<PersistentEvents_Bundle>.Return(bundleEnvelope);
-                    }
-                    else
-                    {
-                        GONetLog.Error($"[SPAWN_SYNC] CLIENT: Reassembled event is not PersistentEvents_Bundle! Type: {deserializedEvent?.GetType().Name ?? "null"}, ChunkId: {chunkId}");
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    GONetLog.Error($"[SPAWN_SYNC] CLIENT: FAILED to deserialize reassembled bundle! ChunkId: {chunkId}, Size: {reassembly.OriginalSize} bytes, Error: {ex.Message}\n{ex.StackTrace}");
-                }
-                finally
-                {
-                    // Clean up reassembly state
-                    pendingChunkReassembly.Remove(chunkId);
-                }
-            }
-        }
+        static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
+        static readonly List<uint> client_finalServerGONetIdForRemoteControl_batchStartValues = new List<uint>();
+        static readonly Stack<int> client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack = new Stack<int>();
+        const int CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE = 100;
 
         /// <summary>
         /// For every runtime instance of <see cref="GONetParticipant"/>, there will be one and only one item in one and only one of the <see cref="activeAutoSyncCompanionsByCodeGenerationIdMap"/>'s <see cref="Dictionary{TKey, TValue}.Values"/>.
@@ -5706,14 +5307,60 @@ namespace GONet
         /// <summary>
         /// PRE: Already known that <paramref name="gonetParticipant"/> has <see cref="GONetParticipant.IsMine_ToRemotelyControl"/> true.
         /// PRE: <see cref="MyAuthorityId"/> is set to final value and is not <see cref="OwnerAuthorityId_Unset"/> in case it is needed as a fallback (i.e., when not enough values in id batch from server).
-        ///
+        /// 
         /// TODO: look into calling this method inside of <see cref="Client_InstantiateToBeRemotelyControlledByMe(GONetParticipant, Vector3, Quaternion)"/> instead of where it is called from now...this would allow for the final GONetId to be set/known immediately!
         /// </summary>
         private static void Client_DoAutoPropogateInstantiationPrep_RemotelyControlled(GONetParticipant gonetParticipant)
         {
-            // Just set the authority - the actual ID allocation happens in GetNextAvailableGONetIdRaw
-            // to avoid double-counting (allocating here and using there)
-            gonetParticipant.OwnerAuthorityId = OwnerAuthorityId_Server;
+            uint nextRemoteControlIdFromServer = client_lastServerGONetIdRawForRemoteControl == GONetParticipant.GONetIdRaw_Unset ? GONetParticipant.GONetIdRaw_Unset : client_lastServerGONetIdRawForRemoteControl + 1;
+            int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
+                if (nextRemoteControlIdFromServer == GONetParticipant.GONetIdRaw_Unset)
+                {
+                    nextRemoteControlIdFromServer = min_inclusive;
+                }
+                else
+                {
+                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+                    if (nextRemoteControlIdFromServer >= min_inclusive && nextRemoteControlIdFromServer < max_exclusive)
+                    {
+                        // good to go within the limits/range of this batch, nothing left to do/look for here
+                        break;
+                    }
+                    else if (nextRemoteControlIdFromServer == max_exclusive) // if just/already assigned end of range of this batch
+                    {
+                        // reset next and mark this batch for removal since we used all the items inside it at this point
+                        client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Push(i);
+                        nextRemoteControlIdFromServer = GONetParticipant.GONetIdRaw_Unset;
+                    }
+                    else
+                    {
+                        // this condition should not be possible
+                        GONetLog.Error("Not possible....guess it was.  oops....figure this one out!");
+                    }
+                }
+            }
+
+            count = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                int index = client_finalServerGONetIdForRemoteControl_batchStartValues_removeIndexStack.Pop();
+                client_finalServerGONetIdForRemoteControl_batchStartValues.RemoveAt(index);
+            }
+
+            if (nextRemoteControlIdFromServer != GONetParticipant.GONetIdRaw_Unset)
+            {
+                gonetParticipant.OwnerAuthorityId = OwnerAuthorityId_Server;
+                client_lastServerGONetIdRawForRemoteControl = nextRemoteControlIdFromServer;
+            }
+            else
+            {
+                //GONetLog.Warning($"Client instantiating something to remotely control, but no enough server assigned GONetIdRaw values to use.  Will default to client owned initially and auto-switch to server once server side.");
+                gonetParticipant.OwnerAuthorityId = MyAuthorityId; // With the flow of methods and such, this looks like the first point in time we know to set this to my authority id
+                client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset;
+            }
         }
 
         /// <summary>
@@ -5786,39 +5433,30 @@ namespace GONet
 
         private static uint GetNextAvailableGONetIdRaw(GONetParticipant gonetParticipant)
         {
-            // CLIENT: Use batch manager for remotely-controlled spawns
-            if (IsClient && gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Server)
-            {
-                uint batchId;
-                bool shouldRequestNewBatch;
-                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out batchId, out shouldRequestNewBatch);
-
-                if (success)
-                {
-                    if (shouldRequestNewBatch)
-                    {
-                        Client_RequestNewGONetIdBatch();
-                    }
-                    return batchId;
-                }
-                else
-                {
-                    // Fallback if no batch available - use regular ID assignment
-                    GONetLog.Warning("[GONetIdBatch] No batch IDs available, falling back to regular ID assignment");
-                    ++lastAssignedGONetIdRaw;
-                    return lastAssignedGONetIdRaw;
-                }
-            }
-
-            // SERVER or CLIENT (non-remotely-controlled): Regular ID assignment
             ++lastAssignedGONetIdRaw;
-
+            
             if (IsServer)
             {
-                // Skip any IDs that fall within client batches
-                while (GONetIdBatchManager.Server_IsIdInAnyBatch(lastAssignedGONetIdRaw))
+                int count = client_finalServerGONetIdForRemoteControl_batchStartValues.Count;
+                for (int i = 0; i < count; ++i)
                 {
-                    ++lastAssignedGONetIdRaw;
+                    uint min_inclusive = client_finalServerGONetIdForRemoteControl_batchStartValues[i];
+                    uint max_exclusive = min_inclusive + CLIENT_FINAL_SERVER_GONETID_BATCH_SIZE;
+                    bool isNewValueInBatch = lastAssignedGONetIdRaw >= min_inclusive && lastAssignedGONetIdRaw < max_exclusive;
+                    if (isNewValueInBatch)
+                    {
+                        // if it was in a batch set it to the value just after the current batch
+                        lastAssignedGONetIdRaw = max_exclusive;
+                    }
+                }
+            }
+            else
+            {
+                bool isForRemotelyControlledOnClient = IsClient && gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Server;
+                if (isForRemotelyControlledOnClient && client_lastServerGONetIdRawForRemoteControl != GONetParticipant.GONetIdRaw_Unset)
+                {
+                    --lastAssignedGONetIdRaw; // undo the now unwanted action we did above in method
+                    return client_lastServerGONetIdRawForRemoteControl;
                 }
             }
 

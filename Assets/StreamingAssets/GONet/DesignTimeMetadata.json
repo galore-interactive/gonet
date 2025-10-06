@@ -21,6 +21,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "resources://Assets/GONet/Sample/Projectile/Resources/SpawnTestBeacon.prefab",
+            "unityGuid": "ed363b3c8191b064fa74c62efdad0f4c",
+            "codeGenerationId": 1
+        },
+        {
             "location": "scene://GONetSample/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1
@@ -87,6 +92,11 @@
         },
         {
             "location": "scene://ProjectileTest/GONet_GlobalContext",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "scene://ProjectileTest/TestBeaconController",
             "unityGuid": "",
             "codeGenerationId": 1
         }

@@ -1,4 +1,4 @@
-/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
+﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential, email: contactus@galoreinteractive.com
  *
@@ -82,29 +82,6 @@ public class ProjectileSpawner : GONetBehaviour
         if (Time.frameCount % 300 == 0 && projectiles.Count > 0)
         {
             GONetLog.Debug($"[ProjectileSpawner] Update: projectiles.Count = {projectiles.Count}, addressableProjectiles.Count = {addressableProjectiles.Count}");
-
-            // Check for duplicate GONetIds in the list (this would cause faster movement!)
-            var seenIds = new HashSet<uint>();
-            var duplicates = new List<uint>();
-            foreach (var p in projectiles)
-            {
-                if (p != null && p.GONetParticipant != null)
-                {
-                    uint id = p.GONetParticipant.GONetId;
-                    if (seenIds.Contains(id))
-                    {
-                        duplicates.Add(id);
-                    }
-                    else
-                    {
-                        seenIds.Add(id);
-                    }
-                }
-            }
-            if (duplicates.Count > 0)
-            {
-                GONetLog.Warning($"[ProjectileSpawner] DUPLICATE GONETIDS IN LIST: {string.Join(", ", duplicates)} - This would cause faster movement!");
-            }
         }
 
         if (GONetMain.IsClient && projectilPrefab != null)

@@ -94,6 +94,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighResolutionTimeUtilsEdgeCaseTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncVerificationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusHolisticTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetIdBatchManagerTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\DualStackConnectionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\MemoryPack\MemoryPackTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncChaosTests.cs" />

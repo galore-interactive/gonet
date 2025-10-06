@@ -220,7 +220,8 @@ namespace GONet
         }
 
         /// <summary>
-        /// CLIENT: Resets all batch state. MUST be called on scene change!
+        /// CLIENT: Resets all batch state. Call on disconnect/reconnect scenarios.
+        /// NOTE: Do NOT call on scene changes - batches persist across scenes!
         /// </summary>
         public static void Client_ResetAllBatches()
         {

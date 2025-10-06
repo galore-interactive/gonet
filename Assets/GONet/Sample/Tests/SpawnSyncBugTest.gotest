@@ -1,0 +1,74 @@
+# Test Case: Spawn Synchronization Bug Reproduction
+# This test reproduces the bug where beacons spawned by Client2 fail to
+# reach the server after the first 2 spawns, causing them to never despawn.
+
+name: Spawn Synchronization Bug Test
+description: Reproduces Client2 spawn message delivery failure after scene changes
+require_clients: 2
+despawn_wait: 40
+
+# Initial setup
+wait_clients: 2
+log: ========== Starting Spawn Sync Bug Test ==========
+
+# Test 1: Initial scene spawn from server (control group)
+log: TEST 1: Server spawns in initial scene
+spawn_server: 2
+wait: 2
+verify_beacons: all
+log: ✓ Server spawns working
+
+# Test 2: Change to ProjectileTest scene
+log: TEST 2: Scene change to ProjectileTest
+scene_change: ProjectileTest
+wait: 3
+
+# Test 3: Spawn beacons from server in new scene
+log: TEST 3: Server spawns in ProjectileTest scene
+spawn_server: 2
+wait: 2
+verify_beacons: all
+
+# Test 4: Client1 spawns (control - should work)
+log: TEST 4: Client1 spawns beacons
+spawn_client: 1, count=2
+wait: 2
+verify_beacons: all
+
+# Test 5: CLIENT2 SPAWNS - THIS IS WHERE THE BUG OCCURS
+# Expected: Server receives all spawn messages
+# Actual: Server only receives first 2, then stops receiving
+log: TEST 5: Client2 spawns beacons (BUG REPRODUCTION)
+spawn_client: 2, count=5
+wait: 3
+verify_beacons: all
+log: If this fails, beacons 3-5 from Client2 didn't reach server
+
+# Test 6: Change scene back to GONetSample
+log: TEST 6: Scene change back to GONetSample
+scene_change: GONetSample
+wait: 3
+
+# Test 7: Spawn more from Client2 to see if issue persists
+log: TEST 7: Client2 spawns again after scene change
+spawn_client: 2, count=3
+wait: 2
+verify_beacons: all
+
+# Test 8: Wait for natural despawn
+log: TEST 8: Waiting for natural despawn (40 seconds)
+wait_despawn: 40
+verify_despawned: all
+log: If this fails, stuck beacons exist (the bug manifests here)
+
+# Test 9: Late joiner synchronization
+log: TEST 9: Late joiner test
+human_action: Start Client3 now
+wait_client: 3
+wait: 3
+log: Client3 should see all beacons that exist
+log: If Client3 sees phantom beacons, they were never despawned
+
+# Final verification
+log: ========== Test Complete ==========
+log: Check for FAILED steps to identify the bug

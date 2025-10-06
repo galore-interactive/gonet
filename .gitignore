@@ -70,3 +70,7 @@ crashlytics-build.properties
 # Claude Code settings (local only)
 .claude/
 **/.claude/
+
+# GONet Test Results (generated logs, do not commit)
+Assets/GONet/Sample/Resources/Tests/Results/
+Assets/GONet/Sample/Resources/Tests/Results.meta

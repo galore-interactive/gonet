@@ -16,6 +16,7 @@
 using GONet;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace GONet.Sample
 {
@@ -26,10 +27,10 @@ namespace GONet.Sample
     /// </summary>
     public class GONetStatusUI : MonoBehaviour
     {
-        private Text headerText;
-        private Text timeText;
-        private Text roleText;
-        private Text connectionStatusText;
+        private TextMeshProUGUI headerText;
+        private TextMeshProUGUI timeText;
+        private TextMeshProUGUI roleText;
+        private TextMeshProUGUI connectionStatusText;
         private bool wasServerSpawned;
 
         private void Awake()
@@ -68,7 +69,7 @@ namespace GONet.Sample
             panelImage.color = new Color(0, 0, 0, 0.7f);
 
             // Create header text - larger and bold to distinguish it
-            headerText = CreateText(panelGO.transform, "HeaderText", "GONet Info", 56, new Vector2(10, -10), new Vector2(500, 50), FontStyle.Bold);
+            headerText = CreateText(panelGO.transform, "HeaderText", "GONet Info", 56, new Vector2(10, -10), new Vector2(500, 50), FontStyles.Bold);
 
             // Create time text - consistent spacing
             timeText = CreateText(panelGO.transform, "TimeText", "Sync'd Time: 0.00", 48, new Vector2(10, -70), new Vector2(580, 45));
@@ -80,7 +81,7 @@ namespace GONet.Sample
             connectionStatusText = CreateText(panelGO.transform, "ConnectionStatusText", "Connection: Not Connected", 48, new Vector2(10, -180), new Vector2(580, 45));
         }
 
-        private Text CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size, FontStyle fontStyle = FontStyle.Normal)
+        private TextMeshProUGUI CreateText(Transform parent, string name, string initialText, int fontSize, Vector2 position, Vector2 size, FontStyles fontStyle = FontStyles.Normal)
         {
             GameObject textGO = new GameObject(name);
             textGO.transform.SetParent(parent, false);
@@ -92,16 +93,15 @@ namespace GONet.Sample
             rect.anchoredPosition = position;
             rect.sizeDelta = size;
 
-            Text text = textGO.AddComponent<Text>();
+            TextMeshProUGUI text = textGO.AddComponent<TextMeshProUGUI>();
             text.text = initialText;
             text.fontSize = fontSize;
             text.fontStyle = fontStyle;
-            text.alignment = TextAnchor.MiddleLeft;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
             text.color = Color.white;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 10;
-            text.resizeTextMaxSize = fontSize;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 10;
+            text.fontSizeMax = fontSize;
 
             return text;
         }
