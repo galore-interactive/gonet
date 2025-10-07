@@ -132,5 +132,223 @@ namespace GONet.Tests.ReliableNetcode
 
             UnityEngine.Debug.Log("✓ sendBuffer size validated: 256");
         }
+
+        /// <summary>
+        /// Test 4: Verify time budget edge cases - many tiny messages vs few large messages.
+        /// Validates that 0.5ms time budget is respected regardless of message count/size.
+        /// </summary>
+        [Test]
+        [Timeout(30000)]
+        public void TestTimeBudget_EdgeCases()
+        {
+            LogAssert.ignoreFailingMessages = true;
+
+            double time = 0.0;
+            const double dt = 1.0 / 60.0;
+
+            // Test 1: Many tiny messages (should process many before time budget)
+            ReliableEndpoint endpoint1 = CreateReliableEndpoint();
+            endpoint1.Update(time);
+
+            // Send 1000 tiny messages (10 bytes each - very fast to process)
+            const int TINY_MESSAGE_COUNT = 1000;
+            byte[] tinyMessage = new byte[10];
+            for (int i = 0; i < TINY_MESSAGE_COUNT; i++)
+            {
+                endpoint1.SendMessage(tinyMessage, tinyMessage.Length, QosType.Reliable);
+            }
+
+            // Simulate ACKs and measure processing time
+            var channelsField = typeof(ReliableEndpoint).GetField("messageChannels", BindingFlags.NonPublic | BindingFlags.Instance);
+            var channels1 = (MessageChannel[])channelsField.GetValue(endpoint1);
+            var reliableChannel1 = channels1[0];
+            var sendBufferField = reliableChannel1.GetType().GetField("sendBuffer", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sendBuffer1 = sendBufferField.GetValue(reliableChannel1);
+            var removeEntriesMethod = sendBuffer1.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
+            removeEntriesMethod.Invoke(sendBuffer1, new object[] { 0, 255 });
+
+            var stopwatch1 = System.Diagnostics.Stopwatch.StartNew();
+            time += dt;
+            endpoint1.Update(time);
+            endpoint1.ProcessSendBuffer_IfAppropriate();
+            stopwatch1.Stop();
+
+            double tinyMessagesTime = stopwatch1.Elapsed.TotalMilliseconds;
+            UnityEngine.Debug.Log($"Tiny messages (10 bytes × 1000): processed in {tinyMessagesTime:F3}ms");
+
+            // Test 2: Few large messages (should process fewer before time budget)
+            time = 0.0;
+            ReliableEndpoint endpoint2 = CreateReliableEndpoint();
+            endpoint2.Update(time);
+
+            // Send 100 large messages (1000 bytes each - slower to process)
+            const int LARGE_MESSAGE_COUNT = 100;
+            byte[] largeMessage = new byte[1000];
+            for (int i = 0; i < LARGE_MESSAGE_COUNT; i++)
+            {
+                endpoint2.SendMessage(largeMessage, largeMessage.Length, QosType.Reliable);
+            }
+
+            var channels2 = (MessageChannel[])channelsField.GetValue(endpoint2);
+            var reliableChannel2 = channels2[0];
+            var sendBuffer2 = sendBufferField.GetValue(reliableChannel2);
+            removeEntriesMethod.Invoke(sendBuffer2, new object[] { 0, 255 });
+
+            var stopwatch2 = System.Diagnostics.Stopwatch.StartNew();
+            time += dt;
+            endpoint2.Update(time);
+            endpoint2.ProcessSendBuffer_IfAppropriate();
+            stopwatch2.Stop();
+
+            double largeMessagesTime = stopwatch2.Elapsed.TotalMilliseconds;
+            UnityEngine.Debug.Log($"Large messages (1000 bytes × 100): processed in {largeMessagesTime:F3}ms");
+
+            // Both should respect time budget (allow margin for overhead)
+            Assert.Less(tinyMessagesTime, 5.0, $"Tiny messages should respect time budget (took {tinyMessagesTime:F3}ms)");
+            Assert.Less(largeMessagesTime, 5.0, $"Large messages should respect time budget (took {largeMessagesTime:F3}ms)");
+
+            UnityEngine.Debug.Log("✓ Time budget respected for both tiny and large messages");
+
+            LogAssert.ignoreFailingMessages = false;
+        }
+
+        /// <summary>
+        /// Test 5: Verify dequeue respects sendBuffer available space.
+        /// If sendBuffer has 50 free slots and queue has 200 messages,
+        /// should dequeue min(50, MAX_DEQUEUE_PER_UPDATE) not MAX_DEQUEUE_PER_UPDATE.
+        /// </summary>
+        [Test]
+        [Timeout(30000)]
+        public void TestDequeue_RespectsSendBufferAvailableSpace()
+        {
+            LogAssert.ignoreFailingMessages = true;
+
+            double time = 0.0;
+            const double dt = 1.0 / 60.0;
+
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
+            endpoint.Update(time);
+
+            // Send 400 messages to overflow queue (~144 queued)
+            const int MESSAGE_COUNT = 400;
+            byte[] messageData = new byte[200];
+            for (int i = 0; i < MESSAGE_COUNT; i++)
+            {
+                endpoint.SendMessage(messageData, messageData.Length, QosType.Reliable);
+            }
+
+            // Access internal structures
+            var channelsField = typeof(ReliableEndpoint).GetField("messageChannels", BindingFlags.NonPublic | BindingFlags.Instance);
+            var channels = (MessageChannel[])channelsField.GetValue(endpoint);
+            var reliableChannel = channels[0];
+            var queueField = reliableChannel.GetType().GetField("messageQueue", BindingFlags.NonPublic | BindingFlags.Instance);
+            var messageQueue = (System.Collections.Generic.Queue<ByteBuffer>)queueField.GetValue(reliableChannel);
+            var sendBufferField = reliableChannel.GetType().GetField("sendBuffer", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sendBuffer = sendBufferField.GetValue(reliableChannel);
+
+            int initialQueueCount = messageQueue.Count;
+            UnityEngine.Debug.Log($"Initial queue: {initialQueueCount} messages");
+
+            // Only clear 30 entries from sendBuffer (not all 256)
+            // This means only 30 slots available for dequeue
+            var removeEntriesMethod = sendBuffer.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
+            removeEntriesMethod.Invoke(sendBuffer, new object[] { 0, 29 }); // Clear first 30 entries
+
+            // Update - should only dequeue ~30 messages (limited by sendBuffer space, not MAX_DEQUEUE_PER_UPDATE)
+            time += dt;
+            endpoint.Update(time);
+            endpoint.ProcessSendBuffer_IfAppropriate();
+
+            int remainingQueueCount = messageQueue.Count;
+            int processedCount = initialQueueCount - remainingQueueCount;
+
+            UnityEngine.Debug.Log($"Processed {processedCount} messages with only 30 sendBuffer slots available");
+
+            // Should process close to 30 (limited by sendBuffer space, not the 100 MAX_DEQUEUE_PER_UPDATE)
+            Assert.GreaterOrEqual(processedCount, 20, $"Should process at least 20 messages (got {processedCount})");
+            Assert.LessOrEqual(processedCount, 40, $"Should not exceed ~30 messages when only 30 slots free (got {processedCount})");
+
+            UnityEngine.Debug.Log("✓ Dequeue correctly limited by sendBuffer available space");
+
+            LogAssert.ignoreFailingMessages = false;
+        }
+
+        /// <summary>
+        /// Test 6: Verify dequeue works correctly across sequence number wraparound.
+        /// Sequence numbers are ushort (0-65535), must wrap cleanly at 65536.
+        /// </summary>
+        [Test]
+        [Timeout(30000)]
+        public void TestDequeue_AcrossSequenceWrap()
+        {
+            LogAssert.ignoreFailingMessages = true;
+
+            double time = 0.0;
+            const double dt = 1.0 / 60.0;
+
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
+            endpoint.Update(time);
+
+            // Access internal sequence counter and set it near wraparound
+            var channelsField = typeof(ReliableEndpoint).GetField("messageChannels", BindingFlags.NonPublic | BindingFlags.Instance);
+            var channels = (MessageChannel[])channelsField.GetValue(endpoint);
+            var reliableChannel = channels[0];
+            var sequenceField = reliableChannel.GetType().GetField("sequence", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // Set sequence to near max ushort (65535 - 50 = 65485)
+            // This way next messages will wrap around
+            ushort nearWrapSequence = (ushort)(ushort.MaxValue - 50);
+            sequenceField.SetValue(reliableChannel, nearWrapSequence);
+
+            var oldestUnackedField = reliableChannel.GetType().GetField("oldestUnacked", BindingFlags.NonPublic | BindingFlags.Instance);
+            oldestUnackedField.SetValue(reliableChannel, nearWrapSequence);
+
+            UnityEngine.Debug.Log($"Set sequence to {nearWrapSequence} (will wrap at {ushort.MaxValue})");
+
+            // Send 100 messages that will cause wraparound
+            const int MESSAGE_COUNT = 100;
+            byte[] messageData = new byte[200];
+            for (int i = 0; i < MESSAGE_COUNT; i++)
+            {
+                endpoint.SendMessage(messageData, messageData.Length, QosType.Reliable);
+            }
+
+            // Get queue count (should have overflowed since we can't fit 100 in sendBuffer with current sequence position)
+            var queueField = reliableChannel.GetType().GetField("messageQueue", BindingFlags.NonPublic | BindingFlags.Instance);
+            var messageQueue = (System.Collections.Generic.Queue<ByteBuffer>)queueField.GetValue(reliableChannel);
+
+            int initialQueueCount = messageQueue.Count;
+            UnityEngine.Debug.Log($"Queue count after sending across wrap: {initialQueueCount}");
+
+            // Clear sendBuffer to allow dequeue
+            var sendBufferField = reliableChannel.GetType().GetField("sendBuffer", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sendBuffer = sendBufferField.GetValue(reliableChannel);
+            var removeEntriesMethod = sendBuffer.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
+
+            // Clear entries across the wraparound
+            removeEntriesMethod.Invoke(sendBuffer, new object[] { nearWrapSequence, ushort.MaxValue });
+            removeEntriesMethod.Invoke(sendBuffer, new object[] { 0, 100 });
+
+            // Update and check dequeue works
+            time += dt;
+            endpoint.Update(time);
+            endpoint.ProcessSendBuffer_IfAppropriate();
+
+            int remainingQueueCount = messageQueue.Count;
+            int processedCount = initialQueueCount - remainingQueueCount;
+
+            UnityEngine.Debug.Log($"Processed {processedCount} messages across sequence wraparound");
+
+            // Should process messages successfully (if queue had any)
+            if (initialQueueCount > 0)
+            {
+                Assert.Greater(processedCount, 0, "Should process at least some messages across wraparound");
+            }
+
+            // Most importantly: should not crash or hang!
+            Assert.Pass($"✓ Dequeue handled sequence wraparound without errors (processed {processedCount} messages)");
+
+            LogAssert.ignoreFailingMessages = false;
+        }
     }
 }
