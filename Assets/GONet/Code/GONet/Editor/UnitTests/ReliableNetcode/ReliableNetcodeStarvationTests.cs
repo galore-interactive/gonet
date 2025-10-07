@@ -52,23 +52,24 @@ namespace GONet.Tests.ReliableNetcode
         }
 
         /// <summary>
-        /// Test 2: Verify message queueing behavior (requires ACKs for full dequeue test).
-        /// This test only validates that messages overflow into messageQueue when sendBuffer is full.
+        /// Test 2: Verify dequeue rate (100 messages per update).
+        /// Uses reflection to simulate ACKs by clearing sendBuffer space.
         /// </summary>
         [Test]
         [Timeout(30000)]
-        public void TestMessageQueue_OverflowsBehavior()
+        public void TestDequeueRate_Processes100MessagesPerUpdate()
         {
             LogAssert.ignoreFailingMessages = true;
 
             double time = 0.0;
+            const double dt = 1.0 / 60.0;
 
             // Create standalone endpoint
             ReliableEndpoint endpoint = CreateReliableEndpoint();
             endpoint.Update(time);
 
-            // Flood with 300 messages to overflow sendBuffer (256) into messageQueue
-            const int MESSAGE_COUNT = 300;
+            // Flood with 400 messages to overflow sendBuffer (256) into messageQueue (~144 queued)
+            const int MESSAGE_COUNT = 400;
             byte[] messageData = new byte[200];
 
             for (int i = 0; i < MESSAGE_COUNT; i++)
@@ -76,21 +77,38 @@ namespace GONet.Tests.ReliableNetcode
                 endpoint.SendMessage(messageData, messageData.Length, QosType.Reliable);
             }
 
-            // Use reflection to check messageQueue count
+            // Use reflection to access internal structures
             var channelsField = typeof(ReliableEndpoint).GetField("messageChannels", BindingFlags.NonPublic | BindingFlags.Instance);
             var channels = (MessageChannel[])channelsField.GetValue(endpoint);
             var reliableChannel = channels[0];
             var queueField = reliableChannel.GetType().GetField("messageQueue", BindingFlags.NonPublic | BindingFlags.Instance);
             var messageQueue = (System.Collections.Generic.Queue<ByteBuffer>)queueField.GetValue(reliableChannel);
 
-            int queuedCount = messageQueue.Count;
-            UnityEngine.Debug.Log($"Sent {MESSAGE_COUNT} messages: {queuedCount} queued (expected ~44 after 256 go to sendBuffer)");
+            var sendBufferField = reliableChannel.GetType().GetField("sendBuffer", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sendBuffer = sendBufferField.GetValue(reliableChannel);
 
-            // Verify messages overflow into queue when sendBuffer is full
-            Assert.GreaterOrEqual(queuedCount, 40, $"Should have at least 40 messages in queue (got {queuedCount})");
-            Assert.LessOrEqual(queuedCount, 50, $"Should have at most 50 messages in queue (got {queuedCount})");
+            int initialQueueCount = messageQueue.Count;
+            UnityEngine.Debug.Log($"Initial: {MESSAGE_COUNT} messages sent, {initialQueueCount} queued (expected ~144)");
 
-            UnityEngine.Debug.Log($"✓ Queue overflow behavior validated: {queuedCount} messages queued when sendBuffer full");
+            // Simulate ACKs by clearing sendBuffer space using RemoveEntries
+            var removeEntriesMethod = sendBuffer.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
+            removeEntriesMethod.Invoke(sendBuffer, new object[] { 0, 255 }); // Clear all 256 entries
+
+            // Now do ONE update - should dequeue up to 100 messages
+            time += dt;
+            endpoint.Update(time);
+            endpoint.ProcessSendBuffer_IfAppropriate();
+
+            int remainingQueueCount = messageQueue.Count;
+            int processedCount = initialQueueCount - remainingQueueCount;
+
+            UnityEngine.Debug.Log($"After 1 update: processed {processedCount} messages (initial: {initialQueueCount}, remaining: {remainingQueueCount})");
+
+            // Should process up to 100 messages (MAX_DEQUEUE_PER_UPDATE)
+            Assert.GreaterOrEqual(processedCount, 90, $"Should process at least 90 messages per update (got {processedCount})");
+            Assert.LessOrEqual(processedCount, 100, $"Should not exceed 100 messages per update (got {processedCount})");
+
+            UnityEngine.Debug.Log($"✓ Dequeue rate validated: {processedCount} messages processed in 1 update (MAX_DEQUEUE_PER_UPDATE=100)");
 
             LogAssert.ignoreFailingMessages = false;
         }
