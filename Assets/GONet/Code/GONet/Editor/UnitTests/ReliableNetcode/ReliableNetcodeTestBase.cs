@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using NUnit.Framework;
 using NetcodeIO.NET;
+using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
 using ReliableNetcode.Utils;
 

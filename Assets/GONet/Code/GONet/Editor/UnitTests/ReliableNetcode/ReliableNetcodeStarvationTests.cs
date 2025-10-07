@@ -3,6 +3,7 @@ using System.Net;
 using System.Reflection;
 using NUnit.Framework;
 using NetcodeIO.NET;
+using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
 using UnityEngine.TestTools;
 
