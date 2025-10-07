@@ -1620,6 +1620,27 @@ namespace GONet
             int count = persistentEventsCancelledOut.Count;
             if (count == 0)
             {
+                // CRITICAL DEDUPLICATION: For persistent RPCs, remove any previous RPC with same RpcId+GONetId
+                // This prevents duplicate state updates from accumulating (e.g., BroadcastParticipantUpdate called 1000x = 1000 copies!)
+                // Only the LATEST state matters for late-joiners, not the entire history
+                if (eventEnvelope.Event is PersistentRpcEvent newRpc)
+                {
+                    // Find and remove any existing RPC with matching RpcId + GONetId
+                    var node = persistentEventsThisSession.First;
+                    while (node != null)
+                    {
+                        var nextNode = node.Next; // Save next before potential removal
+                        if (node.Value is PersistentRpcEvent existingRpc &&
+                            existingRpc.RpcId == newRpc.RpcId &&
+                            existingRpc.GONetId == newRpc.GONetId)
+                        {
+                            persistentEventsThisSession.Remove(node);
+                            //GONetLog.Debug($"[RPC_DEDUP] Removed duplicate persistent RPC 0x{existingRpc.RpcId:X8} for GONetId {existingRpc.GONetId} - keeping latest only");
+                        }
+                        node = nextNode;
+                    }
+                }
+
                 persistentEventsThisSession.AddLast(eventEnvelope.Event);
                 //if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
                 //{

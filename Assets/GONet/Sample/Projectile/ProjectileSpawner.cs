@@ -27,6 +27,10 @@ public class ProjectileSpawner : GONetBehaviour
     private float lastCheckTime = 0f;
     const float CHECK_INTERVAL = 1f;
 
+    // Track last known positions to detect idle projectiles
+    private readonly Dictionary<uint, Vector3> lastKnownPositions = new Dictionary<uint, Vector3>();
+    private readonly Dictionary<uint, float> lastMovementTime = new Dictionary<uint, float>();
+
     public override void OnGONetReady(GONetParticipant gonetParticipant) // NOTE:  OnGONetReady is the recommended approach for v1.5+ (instead of OnGONetParticipantEnabled/Started/Etc..
     {
         base.OnGONetReady(gonetParticipant);
@@ -66,6 +70,11 @@ public class ProjectileSpawner : GONetBehaviour
 
         // Also remove from addressableParticipants list (for Physics Cube Projectiles)
         addressableParticipants.Remove(gonetParticipant);
+
+        // Clean up tracking dictionaries
+        uint gonetId = gonetParticipant.GONetId;
+        lastKnownPositions.Remove(gonetId);
+        lastMovementTime.Remove(gonetId);
     }
 
     private void Update()
@@ -123,11 +132,40 @@ public class ProjectileSpawner : GONetBehaviour
             }
             else
             {
-                // Debug: Log if non-owner projectile hasn't moved in a while (might indicate sync stopped)
-                if (Time.frameCount % 600 == 0) // Every ~10 seconds at 60fps
+                // Track movement to detect idle projectiles (sync stopped)
+                Vector3 currentPos = projectile.transform.position;
+
+                if (lastKnownPositions.TryGetValue(gonetId, out Vector3 lastPos))
                 {
-                    Vector3 pos = projectile.transform.position;
-                    GONetLog.Debug($"[ProjectileSpawner] Non-owner projectile '{projectile.name}' (GONetId: {gonetId}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}) - Pos: {pos}, IsMine: {projectile.GONetParticipant.IsMine}");
+                    float distanceMoved = Vector3.Distance(currentPos, lastPos);
+                    const float IDLE_THRESHOLD = 0.01f; // Consider idle if moved less than this
+
+                    if (distanceMoved > IDLE_THRESHOLD)
+                    {
+                        // Moving - update last movement time
+                        lastMovementTime[gonetId] = Time.time;
+                        lastKnownPositions[gonetId] = currentPos;
+                    }
+                    else
+                    {
+                        // Not moving - check if idle for too long
+                        if (lastMovementTime.TryGetValue(gonetId, out float lastMove))
+                        {
+                            float idleTime = Time.time - lastMove;
+                            const float IDLE_WARNING_THRESHOLD = 3f; // Warn if idle for 3+ seconds
+
+                            if (idleTime >= IDLE_WARNING_THRESHOLD && Time.frameCount % 180 == 0) // Log every 3 seconds
+                            {
+                                GONetLog.Warning($"[ProjectileSpawner] IDLE projectile '{projectile.name}' (GONetId: {gonetId}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}) - IDLE for {idleTime:F1}s at Pos: {currentPos}");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // First time seeing this projectile - initialize tracking
+                    lastKnownPositions[gonetId] = currentPos;
+                    lastMovementTime[gonetId] = Time.time;
                 }
             }
         }
