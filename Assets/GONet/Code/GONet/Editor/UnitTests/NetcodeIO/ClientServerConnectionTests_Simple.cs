@@ -27,6 +27,15 @@ namespace GONet.Tests.Netcode_IO
             0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1,
         };
 
+        /// <summary>
+        /// NOTE: This test can be flaky when run with other tests due to:
+        /// 1. Aggressive network conditions (250ms latency, 250ms jitter, 5% packet loss, 10% duplicates)
+        /// 2. Challenge response packets may be lost in simulated packet loss
+        /// 3. Client gets stuck in SendingChallengeResponse state waiting for ACK
+        ///
+        /// If this test fails when running full suite, try running it in isolation.
+        /// Random packet loss means it may pass on retry.
+        /// </summary>
         [Test]
         [Timeout(30000)]
         public void TestClientServerConnection_Synchronous()
@@ -39,11 +48,11 @@ namespace GONet.Tests.Netcode_IO
             double time = 0.0;
             double dt = 1.0 / 10.0; // 100ms updates
 
-            // Create network simulator
+            // Create network simulator with aggressive conditions (can cause flakiness)
             NetworkSimulatorSocketManager socketMgr = new NetworkSimulatorSocketManager();
             socketMgr.LatencyMS = 250;
             socketMgr.JitterMS = 250;
-            socketMgr.PacketLossChance = 5;
+            socketMgr.PacketLossChance = 5;   // 5% packet loss - challenge response may be lost!
             socketMgr.DuplicatePacketChance = 10;
             socketMgr.AutoTime = false;
 
