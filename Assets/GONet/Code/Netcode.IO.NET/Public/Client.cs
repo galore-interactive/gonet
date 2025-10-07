@@ -372,7 +372,7 @@ namespace NetcodeIO.NET
 			Datagram datagram;
             int countAvailable = socket == null ? 0 : socket.AvailableToReadCount;
             int countProcessed = 0;
-			while (countProcessed < countAvailable && socket.Read(out datagram))
+			while (countProcessed < countAvailable && socket != null && socket.Read(out datagram))
 			{
 				processDatagram(datagram);
 				datagram.Release();
