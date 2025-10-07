@@ -67,31 +67,9 @@ public class ProjectileSpawner : GONetBehaviour
         // Also remove from addressableParticipants list (for Physics Cube Projectiles)
         addressableParticipants.Remove(gonetParticipant);
     }
+
     private void Update()
     {
-        // Log projectiles list size periodically for debugging
-        if (Time.frameCount % 300 == 0 && projectiles.Count > 0)
-        {
-            // Check for duplicate GONetIds in the list (this would cause faster movement!)
-            var seenIds = new HashSet<uint>();
-            var duplicates = new List<uint>();
-            foreach (var p in projectiles)
-            {
-                if (p != null && p.GONetParticipant != null)
-                {
-                    uint id = p.GONetParticipant.GONetId;
-                    if (seenIds.Contains(id))
-                    {
-                        duplicates.Add(id);
-                    }
-                    else
-                    {
-                        seenIds.Add(id);
-                    }
-                }
-            }
-        }
-
         if (GONetMain.IsClient && projectilPrefab != null)
         {
             #region check keys and touches states
@@ -120,15 +98,12 @@ public class ProjectileSpawner : GONetBehaviour
                 InstantiateAddressablesPrefab();
             }
         }
+
         foreach (var projectile in projectiles)
         {
             // CRITICAL CHECK: Verify projectile is fully initialized before moving
             if (projectile == null || projectile.GONetParticipant == null)
             {
-                if (Time.frameCount % 300 == 0)
-                {
-                    GONetLog.Warning($"[ProjectileSpawner] Update: Found null projectile or GONetParticipant in list! Skipping...");
-                }
                 continue;
             }
 
