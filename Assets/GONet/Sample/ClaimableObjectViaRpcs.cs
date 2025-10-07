@@ -316,6 +316,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     {
         if (wasClaimed)
         {
+            ClaimedByAuthorityId = authorityId;
             GONetLog.Debug($"{name} was claimed by Authority {authorityId}");
 
             if (authorityId == GONetMain.MyAuthorityId)
@@ -325,6 +326,7 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
         }
         else
         {
+            ClaimedByAuthorityId = GONetMain.OwnerAuthorityId_Unset;
             GONetLog.Debug($"{name} was released by Authority {authorityId}");
             // AudioManager.PlaySound("claim_released");
         }

@@ -600,8 +600,9 @@ MonoBehaviour:
   rpcPlaygroundButton: {fileID: 0}
   backToMenuButton: {fileID: 0}
   projectileTestSceneName: ProjectileTest
-  rpcPlaygroundSceneName: JustAnotherScene
+  rpcPlaygroundSceneName: RpcPlayground
   menuSceneName: GONetSample
+  rpcPlaygroundIsAddressable: 1
   autoBuildUI: 1
 --- !u!1 &2080963580
 GameObject:

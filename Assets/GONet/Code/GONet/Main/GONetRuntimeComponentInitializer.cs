@@ -44,7 +44,7 @@ namespace GONet
     /// <para><b>Example Scenario:</b> You want chat functionality in multiple scenes:</para>
     /// <list type="bullet">
     ///     <item><description>Scene A (GONetSample): Add initializer with GONetSampleChatSystem, removeOnSceneUnload = FALSE (chat persists)</description></item>
-    ///     <item><description>Scene B (JustAnotherScene): Add initializer with GONetSampleChatSystem, removeOnSceneUnload = FALSE (reuses existing)</description></item>
+    ///     <item><description>Scene B (RPCPlayground): Add initializer with GONetSampleChatSystem, removeOnSceneUnload = FALSE (reuses existing)</description></item>
     ///     <item><description>Scene C (BattleArena): Add initializer with GONetSampleChatSystem, removeOnSceneUnload = TRUE (chat only in this scene)</description></item>
     /// </list>
     ///

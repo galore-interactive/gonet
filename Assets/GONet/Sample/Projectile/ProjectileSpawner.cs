@@ -121,6 +121,15 @@ public class ProjectileSpawner : GONetBehaviour
                 float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
                 projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
             }
+            else
+            {
+                // Debug: Log if non-owner projectile hasn't moved in a while (might indicate sync stopped)
+                if (Time.frameCount % 600 == 0) // Every ~10 seconds at 60fps
+                {
+                    Vector3 pos = projectile.transform.position;
+                    GONetLog.Debug($"[ProjectileSpawner] Non-owner projectile '{projectile.name}' (GONetId: {gonetId}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}) - Pos: {pos}, IsMine: {projectile.GONetParticipant.IsMine}");
+                }
+            }
         }
 
         if (GONetMain.IsServer && Time.time - lastCheckTime >= CHECK_INTERVAL)

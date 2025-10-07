@@ -9,9 +9,9 @@ namespace GONet
 		SyncEvent_GONetParticipant_RemotelyControlledByAuthorityId = 4,
 		SyncEvent_Transform_rotation = 5,
 		SyncEvent_Transform_position = 6,
-		SyncEvent_CircularMotion_NettyWorkedFloat = 7,
-		SyncEvent_ClaimableObjectViaRpcs_ClaimedByAuthorityId = 8,
-		SyncEvent_ClaimableObjectViaRpcs_TotalClaimCount = 9,
+		SyncEvent_ClaimableObjectViaRpcs_ClaimedByAuthorityId = 7,
+		SyncEvent_ClaimableObjectViaRpcs_TotalClaimCount = 8,
+		SyncEvent_CircularMotion_NettyWorkedFloat = 9,
 
 	}
 }

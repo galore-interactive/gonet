@@ -896,6 +896,17 @@ namespace GONet
                     //GONetLog.Info($"[TimeSync] Requesting aggressive time sync AFTER scene load completed (late-joining client - first aggressive sync): {scene.name}");
                     GONetMain.RequestAggressiveTimeSync($"scene_load_complete_{scene.name}");
                 }
+
+                // CRITICAL: Notify server that scene load is complete
+                // Server needs this to know when to send scene-defined object GONetId assignments
+                // This ensures late-joining clients have fully loaded the scene before receiving GONetIds
+                SceneLoadCompleteEvent completeEvent = new SceneLoadCompleteEvent
+                {
+                    SceneName = scene.name,
+                    Mode = mode
+                };
+                GONetMain.EventBus.Publish(completeEvent);
+                //GONetLog.Debug($"[GONetSceneManager] Published SceneLoadCompleteEvent for '{scene.name}' to notify server");
             }
 
             OnSceneLoadCompleted?.Invoke(scene.name, mode);

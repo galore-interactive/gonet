@@ -31,66 +31,6 @@
             "codeGenerationId": 1
         },
         {
-            "location": "scene://JustAnotherScene/AutoRotaters/GameObject",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://JustAnotherScene/AutoRotaters/GameObject (1)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://JustAnotherScene/AutoRotaters/GameObject (2)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://JustAnotherScene/AutoRotaters/GameObject (4)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://JustAnotherScene/AutoRotaters/GameObject (5)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://JustAnotherScene/Followers/Follower",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://JustAnotherScene/Followers/Follower (1)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://JustAnotherScene/Followers/Follower (2)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://JustAnotherScene/Followers/Follower (4)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://JustAnotherScene/Followers/Follower (5)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://JustAnotherScene/GONet_GlobalContext",
-            "unityGuid": "",
-            "codeGenerationId": 1
-        },
-        {
-            "location": "scene://JustAnotherScene/NADA/GameObject (3)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
             "location": "scene://ProjectileTest/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1
@@ -99,6 +39,66 @@
             "location": "scene://ProjectileTest/TestBeaconController",
             "unityGuid": "",
             "codeGenerationId": 1
+        },
+        {
+            "location": "scene://RpcPlayground/AutoRotaters/GameObject",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/AutoRotaters/GameObject (1)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/AutoRotaters/GameObject (2)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/AutoRotaters/GameObject (4)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/AutoRotaters/GameObject (5)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower (1)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower (2)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower (4)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower (5)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/GONet_GlobalContext",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "scene://RpcPlayground/NADA/GameObject (3)",
+            "unityGuid": "",
+            "codeGenerationId": 3
         }
     ]
 }

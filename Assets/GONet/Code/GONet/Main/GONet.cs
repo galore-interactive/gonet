@@ -55,7 +55,7 @@ namespace GONet
         /// <summary>
         /// Tracks scene loading history for debugging message flow.
         /// Thread-safe for concurrent access from network/main threads.
-        /// Format: "GONetSample → JustAnotherScene → ProjectileTest"
+        /// Format: "GONetSample → RPCPlayground → ProjectileTest"
         /// </summary>
         private static readonly List<string> sceneLoadHistory = new List<string>();
         private static readonly object sceneHistoryLock = new object();
@@ -1297,6 +1297,9 @@ namespace GONet
 
             // Subscribe to chunked persistent events for reassembly
             EventBus.Subscribe<PersistentEvents_BundleChunk>(OnPersistentEventsChunkReceived, envelope => envelope.IsSourceRemote);
+
+            // Subscribe to scene load complete events from clients (server-side handler)
+            EventBus.Subscribe<SceneLoadCompleteEvent>(Server_OnClientSceneLoadComplete, envelope => envelope.IsSourceRemote);
 
             EventBus.InitializeRpcSystem();
         }
@@ -4356,10 +4359,10 @@ namespace GONet
             remoteClient.IsInitializedWithServer = true;
             //GONetLog.Debug($"[INIT] Client AuthorityId {newClientGONetLocal.GONetParticipant.OwnerAuthorityId} is now fully initialized with server");
 
-            // IMPORTANT: Send scene-defined object GONetId assignments AFTER client is initialized
-            // This ensures the client has loaded scenes and initialized all GONetParticipants
-            Server_SendClientSceneDefinedObjectIds(remoteClient.ConnectionToClient);
-            //GONetLog.Debug($"[INIT] Sent scene-defined object GONetId assignments to client AuthorityId: {newClientGONetLocal.GONetParticipant.OwnerAuthorityId}");
+            // REMOVED: Scene-defined object ID sync no longer happens immediately
+            // Instead, it's triggered by SceneLoadCompleteEvent from the client after each scene finishes loading
+            // This fixes race condition where scene load was async and objects didn't exist yet
+            // See Server_OnClientSceneLoadComplete() and Server_SendClientSceneDefinedObjectIds_ForSpecificScene()
         }
 
         /// <summary>
@@ -4435,12 +4438,126 @@ namespace GONet
             //GONetLog.Warning($"[SCENE_SYNC] Server_SendClientSceneDefinedObjectIds - END for AuthorityId {gonetConnection_ServerToClient.OwnerAuthorityId}");
         }
 
+        /// <summary>
+        /// Sends GONetId assignments for scene-defined objects in a SPECIFIC scene to a client.
+        /// Called when a client notifies the server that a scene load has completed.
+        /// This ensures the client has fully loaded the scene before receiving GONetIds.
+        /// </summary>
+        private static void Server_SendClientSceneDefinedObjectIds_ForSpecificScene(string sceneName, ushort clientAuthorityId)
+        {
+            //GONetLog.Info($"[SCENE_SYNC] Server sending scene-defined object IDs for scene '{sceneName}' to client AuthorityId {clientAuthorityId}");
+
+            List<string> designTimeLocations = new List<string>();
+            List<uint> gonetIds = new List<uint>();
+
+            // Find all GONetParticipants that were defined in this specific scene
+            foreach (int instanceId in definedInSceneParticipantInstanceIDs)
+            {
+                if (participantInstanceID_to_SpawnSceneName.TryGetValue(instanceId, out string participantScene) &&
+                    participantScene == sceneName)
+                {
+                    // Find the actual participant
+                    foreach (var kvp in gonetParticipantByGONetIdMap)
+                    {
+                        GONetParticipant participant = kvp.Value;
+                        if (participant != null &&
+                            participant.GetInstanceID() == instanceId &&
+                            participant.IsDesignTimeMetadataInitd &&
+                            participant.GONetId != 0 &&
+                            !string.IsNullOrEmpty(participant.DesignTimeLocation))
+                        {
+                            designTimeLocations.Add(participant.DesignTimeLocation);
+                            gonetIds.Add(participant.GONetId);
+                            //GONetLog.Debug($"[SCENE_SYNC] Found scene-defined participant for '{sceneName}': GONetId {participant.GONetId}, Location: {participant.DesignTimeLocation}");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (designTimeLocations.Count > 0)
+            {
+                //GONetLog.Info($"[SCENE_SYNC] Sending {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to client AuthorityId: {clientAuthorityId}");
+                Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), clientAuthorityId);
+            }
+            else
+            {
+                //GONetLog.Debug($"[SCENE_SYNC] No scene-defined objects found for scene '{sceneName}' to send to client {clientAuthorityId}");
+            }
+        }
+
+        /// <summary>
+        /// Server-side handler for when a client notifies that a scene has finished loading.
+        /// This is the CORRECT time to send scene-defined object GONetId assignments.
+        /// </summary>
+        private static void Server_OnClientSceneLoadComplete(GONetEventEnvelope<SceneLoadCompleteEvent> eventEnvelope)
+        {
+            if (!IsServer)
+                return;
+
+            SceneLoadCompleteEvent evt = eventEnvelope.Event;
+            ushort clientAuthorityId = eventEnvelope.SourceAuthorityId;
+
+            GONetLog.Debug($"Client {clientAuthorityId} finished loading scene '{evt.SceneName}' - sending scene-defined object IDs");
+
+            // Send scene-defined object GONetIds for this specific scene now that client has loaded it
+            Server_SendClientSceneDefinedObjectIds_ForSpecificScene(evt.SceneName, clientAuthorityId);
+        }
+
         private static void Server_SendClientPersistentEventsSinceStart(GONetConnection_ServerToClient gonetConnection_ServerToClient)
         {
             //GONetLog.Warning($"[SPAWN_SYNC] Server_SendClientPersistentEventsSinceStart - Total persistent events: {persistentEventsThisSession.Count}");
 
             if (persistentEventsThisSession.Count > 0)
             {
+                // TEMPORARY DEBUG: Log ALL persistent events before filtering
+                /*
+                GONetLog.Error($"[SPAWN_SYNC] ===== DUMPING ALL {persistentEventsThisSession.Count} PERSISTENT EVENTS BEFORE FILTERING =====");
+                int debugIndex = 0;
+                foreach (var evt in persistentEventsThisSession)
+                {
+                    string eventType = evt.GetType().Name;
+                    string details = "";
+
+                    if (evt is InstantiateGONetParticipantEvent spawnEvt)
+                    {
+                        details = $"InstId: {spawnEvt.GONetIdAtInstantiation}, GONetId: {spawnEvt.GONetId}, Scene: '{spawnEvt.SceneIdentifier}', DesignTimeLocation: '{spawnEvt.DesignTimeLocation}'";
+                    }
+                    else if (evt is DespawnGONetParticipantEvent despawnEvt)
+                    {
+                        details = $"GONetId: {despawnEvt.GONetId}";
+                    }
+                    else if (evt is SceneLoadEvent sceneLoadEvt)
+                    {
+                        details = $"SceneName: '{sceneLoadEvt.SceneName}', LoadType: {sceneLoadEvt.LoadType}, Mode: {sceneLoadEvt.Mode}";
+                    }
+                    else if (evt is SceneUnloadEvent sceneUnloadEvt)
+                    {
+                        details = $"SceneName: '{sceneUnloadEvt.SceneName}'";
+                    }
+                    else if (evt is ValueMonitoringSupport_NewBaselineEvent baselineEvt)
+                    {
+                        details = $"GONetId: {baselineEvt.GONetId}";
+                    }
+                    else if (evt is ValueMonitoringSupport_BaselineExpiredEvent expiredEvt)
+                    {
+                        details = $"GONetId: {expiredEvt.GONetId}";
+                    }
+                    else if (evt is OwnerAuthorityIdAssignmentEvent)
+                    {
+                        details = "(OwnerAuthorityIdAssignmentEvent - minimal data)";
+                    }
+                    else if (evt is PersistentRpcEvent rpcEvt)
+                    {
+                        details = $"RpcId: {rpcEvt.RpcId}, GONetId: {rpcEvt.GONetId}, SourceAuthority: {rpcEvt.SourceAuthorityId}, Target: {rpcEvt.OriginalTarget}";
+                    }
+
+                    GONetLog.Error($"[SPAWN_SYNC]   [{debugIndex}] {eventType} - {details}");
+                    debugIndex++;
+                }
+                GONetLog.Error($"[SPAWN_SYNC] ===== END DUMP =====");
+                */
+
                 // Filter persistent events to only those relevant to currently loaded scenes
                 //GONetLog.Error($"[SPAWN_SYNC] BEFORE FilterPersistentEventsByLoadedScenes - Count: {persistentEventsThisSession.Count}");
                 LinkedList<IPersistentEvent> filteredEvents = FilterPersistentEventsByLoadedScenes(persistentEventsThisSession);
@@ -4451,16 +4568,18 @@ namespace GONet
                 //GONetLog.Warning($"[SPAWN_SYNC] *** Sending {filteredCount} of {totalCount} persistent events to newly connected client (filtered by loaded scenes) ***");
 
                 // Log details of what we're sending
+                /*
                 int spawnCount = 0;
                 foreach (var evt in filteredEvents)
                 {
                     if (evt is InstantiateGONetParticipantEvent spawnEvt)
                     {
                         spawnCount++;
-                        //GONetLog.Debug($"[SPAWN_SYNC] - Sending spawn: GONetId {spawnEvt.GONetId}, Scene: '{spawnEvt.SceneIdentifier}', DesignTimeLocation: '{spawnEvt.DesignTimeLocation}'");
+                        GONetLog.Debug($"[SPAWN_SYNC] - Sending spawn: GONetId {spawnEvt.GONetId}, InstId {spawnEvt.GONetIdAtInstantiation}, Scene: '{spawnEvt.SceneIdentifier}', DesignTimeLocation: '{spawnEvt.DesignTimeLocation}'");
                     }
                 }
-                //GONetLog.Debug($"[SPAWN_SYNC] Total spawn events being sent: {spawnCount}");
+                GONetLog.Debug($"[SPAWN_SYNC] Total spawn events being sent: {spawnCount}");
+                */
 
                 if (filteredCount > 0)
                 {
@@ -4616,12 +4735,18 @@ namespace GONet
                         if (shouldInclude)
                         {
                             gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
+                            //GONetLog.Debug($"[SPAWN_SYNC] INCLUDING spawn: InstId {spawnEvent.GONetIdAtInstantiation}, Scene '{spawnEvent.SceneIdentifier}' (matches loaded scenes)");
+                        }
+                        else
+                        {
+                            //GONetLog.Warning($"[SPAWN_SYNC] EXCLUDING spawn: InstId {spawnEvent.GONetIdAtInstantiation}, Scene '{spawnEvent.SceneIdentifier}' (NOT in loaded scenes)");
                         }
                     }
                     // If no scene identifier, include it (backward compatibility for old events)
                     else
                     {
                         gonetIdsWithSpawnsBeingSent.Add(spawnEvent.GONetId);
+                        //GONetLog.Debug($"[SPAWN_SYNC] INCLUDING spawn: InstId {spawnEvent.GONetIdAtInstantiation}, No SceneIdentifier (backward compat)");
                     }
                 }
                 // CRITICAL: Filter value baseline events - only send if corresponding spawn is also being sent

@@ -1203,6 +1203,28 @@ namespace GONet
         }
     }
 
+    /// <summary>
+    /// Transient event published by CLIENT when a scene finishes loading.
+    /// Server uses this to know when to send scene-defined object GONetId assignments.
+    /// This ensures late-joining clients have fully loaded the scene before receiving GONetIds.
+    /// </summary>
+    [MemoryPackable]
+    public partial class SceneLoadCompleteEvent : ITransientEvent
+    {
+        [MemoryPackIgnore]
+        public long OccurredAtElapsedTicks => throw new System.NotImplementedException();
+
+        /// <summary>
+        /// Name of the scene that finished loading
+        /// </summary>
+        public string SceneName;
+
+        /// <summary>
+        /// Load mode that was used (Single or Additive)
+        /// </summary>
+        public UnityEngine.SceneManagement.LoadSceneMode Mode;
+    }
+
     #endregion
 }
 
