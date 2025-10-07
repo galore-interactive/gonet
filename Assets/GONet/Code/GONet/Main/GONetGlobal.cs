@@ -790,11 +790,13 @@ namespace GONet
             CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds);
         }
 
+        /* uncomment this to log all of these for debugging:
         public override void OnGONetReady(GONetParticipant gonetParticipant)
         {
             base.OnGONetReady(gonetParticipant);
 
             GONetLog.Info($"[GONetGlobal] OnGONetReady() called! GNP info - GONetId: {gonetParticipant.GONetId}, name: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}");
         }
+        */
     }
 }

@@ -135,14 +135,6 @@ namespace GONet.Utils
         /// <summary>
         /// This is the best general purpose object (de)serializer GONet can provide.
         /// </summary>
-        public static T DeserializeFromBytes<T>(ArraySegment<byte> bytes)
-        {
-            return MemoryPackSerializer.Deserialize<T>(bytes);
-        }
-
-        /// <summary>
-        /// This is the best general purpose object (de)serializer GONet can provide.
-        /// </summary>
         public static T DeserializeFromBytes<T>(ReadOnlySpan<byte> bytes)
         {
             return MemoryPackSerializer.Deserialize<T>(bytes);

@@ -45,7 +45,7 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
 
         // This parameterless override is ONLY called for THIS beacon's participant (not catch-up calls)
         spawnTime = Time.time;
-        GONetLog.Info($"[TestBeacon] OnGONetReady - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime}");
+        //GONetLog.Info($"[TestBeacon] OnGONetReady - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime}");
     }
 
     void Update()
@@ -93,11 +93,12 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
         // Server despawns when lifetime expires (only server owns these)
         if (GONetMain.IsServer && IsMine && age >= lifetime)
         {
-            GONetLog.Info($"[TestBeacon] Despawning after {age:F2}s - GONetId: {GONetParticipant.GONetId}");
+            //GONetLog.Info($"[TestBeacon] Despawning after {age:F2}s - GONetId: {GONetParticipant.GONetId}");
             Destroy(gameObject);
         }
     }
 
+    /*
     protected override void OnDestroy()
     {
         if (GONetParticipant != null)
@@ -106,4 +107,5 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
         }
         base.OnDestroy();
     }
+    */
 }

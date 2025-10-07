@@ -1867,14 +1867,14 @@ namespace GONet
         {
             uint gonetId = eventEnvelope.Event.GONetId;
 
-            GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: OnDespawnGNPEvent_Remote - Received despawn for GONetId {gonetId} from AuthorityId {eventEnvelope.SourceAuthorityId}");
+            //GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: OnDespawnGNPEvent_Remote - Received despawn for GONetId {gonetId} from AuthorityId {eventEnvelope.SourceAuthorityId}");
 
             // IMPORTANT: If this GONetId has a deferred spawn, defer the despawn too!
             // Otherwise we process despawn before spawn completes, leaving a ghost object.
             bool hasDeferredSpawn = deferredSpawnEvents.Exists(spawnEvent => spawnEvent.GONetId == gonetId);
             if (hasDeferredSpawn)
             {
-                GONetLog.Warning($"[SPAWN_SYNC] DEFERRING despawn for GONetId {gonetId} - spawn is still deferred, will despawn after spawn completes");
+                //GONetLog.Warning($"[SPAWN_SYNC] DEFERRING despawn for GONetId {gonetId} - spawn is still deferred, will despawn after spawn completes");
                 deferredDespawnEvents.Add(eventEnvelope.Event);
                 return;
             }
@@ -1891,7 +1891,7 @@ namespace GONet
                 }
                 else
                 {
-                    GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: Destroying GameObject '{gonetParticipant.gameObject.name}' for GONetId {gonetParticipant.GONetId}");
+                    //GONetLog.Warning($"[DESPAWN_SYNC] CLIENT: Destroying GameObject '{gonetParticipant.gameObject.name}' for GONetId {gonetParticipant.GONetId}");
                     UnityEngine.Object.Destroy(gonetParticipant.gameObject);
                 }
             }

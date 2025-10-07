@@ -73,7 +73,7 @@ public class ProjectileSpawner : GONetBehaviour
         {
             bool removed = projectiles.Remove(projectile);
             addressableProjectiles.Remove(projectile);
-            GONetLog.Debug($"[ProjectileSpawner] OnGONetParticipantDisabled: Removed projectile '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}) from list. Was in list: {removed}, new count: {projectiles.Count}");
+            //GONetLog.Debug($"[ProjectileSpawner] OnGONetParticipantDisabled: Removed projectile '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}) from list. Was in list: {removed}, new count: {projectiles.Count}");
         }
     }
     private void Update()
@@ -81,7 +81,7 @@ public class ProjectileSpawner : GONetBehaviour
         // Log projectiles list size periodically for debugging
         if (Time.frameCount % 300 == 0 && projectiles.Count > 0)
         {
-            GONetLog.Debug($"[ProjectileSpawner] Update: projectiles.Count = {projectiles.Count}, addressableProjectiles.Count = {addressableProjectiles.Count}");
+            //GONetLog.Debug($"[ProjectileSpawner] Update: projectiles.Count = {projectiles.Count}, addressableProjectiles.Count = {addressableProjectiles.Count}");
 
             // Check for duplicate GONetIds in the list (this would cause faster movement!)
             var seenIds = new HashSet<uint>();
@@ -131,8 +131,8 @@ public class ProjectileSpawner : GONetBehaviour
             {
                 GONetParticipant gnp =
                     GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation);
-                GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it. Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
-                //InstantiateAddressablesPrefab();
+                //GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it. Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
+                InstantiateAddressablesPrefab();
             }
         }
         foreach (var projectile in projectiles)
@@ -179,18 +179,33 @@ public class ProjectileSpawner : GONetBehaviour
             GONetMain.Client_InstantiateToBeRemotelyControlledByMe(addressablePrefab, transform.position, transform.rotation);
     }
 
+    /// <summary>
+    /// Server-side cleanup: Destroys addressable projectiles that have traveled too far from spawn origin.
+    /// Uses distance-based check instead of frustum culling because:
+    /// 1. Server typically has no camera (headless)
+    /// 2. We don't know which client camera to use
+    /// 3. Distance check is simpler and more predictable
+    /// </summary>
     private void DestroyAddressableProjectilesOutOfView()
     {
-        if (Camera.main == null) return;
-
-        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(Camera.main);
+        const float MAX_DISTANCE = 50f; // Destroy projectiles beyond this distance from spawn origin
+        Vector3 spawnOrigin = transform.position; // Spawner's position
 
         for (int i = addressableProjectiles.Count - 1; i >= 0; --i)
         {
             Projectile projectile = addressableProjectiles[i];
-            Renderer renderer = projectile.GetComponent<Renderer>();
-            if (renderer != null && !GeometryUtility.TestPlanesAABB(frustumPlanes, renderer.bounds))
+            if (projectile == null || projectile.gameObject == null)
             {
+                // Already destroyed, remove from list
+                addressableProjectiles.RemoveAt(i);
+                continue;
+            }
+
+            float distanceFromSpawn = Vector3.Distance(projectile.transform.position, spawnOrigin);
+
+            if (distanceFromSpawn > MAX_DISTANCE)
+            {
+                GONetLog.Debug($"[ProjectileSpawner] Destroying projectile '{projectile.name}' - too far from spawn ({distanceFromSpawn:F1}m > {MAX_DISTANCE}m)");
                 Destroy(projectile.gameObject);
             }
         }
