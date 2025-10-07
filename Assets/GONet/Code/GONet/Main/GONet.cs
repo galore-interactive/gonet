@@ -6065,7 +6065,11 @@ namespace GONet
         /// </summary>
         internal static void ProcessDeferredSpawnsForScene(string sceneName)
         {
+            // NOTE: This can log every frame when deferred spawns exist
+            // To enable, add LOG_SPAWN_VERBOSE to Player Settings → Scripting Define Symbols
+            #if LOG_SPAWN_VERBOSE
             GONetLog.Debug($"[SPAWN_SYNC] ProcessDeferredSpawnsForScene called for '{sceneName}' - {deferredSpawnEvents.Count} events in queue");
+            #endif
 
             if (deferredSpawnEvents.Count == 0)
                 return;

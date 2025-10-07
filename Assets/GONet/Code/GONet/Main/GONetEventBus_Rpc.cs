@@ -1044,7 +1044,11 @@ namespace GONet
             catch (RpcComponentNotReadyException)
             {
                 // Component doesn't exist yet - defer the RPC until it's added
+                // NOTE: This can generate significant log output during late-joiner connection
+                // To enable this logging, add LOG_RPC_VERBOSE to Player Settings → Scripting Define Symbols
+                #if LOG_RPC_VERBOSE
                 GONetLog.Debug($"Component not ready for RPC 0x{rpcEvent.RpcId:X8} on GONetId {rpcEvent.GONetId} - deferring");
+                #endif
                 DeferRpcForLater(rpcEvent, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
                     isPersistent: false);
             }
@@ -1288,7 +1292,11 @@ namespace GONet
             catch (RpcComponentNotReadyException)
             {
                 // Component doesn't exist yet - defer the RPC until it's added
+                // NOTE: This can generate significant log output during late-joiner connection
+                // To enable this logging, add LOG_RPC_VERBOSE to Player Settings → Scripting Define Symbols
+                #if LOG_RPC_VERBOSE
                 GONetLog.Debug($"Component not ready for persistent RPC 0x{rpcEvent.RpcId:X8} on GONetId {rpcEvent.GONetId} - deferring");
+                #endif
                 DeferRpcForLater(null, envelope.SourceAuthorityId, envelope.TargetClientAuthorityId, envelope.GONetParticipant,
                     isPersistent: true, persistentRpcEvent: rpcEvent);
             }
