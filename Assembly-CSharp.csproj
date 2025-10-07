@@ -122,6 +122,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAutoMagicalSyncAttribute.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSpawner.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\QuaternionUtils.cs" />
+    <Compile Include="Assets\GONet\Code\Netcode.IO.NET\AssemblyInfo.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\ByteStream.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeReplayProtection.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GCLessAlgorithms.cs" />
@@ -180,6 +181,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Analysis\ValueBlendingAnalyzerBehavior.cs" />
     <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.cs" />
+    <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableEndpointTelemetry.cs" />
     <Compile Include="Assets\GONet\Sample\GONetStatusUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeLogLevel.cs" />
