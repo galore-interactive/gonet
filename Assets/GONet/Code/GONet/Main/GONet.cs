@@ -1618,17 +1618,17 @@ namespace GONet
             if (count == 0)
             {
                 persistentEventsThisSession.AddLast(eventEnvelope.Event);
-                if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
-                {
-                    GONetLog.Warning($"[DESPAWN_SYNC] Added DespawnGONetParticipantEvent to persistentEventsThisSession (no events cancelled) - GONetId: {despawn.GONetId}");
-                }
+                //if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
+                //{
+                    //GONetLog.Warning($"[DESPAWN_SYNC] Added DespawnGONetParticipantEvent to persistentEventsThisSession (no events cancelled) - GONetId: {despawn.GONetId}");
+                //}
             }
             else
             {
-                if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
-                {
-                    GONetLog.Warning($"[DESPAWN_SYNC] DespawnGONetParticipantEvent cancelled out {count} events for GONetId {despawn.GONetId} - despawn event NOT added to persistentEventsThisSession (correct: object no longer exists)");
-                }
+                //if (eventEnvelope.Event is DespawnGONetParticipantEvent despawn)
+                //{
+                    //GONetLog.Warning($"[DESPAWN_SYNC] DespawnGONetParticipantEvent cancelled out {count} events for GONetId {despawn.GONetId} - despawn event NOT added to persistentEventsThisSession (correct: object no longer exists)");
+                //}
                 for (int i = 0; i < count; ++i)
                 {
                     IPersistentEvent cancelledEvent = persistentEventsCancelledOut[i];
@@ -6036,7 +6036,7 @@ namespace GONet
             }
 
             DespawnGONetParticipantEvent @event = new DespawnGONetParticipantEvent() { GONetId = gonetParticipant.GONetId };
-            GONetLog.Warning($"[DESPAWN_SYNC] Publishing DespawnGONetParticipantEvent for GONetId {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}'");
+            //GONetLog.Warning($"[DESPAWN_SYNC] Publishing DespawnGONetParticipantEvent for GONetId {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}'");
             EventBus.Publish(@event);
         }
 
