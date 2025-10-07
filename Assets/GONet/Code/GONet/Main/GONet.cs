@@ -1283,8 +1283,12 @@ namespace GONet
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_GONetParticipant_OwnerAuthorityId, OnOwnerAuthorityIdChanged);
 
             // DEBUG: Subscribe to position/rotation sync events to trace what's actually being synced
+            // NOTE: This logs EVERY transform sync (hundreds per second!) - only enable for debugging
+            // To enable, add LOG_SYNC_VERBOSE to Player Settings → Scripting Define Symbols
+            #if LOG_SYNC_VERBOSE
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnTransformPositionChanged_Debug);
             EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_rotation, OnTransformRotationChanged_Debug);
+            #endif
 
             EventBus.Subscribe<ValueMonitoringSupport_NewBaselineEvent>(OnNewBaselineValue_Remote, envelope => envelope.IsSourceRemote);
 
