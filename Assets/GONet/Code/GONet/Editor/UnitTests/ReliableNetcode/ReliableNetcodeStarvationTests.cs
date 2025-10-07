@@ -5,6 +5,7 @@ using NUnit.Framework;
 using NetcodeIO.NET;
 using NetcodeIO.NET.Utils.IO;
 using ReliableNetcode;
+using ReliableNetcode.Utils;
 using UnityEngine.TestTools;
 
 namespace GONet.Tests.ReliableNetcode
@@ -68,7 +69,7 @@ namespace GONet.Tests.ReliableNetcode
             var channels = (MessageChannel[])channelsField.GetValue(endpoint);
             var reliableChannel = channels[0];
             var queueField = reliableChannel.GetType().GetField("messageQueue", BindingFlags.NonPublic | BindingFlags.Instance);
-            var messageQueue = (System.Collections.Generic.Queue<object>)queueField.GetValue(reliableChannel);
+            var messageQueue = (System.Collections.Generic.Queue<ByteBuffer>)queueField.GetValue(reliableChannel);
 
             while (messageQueue.Count > 0 && updateCount < MAX_UPDATES)
             {
