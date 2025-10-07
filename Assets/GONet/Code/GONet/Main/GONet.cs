@@ -3728,10 +3728,14 @@ namespace GONet
             //GONetLog.Debug("received something.... size: " + bytesUsedCount);
 
             // DEBUG: Log ALL messages on Channel 8 immediately when received
+            // NOTE: This logs every network message on chunk channel (hundreds per second)
+            // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+            #if LOG_NETWORK_VERBOSE
             if (channelId == 8 && IsClient)
             {
                 GONetLog.Warning($"[CHUNK_TRACE] NETWORK ENTRY - Channel: {channelId}, Bytes: {bytesUsedCount}, Thread: {Thread.CurrentThread.ManagedThreadId}");
             }
+            #endif
 
             SingleProducerQueues singleProducerReceiveQueues = ReturnSingleProducerResources_IfAppropriate(singleProducerReceiveQueuesByThread, Thread.CurrentThread);
 
@@ -3749,10 +3753,14 @@ namespace GONet
             singleProducerReceiveQueues.queueForWork.Enqueue(networkData);
 
             // DEBUG: Confirm enqueue
+            // NOTE: This logs every network message enqueue (hundreds per second)
+            // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+            #if LOG_NETWORK_VERBOSE
             if (channelId == 8 && IsClient)
             {
                 GONetLog.Warning($"[CHUNK_TRACE] ENQUEUED - Channel: {channelId}, Bytes: {bytesUsedCount}, QueueCount: {singleProducerReceiveQueues.queueForWork.Count}");
             }
+            #endif
         }
 
         #endregion
@@ -3777,16 +3785,23 @@ namespace GONet
                     int readyCount = incomingNetworkData.Count;
 
                     // DEBUG: Log queue stats
+                    // NOTE: This logs every frame when messages are ready (60+ times per second)
+                    // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                    #if LOG_NETWORK_VERBOSE
                     if (readyCount > 0 && IsClient)
                     {
                         GONetLog.Info($"[DEBUG] Processing thread queue #{threadQueueIndex} - {readyCount} messages ready");
                     }
+                    #endif
                     int processedCount = 0;
                     while (processedCount < readyCount && incomingNetworkData.TryDequeue(out networkData))
                     {
                         ++processedCount;
 
                         // DEBUG: Log EVERY dequeued message on Channel 8 (chunk channel)
+                        // NOTE: This logs every dequeued network message (hundreds per second)
+                        // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                        #if LOG_NETWORK_VERBOSE
                         if (networkData.channelId == 8)
                         {
                             GONetLog.Warning($"[CHUNK_TRACE] DEQUEUED - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, ProcessedCount: {processedCount}/{readyCount}");
@@ -3797,14 +3812,19 @@ namespace GONet
                         {
                             GONetLog.Info($"[DEBUG] DEQUEUED - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, ProcessedCount: {processedCount}/{readyCount}");
                         }
+                        #endif
 
                         try
                         {
                             // DEBUG: Track entry to try block for Channel 8
+                            // NOTE: This logs every message processing (hundreds per second)
+                            // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                            #if LOG_NETWORK_VERBOSE
                             if (networkData.channelId == 8)
                             {
                                 GONetLog.Error($"[CHUNK_TRACE] ENTERED TRY BLOCK - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}");
                             }
+                            #endif
 
                             // IMPORTANT: This check must come first as it exits early if condition met!
                             bool shouldQueueForProcessingAfterInitialization =
@@ -3816,10 +3836,14 @@ namespace GONet
                                 bool isInitialized = _gonetClient != null && _gonetClient.IsInitializedWithServer;
 
                                 // DEBUG: Log channel 8 queueing decision
+                                // NOTE: This logs every message queueing decision (hundreds per second)
+                                // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                                #if LOG_NETWORK_VERBOSE
                                 if (networkData.channelId == 8)
                                 {
                                     GONetLog.Warning($"[CHUNK_TRACE] QUEUEING DECISION - Channel: {networkData.channelId}, IsInitRelated: {isInitRelated}, IsInitialized: {isInitialized}, WillQueue: {shouldQueueForProcessingAfterInitialization}");
                                 }
+                                #endif
 
                                 //GONetLog.Debug($"[MSG] Received message - channel: {networkData.channelId}, size: {networkData.bytesUsedCount}, isInitRelated: {isInitRelated}, isInitialized: {isInitialized}, willQueue: {shouldQueueForProcessingAfterInitialization}");
                             }
@@ -3845,7 +3869,11 @@ namespace GONet
                                 }
                                 catch { }
 
+                                // NOTE: This logs every deferred message (can be hundreds during connection)
+                                // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                                #if LOG_NETWORK_VERBOSE
                                 GONetLog.Warning($"[MSG] QUEUING message for later (client not initialized yet) - Channel: {networkData.channelId}, MessageType: {messageInfo}, IsInitRelated: {IsChannelClientInitializationRelated(networkData.channelId)}");
+                                #endif
                                 GONetClient.incomingNetworkData_mustProcessAfterClientInitialized.Enqueue(networkData);
                                 // NOTE: We intentionally DON'T return the byte array to pool here - it's queued for later processing
                                 // The byte array will be returned when the queued message is eventually processed
@@ -3858,10 +3886,14 @@ namespace GONet
                         }
 
                         // DEBUG: Log channel 8 before calling INTERNAL
+                        // NOTE: This logs every message processing (hundreds per second)
+                        // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+                        #if LOG_NETWORK_VERBOSE
                         if (networkData.channelId == 8)
                         {
                             GONetLog.Warning($"[CHUNK_TRACE] CALLING INTERNAL - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}");
                         }
+                        #endif
 
                         ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(networkData);
                     }
@@ -3878,6 +3910,9 @@ namespace GONet
         private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData, bool isProcessingFromQueue = false)
         {
             // DEBUG: Log EVERY message that enters this function on Channel 8
+            // NOTE: This logs every message processing (hundreds per second)
+            // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
+            #if LOG_NETWORK_VERBOSE
             if (networkData.channelId == 8) // ClientInitialization_EventSingles_Reliable
             {
                 GONetLog.Warning($"[CHUNK_TRACE] INTERNAL ENTRY - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, isProcessingFromQueue: {isProcessingFromQueue}");
@@ -3888,6 +3923,7 @@ namespace GONet
             {
                 GONetLog.Info($"[DEBUG] ProcessIncomingBytes ENTRY - Channel: {networkData.channelId}, Bytes: {networkData.bytesUsedCount}, isProcessingFromQueue: {isProcessingFromQueue}, _gonetClient null: {_gonetClient == null}, IsClient: {IsClient}");
             }
+            #endif
 
             bool shouldReturnToPool = true; // Track whether message should be returned to pool (false if queued elsewhere)
             try
