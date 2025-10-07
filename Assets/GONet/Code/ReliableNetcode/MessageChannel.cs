@@ -194,16 +194,33 @@ namespace ReliableNetcode
 
             // see if we can pop messages off of the message queue and put them on the send queue
             if (messageQueue.Count > 0) {
+                // Count send buffer size ONCE before dequeue loop (optimization)
                 int sendBufferSize = 0;
                 for (ushort seq = oldestUnacked; PacketIO.SequenceLessThan(seq, this.sequence); seq++) {
                     if (sendBuffer.Exists(seq))
                         sendBufferSize++;
                 }
 
-                if (sendBufferSize < sendBuffer.Size) {
+                // Dequeue multiple messages per update to prevent channel starvation
+                // When many messages flood one reliable channel (e.g., spawn burst), this ensures
+                // other reliable messages (e.g., position updates) aren't delayed excessively
+                const int MAX_DEQUEUE_PER_UPDATE = 20;  // Process up to 20 messages per update
+                const double MAX_DEQUEUE_TIME_MS = 0.5;  // Stop after 0.5ms to protect frame time
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                int dequeuedCount = 0;
+
+                while (messageQueue.Count > 0 &&
+                       sendBufferSize < sendBuffer.Size &&
+                       dequeuedCount < MAX_DEQUEUE_PER_UPDATE &&
+                       stopwatch.Elapsed.TotalMilliseconds < MAX_DEQUEUE_TIME_MS)
+                {
                     var message = messageQueue.Dequeue();
                     SendMessage(message.InternalBuffer, message.Length);
                     ObjPool<ByteBuffer>.Return(message);
+
+                    sendBufferSize++;  // Track locally (safe: only this thread dequeues in this loop)
+                    dequeuedCount++;
                 }
             }
 
