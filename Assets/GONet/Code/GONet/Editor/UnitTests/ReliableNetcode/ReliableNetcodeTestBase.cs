@@ -30,7 +30,7 @@ namespace GONet.Tests.ReliableNetcode
         /// <summary>
         /// Creates a NetworkSimulator socket manager for testing.
         /// </summary>
-        protected NetworkSimulatorSocketManager CreateSocketManager(int latencyMS = 50, int jitterMS = 10, int packetLoss = 0)
+        internal NetworkSimulatorSocketManager CreateSocketManager(int latencyMS = 50, int jitterMS = 10, int packetLoss = 0)
         {
             var socketMgr = new NetworkSimulatorSocketManager();
             socketMgr.LatencyMS = latencyMS;
@@ -44,7 +44,7 @@ namespace GONet.Tests.ReliableNetcode
         /// <summary>
         /// Creates a Netcode.IO server with pre-bound socket (avoids IPv6Any rebinding).
         /// </summary>
-        protected Server CreateServer(NetworkSimulatorSocketManager socketMgr, IPEndPoint endpoint)
+        internal Server CreateServer(NetworkSimulatorSocketManager socketMgr, IPEndPoint endpoint)
         {
             var serverSocket = socketMgr.CreateContext(endpoint);
             serverSocket.Bind(endpoint);
@@ -64,7 +64,7 @@ namespace GONet.Tests.ReliableNetcode
         /// <summary>
         /// Creates a Netcode.IO client with pre-bound socket.
         /// </summary>
-        protected Client CreateClient(NetworkSimulatorSocketManager socketMgr, IPEndPoint endpoint)
+        internal Client CreateClient(NetworkSimulatorSocketManager socketMgr, IPEndPoint endpoint)
         {
             Client client = new Client((ep) => {
                 var socket = socketMgr.CreateContext(endpoint);
@@ -85,26 +85,19 @@ namespace GONet.Tests.ReliableNetcode
         }
 
         /// <summary>
-        /// Creates a ReliableEndpoint wrapped around a Netcode.IO client.
+        /// Creates a standalone ReliableEndpoint for testing message queueing.
+        /// Sets up mock transmit callback to simulate network transmission.
         /// </summary>
-        protected ReliableEndpoint CreateReliableEndpoint(Client client)
+        protected ReliableEndpoint CreateReliableEndpoint()
         {
-            // Use reflection to get the internal socket from client
-            var socketField = typeof(Client).GetField("socket", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-
-            if (socket == null)
-            {
-                throw new InvalidOperationException("Client socket is null. Client must be connected first.");
-            }
-
-            // Get the remote endpoint that the client is connected to
-            var endpointField = typeof(Client).GetField("serverEndpoints", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var endpoints = (IPEndPoint[])endpointField.GetValue(client);
-            IPEndPoint remoteEndpoint = endpoints[0];
-
             ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, remoteEndpoint);
+
+            // Set up mock transmit callback (simulates sending packets over network)
+            endpoint.TransmitCallback = (buffer, length) =>
+            {
+                // In real use, this would send to network. For testing, we just discard.
+                // The tests focus on queue behavior, not actual network transmission.
+            };
 
             return endpoint;
         }
@@ -113,7 +106,7 @@ namespace GONet.Tests.ReliableNetcode
         /// Connects client to server and waits for connection to establish.
         /// Returns true if connected successfully.
         /// </summary>
-        protected bool ConnectClientToServer(Client client, Server server, NetworkSimulatorSocketManager socketMgr,
+        internal bool ConnectClientToServer(Client client, Server server, NetworkSimulatorSocketManager socketMgr,
             byte[] connectToken, double startTime, out double finalTime, int maxIterations = 500)
         {
             double time = startTime;
@@ -149,7 +142,7 @@ namespace GONet.Tests.ReliableNetcode
         /// <summary>
         /// Advances time by ticking client, server, and socket manager.
         /// </summary>
-        protected void AdvanceTime(Client client, Server server, NetworkSimulatorSocketManager socketMgr, double deltaTime, ref double currentTime)
+        internal void AdvanceTime(Client client, Server server, NetworkSimulatorSocketManager socketMgr, double deltaTime, ref double currentTime)
         {
             currentTime += deltaTime;
             client.Tick(currentTime);

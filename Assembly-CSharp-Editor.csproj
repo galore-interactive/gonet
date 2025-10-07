@@ -126,8 +126,10 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\SpawnBurstTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GNPListCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighResolutionTimeUtilsTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableNetcodeStarvationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableChannelTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetGlobalCustomInspector.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableNetcodeTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Utils\AnimationEditorUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\UnreliableChannelTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcDeferredProcessingTests.cs" />

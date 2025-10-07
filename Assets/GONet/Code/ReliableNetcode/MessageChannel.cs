@@ -204,7 +204,7 @@ namespace ReliableNetcode
                 // Dequeue multiple messages per update to prevent channel starvation
                 // When many messages flood one reliable channel (e.g., spawn burst), this ensures
                 // other reliable messages (e.g., position updates) aren't delayed excessively
-                const int MAX_DEQUEUE_PER_UPDATE = 20;  // Process up to 20 messages per update
+                const int MAX_DEQUEUE_PER_UPDATE = 100;  // Process up to 100 messages per update
                 const double MAX_DEQUEUE_TIME_MS = 0.5;  // Stop after 0.5ms to protect frame time
 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();

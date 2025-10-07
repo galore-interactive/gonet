@@ -46,11 +46,8 @@ namespace GONet.Tests.ReliableNetcode
             bool connected = ConnectClientToServer(client, server, socketMgr, connectToken, time, out time);
             Assert.IsTrue(connected, "Client should connect successfully");
 
-            // Get ReliableEndpoint from client connection
-            var socketField = typeof(Client).GetField("socket", BindingFlags.NonPublic | BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-            ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, serverEndpoint);
+            // Create standalone ReliableEndpoint for testing queue behavior
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
 
             // Flood with 200 reliable messages (simulating spawn burst)
             const int MESSAGE_COUNT = 200;
@@ -88,10 +85,10 @@ namespace GONet.Tests.ReliableNetcode
 
             UnityEngine.Debug.Log($"Cleared {MESSAGE_COUNT} messages in {updateCount} updates ({updateCount * dt:F2}s simulated time)");
 
-            // With fix: Should process ~20 messages per update = 200/20 = 10 updates
+            // With fix: Should process ~100 messages per update = 200/100 = 2 updates
             // Without fix: Would process 1 message per update = 200 updates
             // Allow some margin for send buffer limits
-            Assert.Less(updateCount, 30, $"Should clear {MESSAGE_COUNT} messages in <30 updates (was {updateCount})");
+            Assert.Less(updateCount, 10, $"Should clear {MESSAGE_COUNT} messages in <10 updates (was {updateCount})");
             Assert.AreEqual(0, messageQueue.Count, "Message queue should be empty");
 
             client.Disconnect();
@@ -128,10 +125,7 @@ namespace GONet.Tests.ReliableNetcode
             bool connected = ConnectClientToServer(client, server, socketMgr, connectToken, time, out time);
             Assert.IsTrue(connected, "Client should connect successfully");
 
-            var socketField = typeof(Client).GetField("socket", BindingFlags.NonPublic | BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-            ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, serverEndpoint);
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
 
             // Flood with 100 messages
             const int MESSAGE_COUNT = 100;
@@ -162,10 +156,10 @@ namespace GONet.Tests.ReliableNetcode
 
             UnityEngine.Debug.Log($"Processed {processedCount} messages in 1 update (initial: {initialCount}, remaining: {remainingCount})");
 
-            // Should process up to 20 messages (MAX_DEQUEUE_PER_UPDATE)
+            // Should process up to 100 messages (MAX_DEQUEUE_PER_UPDATE)
             // May process fewer if send buffer is full, but should be much more than 1
-            Assert.GreaterOrEqual(processedCount, 10, "Should process at least 10 messages per update (fix working)");
-            Assert.LessOrEqual(processedCount, 20, "Should not exceed 20 messages per update (MAX_DEQUEUE_PER_UPDATE)");
+            Assert.GreaterOrEqual(processedCount, 50, "Should process at least 50 messages per update (fix working)");
+            Assert.LessOrEqual(processedCount, 100, "Should not exceed 100 messages per update (MAX_DEQUEUE_PER_UPDATE)");
 
             client.Disconnect();
             server.Stop();
@@ -201,10 +195,7 @@ namespace GONet.Tests.ReliableNetcode
             bool connected = ConnectClientToServer(client, server, socketMgr, connectToken, time, out time);
             Assert.IsTrue(connected, "Client should connect successfully");
 
-            var socketField = typeof(Client).GetField("socket", BindingFlags.NonPublic | BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-            ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, serverEndpoint);
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
 
             // Flood with many messages to test time budget
             const int MESSAGE_COUNT = 1000;
@@ -264,10 +255,7 @@ namespace GONet.Tests.ReliableNetcode
             bool connected = ConnectClientToServer(client, server, socketMgr, connectToken, time, out time);
             Assert.IsTrue(connected, "Client should connect successfully");
 
-            var socketField = typeof(Client).GetField("socket", BindingFlags.NonPublic | BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-            ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, serverEndpoint);
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
 
             // Simulate spawn burst: 50 spawns × 4 messages each = 200 messages
             const int SPAWN_COUNT = 50;
@@ -348,10 +336,7 @@ namespace GONet.Tests.ReliableNetcode
             bool connected = ConnectClientToServer(client, server, socketMgr, connectToken, time, out time);
             Assert.IsTrue(connected, "Client should connect successfully");
 
-            var socketField = typeof(Client).GetField("socket", BindingFlags.NonPublic | BindingFlags.Instance);
-            var socket = (SocketContext)socketField.GetValue(client);
-            ReliableEndpoint endpoint = new ReliableEndpoint();
-            endpoint.BindSocket(socket, serverEndpoint);
+            ReliableEndpoint endpoint = CreateReliableEndpoint();
 
             // Flood reliable channel
             byte[] reliableData = new byte[200];
