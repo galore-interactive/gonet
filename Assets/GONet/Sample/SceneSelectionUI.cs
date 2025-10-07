@@ -40,8 +40,11 @@ namespace GONet.Sample
 
         [Header("Scene Names")]
         [SerializeField] private string projectileTestSceneName = "ProjectileTest";
-        [SerializeField] private string rpcPlaygroundSceneName = "JustAnotherScene";
+        [SerializeField] private string rpcPlaygroundSceneName = "RpcPlayground";
         [SerializeField] private string menuSceneName = "GONetSample";
+
+        [Header("Scene Loading Configuration")]
+        [SerializeField] private bool rpcPlaygroundIsAddressable = true;
 
         [Header("Auto-Build UI")]
         [SerializeField] private bool autoBuildUI = true;
@@ -356,13 +359,22 @@ namespace GONet.Sample
 
             if (GONetMain.IsServer)
             {
-                // Server loads directly
-                GONetMain.SceneManager.LoadSceneFromBuildSettings(sceneName, LoadSceneMode.Single);
+                // Server loads directly using appropriate method
+                LoadScene(sceneName, LoadSceneMode.Single);
             }
             else if (GONetMain.IsClient)
             {
-                // Client requests through RPC - show "awaiting approval" UI
-                GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single);
+                // Client requests through RPC - use appropriate request method
+                bool isAddressable = (sceneName == rpcPlaygroundSceneName && rpcPlaygroundIsAddressable);
+
+                if (isAddressable)
+                {
+                    GONetMain.SceneManager.RequestLoadAddressablesScene(sceneName, LoadSceneMode.Single);
+                }
+                else
+                {
+                    GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single);
+                }
 
                 // Show awaiting approval message
                 if (clientResponsePanel != null && clientResponseMessageText != null)
@@ -376,6 +388,26 @@ namespace GONet.Sample
             else
             {
                 GONetLog.Warning("[SceneSelectionUI] Not connected as server or client");
+            }
+        }
+
+        /// <summary>
+        /// Helper method to load a scene using the appropriate method (Build Settings or Addressables)
+        /// </summary>
+        private void LoadScene(string sceneName, LoadSceneMode mode)
+        {
+            // Check if this scene should be loaded from Addressables
+            bool isAddressable = (sceneName == rpcPlaygroundSceneName && rpcPlaygroundIsAddressable);
+
+            if (isAddressable)
+            {
+                GONetLog.Info($"[SceneSelectionUI] Loading scene '{sceneName}' from Addressables");
+                GONetMain.SceneManager.LoadSceneFromAddressables(sceneName, mode);
+            }
+            else
+            {
+                GONetLog.Info($"[SceneSelectionUI] Loading scene '{sceneName}' from Build Settings");
+                GONetMain.SceneManager.LoadSceneFromBuildSettings(sceneName, mode);
             }
         }
 
@@ -464,10 +496,10 @@ namespace GONet.Sample
             approvalPanel.SetActive(false);
             hasPendingRequest = false; // Clear pending request flag
 
-            // Server loads the scene
+            // Server loads the scene using appropriate method
             if (GONetMain.SceneManager != null)
             {
-                GONetMain.SceneManager.LoadSceneFromBuildSettings(pendingSceneName, pendingLoadMode);
+                LoadScene(pendingSceneName, pendingLoadMode);
             }
 
             // Send approval response to client via GONetSceneManager public API

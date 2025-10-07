@@ -920,6 +920,13 @@ namespace GONet.Generation
                     out List<GONetParticipant_ComponentsWithAutoSyncMembers> createdInSceneUniqueSnaps,
                     out List<SnapGnpAssignment> createdInSceneUniqueAssignments);
 
+#if ADDRESSABLES_AVAILABLE
+                //Also get snaps from Addressables scenes
+                CreateAllPossibleUniqueSnapsAndGNPsFromAddressablesScenes(
+                    ref createdInSceneUniqueSnaps,
+                    ref createdInSceneUniqueAssignments);
+#endif
+
                 {//Apply changes (Additions, deletes and/or modifications) to both the unique snaps list and to the corresponding in scene game objects
                     HashSet<GONetParticipant_ComponentsWithAutoSyncMembers> sceneSnapsToDelete = new();
                     foreach (var uniqueSnap in buildingAllSnapsMasterList)
@@ -1005,6 +1012,11 @@ namespace GONet.Generation
                                 inProjectGnp.UnityGuid);
                         GONetSpawnSupport_DesignTime.EnsureExistsInPersistence_WithTheseValues(dtm);
                     }
+
+#if ADDRESSABLES_AVAILABLE
+                    // Save and close Addressables scenes after CodeGenerationIds have been applied
+                    SaveAndCloseAddressablesScenes(initialActiveScene);
+#endif
                 }
 
                 {//Go back to the initial scene when this process started
@@ -1359,6 +1371,172 @@ namespace GONet.Generation
             // Ensure the initial scene is the active scene
             EditorSceneManager.SetActiveScene(initialActiveScene);
         }
+
+#if ADDRESSABLES_AVAILABLE
+        private static void CreateAllPossibleUniqueSnapsAndGNPsFromAddressablesScenes(
+            ref List<GONetParticipant_ComponentsWithAutoSyncMembers> possibleInSceneUniqueSnaps,
+            ref List<SnapGnpAssignment> allSceneSnapGnpAssignments)
+        {
+            try
+            {
+                var settings = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+                if (settings == null)
+                {
+                    GONetLog.Debug("[GONet] No Addressables settings found - skipping Addressables scene scan");
+                    return;
+                }
+
+                // Collect all scene asset entries from Addressables
+                List<string> addressableScenesPath = new List<string>();
+                foreach (var group in settings.groups)
+                {
+                    if (group == null) continue;
+
+                    foreach (var entry in group.entries)
+                    {
+                        if (entry == null) continue;
+
+                        // Check if this is a scene asset
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (!string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".unity"))
+                        {
+                            addressableScenesPath.Add(assetPath);
+                        }
+                    }
+                }
+
+                if (addressableScenesPath.Count == 0)
+                {
+                    GONetLog.Debug("[GONet] No scenes found in Addressables");
+                    return;
+                }
+
+                GONetLog.Debug($"[GONet] Found {addressableScenesPath.Count} scene(s) in Addressables: {string.Join(", ", addressableScenesPath)}");
+
+                // Record the initially active scene
+                Scene initialActiveScene = EditorSceneManager.GetActiveScene();
+
+                // Load each Addressables scene additively, scan it, then unload it
+                foreach (string scenePath in addressableScenesPath)
+                {
+                    try
+                    {
+                        GONetLog.Debug($"[GONet] Loading Addressables scene for scanning: {scenePath}");
+
+                        Scene scene = EditorSceneManager.GetSceneByPath(scenePath);
+                        Scene openScene;
+
+                        if (scene.isLoaded)
+                        {
+                            // The scene is already open; use the existing scene
+                            openScene = scene;
+                        }
+                        else
+                        {
+                            // Open the scene additively without unloading other scenes
+                            openScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+                        }
+
+                        if (openScene.IsValid())
+                        {
+                            // Process GONetParticipants
+                            List<GONetParticipant> gnps = new List<GONetParticipant>();
+                            GetGNPsWithinScene(openScene, out gnps);
+
+                            foreach (GONetParticipant gnp in gnps)
+                            {
+                                // Process each GNP
+                                string gnpFullScenePath = DesignTimeMetadata.GetFullUniquePathInScene(gnp);
+                                GONetParticipant_ComponentsWithAutoSyncMembers assignedSnap = new(gnp);
+                                possibleInSceneUniqueSnaps.Add(assignedSnap);
+                                allSceneSnapGnpAssignments.Add(new()
+                                {
+                                    fullProjectOrScenePath = gnpFullScenePath,
+                                    assignedSnap = assignedSnap,
+                                    gnp = gnp,
+                                });
+                                GONetLog.Debug($"[GONet] Found GNP in Addressables scene '{openScene.name}': {gnp.gameObject.name}");
+                            }
+                        }
+                        else
+                        {
+                            GONetLog.Warning($"[GONet] Invalid Addressables scene: {scenePath}");
+                        }
+
+                        // DON'T close the scene yet - we need to keep it loaded so that
+                        // CodeGenerationIds can be applied to the GONetParticipants later
+                        // The scenes will need to be saved after IDs are applied
+                    }
+                    catch (System.Exception ex)
+                    {
+                        GONetLog.Warning($"[GONet] Failed to load/scan Addressables scene '{scenePath}': {ex.Message}");
+                    }
+                }
+
+                // Ensure the initial scene is the active scene
+                EditorSceneManager.SetActiveScene(initialActiveScene);
+
+                GONetLog.Debug($"[GONet] Finished scanning Addressables scenes");
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[GONet] Error while scanning Addressables scenes: {ex.Message}");
+            }
+        }
+
+        private static void SaveAndCloseAddressablesScenes(Scene initialActiveScene)
+        {
+            try
+            {
+                var settings = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+                if (settings == null)
+                {
+                    return;
+                }
+
+                // Find all Addressables scenes
+                HashSet<string> addressableScenePaths = new HashSet<string>();
+                foreach (var group in settings.groups)
+                {
+                    if (group == null) continue;
+
+                    foreach (var entry in group.entries)
+                    {
+                        if (entry == null) continue;
+
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (!string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".unity"))
+                        {
+                            addressableScenePaths.Add(assetPath);
+                        }
+                    }
+                }
+
+                // Save and close each loaded Addressables scene
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    Scene scene = SceneManager.GetSceneAt(i);
+
+                    // Check if this is an Addressables scene and not the initial active scene
+                    if (addressableScenePaths.Contains(scene.path) && scene != initialActiveScene)
+                    {
+                        if (scene.isDirty)
+                        {
+                            GONetLog.Debug($"[GONet] Saving Addressables scene: {scene.path}");
+                            EditorSceneManager.SaveScene(scene);
+                        }
+
+                        GONetLog.Debug($"[GONet] Closing Addressables scene: {scene.path}");
+                        EditorSceneManager.CloseScene(scene, false); // Don't remove unsaved changes since we just saved
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[GONet] Error while saving/closing Addressables scenes: {ex.Message}");
+            }
+        }
+#endif
 
         private static void GetGNPsWithinScene(Scene scene, out List<GONetParticipant> gonetParticipantsInOpenScenes)
         {

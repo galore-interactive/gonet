@@ -1148,6 +1148,13 @@ namespace GONet.Editor
                 AddIfAppropriate(projectGnps, gonetParticipant);
             }
 
+#if ADDRESSABLES_AVAILABLE
+            // TODO: Re-enable once we figure out the right time to scan Addressables scenes
+            // The issue is that loading scenes during projectChanged can block/hang during builds
+            // Also scan all Addressables scenes for GONetParticipants
+            //LoadAndScanAddressablesScenes(projectGnps);
+#endif
+
             // Collect the design time locations for each GONetParticipant (includes addressables paths)
             HashSet<string> allPathsToGnpsInProject = new();
             foreach (var gonetParticipant in projectGnps)
@@ -1195,6 +1202,7 @@ namespace GONet.Editor
 
         private static bool IsSceneIncludedInBuild(string scenePath)
         {
+            // Check Build Settings first
             foreach (var buildScene in EditorBuildSettings.scenes)
             {
                 if (buildScene.path == scenePath && buildScene.enabled)
@@ -1202,8 +1210,133 @@ namespace GONet.Editor
                     return true; // Scene is included in the build settings
                 }
             }
+
+#if ADDRESSABLES_AVAILABLE
+            // Also check if scene is in Addressables
+            if (IsSceneInAddressables(scenePath))
+            {
+                return true;
+            }
+#endif
+
             return false;
         }
+
+#if ADDRESSABLES_AVAILABLE
+        private static bool IsSceneInAddressables(string scenePath)
+        {
+            try
+            {
+                var settings = AddressableAssetSettingsDefaultObject.Settings;
+                if (settings == null)
+                {
+                    return false;
+                }
+
+                // Get the asset GUID from the scene path
+                string guid = AssetDatabase.AssetPathToGUID(scenePath);
+                if (string.IsNullOrEmpty(guid))
+                {
+                    return false;
+                }
+
+                // Check if this GUID exists in any Addressables group
+                var entry = settings.FindAssetEntry(guid);
+                return entry != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void LoadAndScanAddressablesScenes(HashSet<GONetParticipant> projectGnps)
+        {
+            try
+            {
+                // IMPORTANT: Skip scene loading during build or play mode - it can hang/block
+                if (BuildPipeline.isBuildingPlayer || EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    GONetLog.Debug("[GONetSpawnSupport] Skipping Addressables scene scan during build/play mode");
+                    return;
+                }
+
+                var settings = AddressableAssetSettingsDefaultObject.Settings;
+                if (settings == null)
+                {
+                    GONetLog.Debug("[GONetSpawnSupport] No Addressables settings found - skipping Addressables scene scan");
+                    return;
+                }
+
+                // Collect all scene asset entries from Addressables
+                List<string> addressableScenesPath = new List<string>();
+                foreach (var group in settings.groups)
+                {
+                    if (group == null) continue;
+
+                    foreach (var entry in group.entries)
+                    {
+                        if (entry == null) continue;
+
+                        // Check if this is a scene asset
+                        string assetPath = AssetDatabase.GUIDToAssetPath(entry.guid);
+                        if (!string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".unity"))
+                        {
+                            addressableScenesPath.Add(assetPath);
+                        }
+                    }
+                }
+
+                if (addressableScenesPath.Count == 0)
+                {
+                    GONetLog.Debug("[GONetSpawnSupport] No scenes found in Addressables");
+                    return;
+                }
+
+                GONetLog.Debug($"[GONetSpawnSupport] Found {addressableScenesPath.Count} scene(s) in Addressables: {string.Join(", ", addressableScenesPath)}");
+
+                // Remember currently open scenes
+                List<Scene> originalScenes = new List<Scene>();
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    originalScenes.Add(SceneManager.GetSceneAt(i));
+                }
+
+                // Load each Addressables scene additively, scan it, then unload it
+                foreach (string scenePath in addressableScenesPath)
+                {
+                    try
+                    {
+                        GONetLog.Debug($"[GONetSpawnSupport] Loading Addressables scene for scanning: {scenePath}");
+                        Scene loadedScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+
+                        // Scan for GONetParticipants in this scene
+                        foreach (GameObject rootGameObject in loadedScene.GetRootGameObjects())
+                        {
+                            foreach (GONetParticipant gnp in rootGameObject.GetComponentsInChildren<GONetParticipant>(true))
+                            {
+                                projectGnps.Add(gnp);
+                                GONetLog.Debug($"[GONetSpawnSupport] Found GNP in Addressables scene '{loadedScene.name}': {gnp.gameObject.name}");
+                            }
+                        }
+
+                        // Unload the scene after scanning
+                        EditorSceneManager.CloseScene(loadedScene, true);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        GONetLog.Warning($"[GONetSpawnSupport] Failed to load/scan Addressables scene '{scenePath}': {ex.Message}");
+                    }
+                }
+
+                GONetLog.Debug($"[GONetSpawnSupport] Finished scanning Addressables scenes");
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[GONetSpawnSupport] Error while scanning Addressables scenes: {ex.Message}");
+            }
+        }
+#endif
 
         /// <summary>
         /// Scene-specific version that only compares against objects from the same scenes being scanned.
