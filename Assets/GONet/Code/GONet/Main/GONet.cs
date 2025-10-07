@@ -4186,18 +4186,18 @@ namespace GONet
         {
             try
             {
-                GONetLog.Info($"[SPAWN_SYNC] CLIENT: ATTEMPTING to deserialize EventSingle - Size: {bytesUsedCount} bytes (array capacity: {messageBytes.Length}), From: AuthorityId {relatedConnection.OwnerAuthorityId}");
+                //GONetLog.Info($"[SPAWN_SYNC] CLIENT: ATTEMPTING to deserialize EventSingle - Size: {bytesUsedCount} bytes (array capacity: {messageBytes.Length}), From: AuthorityId {relatedConnection.OwnerAuthorityId}");
 
-                // CRITICAL FIX: Use ArraySegment to deserialize only the actual message bytes, not the entire pooled array capacity
-                var messageSegment = new ArraySegment<byte>(messageBytes, 0, bytesUsedCount);
-                GONetLog.Warning($"[DESER_DEBUG] About to call DeserializeFromBytes - Segment offset: {messageSegment.Offset}, Count: {messageSegment.Count}");
+                // PERFORMANCE: Use ReadOnlySpan to deserialize only the actual message bytes (zero allocation, stack-only)
+                // This is faster than ArraySegment<byte> (no heap allocation) and safer than raw byte[] (bounds-checked slice)
+                IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(
+                    messageBytes.AsSpan(0, bytesUsedCount));
 
-                IGONetEvent @event = SerializationUtils.DeserializeFromBytes<IGONetEvent>(messageSegment);
+                //GONetLog.Warning($"[DESER_DEBUG] DeserializeFromBytes returned - Event is null: {@event == null}, Event type: {@event?.GetType().Name}");
 
-                GONetLog.Warning($"[DESER_DEBUG] DeserializeFromBytes returned - Event is null: {@event == null}, Event type: {@event?.GetType().Name}");
+                //GONetLog.Info($"[SPAWN_SYNC] CLIENT: SUCCESSFULLY deserialized EventSingle - Type: {@event.GetType().Name}, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
 
-                GONetLog.Info($"[SPAWN_SYNC] CLIENT: SUCCESSFULLY deserialized EventSingle - Type: {@event.GetType().Name}, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
-
+                /*
                 // Log PersistentEvents_Bundle and chunks specifically
                 if (@event is PersistentEvents_Bundle bundle)
                 {
@@ -4207,10 +4207,11 @@ namespace GONet
                 {
                     GONetLog.Warning($"[SPAWN_SYNC] CLIENT: Deserialized PersistentEvents_BundleChunk - ChunkId: {chunk.ChunkId}, Index: {chunk.ChunkIndex}/{chunk.TotalChunks}, Size: {chunk.ChunkData.Length} bytes, From: AuthorityId {relatedConnection.OwnerAuthorityId}");
                 }
+                */
 
-                GONetLog.Warning($"[DESER_DEBUG] About to publish event to EventBus");
+                //GONetLog.Warning($"[DESER_DEBUG] About to publish event to EventBus");
                 EventBus.Publish(@event, relatedConnection.OwnerAuthorityId);
-                GONetLog.Warning($"[DESER_DEBUG] EventBus.Publish completed");
+                //GONetLog.Warning($"[DESER_DEBUG] EventBus.Publish completed");
                 // SPAM: Commented out - creates 2,777+ log entries during stress testing, mostly ValueMonitoringSupport events
                 //GONetLog.Debug($"Incoming event being published.  Type: {@event.GetType().Name}");
             }
