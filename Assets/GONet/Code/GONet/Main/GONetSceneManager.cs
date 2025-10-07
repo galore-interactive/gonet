@@ -572,7 +572,7 @@ namespace GONet
             // But we WILL reset after the scene finishes loading (see OnSceneLoadOperationCompleted)
             if (isClientInitialized)
             {
-                GONetLog.Info($"[TimeSync] Requesting aggressive time sync BEFORE scene load (client already initialized): {evt.SceneName}");
+                //GONetLog.Info($"[TimeSync] Requesting aggressive time sync BEFORE scene load (client already initialized): {evt.SceneName}");
                 GONetMain.RequestAggressiveTimeSync($"scene_load_start_{evt.SceneName}");
             }
             else
@@ -893,7 +893,7 @@ namespace GONet
                 else
                 {
                     // Late-joining clients that weren't initialized yet: First aggressive sync happens AFTER scene loads
-                    GONetLog.Info($"[TimeSync] Requesting aggressive time sync AFTER scene load completed (late-joining client - first aggressive sync): {scene.name}");
+                    //GONetLog.Info($"[TimeSync] Requesting aggressive time sync AFTER scene load completed (late-joining client - first aggressive sync): {scene.name}");
                     GONetMain.RequestAggressiveTimeSync($"scene_load_complete_{scene.name}");
                 }
             }

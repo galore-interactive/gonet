@@ -331,10 +331,10 @@ namespace GONet
                     }
                 }
 
-                if (caughtUpCount > 0)
-                {
-                    GONetLog.Info($"[GONetBehaviour] Component '{GetType().Name}' on '{gameObject.name}' caught up on {caughtUpCount} existing participants (WasAddedAtRuntime: {WasAddedAtRuntime})");
-                }
+                //if (caughtUpCount > 0)
+                //{
+                    //GONetLog.Info($"[GONetBehaviour] Component '{GetType().Name}' on '{gameObject.name}' caught up on {caughtUpCount} existing participants (WasAddedAtRuntime: {WasAddedAtRuntime})");
+                //}
             }
         }
 

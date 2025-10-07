@@ -21,7 +21,8 @@ public class ProjectileSpawner : GONetBehaviour
 {
     public GONetParticipant projectilPrefab;
     private readonly List<Projectile> projectiles = new List<Projectile>(100);
-    private readonly List<Projectile> addressableProjectiles = new List<Projectile>(100);
+    private readonly List<Projectile> addressableProjectiles = new List<Projectile>(100); // Legacy - not used for Physics Cube
+    private readonly List<GONetParticipant> addressableParticipants = new List<GONetParticipant>(100); // For Physics Cube Projectiles (no Projectile component)
     private float lastCheckTime = 0f;
     const float CHECK_INTERVAL = 1f;
 
@@ -41,6 +42,9 @@ public class ProjectileSpawner : GONetBehaviour
     {
         base.OnGONetReady(gonetParticipant);
 
+        // Debug: Log ALL OnGONetReady calls to see what's being registered
+        GONetLog.Debug($"[ProjectileSpawner] OnGONetReady called for '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}, IsServer: {GONetMain.IsServer})");
+
         if (gonetParticipant.GetComponent<Projectile>() != null)
         {
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
@@ -54,14 +58,19 @@ public class ProjectileSpawner : GONetBehaviour
             }
             */
         }
+        else
+        {
+            // Debug: Log when Projectile component is missing
+            GONetLog.Debug($"[ProjectileSpawner] OnGONetReady: '{gonetParticipant.name}' has no Projectile component - skipping");
+        }
 
+        // Check for Physics Cube addressable projectiles (INDEPENDENT of Projectile component check)
+        // Note: Physics Cube Projectiles don't have a Projectile component, so we track the GONetParticipant directly
         if (GONetMain.IsServer && gonetParticipant.IsMine && gonetParticipant.gameObject.name.StartsWith("Physics Cube Projectile"))
         {
-            Projectile projectile = gonetParticipant.GetComponent<Projectile>();
-            if (projectile != null)
-            {
-                addressableProjectiles.Add(projectile);
-            }
+            // Store the GONetParticipant in a separate tracking list since Physics Cube doesn't have Projectile component
+            addressableParticipants.Add(gonetParticipant);
+            GONetLog.Debug($"[ProjectileSpawner] Added addressable Physics Cube to cleanup list: '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}) - List count now: {addressableParticipants.Count}");
         }
     }
 
@@ -75,6 +84,9 @@ public class ProjectileSpawner : GONetBehaviour
             addressableProjectiles.Remove(projectile);
             //GONetLog.Debug($"[ProjectileSpawner] OnGONetParticipantDisabled: Removed projectile '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}, IsMine: {gonetParticipant.IsMine}) from list. Was in list: {removed}, new count: {projectiles.Count}");
         }
+
+        // Also remove from addressableParticipants list (for Physics Cube Projectiles)
+        addressableParticipants.Remove(gonetParticipant);
     }
     private void Update()
     {
@@ -191,23 +203,40 @@ public class ProjectileSpawner : GONetBehaviour
         const float MAX_DISTANCE = 50f; // Destroy projectiles beyond this distance from spawn origin
         Vector3 spawnOrigin = transform.position; // Spawner's position
 
-        for (int i = addressableProjectiles.Count - 1; i >= 0; --i)
+        // Debug: Log cleanup check
+        if (addressableParticipants.Count > 0)
         {
-            Projectile projectile = addressableProjectiles[i];
-            if (projectile == null || projectile.gameObject == null)
+            GONetLog.Debug($"[ProjectileSpawner] Cleanup check: {addressableParticipants.Count} addressable Physics Cube projectiles in list, spawn origin: {spawnOrigin}");
+        }
+
+        int destroyedCount = 0;
+        for (int i = addressableParticipants.Count - 1; i >= 0; --i)
+        {
+            GONetParticipant participant = addressableParticipants[i];
+            if (participant == null || participant.gameObject == null)
             {
                 // Already destroyed, remove from list
-                addressableProjectiles.RemoveAt(i);
+                addressableParticipants.RemoveAt(i);
+                GONetLog.Debug($"[ProjectileSpawner] Removed null participant from list at index {i}");
                 continue;
             }
 
-            float distanceFromSpawn = Vector3.Distance(projectile.transform.position, spawnOrigin);
+            float distanceFromSpawn = Vector3.Distance(participant.transform.position, spawnOrigin);
+
+            // Debug: Log each projectile's distance
+            GONetLog.Debug($"[ProjectileSpawner] Physics Cube '{participant.name}' (GONetId: {participant.GONetId}) - Position: {participant.transform.position}, Distance: {distanceFromSpawn:F1}m");
 
             if (distanceFromSpawn > MAX_DISTANCE)
             {
-                GONetLog.Debug($"[ProjectileSpawner] Destroying projectile '{projectile.name}' - too far from spawn ({distanceFromSpawn:F1}m > {MAX_DISTANCE}m)");
-                Destroy(projectile.gameObject);
+                GONetLog.Debug($"[ProjectileSpawner] Destroying Physics Cube '{participant.name}' - too far from spawn ({distanceFromSpawn:F1}m > {MAX_DISTANCE}m)");
+                Destroy(participant.gameObject);
+                destroyedCount++;
             }
+        }
+
+        if (destroyedCount > 0)
+        {
+            GONetLog.Debug($"[ProjectileSpawner] Destroyed {destroyedCount} Physics Cube projectiles this cleanup cycle");
         }
     }
 }
