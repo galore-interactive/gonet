@@ -74,3 +74,6 @@ crashlytics-build.properties
 # GONet Test Results (generated logs, do not commit)
 Assets/GONet/Sample/Resources/Tests/Results/
 Assets/GONet/Sample/Resources/Tests/Results.meta
+
+# Markdown documentation (local working notes only, not tracked in git)
+*.md
