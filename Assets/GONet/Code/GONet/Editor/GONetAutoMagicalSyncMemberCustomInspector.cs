@@ -217,6 +217,42 @@ and check if that event's envelope has <see cref=""GONetEventEnvelope.IsSourceRe
                     EditorGUILayout.EndHorizontal();
                 }
 
+                { // Client_IsInLimbo
+                    EditorGUILayout.BeginHorizontal();
+                    const string IS_IN_LIMBO = "Client Is In Limbo?";
+                    const string TT = @"CLIENT ONLY: Indicates this object is in 'limbo' state - spawned locally but waiting for GONetId batch from server.
+
+IMPORTANT: Limbo is RARE - only occurs during extreme rapid spawning (100+ spawns/sec). Most games will NEVER see this.
+
+While in limbo:
+- Object exists locally but has NO GONetId assigned
+- Object is NOT networked and CANNOT sync values
+- Object CANNOT receive RPCs
+- OnGONetReady() is BLOCKED (will fire after graduation)
+
+When a new batch arrives from server, limbo objects automatically 'graduate':
+- GONetId assigned from batch
+- Disabled components re-enabled (if limbo mode disabled them)
+- OnGONetReady() fired
+- Object becomes fully networked
+
+See Client_GONetIdBatchLimboMode enum for different limbo mode behaviors.";
+                    GUIContent tooltip = new GUIContent(IS_IN_LIMBO, TT);
+                    EditorGUILayout.LabelField(tooltip);
+
+                    // Show with colored background if in limbo (yellow/warning color)
+                    Color previousColor = GUI.backgroundColor;
+                    if (targetGONetParticipant.Client_IsInLimbo)
+                    {
+                        GUI.backgroundColor = new Color(1f, 1f, 0f, 0.5f); // Yellow tint
+                    }
+
+                    EditorGUILayout.Toggle(targetGONetParticipant.Client_IsInLimbo);
+                    GUI.backgroundColor = previousColor;
+
+                    EditorGUILayout.EndHorizontal();
+                }
+
                 if (targetGONetParticipant.RemotelyControlledByAuthorityId != GONetMain.OwnerAuthorityId_Unset)
                 { // RemotelyControlledByAuthorityId && IsMine_ToRemotelyControl
                     EditorGUILayout.BeginHorizontal();
