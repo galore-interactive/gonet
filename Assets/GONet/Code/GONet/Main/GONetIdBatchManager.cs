@@ -89,8 +89,14 @@ namespace GONet
         /// </summary>
         private static int GetBatchSize()
         {
-            // TODO: Get from GONetProjectSettings once implemented
-            // return GONetProjectSettings.Instance.client_GONetIdBatchSize;
+            #if UNITY_EDITOR
+            var settings = GONet.Editor.GONetProjectSettings.Instance;
+            if (settings != null)
+            {
+                return settings.client_GONetIdBatchSize;
+            }
+            #endif
+
             return DEFAULT_BATCH_SIZE;
         }
 

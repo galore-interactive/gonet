@@ -41,6 +41,17 @@ namespace GONet.Editor
                 "Default: Enabled (recommended for development workflow)")]
         public bool enableAutoRoleDetection = true;
 
+        [Header("Client GONetId Batch Settings")]
+        [Tooltip("Number of GONetIds allocated per batch for client-spawned objects.\n\n" +
+                "IMPORTANT: Limbo mode only triggers when client exhausts ALL batch IDs (RARE edge case).\n\n" +
+                "• Higher values (500-1000): Better for rapid spawning scenarios (100+ spawns/sec)\n" +
+                "• Lower values (100-200): Better for typical gameplay (reduces server memory overhead)\n\n" +
+                "Default: 200 IDs per batch (suitable for most games)\n" +
+                "Range: 100-1000 IDs per batch\n\n" +
+                "Client automatically requests new batch when 50% remaining.")]
+        [Range(100, 1000)]
+        public int client_GONetIdBatchSize = 200;
+
         [Header("⚠️ EXPERIMENTAL FEATURES - Use with caution")]
         [Space(5)]
         [Header("Team Development Settings")]
