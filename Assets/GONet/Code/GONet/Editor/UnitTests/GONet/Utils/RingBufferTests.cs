@@ -458,6 +458,154 @@ namespace GONet.Tests.Utils
         }
 
         [Test]
+        public void DynamicResize_DuringWrapAround_PreservesDataIntegrity()
+        {
+            var buffer = new RingBuffer<int>(1024);
+
+            // Fill buffer to 50%, then consume half to force wrap-around
+            for (int i = 0; i < 500; i++)
+            {
+                buffer.TryWrite(i);
+            }
+
+            // Consume 400 items (readIdx now at 400, writeIdx at 500)
+            for (int i = 0; i < 400; i++)
+            {
+                buffer.TryRead(out int value);
+                Assert.AreEqual(i, value);
+            }
+
+            // Now buffer has 100 items, indices: readIdx=400, writeIdx=500
+            Assert.AreEqual(100, buffer.Count);
+
+            // Fill to wrap around and trigger resize
+            // Need to add 668 more items to hit 75% of 1024 (768 total)
+            for (int i = 500; i < 1168; i++)
+            {
+                buffer.TryWrite(i);
+            }
+
+            // Buffer should have resized (indices were wrapped before resize)
+            Assert.AreEqual(2048, buffer.Capacity, "Should have resized to 2048");
+
+            // Verify all 768 items are intact in FIFO order
+            // First 100 items are 400-499 (survived from before resize)
+            for (int i = 400; i < 500; i++)
+            {
+                Assert.IsTrue(buffer.TryRead(out int value));
+                Assert.AreEqual(i, value, $"Item {i} should be intact after resize with wrap-around");
+            }
+
+            // Next 668 items are 500-1167 (added after initial consumption)
+            for (int i = 500; i < 1168; i++)
+            {
+                Assert.IsTrue(buffer.TryRead(out int value));
+                Assert.AreEqual(i, value, $"Item {i} should be intact after resize with wrap-around");
+            }
+
+            Assert.AreEqual(0, buffer.Count, "Buffer should be empty after reading all items");
+        }
+
+        [Test]
+        public void DynamicResize_WithReadIndexGreaterThanWriteIndex_WorksCorrectly()
+        {
+            var buffer = new RingBuffer<int>(1024);
+
+            // Fill almost to capacity
+            for (int i = 0; i < 1000; i++)
+            {
+                buffer.TryWrite(i);
+            }
+
+            // Consume 900 items (readIdx=900, writeIdx=1000)
+            for (int i = 0; i < 900; i++)
+            {
+                buffer.TryRead(out _);
+            }
+
+            // Now add items to wrap writeIdx around (writeIdx will be < readIdx)
+            // Add 600 items: writeIdx goes 1000->1023->0->576 (wrapped!)
+            for (int i = 1000; i < 1600; i++)
+            {
+                buffer.TryWrite(i);
+            }
+
+            // Buffer now has: readIdx=900, writeIdx=576 (wrapped state!)
+            // Count should be: 100 (900-999) + 600 (1000-1599) = 700
+            Assert.AreEqual(700, buffer.Count);
+
+            // Now trigger resize by adding to 75% threshold
+            // Need 68 more items to hit 768 (75% of 1024)
+            for (int i = 1600; i < 1668; i++)
+            {
+                buffer.TryWrite(i);
+            }
+
+            Assert.AreEqual(2048, buffer.Capacity, "Should have resized");
+
+            // Verify all 768 items are intact in correct FIFO order
+            for (int i = 900; i < 1668; i++)
+            {
+                Assert.IsTrue(buffer.TryRead(out int value));
+                Assert.AreEqual(i, value, $"Item {i} should be intact after resize from wrapped state");
+            }
+        }
+
+        [Test]
+        public void DynamicResize_AtVariousIndexPositions_MaintainsOrderAndCount()
+        {
+            // Test resize at different index positions to catch edge cases
+            var testCases = new[]
+            {
+                (fillCount: 200, consumeCount: 0,   description: "No wrap-around"),
+                (fillCount: 600, consumeCount: 400, description: "Partial wrap-around"),
+                (fillCount: 900, consumeCount: 800, description: "Near-full wrap-around"),
+                (fillCount: 1000, consumeCount: 950, description: "Tight wrap-around")
+            };
+
+            foreach (var testCase in testCases)
+            {
+                var buffer = new RingBuffer<int>(1024);
+
+                // Initial fill
+                for (int i = 0; i < testCase.fillCount; i++)
+                {
+                    buffer.TryWrite(i);
+                }
+
+                // Consume some items
+                for (int i = 0; i < testCase.consumeCount; i++)
+                {
+                    buffer.TryRead(out _);
+                }
+
+                int expectedCount = testCase.fillCount - testCase.consumeCount;
+                Assert.AreEqual(expectedCount, buffer.Count, $"Initial count wrong for {testCase.description}");
+
+                // Add items to trigger resize
+                int itemsToAdd = (int)(1024 * 0.75f) - expectedCount + 10; // Exceed 75% threshold
+                for (int i = testCase.fillCount; i < testCase.fillCount + itemsToAdd; i++)
+                {
+                    buffer.TryWrite(i);
+                }
+
+                Assert.AreEqual(2048, buffer.Capacity, $"Should have resized for {testCase.description}");
+
+                // Verify all items are still in FIFO order
+                int expectedValue = testCase.consumeCount;
+                int totalExpectedCount = expectedCount + itemsToAdd;
+
+                for (int i = 0; i < totalExpectedCount; i++)
+                {
+                    Assert.IsTrue(buffer.TryRead(out int value), $"Failed to read item {i} for {testCase.description}");
+                    Assert.AreEqual(expectedValue++, value, $"Wrong value at position {i} for {testCase.description}");
+                }
+
+                Assert.AreEqual(0, buffer.Count, $"Buffer should be empty after test: {testCase.description}");
+            }
+        }
+
+        [Test]
         public void OnResized_Callback_ReceivesCorrectParameters()
         {
             var buffer = new RingBuffer<int>(1024);
