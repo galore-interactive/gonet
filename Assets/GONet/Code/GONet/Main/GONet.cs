@@ -984,6 +984,18 @@ namespace GONet
         /// </summary>
         private static long? _lastWarningSuppressionCleanupTicks;
 
+        /// <summary>
+        /// Total count of unreliable packets dropped due to send buffer full (BorrowedCount > MAX_PACKETS_PER_TICK - 10).
+        /// Incremented in SendBytesToRemoteConnection when flow control throttles unreliable messages.
+        /// </summary>
+        private static long _unreliablePacketDropCount = 0;
+
+        /// <summary>
+        /// Count of unreliable packets dropped since last log message.
+        /// Resets to 0 after logging (every 100 drops).
+        /// </summary>
+        private static int _unreliablePacketDropCount_sinceLastLog = 0;
+
         public const ushort OwnerAuthorityId_Unset = 0;
         public const ushort OwnerAuthorityId_Server = unchecked((ushort)(ushort.MaxValue << GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED)) >> GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED;
 
@@ -2272,8 +2284,22 @@ namespace GONet
             { // flow control:
                 if (GONetChannel.ById(channelId).QualityOfService == QosType.Unreliable && singleProducerSendQueues.resourcePool.BorrowedCount > SingleProducerQueues.MAX_PACKETS_PER_TICK - 10) // TODO better config of this
                 {
-                    //const string SURPASSED = "Surpassed limit...we will now essentially throw away this unreliable data you were trying to send.";
-                    //GONetLog.Info(SURPASSED);
+                    // Track unreliable packet drops for diagnostics
+                    _unreliablePacketDropCount++;
+                    _unreliablePacketDropCount_sinceLastLog++;
+
+                    // Log periodically (every 100 drops or first drop) to avoid spam
+                    if (_unreliablePacketDropCount_sinceLastLog >= 100 || _unreliablePacketDropCount == 1)
+                    {
+                        string channelName = GONetChannel.ById(channelId) == GONetChannel.AutoMagicalSync_Unreliable ? "AutoMagicalSync" :
+                                           GONetChannel.ById(channelId) == GONetChannel.TimeSync_Unreliable ? "TimeSync" :
+                                           GONetChannel.ById(channelId) == GONetChannel.EventSingles_Unreliable ? "EventSingles" :
+                                           GONetChannel.ById(channelId) == GONetChannel.CustomSerialization_Unreliable ? "CustomSerialization" : "Unknown";
+
+                        GONetLog.Warning($"[UNRELIABLE-DROP] Dropped {_unreliablePacketDropCount_sinceLastLog} unreliable packets (total: {_unreliablePacketDropCount}) | Channel: {channelName} | BorrowedCount: {singleProducerSendQueues.resourcePool.BorrowedCount}/{SingleProducerQueues.MAX_PACKETS_PER_TICK} | Connection: {(sendToConnection == null ? "ALL" : sendToConnection.ToString())}");
+                        _unreliablePacketDropCount_sinceLastLog = 0;
+                    }
+
                     return false;
                 }
             }
@@ -2776,6 +2802,12 @@ namespace GONet
                         }
 
                         _lastWarningSuppressionCleanupTicks = currentTicks;
+
+                        // Also log unreliable packet drop summary periodically
+                        if (_unreliablePacketDropCount > 0)
+                        {
+                            GONetLog.Info($"[SYNC-HEALTH] Unreliable packet drops since start: {_unreliablePacketDropCount} | Active GONetParticipants: {gonetParticipantByGONetIdMap.Count} | Send buffer max: {SingleProducerQueues.MAX_PACKETS_PER_TICK}");
+                        }
                     }
                 }
             }
