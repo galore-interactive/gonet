@@ -5081,6 +5081,23 @@ namespace GONet
         public static event Action<Client_SpawnLimboEventArgs> Client_OnSpawnEnteredLimbo;
 
         /// <summary>
+        /// CLIENT ONLY: Gets a read-only collection of participants currently in limbo state.
+        /// For use by editor inspectors and debugging tools.
+        /// </summary>
+        public static IEnumerable<GONetParticipant> Client_GetLimboParticipants()
+        {
+            return client_deferredSpawnsAwaitingBatch;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Gets the count of participants currently in limbo state.
+        /// </summary>
+        public static int Client_GetLimboCount()
+        {
+            return client_deferredSpawnsAwaitingBatch.Count;
+        }
+
+        /// <summary>
         /// CLIENT ONLY: Instantiates an object in limbo state (no GONetId assigned).
         /// Object will be queued for graduation when batch arrives.
         /// </summary>
