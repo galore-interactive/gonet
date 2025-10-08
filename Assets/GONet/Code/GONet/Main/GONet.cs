@@ -971,6 +971,19 @@ namespace GONet
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdAtInstantiationMap = new Dictionary<uint, GONetParticipant>(5000);
         internal static readonly Dictionary<uint, uint> recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map = new Dictionary<uint, uint>(1000);
 
+        /// <summary>
+        /// Tracks last warning time for each GONetId to suppress excessive "Unable to find GONetParticipant" warnings.
+        /// Key: GONetId, Value: Time.ElapsedTicks when warning was last logged.
+        /// Prevents log spam when unreliable sync events arrive after despawn (expected race condition).
+        /// </summary>
+        private static readonly Dictionary<uint, long> missingGONetParticipantWarningSuppressionMap = new Dictionary<uint, long>(100);
+
+        /// <summary>
+        /// Tracks last cleanup time for <see cref="missingGONetParticipantWarningSuppressionMap"/>.
+        /// Cleanup runs once every 10 seconds to prevent unbounded dictionary growth.
+        /// </summary>
+        private static long? _lastWarningSuppressionCleanupTicks;
+
         public const ushort OwnerAuthorityId_Unset = 0;
         public const ushort OwnerAuthorityId_Server = unchecked((ushort)(ushort.MaxValue << GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED)) >> GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED;
 
@@ -1406,9 +1419,22 @@ namespace GONet
             }
             else
             {
-                const string GNID = "Unable to find GONetParticipant for GONetId: ";
-                const string POSSI = ", which is possibly due to it being destroyed and this event came at a bad time just after destroy processed....like was the case during testing with ProjectileTest.unity";
-                GONetLog.Warning(string.Concat(GNID, @event.GONetId, POSSI));
+                // Suppress excessive warnings - only log once per 5 seconds per GONetId
+                // This is expected: unreliable sync events arrive after despawn (race condition, not a bug)
+                const long SUPPRESSION_WINDOW_TICKS = 5 * TimeSpan.TicksPerSecond;
+                long currentTicks = Time.ElapsedTicks;
+                long lastWarningTicks;
+                bool shouldLog = !missingGONetParticipantWarningSuppressionMap.TryGetValue(@event.GONetId, out lastWarningTicks) ||
+                                 (currentTicks - lastWarningTicks) >= SUPPRESSION_WINDOW_TICKS;
+
+                if (shouldLog)
+                {
+                    const string GNID = "Unable to find GONetParticipant for GONetId: ";
+                    const string POSSI = ", which is possibly due to it being destroyed and this event came at a bad time just after destroy processed....like was the case during testing with ProjectileTest.unity";
+                    GONetLog.Warning(string.Concat(GNID, @event.GONetId, POSSI));
+                    missingGONetParticipantWarningSuppressionMap[@event.GONetId] = currentTicks;
+                }
+                // else: warning suppressed (already logged recently for this GONetId)
             }
         }
 
@@ -2722,6 +2748,36 @@ namespace GONet
                 }
 
                 recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map.Clear();
+
+                // Periodically clean up old warning suppression entries (once every 10 seconds)
+                // Prevents dictionary from growing indefinitely with despawned object IDs
+                const long CLEANUP_INTERVAL_TICKS = 10 * TimeSpan.TicksPerSecond;
+                const long SUPPRESSION_WINDOW_TICKS = 5 * TimeSpan.TicksPerSecond;
+                if (missingGONetParticipantWarningSuppressionMap.Count > 0)
+                {
+                    long currentTicks = Time.ElapsedTicks;
+                    if (!_lastWarningSuppressionCleanupTicks.HasValue ||
+                        (currentTicks - _lastWarningSuppressionCleanupTicks.Value) >= CLEANUP_INTERVAL_TICKS)
+                    {
+                        // Remove entries older than suppression window + cleanup interval
+                        long expiryThreshold = currentTicks - (SUPPRESSION_WINDOW_TICKS + CLEANUP_INTERVAL_TICKS);
+                        var keysToRemove = new List<uint>();
+                        foreach (var kvp in missingGONetParticipantWarningSuppressionMap)
+                        {
+                            if (kvp.Value < expiryThreshold)
+                            {
+                                keysToRemove.Add(kvp.Key);
+                            }
+                        }
+
+                        foreach (uint key in keysToRemove)
+                        {
+                            missingGONetParticipantWarningSuppressionMap.Remove(key);
+                        }
+
+                        _lastWarningSuppressionCleanupTicks = currentTicks;
+                    }
+                }
             }
         }
 
