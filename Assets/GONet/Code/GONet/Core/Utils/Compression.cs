@@ -28,6 +28,19 @@ namespace GONet
         void Uncompress(byte[] compressed, ushort compressedBytesUsed, out byte[] uncompressed, out ushort uncompressedBytesUsed);
     }
 
+    /// <summary>
+    /// LZ4 compression/decompression with custom header format.
+    ///
+    /// IMPORTANT LIMITATIONS:
+    /// - Header uses 15-bit compressed size field: MAX 32,767 bytes compressed output
+    /// - Header uses 16-bit uncompressed size field: MAX 65,535 bytes input
+    /// - For incompressible data (random), compressed ≈ uncompressed + overhead
+    /// - PRACTICAL LIMIT: ~32KB for random/incompressible data
+    /// - Compressible data can exceed 32KB input (if compressed output stays under 32KB)
+    ///
+    /// Data exceeding these limits will throw ArgumentOutOfRangeException.
+    /// Use chunking or different compression for larger payloads.
+    /// </summary>
     public sealed class LZ4CompressionSupport : IByteArrayCompressionSupport
     {
         static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
@@ -35,6 +48,12 @@ namespace GONet
         public static LZ4CompressionSupport Instance { get; } = new LZ4CompressionSupport();
 
         public const int ONLY_COMPRESS_IF_LARGER_THAN_BYTE_COUNT = 100; // NOTE: Cannot be less than LZ4MessagePackSerializer.NotCompressionSize;
+
+        /// <summary>
+        /// Maximum safe input size for incompressible data (random bytes).
+        /// Larger values may throw ArgumentOutOfRangeException due to 15-bit compressed size limit.
+        /// </summary>
+        public const int MAX_SAFE_SIZE_INCOMPRESSIBLE = 32000; // ~32KB
 
         const uint IS_COMPRESSED_MASK = (uint)1 << 31;
         const uint HEADER_MASK = IS_COMPRESSED_MASK ^ uint.MaxValue;
@@ -53,7 +72,10 @@ namespace GONet
             }
 
             bool shouldCompress = uncompressed.Length > ONLY_COMPRESS_IF_LARGER_THAN_BYTE_COUNT;
-            int sizeToBorrow = shouldCompress ? uncompressedBytesUsed + HEADER_LENTGH : LZ4Codec.MaximumOutputLength(uncompressedBytesUsed);
+            // CRITICAL FIX: Always request MaximumOutputLength + header space for compression
+            // The worst-case LZ4 output can be larger than input (incompressible data)
+            // Formula: srcSize + (srcSize/255) + 16 + HEADER_LENGTH
+            int sizeToBorrow = LZ4Codec.MaximumOutputLength(uncompressedBytesUsed) + HEADER_LENTGH;
             int compressedBodySize;
             compressed = SerializationUtils.BorrowByteArray(sizeToBorrow);
 

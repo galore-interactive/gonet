@@ -219,6 +219,21 @@ namespace GONet.Utils
         }
 
         /// <summary>
+        /// Checks if the object was borrowed from this pool without throwing an exception.
+        /// This is a lightweight check that only queries the internal tracking dictionary.
+        /// Aggressively inlined for hot-path performance (called by TieredArrayPool.Return).
+        /// </summary>
+        /// <param name="object">The object to check</param>
+        /// <returns>True if the object was borrowed from this pool and not yet returned</returns>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public bool Contains(T @object)
+        {
+            // Cast to object for reference-equality null check (avoids Unity's overloaded == operator)
+            // Unity objects override == with expensive native calls, we only need reference check
+            return (object)@object != null && indexByCheckedOutObjectMap.ContainsKey(@object);
+        }
+
+        /// <summary>
         /// NOT required that <paramref name="borrowed"/> was returned from a call to <see cref="Borrow"/> and not already passed in here.
         /// </summary>
         public bool TryReturn(T borrowed)

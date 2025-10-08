@@ -30,7 +30,7 @@ namespace GONet.Utils
         public const int MTU_x8 = MTU << 3;
         public const int MTU_x32 = MTU << 5;
 
-        static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, ArrayPool<byte>>();
+        static readonly ConcurrentDictionary<Thread, TieredArrayPool<byte>> byteArrayPoolByThreadMap = new ConcurrentDictionary<Thread, TieredArrayPool<byte>>();
 
         static SerializationUtils()
         {
@@ -60,9 +60,9 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static byte[] BorrowByteArray(int minimumSize)
         {
-            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out ArrayPool<byte> arrayPool))
+            if (!byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out TieredArrayPool<byte> arrayPool))
             {
-                arrayPool = new ArrayPool<byte>(25, 1, MTU_x8, MTU_x32);
+                arrayPool = new TieredArrayPool<byte>();
                 byteArrayPoolByThreadMap[Thread.CurrentThread] = arrayPool;
             }
             return arrayPool.Borrow(minimumSize);
@@ -83,7 +83,7 @@ namespace GONet.Utils
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryReturnByteArray(byte[] borrowed)
         {
-            if (byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out ArrayPool<byte> arrayPool))
+            if (byteArrayPoolByThreadMap.TryGetValue(Thread.CurrentThread, out TieredArrayPool<byte> arrayPool))
             {
                 try
                 {
