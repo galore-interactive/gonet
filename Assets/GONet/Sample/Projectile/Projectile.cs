@@ -28,6 +28,13 @@ namespace GONet.Sample
         private float startSpeed;
         public float speed = 5;
 
+        /// <summary>
+        /// Movement direction set at spawn time (for shotgun spread effect).
+        /// Stored separately so rotation doesn't affect movement path.
+        /// </summary>
+        [HideInInspector]
+        public Vector3 movementDirection;
+
         TextMeshProUGUI text;
 
         protected override void Awake()
@@ -37,6 +44,9 @@ namespace GONet.Sample
             text = GetComponentInChildren<TextMeshProUGUI>();
 
             startSpeed = speed;
+
+            // Store initial forward direction for movement (unaffected by rotation)
+            movementDirection = transform.forward;
 
             InitSutffForSupportingHoveringDuplicate();
         }

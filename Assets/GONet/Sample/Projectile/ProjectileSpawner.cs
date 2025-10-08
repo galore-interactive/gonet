@@ -112,16 +112,34 @@ public class ProjectileSpawner : GONetBehaviour
                     // Calculate angle for this projectile (relative to transform.forward)
                     float angleOffset = START_ANGLE + (i * ANGLE_INCREMENT);
 
-                    // Create rotation: rotate around the Z-axis (up/down spread relative to camera)
-                    // Since projectiles move in Vector3.forward (World space), we rotate the spawn rotation
-                    Quaternion spreadRotation = transform.rotation * Quaternion.Euler(0f, 0f, angleOffset);
+                    // Manually calculate direction for vertical spread
+                    // Start with forward direction, then rotate up/down using transform's right axis
+                    Vector3 baseForward = transform.forward;
+                    Vector3 rightAxis = transform.right; // Local X axis
+                    Vector3 upComponent = transform.up * Mathf.Sin(angleOffset * Mathf.Deg2Rad);
+                    Vector3 forwardComponent = baseForward * Mathf.Cos(angleOffset * Mathf.Deg2Rad);
+                    Vector3 spreadDirection = (forwardComponent + upComponent).normalized;
+
+                    // Create rotation that points in the spread direction
+                    Quaternion spreadRotation = Quaternion.LookRotation(spreadDirection, transform.up);
 
                     GONetParticipant gnp =
                         GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, spreadRotation);
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
+                }
 
-                    // Spawn addressable for each projectile as well
-                    InstantiateAddressablesPrefab(spreadRotation);
+                // Spawn just ONE set of 5 addressable physics cubes (not per projectile)
+                for (int i = 0; i < 5; i++)
+                {
+                    float angleOffset = START_ANGLE + (i * (SPREAD_ANGLE / 4f)); // 5 cubes spread across arc
+
+                    Vector3 baseForward = transform.forward;
+                    Vector3 upComponent = transform.up * Mathf.Sin(angleOffset * Mathf.Deg2Rad);
+                    Vector3 forwardComponent = baseForward * Mathf.Cos(angleOffset * Mathf.Deg2Rad);
+                    Vector3 spreadDirection = (forwardComponent + upComponent).normalized;
+                    Quaternion cubeRotation = Quaternion.LookRotation(spreadDirection, transform.up);
+
+                    InstantiateAddressablesPrefab(cubeRotation);
                 }
             }
         }
@@ -138,8 +156,10 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (projectile.GONetParticipant.IsMine)
             {
-                // option to use gonet time delta instead: projectile.transform.Translate(transform.forward * GONetMain.Time.DeltaTime * projectile.speed);
-                projectile.transform.Translate(Vector3.forward * Time.deltaTime * projectile.speed, Space.World);
+                // Move in stored direction (unaffected by rotation - shotgun spread effect)
+                projectile.transform.position += projectile.movementDirection * Time.deltaTime * projectile.speed;
+
+                // Visual rotation (doesn't affect movement path)
                 const float CYCLE_SECONDS = 5f;
                 const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
                 var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
