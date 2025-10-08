@@ -6147,9 +6147,13 @@ namespace GONet
                 }
                 else
                 {
+                    // Check if this is a scene unload destroy (Unity automatically destroys all objects in unloading scenes)
+                    bool isSceneUnloadDestroy = IsDestroyFromSceneUnload(gonetParticipant);
+
                     bool isExpected =
                         gonetIdsDestroyedViaPropagation.Contains(gonetParticipant.GONetId) ||
-                        (IsClient && IsApplicationQuitting);
+                        (IsClient && IsApplicationQuitting) ||
+                        isSceneUnloadDestroy; // Scene unload destroys all objects - this is expected
 
                     if (!isExpected)
                     {
