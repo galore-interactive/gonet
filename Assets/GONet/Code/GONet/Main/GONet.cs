@@ -2013,18 +2013,27 @@ namespace GONet
         /// IMPORTANT: This could be used for projectiles too even if the client instantiating it will not control it after the initial "birth" of it.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// CLIENT ONLY: Legacy API for backward compatibility.
+        /// Internally delegates to Client_TryInstantiateToBeRemotelyControlledByMe() with default limbo fallback.
+        ///
+        /// RECOMMENDED: Use Client_TryInstantiateToBeRemotelyControlledByMe() for explicit control over batch exhaustion handling.
+        /// </summary>
         public static GONetParticipant Client_InstantiateToBeRemotelyControlledByMe(GONetParticipant prefab, Vector3 position, Quaternion rotation)
         {
             if (IsClient)
             {
-                GONetParticipant gonetParticipant =
-                    GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
+                // Delegate to new batch-aware API with default limbo mode
+                // This ensures old code still works but uses the batch system correctly
+                if (Client_TryInstantiateToBeRemotelyControlledByMe(prefab, position, rotation, out GONetParticipant participant))
+                {
+                    return participant;
+                }
 
-                // In order for the caller to immediately see that this is remotely controlled, set this here locally and server will do the same after processing
-                // TODO make sure this local change does not mess up the one that occurs on server to propogate to all others
-                gonetParticipant.RemotelyControlledByAuthorityId = MyAuthorityId;
-
-                return gonetParticipant;
+                // Batch exhausted and limbo mode is ReturnFailure
+                GONetLog.Error($"[GONet] Failed to spawn '{prefab.name}' - batch exhausted and limbo mode is ReturnFailure. " +
+                              "Consider using Client_TryInstantiateToBeRemotelyControlledByMe() for explicit handling.");
+                return null;
             }
 
             return null;
