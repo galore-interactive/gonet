@@ -283,7 +283,7 @@ namespace GONet
         public bool Client_IsInLimbo => client_isInLimbo;
 
         // INTERNAL TRACKING - DO NOT MODIFY THESE FIELDS
-        [NonSerialized] private bool client_isInLimbo = false;
+        [NonSerialized] internal bool client_isInLimbo = false;
 
         // Option 1 tracking (DisableAll):
         [NonSerialized] internal List<MonoBehaviour> client_limboDisabledComponents;

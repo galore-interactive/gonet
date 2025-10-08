@@ -101,10 +101,28 @@ public class ProjectileSpawner : GONetBehaviour
             #endregion
             if (shouldInstantiateBasedOnInput)
             {
-                GONetParticipant gnp =
-                    GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, transform.rotation);
-                //GONetLog.Debug($"Spawned projectile for this client to remotely control, but server will own it. Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
-                InstantiateAddressablesPrefab();
+                // Spawn 9 projectiles in a spread pattern (160 degree arc)
+                const int PROJECTILE_COUNT = 9;
+                const float SPREAD_ANGLE = 160f; // Total spread in degrees
+                const float ANGLE_INCREMENT = SPREAD_ANGLE / (PROJECTILE_COUNT - 1); // Evenly distributed
+                const float START_ANGLE = -SPREAD_ANGLE / 2f; // Start at -80 degrees
+
+                for (int i = 0; i < PROJECTILE_COUNT; i++)
+                {
+                    // Calculate angle for this projectile (relative to transform.forward)
+                    float angleOffset = START_ANGLE + (i * ANGLE_INCREMENT);
+
+                    // Create rotation: rotate around the Z-axis (up/down spread relative to camera)
+                    // Since projectiles move in Vector3.forward (World space), we rotate the spawn rotation
+                    Quaternion spreadRotation = transform.rotation * Quaternion.Euler(0f, 0f, angleOffset);
+
+                    GONetParticipant gnp =
+                        GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, spreadRotation);
+                    //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
+
+                    // Spawn addressable for each projectile as well
+                    InstantiateAddressablesPrefab(spreadRotation);
+                }
             }
         }
 
@@ -176,14 +194,14 @@ public class ProjectileSpawner : GONetBehaviour
             DestroyAddressableProjectilesOutOfView();
         }
     }
-    private async Task InstantiateAddressablesPrefab()
+    private async Task InstantiateAddressablesPrefab(Quaternion rotation)
     {
         const string oohLaLa_addressablesPrefabPath = "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab";
         GONetParticipant addressablePrefab = await GONetAddressablesHelper.LoadGONetPrefabAsync(oohLaLa_addressablesPrefabPath);
         // LoadGONetPrefabAsync guarantees we're back on Unity main thread after await
         // Safe to call Unity APIs now
         GONetParticipant addressableInstance =
-            GONetMain.Client_InstantiateToBeRemotelyControlledByMe(addressablePrefab, transform.position, transform.rotation);
+            GONetMain.Client_InstantiateToBeRemotelyControlledByMe(addressablePrefab, transform.position, rotation);
     }
 
     /// <summary>

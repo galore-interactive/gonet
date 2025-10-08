@@ -127,6 +127,7 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeReplayProtection.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GCLessAlgorithms.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GONetLog.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\Client_GONetIdBatchLimboMode.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileBackedDictionary.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\SocketContext.cs" />
