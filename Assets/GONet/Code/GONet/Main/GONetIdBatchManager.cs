@@ -84,18 +84,16 @@ namespace GONet
         private static bool client_hasRequestedBatch = false; // Track if we've already requested a batch for current low state
 
         /// <summary>
-        /// Gets the configured batch size from GONet Project Settings.
-        /// Falls back to DEFAULT_BATCH_SIZE if settings unavailable.
+        /// Gets the configured batch size from GONetGlobal (runtime settings).
+        /// Falls back to DEFAULT_BATCH_SIZE if GONetGlobal unavailable.
         /// </summary>
         private static int GetBatchSize()
         {
-            #if UNITY_EDITOR
-            var settings = GONet.Editor.GONetProjectSettings.Instance;
-            if (settings != null)
+            var gonetGlobal = GONetGlobal.Instance;
+            if (gonetGlobal != null)
             {
-                return settings.client_GONetIdBatchSize;
+                return gonetGlobal.client_GONetIdBatchSize;
             }
-            #endif
 
             return DEFAULT_BATCH_SIZE;
         }

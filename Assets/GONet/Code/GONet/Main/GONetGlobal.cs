@@ -74,6 +74,16 @@ namespace GONet
                 "Default: Enabled (recommended for development)")]
         public bool enableAutoRoleDetection = true;
 
+        [Tooltip("Number of GONetIds allocated per batch for client-spawned objects.\n\n" +
+                "IMPORTANT: Limbo mode only triggers when client exhausts ALL batch IDs (RARE edge case).\n\n" +
+                "• Higher values (500-1000): Better for rapid spawning scenarios (100+ spawns/sec)\n" +
+                "• Lower values (100-200): Better for typical gameplay (reduces server memory overhead)\n\n" +
+                "Default: 200 IDs per batch (suitable for most games)\n" +
+                "Range: 100-1000 IDs per batch\n\n" +
+                "Client automatically requests new batch when 50% remaining.")]
+        [Range(100, 1000)]
+        public int client_GONetIdBatchSize = 200;
+
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 
