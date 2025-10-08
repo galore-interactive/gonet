@@ -65,6 +65,97 @@ namespace GONet.Editor
             DrawGNPList(targetGNG.EnabledGONetParticipants, ALL, false);
 
             GUI.enabled = guiEnabledPrevious;
+
+            // Live Metrics Section (Play Mode Only)
+            if (Application.isPlaying)
+            {
+                DrawLiveMetrics();
+                Repaint(); // Force continuous update during play mode
+            }
+        }
+
+        private void DrawLiveMetrics()
+        {
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Live Metrics (Play Mode)", EditorStyles.boldLabel);
+
+            var metrics = GONetMain.GetRingBufferMetrics();
+
+            if (metrics.Length == 0)
+            {
+                EditorGUILayout.HelpBox("Ring buffers not initialized yet. Metrics will appear once network threads start.", MessageType.Info);
+                return;
+            }
+
+            // Display metrics for each ring buffer
+            foreach (var metric in metrics)
+            {
+                EditorGUILayout.Space(5);
+                EditorGUILayout.LabelField($"Thread: {metric.ThreadName}", EditorStyles.miniBoldLabel);
+
+                EditorGUI.indentLevel++;
+
+                // Capacity and current count
+                EditorGUILayout.LabelField("Capacity", metric.Capacity.ToString("N0"));
+                EditorGUILayout.LabelField("Current Count", $"{metric.Count:N0} ({metric.FillPercentage:P1})");
+
+                // Color-code fill percentage for visual feedback
+                Color fillColor = GetFillColor(metric.FillPercentage);
+                var previousColor = GUI.color;
+                GUI.color = fillColor;
+                EditorGUILayout.LabelField("Fill Status", GetFillStatus(metric.FillPercentage));
+                GUI.color = previousColor;
+
+                // Peak count
+                EditorGUILayout.LabelField("Peak Count", metric.PeakCount.ToString("N0"));
+
+                // Resize count
+                string resizeText = metric.ResizeCount == 0 ? "0 (never resized)" : metric.ResizeCount.ToString();
+                EditorGUILayout.LabelField("Times Resized", resizeText);
+
+                // Memory estimate (approximate)
+                int memoryKB = (metric.Capacity * 8 + 128 + 24) / 1024;
+                EditorGUILayout.LabelField("Memory Usage", $"~{memoryKB} KB");
+
+                EditorGUI.indentLevel--;
+            }
+
+            // Summary section
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Summary", EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+
+            int totalCapacity = 0;
+            int totalCount = 0;
+            int totalMemoryKB = 0;
+
+            foreach (var metric in metrics)
+            {
+                totalCapacity += metric.Capacity;
+                totalCount += metric.Count;
+                totalMemoryKB += (metric.Capacity * 8 + 128 + 24) / 1024;
+            }
+
+            EditorGUILayout.LabelField("Total Capacity", totalCapacity.ToString("N0"));
+            EditorGUILayout.LabelField("Total Events", $"{totalCount:N0} ({(float)totalCount / totalCapacity:P1})");
+            EditorGUILayout.LabelField("Total Memory", $"~{totalMemoryKB} KB");
+
+            EditorGUI.indentLevel--;
+        }
+
+        private Color GetFillColor(float fillPercentage)
+        {
+            if (fillPercentage < 0.5f) return Color.green;
+            if (fillPercentage < 0.75f) return Color.yellow;
+            return Color.red;
+        }
+
+        private string GetFillStatus(float fillPercentage)
+        {
+            if (fillPercentage < 0.5f) return "Healthy (< 50%)";
+            if (fillPercentage < 0.75f) return "Moderate (50-75%)";
+            if (fillPercentage < 0.9f) return "High (75-90%)";
+            return "Critical (> 90%)";
         }
     }
 

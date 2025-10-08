@@ -128,6 +128,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncActualBehaviorTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetProjectSettings.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\SpawnBurstTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\RingBufferTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GNPListCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighResolutionTimeUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableNetcodeStarvationTests.cs" />

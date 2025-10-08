@@ -103,6 +103,59 @@ namespace GONet
 
         #endregion
 
+        #region Ring Buffer Metrics
+
+        /// <summary>
+        /// Snapshot of ring buffer metrics for a specific thread's event queue.
+        /// Used by the inspector and debugging tools to monitor buffer health.
+        /// </summary>
+        public struct RingBufferMetrics
+        {
+            public int Capacity;
+            public int Count;
+            public int PeakCount;
+            public int ResizeCount;
+            public float FillPercentage;
+            public string ThreadName;
+        }
+
+        /// <summary>
+        /// Gets metrics for all ring buffers (one per sync thread).
+        /// Thread-safe. Returns empty array if not initialized yet.
+        /// Used by GONetGlobalCustomInspector for live metrics display.
+        /// </summary>
+        public static RingBufferMetrics[] GetRingBufferMetrics()
+        {
+            if (events_SendToOthersQueue_ByThreadMap == null || events_SendToOthersQueue_ByThreadMap.Count == 0)
+            {
+                return Array.Empty<RingBufferMetrics>();
+            }
+
+            var metrics = new List<RingBufferMetrics>();
+
+            // Thread-safe iteration (dictionary keys added only from main thread, but ring buffers accessed from multiple threads)
+            lock (events_SendToOthersQueue_ByThreadMap)
+            {
+                foreach (var kvp in events_SendToOthersQueue_ByThreadMap)
+                {
+                    var buffer = kvp.Value;
+                    metrics.Add(new RingBufferMetrics
+                    {
+                        Capacity = buffer.Capacity,
+                        Count = buffer.Count,
+                        PeakCount = buffer.PeakCount,
+                        ResizeCount = buffer.ResizeCount,
+                        FillPercentage = buffer.FillPercentage,
+                        ThreadName = kvp.Key.Name ?? "Main Thread"
+                    });
+                }
+            }
+
+            return metrics.ToArray();
+        }
+
+        #endregion
+
         #region Persistent Event History Export
 
         /// <summary>
@@ -7111,7 +7164,9 @@ namespace GONet
                     thread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
 
                     events_AwaitingSendToOthersQueue_ByThreadMap[thread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
-                    events_SendToOthersQueue_ByThreadMap[thread] = new RingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
+                    var ringBuffer = new RingBuffer<IGONetEvent>(); // Starts at 2048, auto-scales to 16384
+                    ringBuffer.OnResized = OnRingBufferResized;
+                    events_SendToOthersQueue_ByThreadMap[thread] = ringBuffer;
 
                     isThreadRunning = true;
                     thread.Start();
@@ -7123,7 +7178,9 @@ namespace GONet
                     if (!events_AwaitingSendToOthersQueue_ByThreadMap.ContainsKey(Thread.CurrentThread))
                     {
                         events_AwaitingSendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new Queue<IGONetEvent>(100); // we're on main thread, safe to deal with regular dict here
-                        events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = new RingBuffer<IGONetEvent>(1024); // we're on main thread, safe to deal with regular dict here
+                        var ringBuffer = new RingBuffer<IGONetEvent>(); // Starts at 2048, auto-scales to 16384
+                        ringBuffer.OnResized = OnRingBufferResized;
+                        events_SendToOthersQueue_ByThreadMap[Thread.CurrentThread] = ringBuffer;
                     }
                 }
 
@@ -7134,6 +7191,38 @@ namespace GONet
                 if (myThread_Time != Time) // avoid SetFromAuthority if the local time instance is the same as GONetMain instance since it will be already handled/set
                 {
                     myThread_Time.SetFromAuthority(toElapsedTicks);
+                }
+            }
+
+            /// <summary>
+            /// Callback invoked when the ring buffer automatically resizes.
+            /// Logs informative messages about buffer growth and capacity warnings.
+            /// </summary>
+            private void OnRingBufferResized(int oldCapacity, int newCapacity, int currentCount)
+            {
+                // Calculate memory usage (approximate)
+                int memoryKB = (newCapacity * 8 + 128 + 24) / 1024; // Array + padding + overhead
+
+                if (newCapacity > oldCapacity)
+                {
+                    // Successful resize
+                    GONetLog.Info($"[GONet] Ring buffer auto-scaled: {oldCapacity} → {newCapacity} (memory: ~{memoryKB} KB, current fill: {currentCount}/{newCapacity})");
+
+                    if (newCapacity >= 16384)
+                    {
+                        // Reached maximum capacity
+                        GONetLog.Warning($"[GONet] Ring buffer reached maximum capacity ({newCapacity}). Consider optimizing spawn rate or implementing spatial culling. Current load: {currentCount} events.");
+                    }
+                }
+                else
+                {
+                    // Failed to resize (already at max capacity and hitting 75% threshold)
+                    float fillPercent = (float)currentCount / oldCapacity * 100f;
+                    GONetLog.Warning($"[GONet] Ring buffer at maximum capacity ({oldCapacity}) and {fillPercent:F1}% full! Events may be dropped during high load. Consider:\n" +
+                        $"  - Reducing spawn rate (spread spawns over multiple frames)\n" +
+                        $"  - Implementing spatial culling (only sync nearby objects)\n" +
+                        $"  - Contact GONet support if this persists\n" +
+                        $"Current event count: {currentCount}/{oldCapacity}");
                 }
             }
 
