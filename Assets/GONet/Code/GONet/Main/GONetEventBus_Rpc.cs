@@ -1778,9 +1778,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -1834,9 +1844,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -1890,9 +1910,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -1946,9 +1976,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -2002,9 +2042,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -2058,9 +2108,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -2114,9 +2174,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -2170,9 +2240,19 @@ namespace GONet
                     persistentEvent.RpcId = rpcId;
                     persistentEvent.GONetId = instance.GONetParticipant.GONetId;
                     persistentEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-                    persistentEvent.Data = serialized;
+
+                    // Copy to right-sized array (don't store pooled buffer)
+                    persistentEvent.Data = new byte[bytesUsed];
+                    Buffer.BlockCopy(serialized, 0, persistentEvent.Data, 0, bytesUsed);
+
                     persistentEvent.SourceAuthorityId = GONetMain.MyAuthorityId;
                     persistentEvent.OriginalTarget = RpcTarget.All;
+
+                    // Return the pooled buffer
+                    if (needsReturn)
+                    {
+                        SerializationUtils.ReturnByteArray(serialized);
+                    }
 
                     Publish(persistentEvent, shouldPublishReliably: metadata.IsReliable);
                 }
@@ -2563,11 +2643,21 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
 
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
@@ -3085,11 +3175,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else
@@ -3348,11 +3449,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else
@@ -3611,11 +3723,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else
@@ -3874,11 +3997,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else
@@ -4137,11 +4271,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else
@@ -4400,11 +4545,22 @@ namespace GONet
                         persistentRoutedRpc.GONetId = instance.GONetParticipant.GONetId;
                         persistentRoutedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, persistentRoutedRpc.TargetAuthorities, targetCount);
-                        persistentRoutedRpc.Data = serialized;
+
+                        // Copy to right-sized array (don't store pooled buffer)
+                        persistentRoutedRpc.Data = new byte[bytesUsed];
+                        Buffer.BlockCopy(serialized, 0, persistentRoutedRpc.Data, 0, bytesUsed);
+
                         persistentRoutedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         persistentRoutedRpc.SourceAuthorityId = GONetMain.MyAuthorityId;
                         persistentRoutedRpc.OriginalTarget = metadata.Target;
                         persistentRoutedRpc.TargetPropertyName = metadata.TargetPropertyName;
+
+                        // Return the pooled buffer
+                        if (needsReturn)
+                        {
+                            SerializationUtils.ReturnByteArray(serialized);
+                        }
+
                         Publish(persistentRoutedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
                     else

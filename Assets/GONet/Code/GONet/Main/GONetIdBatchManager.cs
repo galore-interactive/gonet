@@ -10,17 +10,29 @@ namespace GONet
     /// what the server will assign, enabling seamless authority transfer.
     ///
     /// CRITICAL INVARIANTS:
-    /// 1. Each batch is 100 sequential IDs (e.g., 6000-6099)
+    /// 1. Each batch is configurable sequential IDs (default 200, range 100-1000)
     /// 2. Batches are assigned to clients on connection
     /// 3. Clients consume batches sequentially (6000, 6001, 6002...)
-    /// 4. Batches are exhausted and removed when all 100 IDs used
-    /// 5. New batches requested automatically when < 20 IDs remain
+    /// 4. Batches are exhausted and removed when all IDs used
+    /// 5. New batches requested automatically when 50% IDs remain (threshold = batchSize / 2)
     /// 6. Scene changes reset client batch state completely
+    ///
+    /// BATCH SIZE CONFIGURATION:
+    /// - Configured in GONet Project Settings
+    /// - Range: 100-1000 IDs per batch
+    /// - Default: 200 (good for typical games with projectiles)
+    /// - Larger batches = fewer limbo occurrences but more ID space used
+    /// - Smaller batches = more limbo occurrences but more efficient ID usage
     /// </summary>
     internal static class GONetIdBatchManager
     {
-        private const int BATCH_SIZE = 100;
-        private const int LOW_BATCH_THRESHOLD = 20; // Request new batch when < 20 IDs left
+        // Batch size limits
+        public const int MIN_BATCH_SIZE = 100;
+        public const int MAX_BATCH_SIZE = 1000;
+        public const int DEFAULT_BATCH_SIZE = 200;
+
+        // Threshold is always 50% of batch size (hardcoded - user cannot configure)
+        private const float BATCH_REQUEST_THRESHOLD_PERCENT = 0.5f;
 
         /// <summary>
         /// Represents a single batch of GONetIds allocated for client use.
@@ -29,15 +41,17 @@ namespace GONet
         {
             public readonly uint BatchStart;
             public readonly uint BatchEnd; // Exclusive
+            public readonly int BatchSize;
             public uint NextAvailableId;
             public int RemainingCount;
 
-            public GONetIdBatch(uint batchStart)
+            public GONetIdBatch(uint batchStart, int batchSize)
             {
                 BatchStart = batchStart;
-                BatchEnd = batchStart + BATCH_SIZE;
+                BatchSize = batchSize;
+                BatchEnd = batchStart + (uint)batchSize;
                 NextAvailableId = batchStart;
-                RemainingCount = BATCH_SIZE;
+                RemainingCount = batchSize;
             }
 
             public bool TryAllocateNext(out uint gonetId)
@@ -69,6 +83,42 @@ namespace GONet
         private static uint client_totalIdsUsed = 0;
         private static bool client_hasRequestedBatch = false; // Track if we've already requested a batch for current low state
 
+        /// <summary>
+        /// Gets the configured batch size from GONet Project Settings.
+        /// Falls back to DEFAULT_BATCH_SIZE if settings unavailable.
+        /// </summary>
+        private static int GetBatchSize()
+        {
+            // TODO: Get from GONetProjectSettings once implemented
+            // return GONetProjectSettings.Instance.client_GONetIdBatchSize;
+            return DEFAULT_BATCH_SIZE;
+        }
+
+        /// <summary>
+        /// Gets the batch request threshold (50% of batch size).
+        /// </summary>
+        private static int GetBatchRequestThreshold()
+        {
+            int batchSize = GetBatchSize();
+            return (int)(batchSize * BATCH_REQUEST_THRESHOLD_PERCENT);
+        }
+
+        /// <summary>
+        /// CLIENT: Returns number of IDs remaining across all active batches.
+        /// </summary>
+        public static uint Client_GetRemainingIds()
+        {
+            return client_totalIdsAllocated - client_totalIdsUsed;
+        }
+
+        /// <summary>
+        /// CLIENT: Returns true if at least one ID is available for allocation.
+        /// </summary>
+        public static bool Client_HasAvailableIds()
+        {
+            return Client_GetRemainingIds() > 0;
+        }
+
         #region SERVER API
 
         /// <summary>
@@ -77,17 +127,18 @@ namespace GONet
         /// </summary>
         public static uint Server_AllocateNewBatch(uint lastAssignedGONetIdRaw)
         {
+            int batchSize = GetBatchSize();
             uint batchStart = lastAssignedGONetIdRaw + 1;
 
             // Ensure we never collide with existing batches
             while (server_allocatedBatchStarts.Contains(batchStart))
             {
-                GONetLog.Warning($"[GONetIdBatch] Batch collision detected at {batchStart}, incrementing by BATCH_SIZE");
-                batchStart += BATCH_SIZE;
+                GONetLog.Warning($"[GONetIdBatch] Batch collision detected at {batchStart}, incrementing by batchSize");
+                batchStart += (uint)batchSize;
             }
 
             server_allocatedBatchStarts.Add(batchStart);
-            GONetLog.Info($"[GONetIdBatch] SERVER allocated batch [{batchStart} - {batchStart + BATCH_SIZE - 1}] to client");
+            GONetLog.Info($"[GONetIdBatch] SERVER allocated batch [{batchStart} - {batchStart + batchSize - 1}] (size: {batchSize}) to client");
 
             return batchStart;
         }
@@ -98,9 +149,10 @@ namespace GONet
         /// </summary>
         public static bool Server_IsIdInAnyBatch(uint gonetIdRaw)
         {
+            int batchSize = GetBatchSize();
             foreach (uint batchStart in server_allocatedBatchStarts)
             {
-                if (gonetIdRaw >= batchStart && gonetIdRaw < batchStart + BATCH_SIZE)
+                if (gonetIdRaw >= batchStart && gonetIdRaw < batchStart + batchSize)
                 {
                     return true;
                 }
@@ -138,6 +190,8 @@ namespace GONet
         /// </summary>
         public static void Client_AddBatch(uint batchStart)
         {
+            int batchSize = GetBatchSize();
+
             // Validate no duplicates
             foreach (var batch in client_activeBatches)
             {
@@ -148,12 +202,12 @@ namespace GONet
                 }
             }
 
-            var newBatch = new GONetIdBatch(batchStart);
+            var newBatch = new GONetIdBatch(batchStart, batchSize);
             client_activeBatches.Add(newBatch);
-            client_totalIdsAllocated += BATCH_SIZE;
+            client_totalIdsAllocated += (uint)batchSize;
             client_hasRequestedBatch = false; // Reset flag - we can request again if we get low
 
-            GONetLog.Info($"[GONetIdBatch] CLIENT received batch [{batchStart} - {batchStart + BATCH_SIZE - 1}] | Total batches: {client_activeBatches.Count} | Remaining IDs: {client_totalIdsAllocated - client_totalIdsUsed}");
+            GONetLog.Info($"[GONetIdBatch] CLIENT received batch [{batchStart} - {batchStart + batchSize - 1}] (size: {batchSize}) | Total batches: {client_activeBatches.Count} | Remaining IDs: {client_totalIdsAllocated - client_totalIdsUsed}");
         }
 
         /// <summary>
@@ -183,14 +237,15 @@ namespace GONet
                     client_totalIdsUsed++;
 
                     uint remainingIds = client_totalIdsAllocated - client_totalIdsUsed;
+                    int threshold = GetBatchRequestThreshold();
                     GONetLog.Info($"[GONetIdBatch] CLIENT allocated GONetId {gonetIdRaw} | Remaining in batch: {client_activeBatches[0].RemainingCount} | Total remaining: {remainingIds}");
 
                     // Check if we should request more batches (only once when dropping below threshold)
-                    if (remainingIds < LOW_BATCH_THRESHOLD && !client_hasRequestedBatch)
+                    if (remainingIds < threshold && !client_hasRequestedBatch)
                     {
                         shouldRequestNewBatch = true;
                         client_hasRequestedBatch = true; // Mark that we've requested
-                        GONetLog.Warning($"[GONetIdBatch] CLIENT low on IDs ({remainingIds} remaining) - should request new batch");
+                        GONetLog.Warning($"[GONetIdBatch] CLIENT low on IDs ({remainingIds} remaining, threshold: {threshold}) - should request new batch");
                     }
 
                     return true;

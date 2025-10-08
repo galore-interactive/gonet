@@ -41,13 +41,32 @@ namespace GONet.Sample
             InitSutffForSupportingHoveringDuplicate();
         }
 
+        // DIAGNOSTIC: Track first update to log ownership state once
+        private bool hasLoggedOwnershipOnce = false;
+        private float despawnTimer = 0f;
+
         private void Update()
         {
+            // DIAGNOSTIC: Log ownership state on first update for this projectile
+            if (!hasLoggedOwnershipOnce)
+            {
+                hasLoggedOwnershipOnce = true;
+                GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) FIRST UPDATE - " +
+                    $"IsMine: {gonetParticipant.IsMine}, " +
+                    $"OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, " +
+                    $"MyAuthorityId: {GONetMain.MyAuthorityId}, " +
+                    $"IsServer: {GONetMain.IsServer}, " +
+                    $"IsClient: {GONetMain.IsClient}, " +
+                    $"startSpeed: {startSpeed}, " +
+                    $"speed: {speed}");
+            }
+
             if (gonetParticipant.IsMine)
             {
                 if (speed > -startSpeed)
                 {
                     speed -= Time.deltaTime;
+                    despawnTimer += Time.deltaTime;
 
                     const string MINE = "Mine";
                     text.text = MINE;
@@ -58,6 +77,11 @@ namespace GONet.Sample
                 }
                 else
                 {
+                    // DIAGNOSTIC: Log despawn decision
+                    GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) DESPAWNING - " +
+                        $"speed: {speed}, -startSpeed: {-startSpeed}, despawnTimer: {despawnTimer:F2}s, " +
+                        $"IsMine: {gonetParticipant.IsMine}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}");
+
                     Destroy(gameObject); // avoid having an ever growing list of things going when they go off screen and cannot be seen
                 }
             }

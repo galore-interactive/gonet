@@ -162,6 +162,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\Compression.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\Defines.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetConnections.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\Utils\TieredArrayPool.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableEndpoint.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\HierarchyUtils.cs" />

@@ -91,6 +91,7 @@
     <Analyzer Include="D:\projects\unity\gonet-git\Assets\GONet\Code\Plugins\MemoryPack\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\LZ4CompressionTieredPoolTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighResolutionTimeUtilsEdgeCaseTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncVerificationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ChannelInterleavingTests.cs" />
@@ -105,6 +106,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcValidationTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ArrayPoolTests.cs" />
     <Compile Include="Assets\GONet\Sample\Editor\SceneBuildSettingsHelper.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\NetworkUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
@@ -112,6 +114,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeCorrectionLogicTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\CrossPlatformTimeTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncSchedulerTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\TieredArrayPoolTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\SecretaryOfTemporalAffairsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
@@ -151,6 +154,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\ClientServerConnectionTests_Simple.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetAutoMagicalSyncMemberCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\RealWorldScenarioTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\PersistentEventMemoryTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetPrefabSaveDetector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncIntegrationTests.cs" />
