@@ -322,7 +322,8 @@ namespace GONet.Tests.Utils
         {
             var buffer = new RingBuffer<int>();
             const int itemCount = 10000;
-            var consumedValues = new List<int>();
+            var consumedValues = new int[itemCount]; // Use array instead of List for thread safety
+            var consumedCount = 0; // Track count with volatile writes
             var producerDone = false;
 
             // Producer thread
@@ -341,13 +342,13 @@ namespace GONet.Tests.Utils
             // Consumer thread
             var consumer = Task.Run(() =>
             {
-                int consumedCount = 0;
-                while (consumedCount < itemCount)
+                int localCount = 0;
+                while (localCount < itemCount)
                 {
                     if (buffer.TryRead(out int value))
                     {
-                        consumedValues.Add(value); // No lock needed - single consumer
-                        consumedCount++;
+                        consumedValues[localCount] = value; // Write to array (safe with single consumer)
+                        localCount++;
                     }
                     else
                     {
@@ -358,14 +359,16 @@ namespace GONet.Tests.Utils
                         }
                     }
                 }
+                System.Threading.Volatile.Write(ref consumedCount, localCount); // Ensure visibility to main thread
             });
 
             Task.WaitAll(producer, consumer);
 
-            Assert.AreEqual(itemCount, consumedValues.Count, "Should consume all items");
+            int finalCount = System.Threading.Volatile.Read(ref consumedCount);
+            Assert.AreEqual(itemCount, finalCount, "Should consume all items");
 
             // Verify FIFO order
-            for (int i = 0; i < itemCount; i++)
+            for (int i = 0; i < finalCount; i++)
             {
                 Assert.AreEqual(i, consumedValues[i], $"Item {i} out of order");
             }
