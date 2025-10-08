@@ -244,6 +244,61 @@ namespace GONet
         [Tooltip("If true, automatically calls DontDestroyOnLoad on this GameObject when instantiated. Must be set before GONetParticipant is enabled.")]
         public bool AutoDontDestroyOnLoad;
 
+        #region CLIENT LIMBO MODE CONFIGURATION (Advanced - Rarely Needed)
+
+        /// <summary>
+        /// CLIENT ONLY: Override project-wide limbo behavior for THIS prefab when GONetId batch is exhausted.
+        ///
+        /// IMPORTANT: Limbo is RARE - only occurs during extreme rapid spawning (100+ spawns/sec).
+        /// Most games will NEVER encounter this. Only configure if spawning at massive rates.
+        ///
+        /// Leave unchecked to use GONet Project Settings default.
+        /// Check to override with custom behavior for this specific prefab.
+        /// </summary>
+        [Header("Client Batch Limbo Override (Advanced - Rarely Needed)")]
+        [Tooltip("Override project-wide limbo behavior for THIS prefab when batch IDs exhausted.\n\n" +
+                 "IMPORTANT: Limbo is RARE - only during extreme rapid spawning (100+ spawns/sec).\n\n" +
+                 "Unchecked = Use GONet Project Settings default\n" +
+                 "Checked = Use custom mode below for this prefab")]
+        public bool client_overrideLimboMode = false;
+
+        /// <summary>
+        /// CLIENT ONLY: Custom limbo mode for this prefab (only used if client_overrideLimboMode is true).
+        /// See <see cref="Client_GONetIdBatchLimboMode"/> for mode descriptions.
+        /// </summary>
+        [Tooltip("Custom limbo mode for this prefab (only if Override checkbox is checked).\n\n" +
+                 "See CLIENT_LIMBO_MODE_IMPLEMENTATION_PLAN.md for details on each mode.")]
+        public Client_GONetIdBatchLimboMode client_limboMode = Client_GONetIdBatchLimboMode.InstantiateInLimboWithAutoDisableRenderingAndPhysics;
+
+        #endregion
+
+        #region CLIENT LIMBO STATE TRACKING (Internal - Do Not Modify)
+
+        /// <summary>
+        /// CLIENT ONLY: Is this object in "limbo" state?
+        /// Limbo = exists locally but has no GONetId (waiting for batch from server).
+        /// Object is NOT networked, cannot sync, cannot receive RPCs.
+        /// Will "graduate" to networked when batch arrives.
+        /// </summary>
+        public bool Client_IsInLimbo => client_isInLimbo;
+
+        // INTERNAL TRACKING - DO NOT MODIFY THESE FIELDS
+        [NonSerialized] private bool client_isInLimbo = false;
+
+        // Option 1 tracking (DisableAll):
+        [NonSerialized] internal List<MonoBehaviour> client_limboDisabledComponents;
+
+        // Option 2 tracking (DisableRenderingAndPhysics):
+        [NonSerialized] internal List<Renderer> client_limboDisabledRenderers;
+        [NonSerialized] internal List<Collider> client_limboDisabledColliders;
+        [NonSerialized] internal List<Collider2D> client_limboDisabledColliders2D;
+        [NonSerialized] internal Rigidbody client_limboRigidbody;
+        [NonSerialized] internal Rigidbody2D client_limboRigidbody2D;
+        [NonSerialized] internal bool client_limboRigidbodyWasKinematic;
+        [NonSerialized] internal RigidbodyType2D client_limboRigidbody2DOriginalType;
+
+        #endregion
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow, uint gonetId_priorToChanges)
         {

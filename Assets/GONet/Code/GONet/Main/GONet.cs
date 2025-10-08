@@ -1841,6 +1841,14 @@ namespace GONet
             // Broadcast OnGONetReady to ALL GONetBehaviours after deserialization is complete
             // This ensures every behaviour gets notified about every participant that becomes ready
 
+            // CRITICAL: Do NOT call OnGONetReady for participants in limbo state
+            // Limbo objects have no GONetId yet and are not fully networked
+            if (gonetParticipant.Client_IsInLimbo)
+            {
+                GONetLog.Info($"[ClientLimbo] Skipping OnGONetReady broadcast for '{gonetParticipant.name}' - participant is in limbo state (will be called after graduation)");
+                return; // Exit early - OnGONetReady will be called after limbo exit
+            }
+
             // COMPREHENSIVE LOGGING - Track OnGONetReady broadcast
             int behaviourCount = allGONetBehaviours.Count;
             LogEventProcess(gonetParticipant, behaviourCount);
@@ -2009,7 +2017,7 @@ namespace GONet
         {
             if (IsClient)
             {
-                GONetParticipant gonetParticipant = 
+                GONetParticipant gonetParticipant =
                     GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
 
                 // In order for the caller to immediately see that this is remotely controlled, set this here locally and server will do the same after processing
@@ -2020,6 +2028,106 @@ namespace GONet
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Try to instantiate a new server-owned object.
+        /// Uses GONetId batch system with limbo mode fallback for batch exhaustion.
+        ///
+        /// IMPORTANT: Limbo is an EDGE CASE for extreme rapid spawning (100+ spawns/sec).
+        /// Most games will NEVER encounter this - batches are designed to prevent it.
+        ///
+        /// <para>
+        /// This is the RECOMMENDED API for client-spawned, server-owned objects (e.g., projectiles).
+        /// Provides explicit failure handling via Try pattern instead of dangerous fallback code.
+        /// </para>
+        ///
+        /// <para>
+        /// Behavior when GONetId batch is exhausted:
+        /// - ReturnFailure: Returns false, user handles spawn failure
+        /// - InstantiateInLimboWithAutoDisableAll: Spawns with all MonoBehaviours disabled
+        /// - InstantiateInLimboWithAutoDisableRenderingAndPhysics: Spawns with only rendering/physics disabled (RECOMMENDED)
+        /// - InstantiateInLimbo: Spawns normally, user checks Client_IsInLimbo
+        /// </para>
+        ///
+        /// <para>
+        /// When batch arrives from server, limbo objects automatically "graduate" to full networked status.
+        /// </para>
+        /// </summary>
+        /// <param name="prefab">The GONetParticipant prefab to instantiate</param>
+        /// <param name="position">Position to spawn at</param>
+        /// <param name="rotation">Rotation to spawn with</param>
+        /// <param name="outParticipant">The instantiated participant (null if ReturnFailure and batch exhausted)</param>
+        /// <returns>True if spawned successfully (either with GONetId or in limbo), false if spawn failed</returns>
+        public static bool Client_TryInstantiateToBeRemotelyControlledByMe(
+            GONetParticipant prefab,
+            Vector3 position,
+            Quaternion rotation,
+            out GONetParticipant outParticipant)
+        {
+            outParticipant = null;
+
+            if (!IsClient)
+            {
+                GONetLog.Error("[ClientLimbo] Client_TryInstantiate called on server - this is client-only API");
+                return false;
+            }
+
+            // Check if we have available batch IDs
+            bool hasBatchIds = GONetIdBatchManager.Client_HasAvailableIds();
+
+            if (hasBatchIds)
+            {
+                // Normal path: We have batch IDs available
+                outParticipant = GONetSpawnSupport_Runtime.Instantiate_MarkToBeRemotelyControlled(prefab, position, rotation);
+                outParticipant.RemotelyControlledByAuthorityId = MyAuthorityId;
+                return true;
+            }
+
+            // BATCH EXHAUSTED: Determine limbo mode
+            Client_GONetIdBatchLimboMode limboMode = Client_GetLimboMode(prefab);
+
+            if (limboMode == Client_GONetIdBatchLimboMode.ReturnFailure)
+            {
+                // User wants explicit failure - return false
+                uint remainingIds = GONetIdBatchManager.Client_GetRemainingIds();
+                GONetLog.Warning($"[ClientLimbo] Spawn FAILED for '{prefab.name}' - no batch IDs available (remaining: {remainingIds}), limbo mode is ReturnFailure");
+
+                // Raise event so user can show UI notification
+                Client_OnSpawnEnteredLimbo?.Invoke(new Client_SpawnLimboEventArgs
+                {
+                    Participant = null,
+                    Prefab = prefab,
+                    LimboMode = limboMode,
+                    RemainingIds = remainingIds,
+                    Position = position,
+                    Rotation = rotation
+                });
+
+                return false;
+            }
+
+            // Spawn in limbo according to configured mode
+            outParticipant = Client_InstantiateInLimbo(prefab, position, rotation, limboMode);
+            return true;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Determines which limbo mode to use for a given prefab.
+        /// Checks prefab override first, then falls back to project settings default.
+        /// </summary>
+        private static Client_GONetIdBatchLimboMode Client_GetLimboMode(GONetParticipant prefab)
+        {
+            if (prefab.client_overrideLimboMode)
+            {
+                return prefab.client_limboMode;
+            }
+
+            // TODO: Read from GONetProjectSettings once implemented
+            // return GONetProjectSettings.Instance.client_defaultLimboMode;
+
+            // Hardcoded default for now (most balanced option)
+            return Client_GONetIdBatchLimboMode.InstantiateInLimboWithAutoDisableRenderingAndPhysics;
         }
 
         #endregion
@@ -4887,6 +4995,9 @@ namespace GONet
             if (IsClient)
             {
                 GONetIdBatchManager.Client_AddBatch(eventEnvelope.Event.GONetIdRawBatchStart);
+
+                // CRITICAL: Process limbo queue when batch arrives
+                Client_OnBatchReceived_ProcessDeferredSpawns();
             }
         }
 
@@ -4954,6 +5065,382 @@ namespace GONet
         static uint lastAssignedGONetIdRaw = GONetParticipant.GONetIdRaw_Unset;
         static uint client_lastServerGONetIdRawForRemoteControl = GONetParticipant.GONetIdRaw_Unset; // Used in GetNextAvailableGONetIdRaw for legacy flow
         // NOTE: Batch management now handled by GONetIdBatchManager
+
+        #region CLIENT LIMBO MODE SUPPORT
+
+        /// <summary>
+        /// CLIENT ONLY: Queue of GONetParticipants that were spawned in limbo state (no GONetId batch available).
+        /// These will be "graduated" to full networked status when a new batch arrives from server.
+        /// </summary>
+        private static readonly Queue<GONetParticipant> client_deferredSpawnsAwaitingBatch = new Queue<GONetParticipant>();
+
+        /// <summary>
+        /// CLIENT ONLY: Event raised when a spawn enters limbo state due to batch exhaustion.
+        /// Subscribe to this to implement custom UI notifications (e.g., "Out of spawn capacity").
+        /// </summary>
+        public static event Action<Client_SpawnLimboEventArgs> Client_OnSpawnEnteredLimbo;
+
+        /// <summary>
+        /// CLIENT ONLY: Instantiates an object in limbo state (no GONetId assigned).
+        /// Object will be queued for graduation when batch arrives.
+        /// </summary>
+        private static GONetParticipant Client_InstantiateInLimbo(
+            GONetParticipant prefab,
+            Vector3 position,
+            Quaternion rotation,
+            Client_GONetIdBatchLimboMode limboMode)
+        {
+            GONetParticipant instance;
+
+            switch (limboMode)
+            {
+                case Client_GONetIdBatchLimboMode.InstantiateInLimboWithAutoDisableAll:
+                    instance = Client_InstantiateInLimbo_DisableAll(prefab, position, rotation);
+                    break;
+
+                case Client_GONetIdBatchLimboMode.InstantiateInLimboWithAutoDisableRenderingAndPhysics:
+                    instance = Client_InstantiateInLimbo_DisableRenderingAndPhysics(prefab, position, rotation);
+                    break;
+
+                case Client_GONetIdBatchLimboMode.InstantiateInLimbo:
+                    instance = Client_InstantiateInLimbo_NoDisable(prefab, position, rotation);
+                    break;
+
+                default:
+                    GONetLog.Error($"[ClientLimbo] Unknown limbo mode: {limboMode}");
+                    return null;
+            }
+
+            // Mark as in limbo and add to deferred queue
+            instance.client_isInLimbo = true;
+            instance.RemotelyControlledByAuthorityId = MyAuthorityId;
+            client_deferredSpawnsAwaitingBatch.Enqueue(instance);
+
+            uint remainingIds = GONetIdBatchManager.Client_GetRemainingIds();
+            GONetLog.Warning($"[ClientLimbo] Spawned '{prefab.name}' in LIMBO mode {limboMode} (remaining IDs: {remainingIds}, limbo queue size: {client_deferredSpawnsAwaitingBatch.Count})");
+
+            // Raise event
+            Client_OnSpawnEnteredLimbo?.Invoke(new Client_SpawnLimboEventArgs
+            {
+                Participant = instance,
+                Prefab = prefab,
+                LimboMode = limboMode,
+                RemainingIds = remainingIds,
+                Position = position,
+                Rotation = rotation
+            });
+
+            return instance;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Limbo Mode 1 - Disable ALL MonoBehaviours (except GONetParticipant).
+        /// Object is completely frozen until batch arrives.
+        /// </summary>
+        private static GONetParticipant Client_InstantiateInLimbo_DisableAll(
+            GONetParticipant prefab,
+            Vector3 position,
+            Quaternion rotation)
+        {
+            // Instantiate normally first
+            GONetParticipant instance = UnityEngine.Object.Instantiate(prefab, position, rotation);
+
+            // Copy design time metadata from prefab (same as Instantiate_MarkToBeRemotelyControlled)
+            DesignTimeMetadata prefabMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(prefab, force: true);
+            if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
+            {
+                DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
+                {
+                    Location = prefabMetadata.Location,
+                    CodeGenerationId = prefabMetadata.CodeGenerationId,
+                    UnityGuid = prefabMetadata.UnityGuid
+                };
+                GONetSpawnSupport_Runtime.SetDesignTimeMetadata(instance, instanceMetadata);
+            }
+
+            // Disable all MonoBehaviours except GONetParticipant
+            instance.client_limboDisabledComponents = new List<MonoBehaviour>();
+            MonoBehaviour[] allComponents = instance.GetComponentsInChildren<MonoBehaviour>(includeInactive: true);
+            foreach (MonoBehaviour component in allComponents)
+            {
+                if (component != null && !(component is GONetParticipant) && component.enabled)
+                {
+                    component.enabled = false;
+                    instance.client_limboDisabledComponents.Add(component);
+                }
+            }
+
+            GONetLog.Info($"[ClientLimbo] DisableAll mode: Disabled {instance.client_limboDisabledComponents.Count} components on '{instance.name}'");
+            return instance;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Limbo Mode 2 - Disable ONLY rendering and physics components.
+        /// MonoBehaviours still run (Start/Update) but object is invisible/non-physical.
+        /// RECOMMENDED DEFAULT: Good balance of safety and flexibility.
+        /// </summary>
+        private static GONetParticipant Client_InstantiateInLimbo_DisableRenderingAndPhysics(
+            GONetParticipant prefab,
+            Vector3 position,
+            Quaternion rotation)
+        {
+            // Instantiate normally first
+            GONetParticipant instance = UnityEngine.Object.Instantiate(prefab, position, rotation);
+
+            // Copy design time metadata from prefab
+            DesignTimeMetadata prefabMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(prefab, force: true);
+            if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
+            {
+                DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
+                {
+                    Location = prefabMetadata.Location,
+                    CodeGenerationId = prefabMetadata.CodeGenerationId,
+                    UnityGuid = prefabMetadata.UnityGuid
+                };
+                GONetSpawnSupport_Runtime.SetDesignTimeMetadata(instance, instanceMetadata);
+            }
+
+            // Disable rendering components
+            instance.client_limboDisabledRenderers = new List<Renderer>();
+            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(includeInactive: true);
+            foreach (Renderer renderer in renderers)
+            {
+                if (renderer != null && renderer.enabled)
+                {
+                    renderer.enabled = false;
+                    instance.client_limboDisabledRenderers.Add(renderer);
+                }
+            }
+
+            // Disable 3D colliders
+            instance.client_limboDisabledColliders = new List<Collider>();
+            Collider[] colliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
+            foreach (Collider collider in colliders)
+            {
+                if (collider != null && collider.enabled)
+                {
+                    collider.enabled = false;
+                    instance.client_limboDisabledColliders.Add(collider);
+                }
+            }
+
+            // Disable 2D colliders
+            instance.client_limboDisabledColliders2D = new List<Collider2D>();
+            Collider2D[] colliders2D = instance.GetComponentsInChildren<Collider2D>(includeInactive: true);
+            foreach (Collider2D collider in colliders2D)
+            {
+                if (collider != null && collider.enabled)
+                {
+                    collider.enabled = false;
+                    instance.client_limboDisabledColliders2D.Add(collider);
+                }
+            }
+
+            // Make Rigidbody kinematic (if present)
+            instance.client_limboRigidbody = instance.GetComponentInChildren<Rigidbody>();
+            if (instance.client_limboRigidbody != null)
+            {
+                instance.client_limboRigidbodyWasKinematic = instance.client_limboRigidbody.isKinematic;
+                instance.client_limboRigidbody.isKinematic = true;
+            }
+
+            // Make Rigidbody2D kinematic (if present)
+            instance.client_limboRigidbody2D = instance.GetComponentInChildren<Rigidbody2D>();
+            if (instance.client_limboRigidbody2D != null)
+            {
+                instance.client_limboRigidbody2DOriginalType = instance.client_limboRigidbody2D.bodyType;
+                instance.client_limboRigidbody2D.bodyType = RigidbodyType2D.Kinematic;
+            }
+
+            GONetLog.Info($"[ClientLimbo] DisableRenderingAndPhysics mode: Disabled {instance.client_limboDisabledRenderers.Count} renderers, {instance.client_limboDisabledColliders.Count} colliders, {instance.client_limboDisabledColliders2D.Count} colliders2D on '{instance.name}'");
+            return instance;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Limbo Mode 3 - No automatic disabling.
+        /// Object runs normally, user must check Client_IsInLimbo themselves.
+        /// </summary>
+        private static GONetParticipant Client_InstantiateInLimbo_NoDisable(
+            GONetParticipant prefab,
+            Vector3 position,
+            Quaternion rotation)
+        {
+            // Instantiate normally - no component disabling
+            GONetParticipant instance = UnityEngine.Object.Instantiate(prefab, position, rotation);
+
+            // Copy design time metadata from prefab
+            DesignTimeMetadata prefabMetadata = GONetSpawnSupport_Runtime.GetDesignTimeMetadata(prefab, force: true);
+            if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
+            {
+                DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
+                {
+                    Location = prefabMetadata.Location,
+                    CodeGenerationId = prefabMetadata.CodeGenerationId,
+                    UnityGuid = prefabMetadata.UnityGuid
+                };
+                GONetSpawnSupport_Runtime.SetDesignTimeMetadata(instance, instanceMetadata);
+            }
+
+            GONetLog.Info($"[ClientLimbo] NoDisable mode: '{instance.name}' spawned normally, user must check Client_IsInLimbo");
+            return instance;
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Processes deferred spawns (limbo queue) when a new batch arrives.
+        /// Called automatically by Client_AssignNewClientGONetIdRawBatch.
+        /// Graduates limbo objects to full networked status by assigning GONetIds and re-enabling components.
+        /// </summary>
+        private static void Client_OnBatchReceived_ProcessDeferredSpawns()
+        {
+            if (client_deferredSpawnsAwaitingBatch.Count == 0)
+            {
+                return; // Nothing to process
+            }
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            GONetLog.Info($"[ClientLimbo] Processing {client_deferredSpawnsAwaitingBatch.Count} deferred spawns from limbo queue");
+
+            // Process all limbo spawns that can be assigned IDs
+            while (client_deferredSpawnsAwaitingBatch.Count > 0 && GONetIdBatchManager.Client_HasAvailableIds())
+            {
+                GONetParticipant participant = client_deferredSpawnsAwaitingBatch.Dequeue();
+
+                if (participant == null || participant.gameObject == null)
+                {
+                    GONetLog.Warning($"[ClientLimbo] Skipping null/destroyed participant in limbo queue");
+                    failedCount++;
+                    continue;
+                }
+
+                // Exit limbo and assign GONetId
+                bool success = Client_ExitLimbo(participant);
+                if (success)
+                {
+                    processedCount++;
+                }
+                else
+                {
+                    failedCount++;
+                }
+            }
+
+            uint remainingIds = GONetIdBatchManager.Client_GetRemainingIds();
+            GONetLog.Info($"[ClientLimbo] Batch processing complete: {processedCount} graduated, {failedCount} failed, {client_deferredSpawnsAwaitingBatch.Count} still in limbo, {remainingIds} IDs remaining");
+        }
+
+        /// <summary>
+        /// CLIENT ONLY: Exits limbo state for a participant.
+        /// Re-enables disabled components and assigns GONetId from batch.
+        /// </summary>
+        private static bool Client_ExitLimbo(GONetParticipant participant)
+        {
+            if (participant == null || !participant.Client_IsInLimbo)
+            {
+                GONetLog.Warning($"[ClientLimbo] Cannot exit limbo - participant is null or not in limbo");
+                return false;
+            }
+
+            string participantName = participant.gameObject.name;
+            GONetLog.Info($"[ClientLimbo] Exiting limbo for '{participantName}'");
+
+            // Re-enable components based on which mode was used
+            if (participant.client_limboDisabledComponents != null && participant.client_limboDisabledComponents.Count > 0)
+            {
+                // Mode 1: DisableAll - Re-enable all MonoBehaviours
+                foreach (MonoBehaviour component in participant.client_limboDisabledComponents)
+                {
+                    if (component != null)
+                    {
+                        component.enabled = true;
+                    }
+                }
+                GONetLog.Info($"[ClientLimbo] Re-enabled {participant.client_limboDisabledComponents.Count} components on '{participantName}'");
+                participant.client_limboDisabledComponents.Clear();
+                participant.client_limboDisabledComponents = null;
+            }
+            else if (participant.client_limboDisabledRenderers != null)
+            {
+                // Mode 2: DisableRenderingAndPhysics - Re-enable rendering/physics
+                foreach (Renderer renderer in participant.client_limboDisabledRenderers)
+                {
+                    if (renderer != null)
+                    {
+                        renderer.enabled = true;
+                    }
+                }
+
+                foreach (Collider collider in participant.client_limboDisabledColliders)
+                {
+                    if (collider != null)
+                    {
+                        collider.enabled = true;
+                    }
+                }
+
+                foreach (Collider2D collider in participant.client_limboDisabledColliders2D)
+                {
+                    if (collider != null)
+                    {
+                        collider.enabled = true;
+                    }
+                }
+
+                if (participant.client_limboRigidbody != null)
+                {
+                    participant.client_limboRigidbody.isKinematic = participant.client_limboRigidbodyWasKinematic;
+                }
+
+                if (participant.client_limboRigidbody2D != null)
+                {
+                    participant.client_limboRigidbody2D.bodyType = participant.client_limboRigidbody2DOriginalType;
+                }
+
+                GONetLog.Info($"[ClientLimbo] Re-enabled rendering/physics on '{participantName}'");
+
+                // Clear references
+                participant.client_limboDisabledRenderers.Clear();
+                participant.client_limboDisabledColliders.Clear();
+                participant.client_limboDisabledColliders2D.Clear();
+                participant.client_limboDisabledRenderers = null;
+                participant.client_limboDisabledColliders = null;
+                participant.client_limboDisabledColliders2D = null;
+                participant.client_limboRigidbody = null;
+                participant.client_limboRigidbody2D = null;
+            }
+            // Mode 3: NoDisable - nothing to re-enable
+
+            // Assign GONetId from batch
+            AssignGONetIdRaw_IfAppropriate(participant, shouldForceChangeEventIfAlreadySet: false);
+
+            // Mark as no longer in limbo BEFORE triggering OnGONetReady
+            participant.client_isInLimbo = false;
+
+            // CRITICAL: Now trigger OnGONetReady since the participant is fully networked
+            // This was blocked during initial instantiation by the check in OnDeserializeInitAllCompletedGNPEvent
+            GONetLog.Info($"[ClientLimbo] '{participantName}' graduated from limbo - GONetId: {participant.GONetId} - broadcasting OnGONetReady");
+
+            using (var en = allGONetBehaviours.GetEnumerator())
+            {
+                while (en.MoveNext())
+                {
+                    GONetBehaviour gnBehaviour = en.Current;
+                    try
+                    {
+                        gnBehaviour.OnGONetReady(participant);
+                    }
+                    catch (Exception ex)
+                    {
+                        GONetLog.Error($"[ClientLimbo] Exception in OnGONetReady() after limbo exit for behaviour '{gnBehaviour.GetType().Name}' on '{gnBehaviour.gameObject.name}': {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        #endregion
 
         /// <summary>
         /// Counter for generating unique chunk IDs for multi-chunk messages.
@@ -5985,10 +6472,20 @@ namespace GONet
                 }
                 else
                 {
-                    // Fallback if no batch available - use regular ID assignment
-                    GONetLog.Warning("[GONetIdBatch] No batch IDs available, falling back to regular ID assignment");
-                    ++lastAssignedGONetIdRaw;
-                    return lastAssignedGONetIdRaw;
+                    // CRITICAL: This should NEVER be reached if using Client_TryInstantiate API correctly
+                    // The dangerous fallback code has been removed and replaced with limbo mode system
+                    // If you hit this exception, you are:
+                    // 1. Using Client_InstantiateToBeRemotelyControlledByMe (old API) during batch exhaustion, OR
+                    // 2. Calling Instantiate_MarkToBeRemotelyControlled directly (internal API - don't do this)
+                    //
+                    // SOLUTION: Use Client_TryInstantiateToBeRemotelyControlledByMe instead
+                    // This will handle batch exhaustion gracefully via limbo mode
+                    throw new InvalidOperationException(
+                        "[GONetIdBatch] CRITICAL: No batch IDs available for client spawn! " +
+                        "This means you're using the OLD API during batch exhaustion. " +
+                        "REQUIRED FIX: Replace Client_InstantiateToBeRemotelyControlledByMe() with Client_TryInstantiateToBeRemotelyControlledByMe(). " +
+                        "The Try version handles batch exhaustion via limbo mode. " +
+                        $"Current state: {GONetIdBatchManager.Client_GetDiagnostics()}");
                 }
             }
 
@@ -7918,5 +8415,42 @@ namespace GONet
                 channelId == ClientInitialization_EventSingles_Reliable ||
                 channelId == ClientInitialization_CustomSerialization_Reliable;
         }
+    }
+
+    /// <summary>
+    /// CLIENT ONLY: Event arguments for when a spawn enters limbo state due to GONetId batch exhaustion.
+    /// IMPORTANT: Limbo is RARE - only occurs during extreme rapid spawning (100+ spawns/sec).
+    /// </summary>
+    public class Client_SpawnLimboEventArgs
+    {
+        /// <summary>
+        /// The GONetParticipant that entered limbo state (no GONetId assigned yet).
+        /// </summary>
+        public GONetParticipant Participant { get; internal set; }
+
+        /// <summary>
+        /// The prefab that was instantiated.
+        /// </summary>
+        public GONetParticipant Prefab { get; internal set; }
+
+        /// <summary>
+        /// The limbo mode that was applied to this spawn.
+        /// </summary>
+        public Client_GONetIdBatchLimboMode LimboMode { get; internal set; }
+
+        /// <summary>
+        /// Number of IDs remaining across all batches (should be 0 if entering limbo).
+        /// </summary>
+        public uint RemainingIds { get; internal set; }
+
+        /// <summary>
+        /// Position where the object was spawned.
+        /// </summary>
+        public Vector3 Position { get; internal set; }
+
+        /// <summary>
+        /// Rotation where the object was spawned.
+        /// </summary>
+        public Quaternion Rotation { get; internal set; }
     }
 }
