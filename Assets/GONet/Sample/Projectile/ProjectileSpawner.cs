@@ -80,8 +80,23 @@ public class ProjectileSpawner : GONetBehaviour
         lastMovementTime.Remove(gonetId);
     }
 
+    /// <summary>
+    /// Standard Unity Update() - Used for logic that doesn't depend on GONet initialization.
+    ///
+    /// PATTERN CHOICE: This demonstrates using BOTH Update() and UpdateAfterGONetReady():
+    /// - Update() handles input polling (no GONet dependency)
+    /// - UpdateAfterGONetReady() handles projectile movement (depends on OnGONetReady)
+    ///
+    /// ALTERNATIVE PATTERN: See SpawnTestBeacon.cs for defensive checks in Update() instead of using UpdateAfterGONetReady.
+    ///
+    /// SCRIPT EXECUTION ORDER NOTE:
+    /// - This Update() runs at ProjectileSpawner's script execution order (default: 0)
+    /// - UpdateAfterGONetReady() runs at GONetGlobal's order (-32000, very early in frame)
+    /// - If you need precise script execution order control, use defensive Update() pattern instead
+    /// </summary>
     private void Update()
     {
+        // INPUT HANDLING: Doesn't depend on GONet initialization, safe to run in Update()
         if (GONetMain.IsClient && projectilPrefab != null)
         {
             #region check keys and touches states
@@ -148,89 +163,20 @@ public class ProjectileSpawner : GONetBehaviour
             }
         }
 
-        foreach (var projectile in projectiles)
-        {
-            // CRITICAL CHECK: Verify projectile is fully initialized before moving
-            if (projectile == null || projectile.GONetParticipant == null)
-            {
-                continue;
-            }
-
-            uint gonetId = projectile.GONetParticipant.GONetId;
-
-            // DIAGNOSTIC: Log every 180 frames (~3 seconds) for server projectiles
-            if (GONetMain.IsServer && Time.frameCount % 180 == 0)
-            {
-                GONetLog.Info($"[ProjectileSpawner] UPDATE loop - Projectile '{projectile.name}' (GONetId: {gonetId}) - IsMine: {projectile.GONetParticipant.IsMine}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}, Pos: {projectile.transform.position}, Speed: {projectile.speed:F2}, MovementDir: {projectile.movementDirection}");
-            }
-
-            if (projectile.GONetParticipant.IsMine)
-            {
-                // CRITICAL: Check if movementDirection is initialized before moving
-                // OnGONetReady() can be called before Awake() on server, causing movementDirection to be zero
-                // temporarily. Skip movement until Awake() sets the proper direction.
-                if (projectile.movementDirection != Vector3.zero)
-                {
-                    // Move in stored direction (unaffected by rotation - shotgun spread effect)
-                    projectile.transform.position += projectile.movementDirection * Time.deltaTime * projectile.speed;
-
-                    // Visual rotation (doesn't affect movement path)
-                    const float CYCLE_SECONDS = 5f;
-                    const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
-                    var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
-                    smoothlyChangingMultiplyFactor *= DECGREES_PER_CYCLE;
-                    smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
-                    float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
-                    projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
-                }
-                // else: movementDirection not yet initialized (Awake not called yet), skip movement this frame
-            }
-            else
-            {
-                // Track movement to detect idle projectiles (sync stopped)
-                Vector3 currentPos = projectile.transform.position;
-
-                if (lastKnownPositions.TryGetValue(gonetId, out Vector3 lastPos))
-                {
-                    float distanceMoved = Vector3.Distance(currentPos, lastPos);
-                    const float IDLE_THRESHOLD = 0.01f; // Consider idle if moved less than this
-
-                    if (distanceMoved > IDLE_THRESHOLD)
-                    {
-                        // Moving - update last movement time
-                        lastMovementTime[gonetId] = Time.time;
-                        lastKnownPositions[gonetId] = currentPos;
-                    }
-                    else
-                    {
-                        // Not moving - check if idle for too long
-                        if (lastMovementTime.TryGetValue(gonetId, out float lastMove))
-                        {
-                            float idleTime = Time.time - lastMove;
-                            const float IDLE_WARNING_THRESHOLD = 3f; // Warn if idle for 3+ seconds
-
-                            if (idleTime >= IDLE_WARNING_THRESHOLD && Time.frameCount % 180 == 0) // Log every 3 seconds
-                            {
-                                GONetLog.Warning($"[ProjectileSpawner] IDLE projectile '{projectile.name}' (GONetId: {gonetId}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}) - IDLE for {idleTime:F1}s at Pos: {currentPos}");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // First time seeing this projectile - initialize tracking
-                    lastKnownPositions[gonetId] = currentPos;
-                    lastMovementTime[gonetId] = Time.time;
-                }
-            }
-        }
-
+        // ADDRESSABLE CLEANUP: Server-side only, doesn't depend on per-projectile GONet state
         if (GONetMain.IsServer && Time.time - lastCheckTime >= CHECK_INTERVAL)
         {
             lastCheckTime = Time.time;
             DestroyAddressableProjectilesOutOfView();
         }
     }
+
+    // NOTE: ProjectileSpawner no longer needs UpdateAfterGONetReady for movement.
+    // Movement logic has been moved to Projectile.UpdateAfterGONetReady() for better encapsulation.
+    // Each projectile now handles its own movement using the UpdateAfterGONetReady pattern.
+    //
+    // See Projectile.UpdateAfterGONetReady() for the movement implementation.
+
     private async Task InstantiateAddressablesPrefab(Quaternion rotation)
     {
         const string oohLaLa_addressablesPrefabPath = "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab";

@@ -299,6 +299,63 @@ namespace GONet
 
         #endregion
 
+        #region LIFECYCLE TRACKING FOR ONGONETREADY (Internal - Do Not Modify)
+
+        /// <summary>
+        /// Tracks Unity lifecycle completion state for OnGONetReady gate.
+        /// OnGONetReady will NOT fire until both didAwakeComplete and didStartComplete are true.
+        /// </summary>
+        [NonSerialized] internal bool didAwakeComplete = false;
+        [NonSerialized] internal bool didStartComplete = false;
+
+        /// <summary>
+        /// Tracks whether DeserializeInitAllCompleted is required for this participant.
+        ///
+        /// TRUE for:
+        /// - Scene-defined objects with IsMine = false (clients receiving sync from server)
+        /// - Runtime spawns received via InstantiateGONetParticipantEvent (remote spawns)
+        ///
+        /// FALSE for:
+        /// - Scene-defined objects with IsMine = true (server authority, no deserialization needed)
+        /// - Runtime spawns with IsMine = true (local authority, spawned by this machine)
+        /// - Limbo objects (local authority, client spawned)
+        /// </summary>
+        [NonSerialized] internal bool requiresDeserializeInit = false;
+
+        /// <summary>
+        /// Tracks whether DeserializeInitAllCompleted has occurred.
+        /// Only relevant if requiresDeserializeInit = true.
+        /// </summary>
+        [NonSerialized] internal bool didDeserializeInitComplete = false;
+
+        /// <summary>
+        /// Tracks whether OnGONetReady has already been called for this participant.
+        /// Prevents duplicate calls across multiple gate check invocations.
+        /// </summary>
+        [NonSerialized] internal bool didOnGONetReadyFire = false;
+
+        /// <summary>
+        /// Marks this participant as requiring DeserializeInitAllCompleted before OnGONetReady.
+        /// Called for objects that will receive remote sync data.
+        /// </summary>
+        internal void MarkRequiresDeserializeInit()
+        {
+            requiresDeserializeInit = true;
+            // Don't check gate yet - deserialization hasn't happened
+        }
+
+        /// <summary>
+        /// Marks DeserializeInitAllCompleted as complete and checks OnGONetReady gate.
+        /// Called when remote sync data has been processed.
+        /// </summary>
+        internal void MarkDeserializeInitComplete()
+        {
+            didDeserializeInitComplete = true;
+            GONetMain.CheckAndPublishOnGONetReady_IfAllConditionsMet(this);
+        }
+
+        #endregion
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(bool isOwnerAuthorityIdKnownToBeGoodValueNow, uint gonetId_priorToChanges)
         {
@@ -776,6 +833,10 @@ namespace GONet
                 GONetLog.Error($"{nameof(GONetParticipant)} on {nameof(GameObject)} with name:'{name}' is required to have {nameof(DesignTimeLocation)} and {nameof(CodeGenerationId)} set to a valid value.  One/both are not.  Therefore, this will be disabled.  GONet will automatically set these values.  Please ensure the scene has been saved and a game build is created so all server/clients have the new/same information.  If for some reason, this message appears even after creating a new game build, please go to the GONet => GONet Editor Support menu/window and click on 'Refresh GONet code generation' and/or 'Fix GONet Generated Code', then once that completes re-run the game build and try again.  **DEBUG**: DesignTimeLocation='{DesignTimeLocation}', CodeGenerationId={CodeGenerationId}, IsDesignTimeMetadataInitd={IsDesignTimeMetadataInitd}");
                 enabled = false;
             }
+
+            // LIFECYCLE GATE: Mark Awake complete and check if OnGONetReady can fire
+            didAwakeComplete = true;
+            GONetMain.CheckAndPublishOnGONetReady_IfAllConditionsMet(this);
         }
 
         /// <summary>
@@ -848,6 +909,10 @@ namespace GONet
 
                     SetRigidBodySettingsConsideringOwner();
                 }
+
+                // LIFECYCLE GATE: Mark Start complete and check if OnGONetReady can fire
+                didStartComplete = true;
+                GONetMain.CheckAndPublishOnGONetReady_IfAllConditionsMet(this);
             }
         }
 
@@ -868,8 +933,25 @@ namespace GONet
                 }
                 else
                 {
+                    // DIAGNOSTIC: Log BEFORE changes (WARNING level so it's never filtered)
+                    GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] BEFORE kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
+
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
+
+                    // Clear constraints when becoming kinematic on non-authority clients
+                    // Rationale: Constraints are for physics simulation only. Since kinematic rigidbodies
+                    // are manually positioned (not physics-driven), constraints shouldn't apply.
+                    // If Unity enforces constraints on kinematic RBs (potential quirk), this prevents
+                    // them from blocking GONet's value blending system from applying synced positions.
+                    if (myRigidBody.constraints != RigidbodyConstraints.None)
+                    {
+                        GONetLog.Warning($"[GONetParticipant] Clearing Rigidbody constraints on non-authority '{name}' (GONetId: {GONetId}) - was: {myRigidBody.constraints}");
+                        myRigidBody.constraints = RigidbodyConstraints.None;
+                    }
+
+                    // DIAGNOSTIC: Log AFTER changes
+                    GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] AFTER kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
                     }
                 }
 

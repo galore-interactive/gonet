@@ -538,6 +538,15 @@ namespace GONet
             GONetEventBus.ProcessDeferredRpcs();
         }
 
+        /// <summary>
+        /// Unity's FixedUpdate() hook - Calls GONetMain.FixedUpdate_AfterGONetReady() for physics frame updates.
+        /// Runs at Unity's fixed timestep (default: 50Hz / 0.02 seconds).
+        /// </summary>
+        private void FixedUpdate()
+        {
+            GONetMain.FixedUpdate_AfterGONetReady();
+        }
+
         private void OnApplicationQuit()
         {
             GONetMain.Shutdown();

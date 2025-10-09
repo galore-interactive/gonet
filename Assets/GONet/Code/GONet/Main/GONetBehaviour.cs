@@ -15,6 +15,8 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -25,6 +27,54 @@ namespace GONet
     /// </summary>
     public abstract class GONetBehaviour : MonoBehaviour
     {
+        #region UpdateAfterGONetReady Support - Static Per-Type Caching
+
+        /// <summary>
+        /// Static helper class for caching method override detection across all three update variants.
+        /// Populated once per type on first instance construction, avoiding per-instance reflection overhead.
+        /// </summary>
+        private static class GONetBehaviour_UpdateAfterGONetReady_Cache
+        {
+            private static readonly Dictionary<Type, Dictionary<string, bool>> overrideCache = new Dictionary<Type, Dictionary<string, bool>>();
+
+            internal static bool HasOverride(Type type, string methodName)
+            {
+                if (!overrideCache.TryGetValue(type, out Dictionary<string, bool> methodCache))
+                {
+                    methodCache = new Dictionary<string, bool>();
+                    overrideCache[type] = methodCache;
+                }
+
+                if (!methodCache.TryGetValue(methodName, out bool hasOverride))
+                {
+                    // First instance of this type checking this method - use reflection ONCE
+                    MethodInfo method = type.GetMethod(
+                        methodName,
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                    // Check if the declaring type is THIS type or a subclass (not GONetBehaviour/GONetParticipantCompanionBehaviour base)
+                    hasOverride = method != null &&
+                                  method.DeclaringType != typeof(GONetBehaviour) &&
+                                  method.DeclaringType != typeof(GONetParticipantCompanionBehaviour);
+
+                    // Cache the result for all future instances of this type
+                    methodCache[methodName] = hasOverride;
+                }
+
+                return hasOverride;
+            }
+        }
+
+        /// <summary>
+        /// Instance-level flags indicating whether THIS specific type overrides update methods.
+        /// Set once during Awake() by looking up the static cache.
+        /// Used by GONetMain update loops to avoid calling empty base implementations.
+        /// </summary>
+        internal bool hasUpdateAfterGONetReadyOverride;
+        internal bool hasLateUpdateAfterGONetReadyOverride;
+        internal bool hasFixedUpdateAfterGONetReadyOverride;
+
+        #endregion
         private const float SEMI_ARBITRAY_WAIT_BEFORE_INFORMING_CLINET_VS_SERVER_STATUS_KNOWN_SECONDS = 0.1f;
 
         [Tooltip("GONet will send a 'tick' at each of the unique synchronization schedules as defined in various profiles (i.e., GONet => GONet Editor Support => Create New Sync Settings Profile) used when syncing values.")]
@@ -66,6 +116,13 @@ namespace GONet
         protected virtual void Awake()
         {
             GONetMain.RegisterBehaviour(this);
+
+            // PERFORMANCE OPTIMIZATION: Static per-type caching for update method override detection
+            // Uses reflection ONCE per type (not per instance) to detect which update methods are overridden
+            Type myType = GetType();
+            hasUpdateAfterGONetReadyOverride = GONetBehaviour_UpdateAfterGONetReady_Cache.HasOverride(myType, "UpdateAfterGONetReady");
+            hasLateUpdateAfterGONetReadyOverride = GONetBehaviour_UpdateAfterGONetReady_Cache.HasOverride(myType, "LateUpdateAfterGONetReady");
+            hasFixedUpdateAfterGONetReadyOverride = GONetBehaviour_UpdateAfterGONetReady_Cache.HasOverride(myType, "FixedUpdateAfterGONetReady");
         }
 
         protected virtual void OnEnable()
@@ -459,6 +516,187 @@ namespace GONet
         /// different initialization logic for each case.</para>
         /// </summary>
         public virtual void OnGONetReady() { }
+
+        /// <summary>
+        /// <para><b>EARLY FRAME UPDATE - Called after this companion's GONetParticipant is fully ready.</b></para>
+        /// <para>This is a framework-provided update loop that runs EARLY in the frame (before most Update() methods).</para>
+        ///
+        /// <para><b>⭐ PERFORMANCE: HIGHLY PREFERRED over Unity's Update()</b></para>
+        /// <list type="bullet">
+        ///   <item><description><b>Unity Update():</b> N objects = N Update() calls registered with Unity (linear overhead, native→managed bridge per call)</description></item>
+        ///   <item><description><b>GONet pattern:</b> N objects = 1 Update() call (constant overhead, centralized C# iteration)</description></item>
+        ///   <item><description><b>Zero overhead if not overridden:</b> Static per-type reflection cache ensures empty implementations are never called</description></item>
+        ///   <item><description><b>One-time reflection cost:</b> Only first instance of each type uses reflection to detect override</description></item>
+        /// </list>
+        ///
+        /// <para><b>⏱️ TIMING: Runs at END of GONetMain.Update() (called from GONetGlobal.Update() at priority -32000)</b></para>
+        /// <list type="bullet">
+        ///   <item><description>Executes BEFORE most Update() methods (early frame)</description></item>
+        ///   <item><description>Good for: Game logic, movement, input processing</description></item>
+        ///   <item><description>Other scripts can see your changes this frame</description></item>
+        ///   <item><description>⚠️ Bypasses Unity's Script Execution Order settings - ALL UpdateAfterGONetReady() calls run at same priority (-32000)</description></item>
+        /// </list>
+        ///
+        /// <para><b>✅ GUARANTEED when this is called:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="OnGONetReady()"/> has fired for this companion's participant</description></item>
+        ///   <item><description><see cref="GONetParticipant.GONetId"/> is assigned (non-zero)</description></item>
+        ///   <item><description><see cref="GONetParticipant.OwnerAuthorityId"/> is assigned</description></item>
+        ///   <item><description>All initialization values set in OnGONetReady are populated</description></item>
+        ///   <item><description>NO defensive checks needed (framework guarantees safety)</description></item>
+        /// </list>
+        ///
+        /// <para><b>🔄 ALTERNATIVES:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="FixedUpdateAfterGONetReady()"/> - For physics-based movement (runs at physics timestep)</description></item>
+        ///   <item><description><see cref="LateUpdateAfterGONetReady()"/> - For camera follow, UI, finalization (runs late in frame)</description></item>
+        ///   <item><description>Defensive Update() - When you need precise Script Execution Order control (see SpawnTestBeacon.cs example)</description></item>
+        /// </list>
+        ///
+        /// <para><b>EXAMPLE USAGE:</b></para>
+        /// <code>
+        /// public class Projectile : GONetParticipantCompanionBehaviour
+        /// {
+        ///     private Vector3 movementDirection;
+        ///     public float speed = 10f;
+        ///
+        ///     public override void OnGONetReady()
+        ///     {
+        ///         base.OnGONetReady();
+        ///         movementDirection = transform.forward; // Initialize state
+        ///     }
+        ///
+        ///     internal override void UpdateAfterGONetReady()
+        ///     {
+        ///         // NO defensive checks needed - guaranteed movementDirection is initialized
+        ///         if (IsMine)
+        ///         {
+        ///             transform.position += movementDirection * Time.deltaTime * speed;
+        ///         }
+        ///     }
+        /// }
+        /// </code>
+        ///
+        /// <para>See ONGONETREADY_LIFECYCLE_DESIGN.md for detailed pattern comparison and frame timeline visualization.</para>
+        /// </summary>
+        internal virtual void UpdateAfterGONetReady() { }
+
+        /// <summary>
+        /// <para><b>PHYSICS FRAME UPDATE - Called after this companion's GONetParticipant is fully ready.</b></para>
+        /// <para>This is a framework-provided update loop that runs at Unity's FIXED TIMESTEP (physics rate).</para>
+        ///
+        /// <para><b>⭐ PERFORMANCE: HIGHLY PREFERRED over Unity's FixedUpdate()</b></para>
+        /// <list type="bullet">
+        ///   <item><description><b>Unity FixedUpdate():</b> N objects = N FixedUpdate() calls registered with Unity (linear overhead)</description></item>
+        ///   <item><description><b>GONet pattern:</b> N objects = 1 FixedUpdate() call (constant overhead, centralized C# iteration)</description></item>
+        ///   <item><description><b>Zero overhead if not overridden:</b> Static per-type reflection cache ensures empty implementations are never called</description></item>
+        /// </list>
+        ///
+        /// <para><b>⏱️ TIMING: Runs in GONetMain.FixedUpdate_AfterGONetReady() (called from GONetGlobal.FixedUpdate())</b></para>
+        /// <list type="bullet">
+        ///   <item><description>Runs at Unity's fixed timestep (default: 50Hz / 0.02 seconds)</description></item>
+        ///   <item><description>Can run multiple times per frame or zero times per frame (depends on frame time)</description></item>
+        ///   <item><description>Good for: Physics-based movement, forces, rigid body manipulation, deterministic simulation</description></item>
+        ///   <item><description>Runs independently of frame rate for consistent physics behavior</description></item>
+        /// </list>
+        ///
+        /// <para><b>✅ GUARANTEED when this is called:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="OnGONetReady()"/> has fired for this companion's participant</description></item>
+        ///   <item><description>All GONet initialization is complete</description></item>
+        ///   <item><description>NO defensive checks needed</description></item>
+        /// </list>
+        ///
+        /// <para><b>🔄 ALTERNATIVES:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="UpdateAfterGONetReady()"/> - For frame-based movement (runs early in frame)</description></item>
+        ///   <item><description><see cref="LateUpdateAfterGONetReady()"/> - For late-frame logic (runs after all updates)</description></item>
+        /// </list>
+        ///
+        /// <para><b>EXAMPLE USAGE:</b></para>
+        /// <code>
+        /// public class PhysicsCharacter : GONetParticipantCompanionBehaviour
+        /// {
+        ///     private Rigidbody rb;
+        ///     public float moveForce = 10f;
+        ///
+        ///     public override void OnGONetReady()
+        ///     {
+        ///         base.OnGONetReady();
+        ///         rb = GetComponent&lt;Rigidbody&gt;();
+        ///     }
+        ///
+        ///     internal override void FixedUpdateAfterGONetReady()
+        ///     {
+        ///         if (IsMine)
+        ///         {
+        ///             Vector3 moveInput = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        ///             rb.AddForce(moveInput * moveForce, ForceMode.Force);
+        ///         }
+        ///     }
+        /// }
+        /// </code>
+        ///
+        /// <para>See ONGONETREADY_LIFECYCLE_DESIGN.md for detailed pattern comparison.</para>
+        /// </summary>
+        internal virtual void FixedUpdateAfterGONetReady() { }
+
+        /// <summary>
+        /// <para><b>LATE FRAME UPDATE - Called after this companion's GONetParticipant is fully ready.</b></para>
+        /// <para>This is a framework-provided update loop that runs LATE in the frame (after all Update() methods).</para>
+        ///
+        /// <para><b>⭐ PERFORMANCE: HIGHLY PREFERRED over Unity's LateUpdate()</b></para>
+        /// <list type="bullet">
+        ///   <item><description><b>Unity LateUpdate():</b> N objects = N LateUpdate() calls registered with Unity (linear overhead)</description></item>
+        ///   <item><description><b>GONet pattern:</b> N objects = 1 LateUpdate() call (constant overhead, centralized C# iteration)</description></item>
+        ///   <item><description><b>Zero overhead if not overridden:</b> Static per-type reflection cache ensures empty implementations are never called</description></item>
+        /// </list>
+        ///
+        /// <para><b>⏱️ TIMING: Runs in GONetMain.Update_DoTheHeavyLifting_IfAppropriate() (called from GONetLocal.LateUpdate() at priority +32000)</b></para>
+        /// <list type="bullet">
+        ///   <item><description>Executes AFTER all Update() methods and most LateUpdate() methods (late frame)</description></item>
+        ///   <item><description>Good for: Camera follow, UI updates, finalization logic, network sync collection</description></item>
+        ///   <item><description>Changes won't be visible to other scripts until next frame</description></item>
+        ///   <item><description>Ideal for "observing" final state after all movement/logic has completed</description></item>
+        /// </list>
+        ///
+        /// <para><b>✅ GUARANTEED when this is called:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="OnGONetReady()"/> has fired for this companion's participant</description></item>
+        ///   <item><description>All GONet initialization is complete</description></item>
+        ///   <item><description>NO defensive checks needed</description></item>
+        /// </list>
+        ///
+        /// <para><b>🔄 ALTERNATIVES:</b></para>
+        /// <list type="bullet">
+        ///   <item><description><see cref="UpdateAfterGONetReady()"/> - For early-frame game logic (runs before most Update() methods)</description></item>
+        ///   <item><description><see cref="FixedUpdateAfterGONetReady()"/> - For physics-based movement (runs at physics timestep)</description></item>
+        /// </list>
+        ///
+        /// <para><b>EXAMPLE USAGE:</b></para>
+        /// <code>
+        /// public class CameraFollow : GONetParticipantCompanionBehaviour
+        /// {
+        ///     private Transform target;
+        ///     public Vector3 offset = new Vector3(0, 5, -10);
+        ///
+        ///     public override void OnGONetReady()
+        ///     {
+        ///         base.OnGONetReady();
+        ///         target = transform; // Follow this object
+        ///     }
+        ///
+        ///     internal override void LateUpdateAfterGONetReady()
+        ///     {
+        ///         // Runs AFTER all movement is complete - smooth camera follow
+        ///         Camera.main.transform.position = target.position + offset;
+        ///     }
+        /// }
+        /// </code>
+        ///
+        /// <para>See ONGONETREADY_LIFECYCLE_DESIGN.md for detailed pattern comparison and frame timeline visualization.</para>
+        /// </summary>
+        internal virtual void LateUpdateAfterGONetReady() { }
 
         #region RPC Support
         // 0 parameters

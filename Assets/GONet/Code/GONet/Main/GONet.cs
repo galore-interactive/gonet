@@ -1935,36 +1935,9 @@ namespace GONet
                 }
             }
 
-            // Broadcast OnGONetReady to ALL GONetBehaviours after deserialization is complete
-            // This ensures every behaviour gets notified about every participant that becomes ready
-
-            // CRITICAL: Do NOT call OnGONetReady for participants in limbo state
-            // Limbo objects have no GONetId yet and are not fully networked
-            if (gonetParticipant.Client_IsInLimbo)
-            {
-                GONetLog.Info($"[ClientLimbo] Skipping OnGONetReady broadcast for '{gonetParticipant.name}' - participant is in limbo state (will be called after graduation)");
-                return; // Exit early - OnGONetReady will be called after limbo exit
-            }
-
-            // COMPREHENSIVE LOGGING - Track OnGONetReady broadcast
-            int behaviourCount = allGONetBehaviours.Count;
-            LogEventProcess(gonetParticipant, behaviourCount);
-
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    try
-                    {
-                        gnBehaviour.OnGONetReady(gonetParticipant);
-                    }
-                    catch (Exception ex)
-                    {
-                        GONetLog.Error($"[GONet] Exception in OnGONetReady() broadcast for behaviour '{gnBehaviour.GetType().Name}' on '{gnBehaviour.gameObject.name}' with participant '{gonetParticipant.name}': {ex.Message}\n{ex.StackTrace}");
-                    }
-                }
-            }
+            // LIFECYCLE GATE: Mark deserialization complete and check if OnGONetReady can fire
+            // This replaces the old direct broadcast - now uses the centralized gate check
+            gonetParticipant.MarkDeserializeInitComplete();
         }
 
         private static void OnDisabledGNPEvent(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
@@ -2728,6 +2701,10 @@ namespace GONet
             {
                 coroutineManager.StartCoroutine(Update_EndOfFrame());
             }
+
+            // EARLY FRAME UPDATE: Call UpdateAfterGONetReady for all ready companions
+            // Runs at end of GONetGlobal.Update() (priority -32000, early in frame)
+            Update_EarlyFrame_UpdateAfterGONetReady();
         }
 
         private static IEnumerator Update_EndOfFrame()
@@ -2871,6 +2848,199 @@ namespace GONet
                         {
                             GONetLog.Info($"[SYNC-HEALTH] Unreliable packet drops since start: {_unreliablePacketDropCount} | Active GONetParticipants: {gonetParticipantByGONetIdMap.Count} | Send buffer max: {SingleProducerQueues.MAX_PACKETS_PER_TICK}");
                         }
+                    }
+                }
+
+                // LATE FRAME UPDATE: LateUpdateAfterGONetReady for all ready GONetParticipantCompanionBehaviours
+                // Runs in Update_DoTheHeavyLifting_IfAppropriate (called from GONetLocal.LateUpdate() at priority +32000)
+                //
+                // ROBUSTNESS FEATURES:
+                // - Enumerator with dispose: Safe against DestroyImmediate() modifying HashSet mid-loop
+                // - Per-behaviour try-catch: One exception doesn't break entire pipeline
+                // - Optimized null checks: Avoids Unity's overloaded null operator
+                // - Static reflection cache: Zero overhead for behaviours that don't override method
+                using (var enumerator = allGONetBehaviours.GetEnumerator())
+                {
+                    while (enumerator.MoveNext())
+                    {
+                        GONetBehaviour behaviour = enumerator.Current;
+
+                        // Defensive: Check if destroyed during iteration
+                        object behaviourObj = behaviour;
+                        if (behaviourObj == null)
+                        {
+                            continue;
+                        }
+
+                        // Fast early exit: Type doesn't override method
+                        if (!behaviour.hasLateUpdateAfterGONetReadyOverride)
+                        {
+                            continue;
+                        }
+
+                        // Optimized cast and null checks (avoid Unity null operator)
+                        GONetParticipantCompanionBehaviour companion = behaviour as GONetParticipantCompanionBehaviour;
+                        object companionObj = companion;
+                        if (companionObj == null)
+                        {
+                            continue;
+                        }
+
+                        object participantObj = companion.GONetParticipant;
+                        if (participantObj == null)
+                        {
+                            continue;
+                        }
+
+                        // Check if participant is ready
+                        if (!IsGONetReady(companion.GONetParticipant))
+                        {
+                            continue;
+                        }
+
+                        // ROBUST: Try-catch per behaviour - one exception doesn't break pipeline
+                        try
+                        {
+                            companion.LateUpdateAfterGONetReady();
+                        }
+                        catch (Exception e)
+                        {
+                            // Log with full context for debugging
+                            GONetLog.Error($"[GONet] Exception in LateUpdateAfterGONetReady() for {companion.GetType().Name} (GONetId: {companion.GONetParticipant.GONetId}): {e}");
+                        }
+                    }
+                }
+                // END of late update loop
+            }
+        }
+        // END of Update_DoTheHeavyLifting_IfAppropriate method
+
+        /// <summary>
+        /// EARLY FRAME UPDATE: UpdateAfterGONetReady for all ready GONetParticipantCompanionBehaviours.
+        /// Called from GONetMain.Update() at end (runs at GONetGlobal.Update priority -32000, early in frame).
+        ///
+        /// ROBUSTNESS FEATURES:
+        /// - Enumerator with dispose: Safe against DestroyImmediate() modifying HashSet mid-loop
+        /// - Per-behaviour try-catch: One exception doesn't break entire pipeline
+        /// - Optimized null checks: Avoids Unity's overloaded null operator (cast to object first)
+        /// - Static reflection cache: Zero overhead for behaviours that don't override method
+        /// </summary>
+        internal static void Update_EarlyFrame_UpdateAfterGONetReady()
+        {
+            // SAFE ITERATION: Using enumerator with dispose pattern (HashSet-safe)
+            // This handles DestroyImmediate() modifying the collection during iteration
+            using (var enumerator = allGONetBehaviours.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    GONetBehaviour behaviour = enumerator.Current;
+
+                // Defensive: Check if destroyed during iteration
+                object behaviourObj = behaviour;
+                if (behaviourObj == null)
+                {
+                    continue;
+                }
+
+                // Fast early exit: Type doesn't override method
+                if (!behaviour.hasUpdateAfterGONetReadyOverride)
+                {
+                    continue;
+                }
+
+                // Optimized cast and null checks (avoid Unity null operator)
+                GONetParticipantCompanionBehaviour companion = behaviour as GONetParticipantCompanionBehaviour;
+                object companionObj = companion;
+                if (companionObj == null)
+                {
+                    continue;
+                }
+
+                object participantObj = companion.GONetParticipant;
+                if (participantObj == null)
+                {
+                    continue;
+                }
+
+                // Check if participant is ready
+                if (!IsGONetReady(companion.GONetParticipant))
+                {
+                    continue;
+                }
+
+                    // ROBUST: Try-catch per behaviour - one exception doesn't break pipeline
+                    try
+                    {
+                        companion.UpdateAfterGONetReady();
+                    }
+                    catch (Exception e)
+                    {
+                        // Log with full context for debugging
+                        GONetLog.Error($"[GONet] Exception in UpdateAfterGONetReady() for {companion.GetType().Name} (GONetId: {companion.GONetParticipant.GONetId}): {e}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// PHYSICS FRAME UPDATE: FixedUpdateAfterGONetReady for all ready GONetParticipantCompanionBehaviours.
+        /// Called from GONetGlobal.FixedUpdate() at Unity's fixed timestep (default: 50Hz / 0.02s).
+        ///
+        /// ROBUSTNESS FEATURES:
+        /// - Enumerator with dispose: Safe against DestroyImmediate() modifying HashSet mid-loop
+        /// - Per-behaviour try-catch: One exception doesn't break entire pipeline
+        /// - Optimized null checks: Avoids Unity's overloaded null operator
+        /// </summary>
+        internal static void FixedUpdate_AfterGONetReady()
+        {
+            // SAFE ITERATION: Using enumerator with dispose pattern (HashSet-safe)
+            using (var enumerator = allGONetBehaviours.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    GONetBehaviour behaviour = enumerator.Current;
+
+                // Defensive: Check if destroyed during iteration
+                object behaviourObj = behaviour;
+                if (behaviourObj == null)
+                {
+                    continue;
+                }
+
+                // Fast early exit: Type doesn't override method
+                if (!behaviour.hasFixedUpdateAfterGONetReadyOverride)
+                {
+                    continue;
+                }
+
+                // Optimized cast and null checks
+                GONetParticipantCompanionBehaviour companion = behaviour as GONetParticipantCompanionBehaviour;
+                object companionObj = companion;
+                if (companionObj == null)
+                {
+                    continue;
+                }
+
+                object participantObj = companion.GONetParticipant;
+                if (participantObj == null)
+                {
+                    continue;
+                }
+
+                // Check if participant is ready
+                if (!IsGONetReady(companion.GONetParticipant))
+                {
+                    continue;
+                }
+
+                    // ROBUST: Try-catch per behaviour
+                    try
+                    {
+                        companion.FixedUpdateAfterGONetReady();
+                    }
+                    catch (Exception e)
+                    {
+                        GONetLog.Error($"[GONet] Exception in FixedUpdateAfterGONetReady() for {companion.GetType().Name} (GONetId: {companion.GONetParticipant.GONetId}): {e}");
                     }
                 }
             }
@@ -4686,6 +4856,9 @@ namespace GONet
             remoteSpawns_avoidAutoPropagateSupport.Add(instance);
             instance.IsOKToStartAutoMagicalProcessing = true;
 
+            // LIFECYCLE GATE: Remote spawns require DeserializeInitAllCompleted before OnGONetReady
+            instance.MarkRequiresDeserializeInit();
+
             // Track which scene this GNP was spawned in
             string spawnSceneName = GONetSceneManager.GetSceneIdentifier(instance.gameObject);
             if (!string.IsNullOrEmpty(spawnSceneName))
@@ -5671,25 +5844,10 @@ namespace GONet
             // Mark as no longer in limbo BEFORE triggering OnGONetReady
             participant.client_isInLimbo = false;
 
-            // CRITICAL: Now trigger OnGONetReady since the participant is fully networked
-            // This was blocked during initial instantiation by the check in OnDeserializeInitAllCompletedGNPEvent
-            GONetLog.Info($"[ClientLimbo] '{participantName}' graduated from limbo - GONetId: {participant.GONetId} - broadcasting OnGONetReady");
-
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    try
-                    {
-                        gnBehaviour.OnGONetReady(participant);
-                    }
-                    catch (Exception ex)
-                    {
-                        GONetLog.Error($"[ClientLimbo] Exception in OnGONetReady() after limbo exit for behaviour '{gnBehaviour.GetType().Name}' on '{gnBehaviour.gameObject.name}': {ex.Message}\n{ex.StackTrace}");
-                    }
-                }
-            }
+            // LIFECYCLE GATE: Graduated from limbo - check if OnGONetReady can fire
+            // This replaces the old direct broadcast - now uses the centralized gate check
+            GONetLog.Info($"[ClientLimbo] '{participantName}' graduated from limbo - GONetId: {participant.GONetId} - checking OnGONetReady gate");
+            CheckAndPublishOnGONetReady_IfAllConditionsMet(participant);
 
             return true;
         }
@@ -6564,6 +6722,12 @@ namespace GONet
                 {
                     AssignGONetIdRaw_IfAppropriate(gonetParticipant);
                 }
+                else if (IsClient)
+                {
+                    // LIFECYCLE GATE: Scene-defined objects on clients require DeserializeInitAllCompleted before OnGONetReady
+                    // (They're receiving sync data from server, not local authority)
+                    gonetParticipant.MarkRequiresDeserializeInit();
+                }
             }
             else
             {
@@ -6699,6 +6863,9 @@ namespace GONet
                 {
                     uint gonetId_raw = GetNextAvailableGONetIdRaw(gonetParticipant);
                     gonetParticipant.GONetId = (gonetId_raw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED) | gonetParticipant.OwnerAuthorityId;
+
+                    // LIFECYCLE GATE: GONetId assigned - check if OnGONetReady can fire
+                    CheckAndPublishOnGONetReady_IfAllConditionsMet(gonetParticipant);
                 }
                 else
                 {
@@ -6765,6 +6932,9 @@ namespace GONet
         {
             gonetParticipant.GONetId = gonetId;
             GONetLog.Debug($"[GONetId] Directly assigned GONetId {gonetId} to '{gonetParticipant.gameObject.name}'");
+
+            // LIFECYCLE GATE: GONetId assigned - check if OnGONetReady can fire
+            CheckAndPublishOnGONetReady_IfAllConditionsMet(gonetParticipant);
         }
 
         /// <summary>
@@ -8560,18 +8730,28 @@ namespace GONet
         /// </summary>
         public static bool IsGONetReady(GONetParticipant gonetParticipant)
         {
+            bool isBeaconDiagnostic = gonetParticipant != null && gonetParticipant.gameObject != null && gonetParticipant.gameObject.name.Contains("TestBeacon");
+
             // Check basic participant initialization
-            if (gonetParticipant == null || 
-                gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset || 
+            if (gonetParticipant == null ||
+                gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset ||
                 gonetParticipant.gonetId_raw == GONetParticipant.GONetIdRaw_Unset ||
                 !gonetParticipant.IsInternallyConfigured)
             {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED basic checks for '{gonetParticipant?.gameObject?.name}' - null? {gonetParticipant == null}, AuthorityUnset? {gonetParticipant?.OwnerAuthorityId == OwnerAuthorityId_Unset}, IdUnset? {gonetParticipant?.gonetId_raw == GONetParticipant.GONetIdRaw_Unset}, InternallyConfigured? {gonetParticipant?.IsInternallyConfigured}");
+                }
                 return false;
             }
 
             // Check client/server status is known
             if (!IsClientVsServerStatusKnown)
             {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Client/Server status not yet known");
+                }
                 return false;
             }
 
@@ -8580,11 +8760,19 @@ namespace GONet
             {
                 if (GONetClient == null)
                 {
+                    if (isBeaconDiagnostic)
+                    {
+                        GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetClient is NULL");
+                    }
                     return false; // Client but no client instance - not ready
                 }
 
                 if (!GONetClient.IsInitializedWithServer)
                 {
+                    if (isBeaconDiagnostic)
+                    {
+                        GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetClient NOT initialized with server yet");
+                    }
                     return false; // Client exists but not initialized with server
                 }
             }
@@ -8592,6 +8780,10 @@ namespace GONet
             // Check GONetLocal lookup is available
             if (GONetLocal.LookupByAuthorityId == null)
             {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetLocal.LookupByAuthorityId is NULL");
+                }
                 return false;
             }
 
@@ -8600,10 +8792,111 @@ namespace GONet
             GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
             if (local == null)
             {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetLocal lookup for AuthorityId {gonetParticipant.OwnerAuthorityId} returned NULL");
+                }
                 return false;
             }
 
+            // LIFECYCLE GATE: Check Unity lifecycle completion (Awake, Start)
+            if (!gonetParticipant.didAwakeComplete || !gonetParticipant.didStartComplete)
+            {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Unity lifecycle incomplete - Awake: {gonetParticipant.didAwakeComplete}, Start: {gonetParticipant.didStartComplete}");
+                }
+                return false; // Unity lifecycle not yet complete
+            }
+
+            // LIFECYCLE GATE: Check deserialization requirement (if needed for remote objects)
+            if (gonetParticipant.requiresDeserializeInit && !gonetParticipant.didDeserializeInitComplete)
+            {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Waiting for DeserializeInit (requiresDeserializeInit: {gonetParticipant.requiresDeserializeInit}, didDeserializeInitComplete: {gonetParticipant.didDeserializeInitComplete})");
+                }
+                return false; // Waiting for remote sync data (DeserializeInitAllCompleted)
+            }
+
+            // LIFECYCLE GATE: Ensure not in limbo state (client batch exhaustion edge case)
+            if (gonetParticipant.Client_IsInLimbo)
+            {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Still in limbo (waiting for GONetId batch)");
+                }
+                return false; // Still waiting for GONetId batch from server
+            }
+
+            // ALL CHECKS PASSED!
+            if (isBeaconDiagnostic)
+            {
+                GONetLog.Info($"[IsGONetReady] ✅ SUCCESS for '{gonetParticipant.gameObject.name}' (GONetId: {gonetParticipant.GONetId}) - All lifecycle gates passed!");
+            }
             return true;
+        }
+
+        /// <summary>
+        /// Checks if all OnGONetReady prerequisites are met and broadcasts to all GONetBehaviours if so.
+        /// Called after each lifecycle milestone (Awake, Start, DeserializeInit, ExitLimbo).
+        ///
+        /// This is the simplified gate check that delegates to IsGONetReady() for all validation.
+        /// Only fires OnGONetReady once per participant (tracked via didOnGONetReadyFire flag).
+        /// </summary>
+        internal static void CheckAndPublishOnGONetReady_IfAllConditionsMet(GONetParticipant gonetParticipant)
+        {
+            bool isBeaconDiagnostic = gonetParticipant != null && gonetParticipant.gameObject != null && gonetParticipant.gameObject.name.Contains("TestBeacon");
+
+            if (isBeaconDiagnostic)
+            {
+                GONetLog.Info($"[CheckAndPublishOnGONetReady] Called for '{gonetParticipant.gameObject.name}' (GONetId: {gonetParticipant.GONetId}) - didOnGONetReadyFire: {gonetParticipant.didOnGONetReadyFire}");
+            }
+
+            // Prevent duplicate calls - OnGONetReady should only fire once
+            if (gonetParticipant.didOnGONetReadyFire)
+            {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[CheckAndPublishOnGONetReady] Skipping '{gonetParticipant.gameObject.name}' - already fired");
+                }
+                return; // Already fired, nothing to do
+            }
+
+            // Check if all prerequisites are met (delegates to IsGONetReady)
+            if (!IsGONetReady(gonetParticipant))
+            {
+                if (isBeaconDiagnostic)
+                {
+                    GONetLog.Info($"[CheckAndPublishOnGONetReady] Not ready yet for '{gonetParticipant.gameObject.name}' - waiting for prerequisites");
+                }
+                return; // Not ready yet, wait for next milestone
+            }
+
+            // All conditions met! Mark as fired and broadcast OnGONetReady to all GONetBehaviours
+            gonetParticipant.didOnGONetReadyFire = true;
+
+            if (isBeaconDiagnostic)
+            {
+                GONetLog.Info($"[CheckAndPublishOnGONetReady] 🎯 Broadcasting OnGONetReady for '{gonetParticipant.gameObject.name}' to {allGONetBehaviours.Count} behaviours");
+            }
+
+            // Broadcast OnGONetReady to all registered GONetBehaviours
+            using (var en = allGONetBehaviours.GetEnumerator())
+            {
+                while (en.MoveNext())
+                {
+                    GONetBehaviour gnBehaviour = en.Current;
+                    try
+                    {
+                        gnBehaviour.OnGONetReady(gonetParticipant);
+                    }
+                    catch (Exception ex)
+                    {
+                        GONetLog.Error($"[GONet] Exception in OnGONetReady() broadcast for behaviour '{gnBehaviour.GetType().Name}' on '{gnBehaviour.gameObject.name}' with participant '{gonetParticipant.name}': {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
         }
     }
 

@@ -63,22 +63,61 @@ namespace GONet.Sample
         private bool hasLoggedOwnershipOnce = false;
         private float despawnTimer = 0f;
 
-        private void Update()
+        /// <summary>
+        /// EARLY FRAME UPDATE: Projectile movement using GONet's UpdateAfterGONetReady pattern.
+        ///
+        /// This demonstrates the ⭐ HIGHLY PREFERRED pattern for networked game logic:
+        /// - NO defensive checks needed (guaranteed movementDirection is initialized)
+        /// - Runs early in frame (priority -32000, before most Update() methods)
+        /// - Zero overhead if not overridden (static per-type caching)
+        /// - Constant overhead (1 Update() call) vs linear overhead (N Update() calls with Unity's Update())
+        ///
+        /// ALTERNATIVE PATTERN: See SpawnTestBeacon.cs for defensive Update() pattern
+        /// (only use when you need precise Script Execution Order control).
+        ///
+        /// See ONGONETREADY_LIFECYCLE_DESIGN.md for detailed pattern comparison.
+        /// </summary>
+        internal override void UpdateAfterGONetReady()
         {
-            // DIAGNOSTIC: Log ownership state on first update for this projectile
+            // DIAGNOSTIC: Log on first UpdateAfterGONetReady call
             if (!hasLoggedOwnershipOnce)
             {
                 hasLoggedOwnershipOnce = true;
-                GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) FIRST UPDATE - " +
+                GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) FIRST UpdateAfterGONetReady - " +
                     $"IsMine: {gonetParticipant.IsMine}, " +
                     $"OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, " +
                     $"MyAuthorityId: {GONetMain.MyAuthorityId}, " +
                     $"IsServer: {GONetMain.IsServer}, " +
                     $"IsClient: {GONetMain.IsClient}, " +
                     $"startSpeed: {startSpeed}, " +
-                    $"speed: {speed}");
+                    $"speed: {speed}, " +
+                    $"movementDirection: {movementDirection}");
             }
 
+            if (gonetParticipant.IsMine)
+            {
+                // NO DEFENSIVE CHECK NEEDED for movementDirection!
+                // UpdateAfterGONetReady guarantees:
+                // - OnGONetReady has fired for this projectile
+                // - Projectile.Awake() has completed (sets movementDirection)
+                // - movementDirection is guaranteed to be initialized (non-zero)
+
+                // Move in stored direction (unaffected by rotation - shotgun spread effect)
+                transform.position += movementDirection * UnityEngine.Time.deltaTime * speed;
+
+                // Visual rotation (doesn't affect movement path)
+                const float CYCLE_SECONDS = 5f;
+                const float DEGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
+                var smoothlyChangingMultiplyFactor = UnityEngine.Time.time % CYCLE_SECONDS;
+                smoothlyChangingMultiplyFactor *= DEGREES_PER_CYCLE;
+                smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
+                float rotationAngle = UnityEngine.Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
+                transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
+            }
+        }
+
+        private void Update()
+        {
             if (gonetParticipant.IsMine)
             {
                 if (speed > -startSpeed)
