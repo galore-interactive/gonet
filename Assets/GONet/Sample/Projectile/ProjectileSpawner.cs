@@ -166,17 +166,24 @@ public class ProjectileSpawner : GONetBehaviour
 
             if (projectile.GONetParticipant.IsMine)
             {
-                // Move in stored direction (unaffected by rotation - shotgun spread effect)
-                projectile.transform.position += projectile.movementDirection * Time.deltaTime * projectile.speed;
+                // CRITICAL: Check if movementDirection is initialized before moving
+                // OnGONetReady() can be called before Awake() on server, causing movementDirection to be zero
+                // temporarily. Skip movement until Awake() sets the proper direction.
+                if (projectile.movementDirection != Vector3.zero)
+                {
+                    // Move in stored direction (unaffected by rotation - shotgun spread effect)
+                    projectile.transform.position += projectile.movementDirection * Time.deltaTime * projectile.speed;
 
-                // Visual rotation (doesn't affect movement path)
-                const float CYCLE_SECONDS = 5f;
-                const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
-                var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
-                smoothlyChangingMultiplyFactor *= DECGREES_PER_CYCLE;
-                smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
-                float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
-                projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
+                    // Visual rotation (doesn't affect movement path)
+                    const float CYCLE_SECONDS = 5f;
+                    const float DECGREES_PER_CYCLE = 360f / CYCLE_SECONDS;
+                    var smoothlyChangingMultiplyFactor = Time.time % CYCLE_SECONDS;
+                    smoothlyChangingMultiplyFactor *= DECGREES_PER_CYCLE;
+                    smoothlyChangingMultiplyFactor = Mathf.Sin(smoothlyChangingMultiplyFactor * Mathf.Deg2Rad) + 2; // should be between 1 and 3 after this
+                    float rotationAngle = Time.deltaTime * 100 * smoothlyChangingMultiplyFactor;
+                    projectile.transform.Rotate(rotationAngle, rotationAngle, rotationAngle);
+                }
+                // else: movementDirection not yet initialized (Awake not called yet), skip movement this frame
             }
             else
             {

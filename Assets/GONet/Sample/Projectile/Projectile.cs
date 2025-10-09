@@ -31,9 +31,11 @@ namespace GONet.Sample
         /// <summary>
         /// Movement direction set at spawn time (for shotgun spread effect).
         /// Stored separately so rotation doesn't affect movement path.
+        /// IMPORTANT: Initialized to Vector3.zero as sentinel value. Set in Awake() to transform.forward.
+        /// ProjectileSpawner checks if zero before applying movement to handle OnGONetReady/Awake race condition.
         /// </summary>
         [HideInInspector]
-        public Vector3 movementDirection;
+        public Vector3 movementDirection = Vector3.zero;
 
         TextMeshProUGUI text;
 
@@ -46,6 +48,9 @@ namespace GONet.Sample
             startSpeed = speed;
 
             // Store initial forward direction for movement (unaffected by rotation)
+            // CRITICAL: ProjectileSpawner may add this projectile to its update loop BEFORE Awake() runs
+            // (OnGONetReady called before Awake on server). Setting this at the END of Awake ensures
+            // movement doesn't start until direction is properly initialized.
             movementDirection = transform.forward;
 
             // DIAGNOSTIC: Log initial movement direction
