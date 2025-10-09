@@ -431,5 +431,155 @@ namespace GONet.Editor.UnitTests.Utils
                 pool.Return(buffer);
             }
         }
+
+        #region Congestion Management Tests (October 2025)
+
+        [Test]
+        public void BorrowedCount_EmptyPool_ReturnsZero()
+        {
+            // Test NEW BorrowedCount property added for congestion management
+            var pool = new TieredArrayPool<byte>();
+
+            Assert.AreEqual(0, pool.BorrowedCount, "Empty pool should have BorrowedCount = 0");
+        }
+
+        [Test]
+        public void BorrowedCount_AfterBorrow_IncrementsCorrectly()
+        {
+            var pool = new TieredArrayPool<byte>();
+
+            Assert.AreEqual(0, pool.BorrowedCount, "Initial count should be 0");
+
+            byte[] buffer1 = pool.Borrow(10);
+            Assert.AreEqual(1, pool.BorrowedCount, "Count should be 1 after first borrow");
+
+            byte[] buffer2 = pool.Borrow(500);
+            Assert.AreEqual(2, pool.BorrowedCount, "Count should be 2 after second borrow");
+
+            byte[] buffer3 = pool.Borrow(5000);
+            Assert.AreEqual(3, pool.BorrowedCount, "Count should be 3 after third borrow");
+
+            // Cleanup
+            pool.Return(buffer1);
+            pool.Return(buffer2);
+            pool.Return(buffer3);
+        }
+
+        [Test]
+        public void BorrowedCount_AfterReturn_DecrementsCorrectly()
+        {
+            var pool = new TieredArrayPool<byte>();
+
+            byte[] buffer1 = pool.Borrow(10);
+            byte[] buffer2 = pool.Borrow(500);
+            byte[] buffer3 = pool.Borrow(5000);
+
+            Assert.AreEqual(3, pool.BorrowedCount, "Count should be 3 after borrowing 3 buffers");
+
+            pool.Return(buffer1);
+            Assert.AreEqual(2, pool.BorrowedCount, "Count should be 2 after returning 1 buffer");
+
+            pool.Return(buffer2);
+            Assert.AreEqual(1, pool.BorrowedCount, "Count should be 1 after returning 2 buffers");
+
+            pool.Return(buffer3);
+            Assert.AreEqual(0, pool.BorrowedCount, "Count should be 0 after returning all buffers");
+        }
+
+        [Test]
+        public void BorrowedCount_AcrossAllTiers_TracksAccurately()
+        {
+            // Test that BorrowedCount accurately sums across all tiers
+            var pool = new TieredArrayPool<byte>();
+            var buffers = new List<byte[]>();
+
+            // Borrow from each tier
+            buffers.Add(pool.Borrow(10));      // Tiny
+            buffers.Add(pool.Borrow(500));     // Small
+            buffers.Add(pool.Borrow(5000));    // Medium
+            buffers.Add(pool.Borrow(20000));   // Large
+
+            Assert.AreEqual(4, pool.BorrowedCount, "Count should be 4 (one from each tier)");
+
+            // Borrow more from each tier
+            buffers.Add(pool.Borrow(50));      // Tiny
+            buffers.Add(pool.Borrow(800));     // Small
+            buffers.Add(pool.Borrow(8000));    // Medium
+            buffers.Add(pool.Borrow(30000));   // Large
+
+            Assert.AreEqual(8, pool.BorrowedCount, "Count should be 8 (two from each tier)");
+
+            // Return all
+            foreach (var buffer in buffers)
+            {
+                pool.Return(buffer);
+            }
+
+            Assert.AreEqual(0, pool.BorrowedCount, "Count should be 0 after returning all buffers");
+        }
+
+        [Test]
+        public void BorrowedCount_StressTest_RapidBorrowReturn()
+        {
+            // Test BorrowedCount under high-frequency borrow/return (simulates real network traffic)
+            var pool = new TieredArrayPool<byte>();
+            var random = new System.Random(11111);
+
+            for (int cycle = 0; cycle < 1000; cycle++)
+            {
+                var borrowed = new List<byte[]>();
+
+                // Borrow random number of buffers (1-50)
+                int borrowCount = random.Next(1, 51);
+                for (int i = 0; i < borrowCount; i++)
+                {
+                    int size = random.Next(1, 10001);
+                    borrowed.Add(pool.Borrow(size));
+                }
+
+                Assert.AreEqual(borrowCount, pool.BorrowedCount,
+                    $"Cycle {cycle}: BorrowedCount should match borrow count {borrowCount}");
+
+                // Return all
+                foreach (var buffer in borrowed)
+                {
+                    pool.Return(buffer);
+                }
+
+                Assert.AreEqual(0, pool.BorrowedCount,
+                    $"Cycle {cycle}: BorrowedCount should be 0 after returning all");
+            }
+        }
+
+        [Test]
+        public void BorrowedCount_CongestionSimulation_10xOverflow()
+        {
+            // Simulate congestion scenario: borrow 10x the old MAX_PACKETS_PER_TICK (1000)
+            // This tests that TieredArrayPool can handle what would overflow old ArrayPool
+            var pool = new TieredArrayPool<byte>();
+            var buffers = new List<byte[]>();
+
+            const int OLD_MAX = 1000;
+            const int STRESS_MULTIPLIER = 10;
+
+            // Borrow 10,000 buffers (would fail with old ArrayPool at ~1000)
+            for (int i = 0; i < OLD_MAX * STRESS_MULTIPLIER; i++)
+            {
+                buffers.Add(pool.Borrow(50)); // Typical small message size
+            }
+
+            Assert.AreEqual(OLD_MAX * STRESS_MULTIPLIER, pool.BorrowedCount,
+                "Should successfully borrow 10x old limit without failure");
+
+            // Cleanup
+            foreach (var buffer in buffers)
+            {
+                pool.Return(buffer);
+            }
+
+            Assert.AreEqual(0, pool.BorrowedCount, "All buffers should be returned");
+        }
+
+        #endregion
     }
 }
