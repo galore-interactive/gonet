@@ -250,6 +250,15 @@ namespace GONet.Utils
         }
 
         /// <summary>
+        /// Gets the total number of arrays currently borrowed across all tiers.
+        /// Thread-safe: Each individual pool's BorrowedCount is thread-safe.
+        /// Note: This is a snapshot value - may change immediately after read.
+        /// </summary>
+        public int BorrowedCount =>
+            tinyPool.BorrowedCount + smallPool.BorrowedCount +
+            mediumPool.BorrowedCount + largePool.BorrowedCount;
+
+        /// <summary>
         /// Gets statistics for debugging/monitoring pool usage
         /// </summary>
         public string GetStats()
