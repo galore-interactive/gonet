@@ -84,6 +84,59 @@ namespace GONet
         [Range(100, 1000)]
         public int client_GONetIdBatchSize = 200;
 
+        [Header("Congestion Management")]
+        [Tooltip("Maximum concurrent packet operations before flow control kicks in.\n\n" +
+                "This controls the size of the packet pool used for network send operations.\n" +
+                "When pool utilization exceeds UnreliableDropThreshold, unreliable packets are dropped.\n\n" +
+                "CONFIGURATION GUIDELINES:\n" +
+                "• Small Co-op (2-8 players): 500-1000\n" +
+                "• Battle Royale (50-100 players): 2000-5000\n" +
+                "• MMO (100+ players): 5000-10000\n\n" +
+                "SYMPTOMS OF TOO LOW:\n" +
+                "• Objects stuck at spawn position (position sync dropped)\n" +
+                "• 'Ring buffer is full' warnings in logs\n" +
+                "• High unreliable packet drop rate (>5%)\n\n" +
+                "SYMPTOMS OF TOO HIGH:\n" +
+                "• Increased memory usage (each slot uses ~1-12KB depending on message size)\n" +
+                "• No benefit if network bandwidth is the bottleneck\n\n" +
+                "Default: 1000 (suitable for small-medium games)\n" +
+                "Range: 100-20000")]
+        [Range(100, 20000)]
+        public int maxPacketsPerTick = 1000;
+
+        [Tooltip("Start dropping unreliable packets when pool utilization exceeds this percentage.\n\n" +
+                "Flow control threshold to prevent packet pool exhaustion.\n" +
+                "When borrowed packet count exceeds (maxPacketsPerTick × unreliableDropThreshold),\n" +
+                "new unreliable packets are dropped to preserve pool capacity for reliable packets.\n\n" +
+                "TUNING GUIDANCE:\n" +
+                "• Higher (0.95-0.99): More aggressive - allows pool to fill nearly completely\n" +
+                "  Use when: Reliable packets are rare, mostly unreliable traffic\n" +
+                "• Lower (0.80-0.90): More conservative - drops unreliable earlier\n" +
+                "  Use when: Mix of reliable/unreliable, want buffer for reliable messages\n\n" +
+                "TRADE-OFFS:\n" +
+                "• Too high: Reliable packets may fail if pool suddenly fills\n" +
+                "• Too low: Unnecessary unreliable packet drops under normal load\n\n" +
+                "Default: 0.90 (drop unreliable when 90% pool utilization)\n" +
+                "Range: 0.50-0.99 (50%-99%)")]
+        [Range(0.5f, 0.99f)]
+        public float unreliableDropThreshold = 0.90f;
+
+        [Tooltip("Enable detailed congestion logging for debugging network bottlenecks.\n\n" +
+                "When enabled, logs packet drop events with actionable diagnostics:\n" +
+                "• Drop rate (packets dropped / total packets)\n" +
+                "• Pool utilization percentage\n" +
+                "• Channel causing drops (AutoMagicalSync, TimeSync, etc.)\n" +
+                "• Recommended solutions (increase pool size, reduce sync frequency, etc.)\n\n" +
+                "WHEN TO ENABLE:\n" +
+                "• Investigating objects stuck at spawn position\n" +
+                "• Tuning maxPacketsPerTick for your game\n" +
+                "• Debugging high packet drop rates\n\n" +
+                "PERFORMANCE IMPACT:\n" +
+                "• Minimal - only logs when drops occur\n" +
+                "• Throttled logging (batches drops to avoid spam)\n\n" +
+                "Default: Enabled (helps identify congestion issues)")]
+        public bool enableCongestionLogging = true;
+
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 
