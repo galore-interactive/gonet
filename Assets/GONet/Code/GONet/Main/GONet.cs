@@ -2282,25 +2282,41 @@ namespace GONet
             SingleProducerQueues singleProducerSendQueues = ReturnSingleProducerResources_IfAppropriate(singleProducerSendQueuesByThread, Thread.CurrentThread);
 
             { // flow control:
-                if (GONetChannel.ById(channelId).QualityOfService == QosType.Unreliable && singleProducerSendQueues.resourcePool.BorrowedCount > SingleProducerQueues.MAX_PACKETS_PER_TICK - 10) // TODO better config of this
+                // IMPROVED (October 2025): Use percentage-based threshold instead of fixed "- 10" offset
+                // This allows better tuning for different game types and scales
+                if (GONetChannel.ById(channelId).QualityOfService == QosType.Unreliable)
                 {
-                    // Track unreliable packet drops for diagnostics
-                    _unreliablePacketDropCount++;
-                    _unreliablePacketDropCount_sinceLastLog++;
+                    int maxPackets = GONetGlobal.Instance != null ? GONetGlobal.Instance.maxPacketsPerTick : SingleProducerQueues.MAX_PACKETS_PER_TICK;
+                    float threshold = GONetGlobal.Instance != null ? GONetGlobal.Instance.unreliableDropThreshold : 0.90f;
+                    int dropThresholdCount = (int)(maxPackets * threshold);
 
-                    // Log periodically (every 100 drops or first drop) to avoid spam
-                    if (_unreliablePacketDropCount_sinceLastLog >= 100 || _unreliablePacketDropCount == 1)
+                    if (singleProducerSendQueues.resourcePool.BorrowedCount > dropThresholdCount)
                     {
-                        string channelName = GONetChannel.ById(channelId) == GONetChannel.AutoMagicalSync_Unreliable ? "AutoMagicalSync" :
-                                           GONetChannel.ById(channelId) == GONetChannel.TimeSync_Unreliable ? "TimeSync" :
-                                           GONetChannel.ById(channelId) == GONetChannel.EventSingles_Unreliable ? "EventSingles" :
-                                           GONetChannel.ById(channelId) == GONetChannel.CustomSerialization_Unreliable ? "CustomSerialization" : "Unknown";
+                        // Track unreliable packet drops for diagnostics
+                        _unreliablePacketDropCount++;
+                        _unreliablePacketDropCount_sinceLastLog++;
 
-                        GONetLog.Warning($"[UNRELIABLE-DROP] Dropped {_unreliablePacketDropCount_sinceLastLog} unreliable packets (total: {_unreliablePacketDropCount}) | Channel: {channelName} | BorrowedCount: {singleProducerSendQueues.resourcePool.BorrowedCount}/{SingleProducerQueues.MAX_PACKETS_PER_TICK} | Connection: {(sendToConnection == null ? "ALL" : sendToConnection.ToString())}");
-                        _unreliablePacketDropCount_sinceLastLog = 0;
+                        // Log periodically (every 100 drops or first drop) to avoid spam
+                        if (_unreliablePacketDropCount_sinceLastLog >= 100 || _unreliablePacketDropCount == 1)
+                        {
+                            string channelName = GONetChannel.ById(channelId) == GONetChannel.AutoMagicalSync_Unreliable ? "AutoMagicalSync" :
+                                               GONetChannel.ById(channelId) == GONetChannel.TimeSync_Unreliable ? "TimeSync" :
+                                               GONetChannel.ById(channelId) == GONetChannel.EventSingles_Unreliable ? "EventSingles" :
+                                               GONetChannel.ById(channelId) == GONetChannel.CustomSerialization_Unreliable ? "CustomSerialization" : "Unknown";
+
+                            int borrowed = singleProducerSendQueues.resourcePool.BorrowedCount;
+                            float utilization = (float)borrowed / maxPackets;
+
+                            GONetLog.Warning($"[UNRELIABLE-DROP] Dropped {_unreliablePacketDropCount_sinceLastLog} unreliable packets (total: {_unreliablePacketDropCount}) | " +
+                                           $"Channel: {channelName} | " +
+                                           $"Pool: {borrowed}/{maxPackets} ({utilization:P}) | " +
+                                           $"Threshold: {threshold:P} | " +
+                                           $"Connection: {(sendToConnection == null ? "ALL" : sendToConnection.ToString())}");
+                            _unreliablePacketDropCount_sinceLastLog = 0;
+                        }
+
+                        return false;
                     }
-
-                    return false;
                 }
             }
 
