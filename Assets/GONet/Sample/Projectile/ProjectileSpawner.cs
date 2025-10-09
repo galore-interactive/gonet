@@ -40,6 +40,9 @@ public class ProjectileSpawner : GONetBehaviour
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
             projectiles.Add(projectile);
 
+            // DIAGNOSTIC: Log when projectile is added to tracking list
+            GONetLog.Info($"[ProjectileSpawner] OnGONetReady() called for '{projectile.name}' (GONetId: {gonetParticipant.GONetId}) - IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}, IsServer: {GONetMain.IsServer}, projectiles.Count: {projectiles.Count}");
+
             /* This was replaced in v1.1.1 with use of GONetMain.Client_InstantiateToBeRemotelyControlledByMe():
             if (GONetMain.IsServer && !projectile.GONetParticipant.IsMine)
             {
@@ -154,6 +157,12 @@ public class ProjectileSpawner : GONetBehaviour
             }
 
             uint gonetId = projectile.GONetParticipant.GONetId;
+
+            // DIAGNOSTIC: Log every 180 frames (~3 seconds) for server projectiles
+            if (GONetMain.IsServer && Time.frameCount % 180 == 0)
+            {
+                GONetLog.Info($"[ProjectileSpawner] UPDATE loop - Projectile '{projectile.name}' (GONetId: {gonetId}) - IsMine: {projectile.GONetParticipant.IsMine}, Owner: {projectile.GONetParticipant.OwnerAuthorityId}, Pos: {projectile.transform.position}, Speed: {projectile.speed:F2}, MovementDir: {projectile.movementDirection}");
+            }
 
             if (projectile.GONetParticipant.IsMine)
             {

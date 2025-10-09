@@ -48,6 +48,9 @@ namespace GONet.Sample
             // Store initial forward direction for movement (unaffected by rotation)
             movementDirection = transform.forward;
 
+            // DIAGNOSTIC: Log initial movement direction
+            GONetLog.Info($"[Projectile] Awake() - '{gameObject.name}' - movementDirection set to: {movementDirection}, transform.forward: {transform.forward}, transform.position: {transform.position}, transform.rotation: {transform.rotation.eulerAngles}");
+
             InitSutffForSupportingHoveringDuplicate();
         }
 
