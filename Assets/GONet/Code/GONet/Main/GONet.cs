@@ -996,6 +996,12 @@ namespace GONet
         /// </summary>
         private static int _unreliablePacketDropCount_sinceLastLog = 0;
 
+        /// <summary>
+        /// Total count of successful packet sends (for calculating drop rate).
+        /// Incremented in SendBytesToRemoteConnection when packets are successfully queued.
+        /// </summary>
+        private static long _successfulPacketSendCount = 0;
+
         public const ushort OwnerAuthorityId_Unset = 0;
         public const ushort OwnerAuthorityId_Server = unchecked((ushort)(ushort.MaxValue << GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED)) >> GONetParticipant.OWNER_AUTHORITY_ID_BIT_COUNT_UNUSED;
 
@@ -2297,7 +2303,11 @@ namespace GONet
                         _unreliablePacketDropCount_sinceLastLog++;
 
                         // Log periodically (every 100 drops or first drop) to avoid spam
-                        if (_unreliablePacketDropCount_sinceLastLog >= 100 || _unreliablePacketDropCount == 1)
+                        // ONLY log if congestion logging is enabled (configurable in GONetGlobal)
+                        bool shouldLog = (_unreliablePacketDropCount_sinceLastLog >= 100 || _unreliablePacketDropCount == 1) &&
+                                        (GONetGlobal.Instance == null || GONetGlobal.Instance.enableCongestionLogging);
+
+                        if (shouldLog)
                         {
                             string channelName = GONetChannel.ById(channelId) == GONetChannel.AutoMagicalSync_Unreliable ? "AutoMagicalSync" :
                                                GONetChannel.ById(channelId) == GONetChannel.TimeSync_Unreliable ? "TimeSync" :
@@ -2306,12 +2316,46 @@ namespace GONet
 
                             int borrowed = singleProducerSendQueues.resourcePool.BorrowedCount;
                             float utilization = (float)borrowed / maxPackets;
+                            float dropRate = (float)_unreliablePacketDropCount / (_unreliablePacketDropCount + _successfulPacketSendCount);
 
-                            GONetLog.Warning($"[UNRELIABLE-DROP] Dropped {_unreliablePacketDropCount_sinceLastLog} unreliable packets (total: {_unreliablePacketDropCount}) | " +
-                                           $"Channel: {channelName} | " +
-                                           $"Pool: {borrowed}/{maxPackets} ({utilization:P}) | " +
-                                           $"Threshold: {threshold:P} | " +
-                                           $"Connection: {(sendToConnection == null ? "ALL" : sendToConnection.ToString())}");
+                            // Build diagnostic message with actionable recommendations
+                            string message = $"[CONGESTION] Unreliable packet drops detected!\n" +
+                                           $"  Dropped: {_unreliablePacketDropCount_sinceLastLog} packets (this batch), {_unreliablePacketDropCount} total\n" +
+                                           $"  Drop Rate: {dropRate:P} ({_unreliablePacketDropCount} dropped / {_unreliablePacketDropCount + _successfulPacketSendCount} total)\n" +
+                                           $"  Pool Utilization: {borrowed}/{maxPackets} ({utilization:P})\n" +
+                                           $"  Drop Threshold: {threshold:P}\n" +
+                                           $"  Channel: {channelName}\n" +
+                                           $"  Connection: {(sendToConnection == null ? "ALL (broadcast)" : sendToConnection.ToString())}\n";
+
+                            // Add severity-based recommendations
+                            if (dropRate > 0.10f) // Critical: >10% drop rate
+                            {
+                                message += $"\n⚠️ CRITICAL CONGESTION ({dropRate:P} drop rate):\n" +
+                                          "  IMMEDIATE ACTIONS:\n" +
+                                          $"  1. Increase maxPacketsPerTick in GONetGlobal (currently: {maxPackets})\n" +
+                                          "     Recommended: Try 2000-5000 for high spawn rates\n" +
+                                          "  2. Check for spawn storms (too many objects spawned at once)\n" +
+                                          "  3. Reduce sync frequency in GONetParticipant sync profiles\n" +
+                                          $"  4. If '{channelName}' is AutoMagicalSync, consider:\n" +
+                                          "     - Using less frequent position/rotation sync\n" +
+                                          "     - Disabling sync on distant/irrelevant objects\n";
+                            }
+                            else if (dropRate > 0.05f) // Warning: >5% drop rate
+                            {
+                                message += $"\n⚠️ HIGH CONGESTION ({dropRate:P} drop rate):\n" +
+                                          "  RECOMMENDED ACTIONS:\n" +
+                                          $"  1. Consider increasing maxPacketsPerTick (currently: {maxPackets})\n" +
+                                          "  2. Monitor for spawn rate spikes\n" +
+                                          "  3. Review sync profiles for over-syncing\n";
+                            }
+                            else // Moderate: <5% drop rate
+                            {
+                                message += $"\n  STATUS: Moderate congestion ({dropRate:P} drop rate)\n" +
+                                          "  This is typically acceptable for burst scenarios.\n" +
+                                          "  If drops persist, consider increasing maxPacketsPerTick.\n";
+                            }
+
+                            GONetLog.Warning(message);
                             _unreliablePacketDropCount_sinceLastLog = 0;
                         }
 
@@ -2333,6 +2377,9 @@ namespace GONet
             };
 
             singleProducerSendQueues.queueForWork.Enqueue(networkData);
+
+            // Track successful packet sends for drop rate calculation
+            System.Threading.Interlocked.Increment(ref _successfulPacketSendCount);
 
             return true;
         }
