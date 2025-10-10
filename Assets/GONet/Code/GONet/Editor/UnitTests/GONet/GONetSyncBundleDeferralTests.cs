@@ -396,7 +396,7 @@ namespace GONet
         }
 
         [Test]
-        public void UnityFakeNull_AccessingPropertyThrowsException()
+        public void UnityFakeNull_AccessingGameObjectNameThrowsException()
         {
             // Arrange - Create GameObject with component
             GameObject testObj = new GameObject("TestDestroyedWithComponent");
@@ -413,15 +413,15 @@ namespace GONet
             Assert.IsTrue((object)participant != null,
                 "C# reference should still exist (fake null)");
 
-            // Assert - Accessing ANY property throws NullReferenceException
+            // Assert - Accessing gameObject.name throws NullReferenceException (the actual bug!)
             Assert.Throws<System.NullReferenceException>(() =>
             {
-                var _ = participant.GONetId; // This will throw!
-            }, "Accessing property on destroyed Unity object should throw NullReferenceException");
+                var _ = participant.name; // This will throw!
+            }, "Accessing name on destroyed Unity object should throw NullReferenceException");
         }
 
         [Test]
-        public void UnityFakeNull_SafePatternDoesNotAccessProperties()
+        public void UnityFakeNull_SafePatternDoesNotAccessUnityProperties()
         {
             // This test documents the SAFE pattern for handling destroyed Unity objects
             //
@@ -429,22 +429,28 @@ namespace GONet
             //
             // UNSAFE (causes NullReferenceException):
             //   if (participant == null) {
-            //       uint id = participant.GONetId;  // ❌ CRASH!
-            //       Log($"Destroyed participant: {id}");
+            //       string name = participant.name;  // ❌ CRASH! (Unity property)
+            //       Log($"Destroyed participant: {name}");
             //   }
             //
-            // SAFE (stores data before destruction check):
-            //   uint id = participant.GONetId;  // ✅ Read while still alive
+            // SAFE (stores Unity data before destruction check):
+            //   string name = participant.name;  // ✅ Read Unity property while still alive
+            //   uint id = participant.GONetId;   // ✅ Non-Unity C# property (also safe to cache)
             //   if (participant == null) {
-            //       Log($"Destroyed participant: {id}");  // ✅ Use cached value
+            //       Log($"Destroyed participant: {name}, GONetId: {id}");  // ✅ Use cached values
             //   }
+            //
+            // KEY INSIGHT: Unity properties (.name, .gameObject, etc.) throw when accessed
+            // on destroyed objects. Pure C# properties (GONetId, etc.) may work but should
+            // still be cached for consistency and safety.
 
-            // Arrange - Create participant and cache its ID while alive
+            // Arrange - Create participant and cache data while alive
             GameObject testObj = new GameObject("TestSafePattern");
             var participant = testObj.AddComponent<GONetParticipant>();
 
-            // Cache data BEFORE destruction check
-            uint cachedId = participant.GONetId; // Safe - object still alive
+            // Cache Unity properties BEFORE destruction check (CRITICAL!)
+            string cachedName = participant.name; // Unity property - cache while alive!
+            uint cachedId = participant.GONetId;  // C# property - also cache for consistency
 
             // Act - Destroy object (enters fake null state)
             Object.DestroyImmediate(testObj);
@@ -453,8 +459,8 @@ namespace GONet
             Assert.IsTrue(participant == null, "Object should be destroyed");
             Assert.DoesNotThrow(() =>
             {
-                string safeLog = $"Destroyed participant with GONetId: {cachedId}";
-                // No property access on destroyed object - uses cached value ✅
+                string safeLog = $"Destroyed participant: {cachedName}, GONetId: {cachedId}";
+                // No property access on destroyed object - uses cached values ✅
             }, "Using cached values should not throw even when object is destroyed");
         }
 
@@ -463,13 +469,13 @@ namespace GONet
         {
             // This test documents the bug that was fixed in commit b547e827
             //
-            // BUG LOCATION: GONet.cs:8633
+            // BUG LOCATION: GONet.cs:8633 (and line 8636 - accessing gonetParticipant.name in error log)
             //
             // ORIGINAL CODE (BUGGY):
             //   if (gonetParticipant == null) {  // TRUE - Unity destroyed
             //       bool csharpNull = (object)gonetParticipant == null;  // FALSE - C# ref exists
-            //       uint logId = gonetParticipant.GONetId;  // ❌ NullReferenceException!
-            //       Log($"Destroyed: {logId}");
+            //       uint logId = gonetParticipant.GONetId;  // ❌ May or may not throw
+            //       Log($"Destroyed: {logId}, GameObject: '{gonetParticipant.name}'");  // ❌ THROWS!
             //   }
             //
             // FIXED CODE:
@@ -480,7 +486,7 @@ namespace GONet
             //   }
             //
             // ROOT CAUSE: Unity's operator overload makes `== null` return true,
-            // but C# reference isn't null. Accessing properties throws NullReferenceException.
+            // but C# reference isn't null. Accessing .name throws NullReferenceException.
 
             // Arrange
             GameObject testObj = new GameObject("TestBugReproduction");
@@ -493,11 +499,11 @@ namespace GONet
             Assert.IsTrue(participant == null, "Unity == operator returns true");
             Assert.IsTrue((object)participant != null, "C# reference is not null");
 
-            // Assert - This was the bug: accessing property throws
+            // Assert - This was the bug: accessing .name throws (used in error log)
             Assert.Throws<System.NullReferenceException>(() =>
             {
-                uint throwsException = participant.GONetId; // The exact line that crashed!
-            }, "This is the bug that was fixed - accessing GONetId on destroyed object throws");
+                string throwsException = participant.name; // The actual bug that crashed!
+            }, "This is the bug that was fixed - accessing .name on destroyed object throws");
         }
 
         #endregion
