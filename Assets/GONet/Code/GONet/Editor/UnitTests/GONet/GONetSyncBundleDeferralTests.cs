@@ -15,9 +15,8 @@
 
 using NUnit.Framework;
 using UnityEngine;
-using GONetParticipantNotReadyException = GONet.GONetMain.GONetParticipantNotReadyException;
 
-namespace GONet.Editor.UnitTests
+namespace GONet
 {
     /// <summary>
     /// Unit tests for sync bundle deferral system (OnGONetReady race condition fix).
@@ -75,7 +74,7 @@ namespace GONet.Editor.UnitTests
             string expectedMessage = "Test participant not ready";
 
             // Act
-            var exception = new GONetParticipantNotReadyException(expectedMessage, expectedGONetId);
+            var exception = new GONetMain.GONetParticipantNotReadyException(expectedMessage, expectedGONetId);
 
             // Assert
             Assert.AreEqual(expectedGONetId, exception.GONetId, "Exception should store GONetId for diagnostics");
@@ -92,9 +91,9 @@ namespace GONet.Editor.UnitTests
             // Act
             try
             {
-                throw new GONetParticipantNotReadyException("Test exception", testGONetId);
+                throw new GONetMain.GONetParticipantNotReadyException("Test exception", testGONetId);
             }
-            catch (GONetParticipantNotReadyException ex)
+            catch (GONetMain.GONetParticipantNotReadyException ex)
             {
                 exceptionCaught = true;
                 Assert.AreEqual(testGONetId, ex.GONetId, "Caught exception should preserve GONetId");
