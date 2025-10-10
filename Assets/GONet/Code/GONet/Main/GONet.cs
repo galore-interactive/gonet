@@ -889,6 +889,14 @@ namespace GONet
         /// </summary>
         static readonly Queue<SyncEvent_ValueChangeProcessed> syncValueChanges_ReceivedFromOtherQueue = new Queue<SyncEvent_ValueChangeProcessed>(100);
 
+        /// <summary>
+        /// AUTHORITY-AGNOSTIC: Queue for sync bundles deferred due to participants still in Awake/initialization.
+        /// Used by BOTH authority owners (clients/server spawning objects) AND non-authority receivers.
+        /// Only populated when GONetGlobal.deferSyncBundlesWaitingForGONetReady == true AND channel is reliable.
+        /// Processed incrementally when any participant completes OnGONetReady (up to maxBundlesProcessedPerGONetReadyCallback per callback).
+        /// </summary>
+        internal static readonly Queue<NetworkData> incomingNetworkData_waitingForGONetReady = new Queue<NetworkData>(100);
+
         internal static GONetClient _gonetClient;
         /// <summary>
         /// This will be set internally only on the client side.  Do NOT set yourself!
@@ -978,6 +986,103 @@ namespace GONet
             }
 
             GONetLog.Info($"[GONETID-QUEUE] Finished processing queued messages - Processed: {processedCount}, Failed: {failedCount}");
+        }
+
+        /// <summary>
+        /// Defers a sync bundle for retry after participant completes OnGONetReady.
+        /// FIFO queue with size limit - oldest bundles dropped if queue full.
+        /// </summary>
+        private static void DeferSyncBundleWaitingForGONetReady(NetworkData networkData, long elapsedTicksAtSend, Type messageType)
+        {
+            int maxQueueSize = GONetGlobal.Instance.maxSyncBundlesWaitingForGONetReady;
+
+            if (incomingNetworkData_waitingForGONetReady.Count < maxQueueSize)
+            {
+                incomingNetworkData_waitingForGONetReady.Enqueue(networkData);
+            }
+            else
+            {
+                // Queue full - drop OLDEST bundle and queue newest (FIFO policy)
+                GONetLog.Warning($"[GONETREADY-QUEUE] Queue full ({maxQueueSize} bundles)! " +
+                                $"Dropping OLDEST deferred bundle to make room. " +
+                                $"Consider increasing GONetGlobal.maxSyncBundlesWaitingForGONetReady or disabling deferral. " +
+                                $"MessageType: {messageType.Name}");
+
+                NetworkData droppedMessage = incomingNetworkData_waitingForGONetReady.Dequeue();
+
+                // Return dropped message's byte array to pool (critical for memory management)
+                SingleProducerQueues droppedQueues = singleProducerReceiveQueuesByThread[droppedMessage.messageBytesBorrowedOnThread];
+                droppedQueues.queueForPostWorkResourceReturn.Enqueue(droppedMessage);
+
+                // Queue current message
+                incomingNetworkData_waitingForGONetReady.Enqueue(networkData);
+            }
+        }
+
+        /// <summary>
+        /// Processes deferred sync bundles waiting for participants to complete OnGONetReady.
+        /// Called automatically when any participant completes OnGONetReady.
+        /// Processes up to maxBundlesProcessedPerGONetReadyCallback bundles per call to prevent frame stutter.
+        /// </summary>
+        internal static void ProcessDeferredSyncBundlesWaitingForGONetReady()
+        {
+            // Feature disabled - nothing to process
+            if (!GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady)
+                return;
+
+            int queueSize = incomingNetworkData_waitingForGONetReady.Count;
+            if (queueSize == 0)
+                return; // Nothing queued
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            // PERFORMANCE: Limit processing per callback to prevent frame stutter during mass spawns
+            // OnGONetReady fires for EVERY participant - processing all queued bundles would cause spikes
+            int maxPerCallback = GONetGlobal.Instance.maxBundlesProcessedPerGONetReadyCallback;
+            int processed = 0;
+
+            while (incomingNetworkData_waitingForGONetReady.Count > 0 && processed < maxPerCallback)
+            {
+                NetworkData item = incomingNetworkData_waitingForGONetReady.Dequeue();
+                processed++;
+
+                try
+                {
+                    // CRITICAL: Pass isProcessingFromQueue=true to prevent infinite retry loops
+                    // If participant STILL not ready after retry, exception handler will DROP (not requeue)
+                    ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(item, isProcessingFromQueue: true);
+                    processedCount++;
+                }
+                catch (GONetParticipantNotReadyException notReadyEx)
+                {
+                    // Participant STILL not ready after 1+ frames - DROP (don't requeue)
+                    // Exception handler in ProcessIncomingBytes already logged error via isProcessingFromQueue check
+                    failedCount++;
+
+                    // Return byte array to pool
+                    SingleProducerQueues queues = singleProducerReceiveQueuesByThread[item.messageBytesBorrowedOnThread];
+                    queues.queueForPostWorkResourceReturn.Enqueue(item);
+                }
+                catch (Exception e)
+                {
+                    // Unexpected failure - log and drop
+                    failedCount++;
+                    GONetLog.Error($"[GONETREADY-QUEUE] Failed to process deferred bundle: {e.Message}\n{e.StackTrace}");
+
+                    // Return byte array to pool
+                    SingleProducerQueues queues = singleProducerReceiveQueuesByThread[item.messageBytesBorrowedOnThread];
+                    queues.queueForPostWorkResourceReturn.Enqueue(item);
+                }
+            }
+
+            // Diagnostic logging (only if something happened)
+            if (processedCount > 0 || failedCount > 0)
+            {
+                GONetLog.Debug($"[GONETREADY-QUEUE] Processed {processedCount} deferred bundles, " +
+                              $"{failedCount} dropped (still not ready after retry), " +
+                              $"{incomingNetworkData_waitingForGONetReady.Count} remaining in queue");
+            }
         }
 
         internal static readonly Dictionary<uint, GONetParticipant> gonetParticipantByGONetIdMap = new Dictionary<uint, GONetParticipant>(1000);
@@ -4566,18 +4671,52 @@ namespace GONet
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
                                 messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
                             {
-                                DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
-                                if (IsServer)
+                                try
                                 {
-                                    /*
-                                     * When dealing with client -> server -> client experience, which is to say the server needs to re broadcast this "values now at rest bundle" 
-                                     * since we piggy backed this "at rest" impl off of the value change impl where the re broadcast pretty much happens automatically through the 
-                                     * changed value, but things are a little different for "at rest" seeing as how the server receiving the initiating client's "at rest" message 
-                                     * could already have that same "at rest" value as its latest in the buffer prior to receiving the "at rest" message when it clears out the buffer 
-                                     * except for the at rest value and that means the server would not realize or have a mechanism to turn around and send "at rest" to other clients, 
-                                     * which is the remaining issue in long drawn out Shaun speak.
-                                     */
-                                    Server_SendBytesToNonSourceClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.relatedConnection, networkData.channelId);
+                                    DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
+                                    if (IsServer)
+                                    {
+                                        /*
+                                         * When dealing with client -> server -> client experience, which is to say the server needs to re broadcast this "values now at rest bundle"
+                                         * since we piggy backed this "at rest" impl off of the value change impl where the re broadcast pretty much happens automatically through the
+                                         * changed value, but things are a little different for "at rest" seeing as how the server receiving the initiating client's "at rest" message
+                                         * could already have that same "at rest" value as its latest in the buffer prior to receiving the "at rest" message when it clears out the buffer
+                                         * except for the at rest value and that means the server would not realize or have a mechanism to turn around and send "at rest" to other clients,
+                                         * which is the remaining issue in long drawn out Shaun speak.
+                                         */
+                                        Server_SendBytesToNonSourceClients(networkData.messageBytes, networkData.bytesUsedCount, networkData.relatedConnection, networkData.channelId);
+                                    }
+                                }
+                                catch (GONetParticipantNotReadyException notReadyEx)
+                                {
+                                    // Participant exists but Awake incomplete - handle based on channel quality and config
+                                    QosType channelQuality = GONetChannel.ById(networkData.channelId).QualityOfService;
+
+                                    if (isProcessingFromQueue)
+                                    {
+                                        // Already retried once - participant STILL not ready after 1+ frames
+                                        GONetLog.Error($"[GONETREADY-QUEUE] Sync bundle still has unready participant (GONetId: {notReadyEx.GONetId}) after retry. " +
+                                                      $"This indicates an OnGONetReady lifecycle bug. Dropping bundle. Channel: {networkData.channelId}");
+                                        // Falls through to pool return (shouldReturnToPool=true)
+                                    }
+                                    else if (channelQuality == QosType.Reliable &&
+                                             GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady)
+                                    {
+                                        // CONFIGURABLE: User opted into deferral for reliable channels
+                                        DeferSyncBundleWaitingForGONetReady(networkData, elapsedTicksAtSend, messageType);
+                                        shouldReturnToPool = false; // Queue owns byte array now
+
+                                        GONetLog.Debug($"[GONETREADY-QUEUE] Deferred reliable sync bundle - participant {notReadyEx.GONetId} not ready yet. " +
+                                                      $"Queue size: {incomingNetworkData_waitingForGONetReady.Count}");
+                                    }
+                                    else
+                                    {
+                                        // DEFAULT: Drop the bundle (unreliable channel OR user disabled deferral)
+                                        GONetLog.Debug($"[GONETREADY-DROP] Dropped sync bundle - participant {notReadyEx.GONetId} not ready. " +
+                                                      $"Channel: {networkData.channelId} ({channelQuality}), " +
+                                                      $"DeferEnabled: {GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady}");
+                                        // Falls through to pool return (shouldReturnToPool=true)
+                                    }
                                 }
                             }
                             else if (messageType == typeof(RequestMessage))
@@ -8559,6 +8698,28 @@ namespace GONet
                     }
                 }
 
+                // DEFENSIVE CHECK (NEW - SYNC BUNDLE GONETREADY RACE CONDITION FIX):
+                // Participant must have completed Awake() and have syncCompanion ready before deserialization.
+                // Even though we fetched syncCompanion from the map above, during rapid spawning scenarios:
+                // - The companion might have been registered to the map BUT
+                // - The participant's Awake() coroutine is still running (didAwakeComplete=false)
+                // - Accessing syncCompanion methods can cause NullReferenceException or unexpected behavior
+                //
+                // This is a RACE CONDITION between:
+                // 1. Network thread processing sync bundles (this code)
+                // 2. Main thread running GONetParticipant.AwakeCoroutine()
+                //
+                // Solution: Throw descriptive exception that calling code will catch and defer/drop based on config.
+                if (!gonetParticipant.didAwakeComplete || syncCompanion == null)
+                {
+                    throw new GONetParticipantNotReadyException(
+                        $"GONetParticipant {gonetIdAtInstantiation} exists but not ready for deserialization. " +
+                        $"didAwakeComplete: {gonetParticipant.didAwakeComplete}, " +
+                        $"syncCompanion null: {syncCompanion == null}, " +
+                        $"GameObject: '{gonetParticipant.name}'",
+                        gonetIdAtInstantiation);
+                }
+
                 try
                 {
                     // CRITICAL: Re-check if Unity object still exists before accessing properties
@@ -9032,6 +9193,10 @@ namespace GONet
                     }
                 }
             }
+
+            // NEW: This participant is now ready - try processing deferred sync bundles
+            // (They might have been waiting for THIS participant specifically)
+            ProcessDeferredSyncBundlesWaitingForGONetReady();
         }
     }
 
@@ -9051,6 +9216,49 @@ namespace GONet
         }
 
         protected GONetOutOfOrderHorseDickoryException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Thrown when attempting to deserialize sync data for a GONetParticipant that exists
+    /// but hasn't completed Awake()/OnGONetReady initialization yet.
+    /// Distinct from KeyNotFoundException (participant missing entirely) or GONetOutOfOrderHorseDickoryException (participant fully missing).
+    ///
+    /// This exception indicates a RACE CONDITION where:
+    /// - The participant GameObject exists in the scene/hierarchy
+    /// - GONetId lookup succeeds (participant is in dictionaries)
+    /// - BUT: didAwakeComplete=false OR syncCompanion=null (async Awake() coroutine still running)
+    ///
+    /// Solution: Defer bundle processing until OnGONetReady fires (configurable) or drop (default).
+    /// </summary>
+    [Serializable]
+    internal class GONetParticipantNotReadyException : Exception
+    {
+        /// <summary>
+        /// The GONetId (instantiation) of the participant that wasn't ready.
+        /// Useful for logging/diagnostics and retry logic.
+        /// </summary>
+        public uint GONetId { get; }
+
+        public GONetParticipantNotReadyException()
+        {
+        }
+
+        public GONetParticipantNotReadyException(string message) : base(message)
+        {
+        }
+
+        public GONetParticipantNotReadyException(string message, uint gonetId) : base(message)
+        {
+            GONetId = gonetId;
+        }
+
+        public GONetParticipantNotReadyException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+
+        protected GONetParticipantNotReadyException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }

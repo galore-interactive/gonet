@@ -84,25 +84,52 @@ namespace GONet
         [Range(100, 1000)]
         public int client_GONetIdBatchSize = 200;
 
-        [Header("Congestion Management")]
-        [Tooltip("Maximum concurrent packet operations before flow control kicks in.\n\n" +
-                "This controls the size of the packet pool used for network send operations.\n" +
-                "When pool utilization exceeds UnreliableDropThreshold, unreliable packets are dropped.\n\n" +
+        [Header("Congestion Management - Adaptive Scaling")]
+        [Tooltip("⭐ ADAPTIVE POOL SIZING (Recommended)\n\n" +
+                "When TRUE (default): Pool size automatically scales based on network demand.\n" +
+                "• Scales UP when utilization exceeds 75% (prevents drops)\n" +
+                "• Scales DOWN when utilization stays below 25% (conserves memory)\n" +
+                "• Warns aggressively when memory/bandwidth limits approached\n" +
+                "• Respects maxPacketsPerTick as absolute ceiling (safety cap)\n\n" +
+                "When FALSE: Manual control - pool fixed at maxPacketsPerTick.\n" +
+                "• For experts who need precise bandwidth control\n" +
+                "• For bandwidth-constrained scenarios (mobile, low-end servers)\n\n" +
+                "GONet Philosophy: \"Do what the user wants, warn when risky\"\n" +
+                "Default: TRUE (auto-scale for best user experience)")]
+        public bool enableAdaptivePoolScaling = true;
+
+        [Tooltip("Starting pool size for adaptive scaling (when enableAdaptivePoolScaling=true).\n\n" +
+                "Adaptive scaling will grow/shrink from this baseline:\n" +
+                "• Grows when utilization >75% (up to maxPacketsPerTick ceiling)\n" +
+                "• Shrinks when utilization <25% (down to this minimum)\n\n" +
                 "CONFIGURATION GUIDELINES:\n" +
-                "• Small Co-op (2-8 players): 500-1000\n" +
-                "• Battle Royale (50-100 players): 2000-5000\n" +
-                "• MMO (100+ players): 5000-10000\n\n" +
-                "SYMPTOMS OF TOO LOW:\n" +
-                "• Objects stuck at spawn position (position sync dropped)\n" +
-                "• 'Ring buffer is full' warnings in logs\n" +
-                "• High unreliable packet drop rate (>5%)\n\n" +
-                "SYMPTOMS OF TOO HIGH:\n" +
-                "• Increased memory usage (each slot uses ~1-12KB depending on message size)\n" +
-                "• No benefit if network bandwidth is the bottleneck\n\n" +
-                "Default: 1000 (suitable for small-medium games)\n" +
-                "Range: 100-20000")]
-        [Range(100, 20000)]
-        public int maxPacketsPerTick = 1000;
+                "• Small Co-op (2-8 players): 500\n" +
+                "• Battle Royale (50-100 players): 1500\n" +
+                "• MMO (100+ players): 3000\n\n" +
+                "NOTE: When enableAdaptivePoolScaling=false, this value is ignored and\n" +
+                "maxPacketsPerTick is used as a fixed pool size.\n\n" +
+                "Default: 1000 (suitable for most games)\n" +
+                "Range: 100-10000")]
+        [Range(100, 10000)]
+        public int adaptivePoolBaselineSize = 1000;
+
+        [Tooltip("ABSOLUTE MAXIMUM pool size (safety ceiling for adaptive scaling).\n\n" +
+                "When enableAdaptivePoolScaling=TRUE:\n" +
+                "• Pool can never grow beyond this limit (prevents runaway memory)\n" +
+                "• Aggressive warnings logged when approaching this ceiling\n" +
+                "• Recommended: 10x your baseline (e.g., baseline=1000 → max=10000)\n\n" +
+                "When enableAdaptivePoolScaling=FALSE:\n" +
+                "• This IS the fixed pool size (no scaling occurs)\n\n" +
+                "EXPERT OVERRIDE: Lower this to cap bandwidth in constrained scenarios:\n" +
+                "• Mobile clients with limited bandwidth\n" +
+                "• Low-end servers with strict memory budgets\n" +
+                "• Development/testing with artificial constraints\n\n" +
+                "⚠️ WARNING: Setting this TOO LOW will cause packet drops!\n" +
+                "SYMPTOMS: Objects stuck at spawn, high drop rates, 'Pool exhausted' errors\n\n" +
+                "Default: 20000 (generous ceiling for auto-scaling)\n" +
+                "Range: 100-100000")]
+        [Range(100, 100000)]
+        public int maxPacketsPerTick = 20000;
 
         [Tooltip("Start dropping unreliable packets when pool utilization exceeds this percentage.\n\n" +
                 "Flow control threshold to prevent packet pool exhaustion.\n" +
@@ -136,6 +163,51 @@ namespace GONet
                 "• Throttled logging (batches drops to avoid spam)\n\n" +
                 "Default: Enabled (helps identify congestion issues)")]
         public bool enableCongestionLogging = true;
+
+        [Header("Sync Bundle Handling - OnGONetReady Race Condition")]
+        [Tooltip("DEFAULT: false (DROP bundles if participant not ready - industry standard).\n\n" +
+                "When enabled, reliable sync bundles will be queued and retried once if participant hasn't completed OnGONetReady.\n\n" +
+                "WHEN TO ENABLE:\n" +
+                "• Turn-based games where every state change must be received\n" +
+                "• Zero data loss is critical (e.g., ownership changes, inventory updates)\n\n" +
+                "WHEN TO LEAVE DISABLED (DEFAULT):\n" +
+                "• Action games with high-frequency updates (positions, rotations)\n" +
+                "• Unreliable bundles are ALWAYS dropped regardless of this setting\n" +
+                "• Authority re-sends updated state 30-60 times/sec (auto-recovery)\n" +
+                "• Value blending smooths over 1-2 dropped frames\n\n" +
+                "AUTHORITY-AGNOSTIC:\n" +
+                "• Works on clients AND servers receiving sync data\n" +
+                "• Handles ALL network topologies (client→server, server→client, peer-to-peer)\n\n" +
+                "Default: false (matches industry standards - FishNet, Mirror)")]
+        public bool deferSyncBundlesWaitingForGONetReady = false;
+
+        [Tooltip("Maximum sync bundles to queue per receiver while waiting for participants to complete OnGONetReady.\n\n" +
+                "TYPICAL VALUES:\n" +
+                "• Awake() completes in 1-2 frames typically\n" +
+                "• At 200 spawns/sec, only 6-12 bundles queued\n" +
+                "• Queue size of 100 handles extreme burst scenarios\n\n" +
+                "FIFO DROP POLICY:\n" +
+                "• When queue fills, oldest bundles are dropped to make room\n" +
+                "• Warning logged prompting you to increase limit or disable deferral\n\n" +
+                "Only used when deferSyncBundlesWaitingForGONetReady=true.\n\n" +
+                "Default: 100 bundles\n" +
+                "Range: 10-500")]
+        [Range(10, 500)]
+        public int maxSyncBundlesWaitingForGONetReady = 100;
+
+        [Tooltip("Maximum bundles to process per OnGONetReady callback (prevents frame stutter during burst processing).\n\n" +
+                "PERFORMANCE RATIONALE:\n" +
+                "• OnGONetReady fires for EVERY participant that becomes ready\n" +
+                "• Processing all queued bundles at once would cause frame stutter during mass spawns\n" +
+                "• Remaining bundles will be processed in subsequent OnGONetReady callbacks\n\n" +
+                "TUNING:\n" +
+                "• Higher (20-50): Faster queue drainage, but potential frame spikes\n" +
+                "• Lower (5-10): Smoother frame times, but slower queue drainage\n\n" +
+                "Only used when deferSyncBundlesWaitingForGONetReady=true.\n\n" +
+                "Default: 10 bundles/callback\n" +
+                "Range: 1-50")]
+        [Range(1, 50)]
+        public int maxBundlesProcessedPerGONetReadyCallback = 10;
 
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;

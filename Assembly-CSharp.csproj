@@ -100,6 +100,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Client_GONetIdBatchLimboMode.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileBackedDictionary.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetAdaptivePoolScaler.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\SocketContext.cs" />
     <Compile Include="Assets\Amazon\Scripts\GameLift.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Safe64.Dirty.cs" />
