@@ -413,11 +413,11 @@ namespace GONet
             Assert.IsTrue((object)participant != null,
                 "C# reference should still exist (fake null)");
 
-            // Assert - Accessing gameObject.name throws NullReferenceException (the actual bug!)
-            Assert.Throws<System.NullReferenceException>(() =>
+            // Assert - Accessing gameObject.name throws MissingReferenceException (the actual bug!)
+            Assert.Throws<UnityEngine.MissingReferenceException>(() =>
             {
                 var _ = participant.name; // This will throw!
-            }, "Accessing name on destroyed Unity object should throw NullReferenceException");
+            }, "Accessing name on destroyed Unity object should throw MissingReferenceException");
         }
 
         [Test]
@@ -427,7 +427,7 @@ namespace GONet
             //
             // SCENARIO: Code needs to check if Unity object was destroyed and log info
             //
-            // UNSAFE (causes NullReferenceException):
+            // UNSAFE (causes MissingReferenceException):
             //   if (participant == null) {
             //       string name = participant.name;  // ❌ CRASH! (Unity property)
             //       Log($"Destroyed participant: {name}");
@@ -486,7 +486,7 @@ namespace GONet
             //   }
             //
             // ROOT CAUSE: Unity's operator overload makes `== null` return true,
-            // but C# reference isn't null. Accessing .name throws NullReferenceException.
+            // but C# reference isn't null. Accessing .name throws MissingReferenceException.
 
             // Arrange
             GameObject testObj = new GameObject("TestBugReproduction");
@@ -500,7 +500,7 @@ namespace GONet
             Assert.IsTrue((object)participant != null, "C# reference is not null");
 
             // Assert - This was the bug: accessing .name throws (used in error log)
-            Assert.Throws<System.NullReferenceException>(() =>
+            Assert.Throws<UnityEngine.MissingReferenceException>(() =>
             {
                 string throwsException = participant.name; // The actual bug that crashed!
             }, "This is the bug that was fixed - accessing .name on destroyed object throws");
