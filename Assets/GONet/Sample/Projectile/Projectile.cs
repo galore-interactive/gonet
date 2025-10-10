@@ -174,10 +174,12 @@ namespace GONet.Sample
             //GONetLog.Debug("buffer capacity: " + buffer_capacitySize);
         }
 
-        protected override void Start()
+        public override void OnGONetReady()
         {
-            base.Start();
+            base.OnGONetReady();
 
+            // CRITICAL: Subscribe to events in OnGONetReady (NOT Start) to ensure gonetParticipant is initialized
+            // Under heavy load, Start() can fire before OnGONetReady, causing NullReferenceException
             GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
         }
 

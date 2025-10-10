@@ -1,7 +1,7 @@
-﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
+/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential, email: contactus@galoreinteractive.com
- * 
+ *
  *
  * Authorized use is explicitly limited to the following:	
  * -The ability to view and reference source code without changing it
@@ -323,6 +323,12 @@ namespace GONet
         public static GONetGlobal Global { get; private set; }
 
         /// <summary>
+        /// Adaptive pool scaler manages dynamic pool sizing based on network demand.
+        /// Initialized during InitOnUnityMainThread() with settings from GONetGlobal.
+        /// </summary>
+        private static GONetAdaptivePoolScaler adaptivePoolScaler;
+
+        /// <summary>
         /// Manages networked scene loading and unloading.
         /// Server-authoritative: only server can initiate scene changes.
         /// Access from GONetBehaviour via this.SceneManager property.
@@ -428,6 +434,7 @@ namespace GONet
             InitObjectPools();
             InitClientTime();
             InitSceneManager();
+            InitAdaptivePoolScaler(); // Initialize adaptive scaling system
 
             ticksAtLastInit_UtcNow = DateTime.UtcNow.Ticks;
 
@@ -441,6 +448,12 @@ namespace GONet
             SceneManager.OnSceneLoadCompleted += OnSceneLoadCompleted_ProcessDeferredSpawns;
 
             GONetLog.Debug("[GONetMain] Scene manager initialized");
+        }
+
+        private static void InitAdaptivePoolScaler()
+        {
+            adaptivePoolScaler = new GONetAdaptivePoolScaler(Global);
+            GONetLog.Debug("[GONetMain] Adaptive pool scaler initialized");
         }
 
         private static void OnSceneLoadCompleted_ProcessDeferredSpawns(string sceneName, LoadSceneMode mode)
@@ -2261,13 +2274,17 @@ namespace GONet
             SingleProducerQueues singleProducerSendQueues = ReturnSingleProducerResources_IfAppropriate(singleProducerSendQueuesByThread, Thread.CurrentThread);
 
             { // flow control:
-                // IMPROVED (October 2025): Use percentage-based threshold instead of fixed "- 10" offset
-                // This allows better tuning for different game types and scales
+                // ADAPTIVE POOL SIZING (October 2025): Use dynamic pool size from adaptive scaler
+                // Pool automatically scales based on demand while respecting absolute maximum
                 if (GONetChannel.ById(channelId).QualityOfService == QosType.Unreliable)
                 {
-                    int maxPackets = GONetGlobal.Instance != null ? GONetGlobal.Instance.maxPacketsPerTick : SingleProducerQueues.MAX_PACKETS_PER_TICK;
+                    // Get current effective pool size (dynamically adjusted by adaptive scaler)
+                    int currentPoolSize = adaptivePoolScaler != null
+                        ? adaptivePoolScaler.GetCurrentPoolSize()
+                        : (GONetGlobal.Instance != null ? GONetGlobal.Instance.maxPacketsPerTick : SingleProducerQueues.MAX_PACKETS_PER_TICK);
+
                     float threshold = GONetGlobal.Instance != null ? GONetGlobal.Instance.unreliableDropThreshold : 0.90f;
-                    int dropThresholdCount = (int)(maxPackets * threshold);
+                    int dropThresholdCount = (int)(currentPoolSize * threshold);
 
                     if (singleProducerSendQueues.resourcePool.BorrowedCount > dropThresholdCount)
                     {
@@ -2288,25 +2305,33 @@ namespace GONet
                                                GONetChannel.ById(channelId) == GONetChannel.CustomSerialization_Unreliable ? "CustomSerialization" : "Unknown";
 
                             int borrowed = singleProducerSendQueues.resourcePool.BorrowedCount;
-                            float utilization = (float)borrowed / maxPackets;
+                            float utilization = (float)borrowed / currentPoolSize;
                             float dropRate = (float)_unreliablePacketDropCount / (_unreliablePacketDropCount + _successfulPacketSendCount);
+
+                            // Get adaptive scaler diagnostics if available
+                            string adaptiveInfo = adaptivePoolScaler != null ? adaptivePoolScaler.GetDiagnostics() : "";
 
                             // Build diagnostic message with actionable recommendations
                             string message = $"[CONGESTION] Unreliable packet drops detected!\n" +
                                            $"  Dropped: {_unreliablePacketDropCount_sinceLastLog} packets (this batch), {_unreliablePacketDropCount} total\n" +
                                            $"  Drop Rate: {dropRate:P} ({_unreliablePacketDropCount} dropped / {_unreliablePacketDropCount + _successfulPacketSendCount} total)\n" +
-                                           $"  Pool Utilization: {borrowed}/{maxPackets} ({utilization:P})\n" +
+                                           $"  Pool Utilization: {borrowed}/{currentPoolSize} ({utilization:P})\n" +
                                            $"  Drop Threshold: {threshold:P}\n" +
                                            $"  Channel: {channelName}\n" +
-                                           $"  Connection: {(sendToConnection == null ? "ALL (broadcast)" : sendToConnection.ToString())}\n";
+                                           $"  Connection: {(sendToConnection == null ? "ALL (broadcast)" : sendToConnection.ToString())}\n" +
+                                           (string.IsNullOrEmpty(adaptiveInfo) ? "" : $"  {adaptiveInfo}\n");
 
                             // Add severity-based recommendations
                             if (dropRate > 0.10f) // Critical: >10% drop rate
                             {
+                                bool isAdaptiveEnabled = GONetGlobal.Instance != null && GONetGlobal.Instance.enableAdaptivePoolScaling;
                                 message += $"\n⚠️ CRITICAL CONGESTION ({dropRate:P} drop rate):\n" +
                                           "  IMMEDIATE ACTIONS:\n" +
-                                          $"  1. Increase maxPacketsPerTick in GONetGlobal (currently: {maxPackets})\n" +
-                                          "     Recommended: Try 2000-5000 for high spawn rates\n" +
+                                          (isAdaptiveEnabled
+                                              ? $"  1. Adaptive scaling is ENABLED - pool is at {currentPoolSize} packets\n" +
+                                                "     If this is close to maxPacketsPerTick ceiling, increase the ceiling!\n"
+                                              : $"  1. Adaptive scaling is DISABLED - using fixed size: {currentPoolSize}\n" +
+                                                "     Enable adaptive scaling or increase maxPacketsPerTick\n") +
                                           "  2. Check for spawn storms (too many objects spawned at once)\n" +
                                           "  3. Reduce sync frequency in GONetParticipant sync profiles\n" +
                                           $"  4. If '{channelName}' is AutoMagicalSync, consider:\n" +
@@ -2317,7 +2342,7 @@ namespace GONet
                             {
                                 message += $"\n⚠️ HIGH CONGESTION ({dropRate:P} drop rate):\n" +
                                           "  RECOMMENDED ACTIONS:\n" +
-                                          $"  1. Consider increasing maxPacketsPerTick (currently: {maxPackets})\n" +
+                                          $"  1. Current pool size: {currentPoolSize} (check if adaptive scaling is working)\n" +
                                           "  2. Monitor for spawn rate spikes\n" +
                                           "  3. Review sync profiles for over-syncing\n";
                             }
@@ -2724,6 +2749,20 @@ namespace GONet
             if (isAppropriate)
             {
                 lastCalledFrame_Update_DoTheHeavyLifting = UnityEngine.Time.frameCount;
+
+                // Update adaptive pool scaler based on current utilization
+                if (adaptivePoolScaler != null)
+                {
+                    // Calculate total borrowed count across all thread pools
+                    int totalBorrowed = 0;
+                    foreach (var kvp in singleProducerSendQueuesByThread)
+                    {
+                        totalBorrowed += kvp.Value.resourcePool.BorrowedCount;
+                    }
+
+                    int numClients = IsServer && gonetServer != null ? (int)gonetServer.numConnections : 0;
+                    adaptivePoolScaler.Update(totalBorrowed, numClients);
+                }
 
                 // Process any queued main thread callbacks from async operations
                 GONetThreading.ProcessMainThreadCallbacks();
@@ -8461,11 +8500,74 @@ namespace GONet
                 }
 
                 //Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap[gonetParticipant.codeGenerationId];
-                Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap = activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance[gonetParticipant.CodeGenerationId];
+
+                // CRITICAL FIX: Defensive check for sync companion availability during rapid spawning
+                // During high spawn rates, sync bundles can arrive BEFORE GONetParticipant.Awake() completes
+                // (Awake runs as coroutine and yields). This causes NullReferenceException when trying to
+                // access sync companion that hasn't been registered yet.
+                Dictionary<uint, GONetParticipant_AutoMagicalSyncCompanion_Generated> companionMap;
+                if (!activeAutoSyncCompanionsByCodeGenerationIdMap_uintKeyForPerformance.TryGetValue(gonetParticipant.CodeGenerationId, out companionMap))
+                {
+                    // Sync companion map not created yet for this CodeGenerationId
+                    // This happens when spawn event was received but participant hasn't finished initializing
+                    QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
+                    if (channelQuality == QosType.Reliable)
+                    {
+                        GONetLog.Warning($"[SYNC] Reliable sync bundle received for participant that hasn't initialized yet. " +
+                                        $"GONetId: {gonetParticipant.GONetId}, CodeGenerationId: {gonetParticipant.CodeGenerationId}, " +
+                                        $"GameObject: '{gonetParticipant.name}'. Adding to awaiting queue.");
+
+                        // Add to awaiting queue - will be processed when companion is ready
+                        if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
+                        {
+                            gnpsAwaitingCompanion.Add(gonetParticipant);
+                        }
+
+                        // IMPORTANT: Don't throw exception - just skip this bundle and wait for next one
+                        // The participant will be re-synced once companion is ready
+                        return;
+                    }
+                    else
+                    {
+                        // Unreliable data - safe to skip (next update will arrive soon)
+                        GONetLog.Debug($"[SYNC] Unreliable sync data received before companion ready - GONetId: {gonetParticipant.GONetId}, skipping.");
+                        return;
+                    }
+                }
+
+                GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
+                if (!companionMap.TryGetValue(gonetParticipant._GONetIdAtInstantiation, out syncCompanion))
+                {
+                    // Companion not registered yet for this specific participant instance
+                    QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
+                    if (channelQuality == QosType.Reliable)
+                    {
+                        GONetLog.Warning($"[SYNC] Reliable sync bundle received but sync companion not found in map. " +
+                                        $"GONetId: {gonetParticipant.GONetId}, GONetIdAtInstantiation: {gonetParticipant._GONetIdAtInstantiation}, " +
+                                        $"GameObject: '{gonetParticipant.name}'. Adding to awaiting queue.");
+
+                        if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
+                        {
+                            gnpsAwaitingCompanion.Add(gonetParticipant);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        GONetLog.Debug($"[SYNC] Unreliable sync data received before companion registered - GONetId: {gonetParticipant.GONetId}, skipping.");
+                        return;
+                    }
+                }
 
                 try
                 {
-                    GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion = companionMap[gonetParticipant._GONetIdAtInstantiation];
+                    // CRITICAL: Re-check if Unity object still exists before accessing properties
+                    // Object could have been destroyed during bundle processing (mid-loop through multiple participants)
+                    if (gonetParticipant == null)
+                    {
+                        GONetLog.Warning($"[SYNC] GONetParticipant was destroyed during bundle processing. Skipping this sync data item.");
+                        continue;
+                    }
 
                     bool isBundleTypeValueChanges = chosenBundleType == typeof(AutoMagicalSync_ValueChanges_Message);
 
@@ -8478,7 +8580,10 @@ namespace GONet
                         // IMPORTANT: Log when Client:2 skips its own values
                         if (IsClient)
                         {
-                            GONetLog.Info($"[SYNC-SKIP] Client skipping own value - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
+                            // DEFENSIVE: Check again before accessing properties (object could be destroyed mid-processing)
+                            string logName = (gonetParticipant != null && gonetParticipant.gameObject != null) ? gonetParticipant.gameObject.name : "<destroyed>";
+                            uint logId = (gonetParticipant != null) ? gonetParticipant.GONetId : GONetParticipant.GONetId_Unset;
+                            GONetLog.Info($"[SYNC-SKIP] Client skipping own value - GONetId: {logId}, GameObject: '{logName}', index: {index}");
                         }
                     }
                     else
@@ -8488,7 +8593,10 @@ namespace GONet
                             // IMPORTANT: Log value change application for Client:2
                             //if (IsClient)
                             //{
-                                //GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {gonetParticipant.GONetId}, GameObject: '{gonetParticipant.gameObject.name}', index: {index}");
+                                // DEFENSIVE: Check again before accessing properties (object could be destroyed mid-processing)
+                                //string logName = (gonetParticipant != null && gonetParticipant.gameObject != null) ? gonetParticipant.gameObject.name : "<destroyed>";
+                                //uint logId = (gonetParticipant != null) ? gonetParticipant.GONetId : GONetParticipant.GONetId_Unset;
+                                //GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {logId}, GameObject: '{logName}', index: {index}");
                             //}
                             syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
 
@@ -8584,7 +8692,34 @@ namespace GONet
                 }
                 catch (Exception e)
                 {
-                    GONetLog.Error($"name: {gonetParticipant.name} _GONetIdAtInstantiation: {gonetParticipant._GONetIdAtInstantiation}, now: {gonetParticipant.GONetId}, contains.now? {companionMap.ContainsKey(gonetParticipant.GONetId)}, genId: {gonetParticipant.CodeGenerationId}");
+                    // CRITICAL FIX: Defensive property access - object could be destroyed, causing the original exception!
+                    // Accessing gonetParticipant properties here would throw ANOTHER NullRef, hiding the original error
+                    string logName = "<error-accessing-name>";
+                    uint logIdInstantiation = GONetParticipant.GONetId_Unset;
+                    uint logIdCurrent = GONetParticipant.GONetId_Unset;
+                    uint logCodeGenId = 0;
+                    bool logContainsKey = false;
+
+                    try
+                    {
+                        if (gonetParticipant != null)
+                        {
+                            logName = gonetParticipant.name;
+                            logIdInstantiation = gonetParticipant._GONetIdAtInstantiation;
+                            logIdCurrent = gonetParticipant.GONetId;
+                            logCodeGenId = gonetParticipant.CodeGenerationId;
+                            if (companionMap != null)
+                            {
+                                logContainsKey = companionMap.ContainsKey(logIdCurrent);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore errors during error logging - we just want to get as much info as possible
+                    }
+
+                    GONetLog.Error($"name: {logName} _GONetIdAtInstantiation: {logIdInstantiation}, now: {logIdCurrent}, contains.now? {logContainsKey}, genId: {logCodeGenId}");
                     GONetLog.Error("BOOM! bitStream_headerAlreadyRead  " + e.StackTrace + "  position_bytes: " + bitStream_headerAlreadyRead.Position_Bytes + " Length_WrittenBytes: " + bitStream_headerAlreadyRead.Length_WrittenBytes);
 
                     throw e;
