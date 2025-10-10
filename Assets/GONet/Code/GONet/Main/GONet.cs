@@ -8928,7 +8928,9 @@ namespace GONet
                 var disabledEvent = new GONetParticipantDisabledEvent(gonetParticipant);
                 EventBus.Publish<IGONetEvent>(disabledEvent); // make sure this comes before gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId); or else the GNP will not be found to attach to the envelope and the subscription handlers will not have what they are expecing
 
+                // CRITICAL FIX: Remove from BOTH maps to prevent "destroyed but still in maps" errors
                 gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);
+                gonetParticipantByGONetIdAtInstantiationMap.Remove(gonetParticipant.GONetIdAtInstantiation);
 
                 // Cleanup: Remove from deduplication tracking to allow GONetId reuse
                 deserializeInitPublishedGONetIds.Remove(gonetParticipant.GONetId);
