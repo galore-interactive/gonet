@@ -74,7 +74,7 @@ namespace GONet
             string expectedMessage = "Test participant not ready";
 
             // Act
-            var exception = new GONetMain.GONetParticipantNotReadyException(expectedMessage, expectedGONetId);
+            var exception = new GONetParticipantNotReadyException(expectedMessage, expectedGONetId);
 
             // Assert
             Assert.AreEqual(expectedGONetId, exception.GONetId, "Exception should store GONetId for diagnostics");
@@ -91,9 +91,9 @@ namespace GONet
             // Act
             try
             {
-                throw new GONetMain.GONetParticipantNotReadyException("Test exception", testGONetId);
+                throw new GONetParticipantNotReadyException("Test exception", testGONetId);
             }
-            catch (GONetMain.GONetParticipantNotReadyException ex)
+            catch (GONetParticipantNotReadyException ex)
             {
                 exceptionCaught = true;
                 Assert.AreEqual(testGONetId, ex.GONetId, "Caught exception should preserve GONetId");
@@ -365,6 +365,139 @@ namespace GONet
                 "Queue size should handle typical burst scenarios");
             Assert.AreEqual(10, testGlobal.maxBundlesProcessedPerGONetReadyCallback,
                 "Processing limit should prevent frame spikes");
+        }
+
+        #endregion
+
+        #region Unity Fake Null Pattern Tests
+
+        [Test]
+        public void UnityFakeNull_DestroyedGameObject_EqualsNullReturnsTrue()
+        {
+            // Arrange - Create and immediately destroy GameObject
+            GameObject testObj = new GameObject("TestDestroyedObject");
+            Object.DestroyImmediate(testObj);
+
+            // Act & Assert - Unity's overloaded == operator returns true for destroyed objects
+            Assert.IsTrue(testObj == null,
+                "Unity's == operator should return true for destroyed GameObject");
+        }
+
+        [Test]
+        public void UnityFakeNull_DestroyedGameObject_CSharpReferenceNotNull()
+        {
+            // Arrange - Create and immediately destroy GameObject
+            GameObject testObj = new GameObject("TestDestroyedObject");
+            Object.DestroyImmediate(testObj);
+
+            // Act & Assert - C# reference is NOT null (fake null pattern)
+            Assert.IsTrue((object)testObj != null,
+                "C# reference should NOT be null even after GameObject destruction");
+        }
+
+        [Test]
+        public void UnityFakeNull_AccessingPropertyThrowsException()
+        {
+            // Arrange - Create GameObject with component
+            GameObject testObj = new GameObject("TestDestroyedWithComponent");
+            var participant = testObj.AddComponent<GONetParticipant>();
+
+            // Destroy immediately (fake null state)
+            Object.DestroyImmediate(testObj);
+
+            // Assert - Unity == operator shows destroyed
+            Assert.IsTrue(participant == null,
+                "Unity's == operator should detect destroyed object");
+
+            // Assert - C# reference still exists
+            Assert.IsTrue((object)participant != null,
+                "C# reference should still exist (fake null)");
+
+            // Assert - Accessing ANY property throws NullReferenceException
+            Assert.Throws<System.NullReferenceException>(() =>
+            {
+                var _ = participant.GONetId; // This will throw!
+            }, "Accessing property on destroyed Unity object should throw NullReferenceException");
+        }
+
+        [Test]
+        public void UnityFakeNull_SafePatternDoesNotAccessProperties()
+        {
+            // This test documents the SAFE pattern for handling destroyed Unity objects
+            //
+            // SCENARIO: Code needs to check if Unity object was destroyed and log info
+            //
+            // UNSAFE (causes NullReferenceException):
+            //   if (participant == null) {
+            //       uint id = participant.GONetId;  // ❌ CRASH!
+            //       Log($"Destroyed participant: {id}");
+            //   }
+            //
+            // SAFE (stores data before destruction check):
+            //   uint id = participant.GONetId;  // ✅ Read while still alive
+            //   if (participant == null) {
+            //       Log($"Destroyed participant: {id}");  // ✅ Use cached value
+            //   }
+
+            // Arrange - Create participant and cache its ID while alive
+            GameObject testObj = new GameObject("TestSafePattern");
+            var participant = testObj.AddComponent<GONetParticipant>();
+
+            // Cache data BEFORE destruction check
+            uint cachedId = participant.GONetId; // Safe - object still alive
+
+            // Act - Destroy object (enters fake null state)
+            Object.DestroyImmediate(testObj);
+
+            // Assert - Can safely use cached data without accessing destroyed object
+            Assert.IsTrue(participant == null, "Object should be destroyed");
+            Assert.DoesNotThrow(() =>
+            {
+                string safeLog = $"Destroyed participant with GONetId: {cachedId}";
+                // No property access on destroyed object - uses cached value ✅
+            }, "Using cached values should not throw even when object is destroyed");
+        }
+
+        [Test]
+        public void UnityFakeNull_DocumentsCommonMistake()
+        {
+            // This test documents the bug that was fixed in commit b547e827
+            //
+            // BUG LOCATION: GONet.cs:8633
+            //
+            // ORIGINAL CODE (BUGGY):
+            //   if (gonetParticipant == null) {  // TRUE - Unity destroyed
+            //       bool csharpNull = (object)gonetParticipant == null;  // FALSE - C# ref exists
+            //       uint logId = gonetParticipant.GONetId;  // ❌ NullReferenceException!
+            //       Log($"Destroyed: {logId}");
+            //   }
+            //
+            // FIXED CODE:
+            //   if (gonetParticipant == null) {  // TRUE - Unity destroyed
+            //       bool csharpNull = (object)gonetParticipant == null;  // FALSE - C# ref exists
+            //       // ✅ Don't access ANY properties! Use cached value instead
+            //       Log($"Destroyed: GONetIdAtInstantiation {cachedId}");
+            //   }
+            //
+            // ROOT CAUSE: Unity's operator overload makes `== null` return true,
+            // but C# reference isn't null. Accessing properties throws NullReferenceException.
+
+            // Arrange
+            GameObject testObj = new GameObject("TestBugReproduction");
+            var participant = testObj.AddComponent<GONetParticipant>();
+
+            // Destroy object
+            Object.DestroyImmediate(testObj);
+
+            // Assert - Reproduce the exact conditions of the bug
+            Assert.IsTrue(participant == null, "Unity == operator returns true");
+            Assert.IsTrue((object)participant != null, "C# reference is not null");
+
+            // Assert - This was the bug: accessing property throws
+            Assert.Throws<System.NullReferenceException>(() =>
+            {
+                uint throwsException = participant.GONetId; // The exact line that crashed!
+            }, "This is the bug that was fixed - accessing GONetId on destroyed object throws");
         }
 
         #endregion
