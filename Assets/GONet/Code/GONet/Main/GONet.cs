@@ -8601,7 +8601,8 @@ namespace GONet
                 else if (gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation))
                 {
                     gonetParticipant = gonetParticipantByGONetIdAtInstantiationMap[gonetIdAtInstantiation];
-                    GONetLog.Debug($"GONetId lookup: Found in instantiation map (current: {gonetId}, instantiation: {gonetIdAtInstantiation}), participant: '{gonetParticipant.name}', IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}");
+                    // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
+                    GONetLog.Debug($"GONetId lookup: Found in instantiation map (current: {gonetId}, instantiation: {gonetIdAtInstantiation}), IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}");
                 }
 
                 if ((object)gonetParticipant == null)
@@ -8654,9 +8655,10 @@ namespace GONet
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
                     if (channelQuality == QosType.Reliable)
                     {
+                        // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
                         GONetLog.Warning($"[SYNC] Reliable sync bundle received for participant that hasn't initialized yet. " +
                                         $"GONetId: {gonetParticipant.GONetId}, CodeGenerationId: {gonetParticipant.CodeGenerationId}, " +
-                                        $"GameObject: '{gonetParticipant.name}'. Adding to awaiting queue.");
+                                        $"GONetIdAtInstantiation: {gonetIdAtInstantiation}. Adding to awaiting queue.");
 
                         // Add to awaiting queue - will be processed when companion is ready
                         if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
@@ -8683,9 +8685,10 @@ namespace GONet
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
                     if (channelQuality == QosType.Reliable)
                     {
+                        // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
                         GONetLog.Warning($"[SYNC] Reliable sync bundle received but sync companion not found in map. " +
-                                        $"GONetId: {gonetParticipant.GONetId}, GONetIdAtInstantiation: {gonetParticipant._GONetIdAtInstantiation}, " +
-                                        $"GameObject: '{gonetParticipant.name}'. Adding to awaiting queue.");
+                                        $"GONetId: {gonetParticipant.GONetId}, GONetIdAtInstantiation: {gonetParticipant._GONetIdAtInstantiation}. " +
+                                        $"Adding to awaiting queue.");
 
                         if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
                         {
@@ -8714,11 +8717,11 @@ namespace GONet
                 // Solution: Throw descriptive exception that calling code will catch and defer/drop based on config.
                 if (!gonetParticipant.didAwakeComplete || syncCompanion == null)
                 {
+                    // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
                     throw new GONetParticipantNotReadyException(
                         $"GONetParticipant {gonetIdAtInstantiation} exists but not ready for deserialization. " +
                         $"didAwakeComplete: {gonetParticipant.didAwakeComplete}, " +
-                        $"syncCompanion null: {syncCompanion == null}, " +
-                        $"GameObject: '{gonetParticipant.name}'",
+                        $"syncCompanion null: {syncCompanion == null}",
                         gonetIdAtInstantiation);
                 }
 
