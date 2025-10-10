@@ -8635,8 +8635,10 @@ namespace GONet
                     }
                     else
                     {
+                        // CRITICAL FIX: Use continue instead of return to process other items in bundle
+                        // Returning would abort processing ALL remaining items in this bundle
                         GONetLog.Debug($"Unreliable sync data received before participant ready. GONetId (instantiation): {gonetIdAtInstantiation}, GONetId (current): {gonetId}. IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}, InMaps: (byId:{gonetParticipantByGONetIdMap.ContainsKey(gonetIdAtInstantiation)}, byInstId:{gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation)})");
-                        return;
+                        continue; // Skip THIS item, but continue processing other items in bundle
                     }
                 }
 
