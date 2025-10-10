@@ -559,45 +559,52 @@ namespace GONet
         }
 
         [Test]
-        public void UnityFakeNull_StringInterpolationIsNotSafe()
+        public void UnityFakeNull_StringInterpolationInExecutedCode()
         {
-            // This test demonstrates why string interpolation with Unity properties is dangerous
+            // This test demonstrates the ACTUAL behavior: string interpolation is safe
+            // if the code path doesn't execute, but UNSAFE if it does execute.
             //
-            // IMPORTANT LESSON: C# evaluates ALL parts of string interpolation BEFORE checking
-            // if the containing block will execute. This means:
+            // CORRECTED UNDERSTANDING:
+            // - If the if-block doesn't execute, string interpolation is NOT evaluated (safe)
+            // - If the if-block DOES execute, string interpolation evaluates and throws (unsafe)
             //
-            // STILL UNSAFE (even though it looks safe):
-            //   if (shouldLog) {
-            //       Log($"Participant: {participant.name}");  // ❌ Evaluates .name even if shouldLog=false!
-            //   }
-            //
-            // The $"..." interpolation evaluates participant.name BEFORE the if statement!
+            // The bugs we fixed (GONet.cs:8604, 8659, 8688, 8721) were all in EXECUTED code paths,
+            // so accessing participant.name in logs would throw when participant was destroyed.
 
             // Arrange
             GameObject testObj = new GameObject("InterpolationTest");
             var participant = testObj.AddComponent<GONetParticipant>();
             Object.DestroyImmediate(testObj);
 
-            // Assert - String interpolation throws even in conditional that won't execute
+            // Assert - String interpolation in NON-executed path is safe
             bool shouldLog = false;
+            Assert.DoesNotThrow(() =>
+            {
+                if (shouldLog)  // This block never executes
+                {
+                    string message = $"Participant: {participant.name}"; // Not evaluated, safe
+                }
+            }, "String interpolation in non-executed code path is safe");
+
+            // Assert - String interpolation in EXECUTED path throws
+            bool mustLog = true;
             Assert.Throws<UnityEngine.MissingReferenceException>(() =>
             {
-                // String interpolation evaluates BEFORE the if check
-                if (shouldLog)
+                if (mustLog)  // This block DOES execute
                 {
-                    string message = $"Participant: {participant.name}"; // Throws here!
+                    string message = $"Participant: {participant.name}"; // Evaluated, throws!
                 }
-            }, "String interpolation evaluates Unity properties before conditional check");
+            }, "String interpolation in executed code path throws when accessing destroyed Unity object");
 
             // Assert - Safe version uses cached value
             uint cachedId = 999;
             Assert.DoesNotThrow(() =>
             {
-                if (shouldLog)
+                if (mustLog)
                 {
                     string message = $"Participant: {cachedId}"; // Safe - no Unity property access
                 }
-            }, "Using cached values in string interpolation is safe");
+            }, "Using cached values in string interpolation is always safe");
         }
 
         #endregion
