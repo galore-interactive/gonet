@@ -8631,8 +8631,9 @@ namespace GONet
                 {
                     bool isCSharpReferenceNull = (object)gonetParticipant == null;
 
-                    // IMPORTANT: Do NOT access any properties of gonetParticipant here!
-                    // Even though C# reference may not be null, Unity object is destroyed and accessing properties throws NullReferenceException
+                    // IMPORTANT: Do NOT access any Unity properties of gonetParticipant here!
+                    // Even though C# reference may not be null, Unity object is destroyed and accessing Unity properties throws MissingReferenceException
+                    // Pure C# properties (like GONetId) may work, but should be avoided for consistency - use cached values instead
                     GONetLog.Error($"GONetParticipant Unity object destroyed but still in maps. C# reference null: {isCSharpReferenceNull}, GONetIdAtInstantiation: {gonetIdAtInstantiation}. Skipping this sync bundle item.");
 
                     // Skip processing this destroyed participant - do NOT add to awaiting or continue processing
