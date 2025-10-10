@@ -2061,6 +2061,21 @@ namespace GONet
         private static void OnDisabledGNPEvent(GONetEventEnvelope<GONetParticipantDisabledEvent> eventEnvelope)
         {
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
+
+            // CRITICAL: Check if Unity object is destroyed before accessing Unity methods
+            // Unity fake null pattern: gonetParticipant reference exists, but Unity object may be destroyed
+            if (gonetParticipant == null)
+            {
+                // Unity object destroyed - can't access Unity methods like GetInstanceID()
+                // But we can still access C# properties if the reference isn't actually null
+                if ((object)gonetParticipant != null)
+                {
+                    // C# reference exists - can access pure C# properties
+                    recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map[gonetParticipant.GONetId] = gonetParticipant.GONetIdAtInstantiation;
+                }
+                return; // Skip rest of processing - can't call Unity methods on destroyed object
+            }
+
             recentlyDisabledGONetId_to_GONetIdAtInstantiation_Map[gonetParticipant.GONetId] = gonetParticipant.GONetIdAtInstantiation;
 
             // Clean up spawn scene tracking when GNP is disabled/destroyed
