@@ -110,6 +110,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcDeferredProcessingTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\CongestionControlTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcEventBusTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetSyncBundleDeferralTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetProjectSettingsInitializer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetContentSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSyncSettingsProfileCustomInspector.cs" />

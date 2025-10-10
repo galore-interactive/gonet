@@ -9233,7 +9233,7 @@ namespace GONet
     /// Solution: Defer bundle processing until OnGONetReady fires (configurable) or drop (default).
     /// </summary>
     [Serializable]
-    internal class GONetParticipantNotReadyException : Exception
+    public class GONetParticipantNotReadyException : Exception
     {
         /// <summary>
         /// The GONetId (instantiation) of the participant that wasn't ready.
