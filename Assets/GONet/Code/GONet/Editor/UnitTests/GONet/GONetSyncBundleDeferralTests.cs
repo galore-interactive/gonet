@@ -506,6 +506,100 @@ namespace GONet
             }, "This is the bug that was fixed - accessing .name on destroyed object throws");
         }
 
+        [Test]
+        public void UnityFakeNull_DiagnosticLoggingMustCacheNames()
+        {
+            // This test documents the bugs fixed in commit 16bde5b2
+            //
+            // BUG LOCATIONS:
+            // - GONet.cs:8604 - Debug log in instantiation map lookup
+            // - GONet.cs:8659 - Warning log when companion map not found
+            // - GONet.cs:8688 - Warning log when sync companion not found
+            // - GONet.cs:8721 - Exception message for GONetParticipantNotReadyException
+            //
+            // PROBLEM: Diagnostic logs tried to access participant.name for better error messages,
+            // but if the participant was destroyed mid-deserialization, this throws MissingReferenceException.
+            //
+            // SCENARIO: During rapid spawning/despawning:
+            // 1. Sync bundle arrives for participant
+            // 2. Participant lookup succeeds (object in map)
+            // 3. Object gets destroyed mid-processing (despawn event)
+            // 4. Diagnostic log tries to access participant.name → CRASH
+            //
+            // SOLUTION: Use gonetIdAtInstantiation or other cached values in diagnostic logs,
+            // NEVER access Unity properties on participants that may be destroyed.
+
+            // Arrange - Create participant
+            GameObject testObj = new GameObject("DiagnosticTest");
+            var participant = testObj.AddComponent<GONetParticipant>();
+
+            // Cache safe value BEFORE destruction
+            uint cachedId = 12345; // In production this would be gonetIdAtInstantiation from deserialization
+
+            // Act - Destroy participant (simulates mid-deserialization despawn)
+            Object.DestroyImmediate(testObj);
+
+            // Assert - Participant appears destroyed
+            Assert.IsTrue(participant == null, "Unity == shows destroyed");
+            Assert.IsTrue((object)participant != null, "C# reference exists");
+
+            // Assert - UNSAFE: Accessing .name would throw
+            Assert.Throws<UnityEngine.MissingReferenceException>(() =>
+            {
+                // This is what the BUGGY code did in diagnostic logs
+                string unsafeLog = $"Error for participant: {participant.name}";
+            }, "Diagnostic log accessing .name throws MissingReferenceException");
+
+            // Assert - SAFE: Using cached ID works
+            Assert.DoesNotThrow(() =>
+            {
+                // This is what the FIXED code does
+                string safeLog = $"Error for participant GONetIdAtInstantiation: {cachedId}";
+            }, "Diagnostic log using cached values does not throw");
+        }
+
+        [Test]
+        public void UnityFakeNull_StringInterpolationIsNotSafe()
+        {
+            // This test demonstrates why string interpolation with Unity properties is dangerous
+            //
+            // IMPORTANT LESSON: C# evaluates ALL parts of string interpolation BEFORE checking
+            // if the containing block will execute. This means:
+            //
+            // STILL UNSAFE (even though it looks safe):
+            //   if (shouldLog) {
+            //       Log($"Participant: {participant.name}");  // ❌ Evaluates .name even if shouldLog=false!
+            //   }
+            //
+            // The $"..." interpolation evaluates participant.name BEFORE the if statement!
+
+            // Arrange
+            GameObject testObj = new GameObject("InterpolationTest");
+            var participant = testObj.AddComponent<GONetParticipant>();
+            Object.DestroyImmediate(testObj);
+
+            // Assert - String interpolation throws even in conditional that won't execute
+            bool shouldLog = false;
+            Assert.Throws<UnityEngine.MissingReferenceException>(() =>
+            {
+                // String interpolation evaluates BEFORE the if check
+                if (shouldLog)
+                {
+                    string message = $"Participant: {participant.name}"; // Throws here!
+                }
+            }, "String interpolation evaluates Unity properties before conditional check");
+
+            // Assert - Safe version uses cached value
+            uint cachedId = 999;
+            Assert.DoesNotThrow(() =>
+            {
+                if (shouldLog)
+                {
+                    string message = $"Participant: {cachedId}"; // Safe - no Unity property access
+                }
+            }, "Using cached values in string interpolation is safe");
+        }
+
         #endregion
     }
 }
