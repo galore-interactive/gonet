@@ -4482,6 +4482,12 @@ namespace GONet
                     NetworkData networkData;
                     int readyCount = incomingNetworkData.Count;
 
+                    // DIAGNOSTIC: Log queue backup (only when queue > 10 to avoid spam)
+                    if (readyCount > 10 && IsClient)
+                    {
+                        GONetLog.Warning($"[QUEUE-BACKUP] Thread queue #{threadQueueIndex} has {readyCount} messages ready (potential processing bottleneck)");
+                    }
+
                     // DEBUG: Log queue stats
                     // NOTE: This logs every frame when messages are ready (60+ times per second)
                     // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
@@ -7844,10 +7850,31 @@ namespace GONet
                             {
                                 while (enumeratorInner.MoveNext())
                                 {
+                                    GONetParticipant participant = enumeratorInner.Current.Key;
                                     GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+
                                     if (monitoringSupport == null)
                                     {
                                         GONetLog.Error("monitoringSupport == null");
+                                        continue;
+                                    }
+
+                                    // CRITICAL FIX: Skip destroyed/despawned participants to prevent sending sync data for dead objects
+                                    // This fixes the "white beacon/stuck projectile" bug where sync bundles included despawned objects for 30+ seconds
+                                    // causing GetCurrentGONetIdByIdAtInstantiation() to return 0 and abort entire bundles on receiver side.
+                                    //
+                                    // Root cause: everythingMap not cleaned up when participants despawn, so sync thread keeps iterating
+                                    // over dead participants and including their (now invalid) InstantiationIds in outgoing bundles.
+                                    //
+                                    // This check works for ALL authority scenarios (client-authority, server-authority, etc.) because:
+                                    // - gonetParticipantByGONetIdMap is static (shared across all instances)
+                                    // - Participants removed from map in OnDisable() on BOTH authority and non-authority sides
+                                    // - Unity fake null pattern catches destroyed GameObjects
+                                    if (participant == null ||  // Unity fake null - GameObject destroyed
+                                        participant.GONetId == GONetParticipant.GONetId_Unset ||  // GONetId was reset/unset
+                                        !gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId))  // Participant despawned but still in everythingMap
+                                    {
+                                        continue; // Skip this participant - it's destroyed or despawned
                                     }
 
                                     if (signalNeedToResetAtRest_untilBetterWayToDealWithThisSituation)
@@ -7887,13 +7914,24 @@ namespace GONet
                                 {
                                     while (enumeratorInner.MoveNext())
                                     {
+                                        GONetParticipant participant = enumeratorInner.Current.Key;
                                         GONetParticipant_AutoMagicalSyncCompanion_Generated monitoringSupport = enumeratorInner.Current.Value;
+
                                         if (monitoringSupport == null)
                                         {
                                             GONetLog.Error("monitoringSupport == null");
+                                            continue;
                                         }
 
-                                        monitoringSupport.ApplyAnnotatedBaselineValueAdjustments(baselineAdjustmentsEventQueue); // we figured out when this needs to get called....and it is now, AFTER the send of the changes accumulated herein to avoid using new baseline incorrectly 
+                                        // CRITICAL FIX: Skip destroyed/despawned participants (same check as main sync loop above)
+                                        if (participant == null ||
+                                            participant.GONetId == GONetParticipant.GONetId_Unset ||
+                                            !gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId))
+                                        {
+                                            continue; // Skip this participant - it's destroyed or despawned
+                                        }
+
+                                        monitoringSupport.ApplyAnnotatedBaselineValueAdjustments(baselineAdjustmentsEventQueue); // we figured out when this needs to get called....and it is now, AFTER the send of the changes accumulated herein to avoid using new baseline incorrectly
                                     }
                                 }
                             }
@@ -8635,10 +8673,34 @@ namespace GONet
                     }
                     else
                     {
-                        // CRITICAL FIX: Use continue instead of return to process other items in bundle
-                        // Returning would abort processing ALL remaining items in this bundle
-                        GONetLog.Debug($"Unreliable sync data received before participant ready. GONetId (instantiation): {gonetIdAtInstantiation}, GONetId (current): {gonetId}. IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}, InMaps: (byId:{gonetParticipantByGONetIdMap.ContainsKey(gonetIdAtInstantiation)}, byInstId:{gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation)})");
-                        continue; // Skip THIS item, but continue processing other items in bundle
+                        // DIAGNOSTIC LOGGING: Track which GONetIds cause bundle aborts
+                        GONetLog.Error($"[BUNDLE-ABORT] ⚠️ UNRELIABLE BUNDLE ABORTED ⚠️ " +
+                                      $"GONetId: {gonetId}, " +
+                                      $"InstantiationId: {gonetIdAtInstantiation}, " +
+                                      $"ChannelId: {channelId}, " +
+                                      $"QoS: {GONetChannel.ById(channelId).QualityOfService}, " +
+                                      $"IsClient: {IsClient}, " +
+                                      $"MyAuthorityId: {MyAuthorityId}, " +
+                                      $"InGONetIdMap: {gonetParticipantByGONetIdMap.ContainsKey(gonetId)}, " +
+                                      $"InInstantiationMap: {gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetIdAtInstantiation)}, " +
+                                      $"TotalInGONetIdMap: {gonetParticipantByGONetIdMap.Count}, " +
+                                      $"TotalInInstantiationMap: {gonetParticipantByGONetIdAtInstantiationMap.Count}");
+
+                        // CRITICAL: Throw exception to trigger deferral system for unreliable bundles too
+                        // Original approach: `return` aborted ENTIRE bundle, losing sync data for ALL subsequent participants
+                        // Cannot use `continue`: Bitstream has unread value data (index + value bytes), skipping causes desync
+                        //
+                        // PROBLEM: Sync bundles pack hundreds of participants. If ONE participant is missing:
+                        //   - Using `return`: Drops entire bundle → hundreds of objects never get position/rotation updates
+                        //   - Using `continue`: Desyncs bitstream → corrupts ALL subsequent reads in bundle
+                        //
+                        // SOLUTION: Defer ENTIRE bundle (even for unreliable) and retry next frame when participant likely ready.
+                        // User symptoms with `return`: White beacons (color never syncs), projectiles stuck at origin (position never syncs).
+                        //
+                        // Exception caught in ProcessIncomingBytes - will defer if GONetGlobal.deferUnreliableSyncBundles enabled.
+                        throw new GONetParticipantNotReadyException(
+                            $"Unreliable sync bundle received for missing participant (GONetId: {gonetId}, Instantiation: {gonetIdAtInstantiation})",
+                            gonetIdAtInstantiation);
                     }
                 }
 
@@ -8670,29 +8732,20 @@ namespace GONet
                     // Sync companion map not created yet for this CodeGenerationId
                     // This happens when spawn event was received but participant hasn't finished initializing
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
-                    if (channelQuality == QosType.Reliable)
-                    {
-                        // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
-                        GONetLog.Warning($"[SYNC] Reliable sync bundle received for participant that hasn't initialized yet. " +
-                                        $"GONetId: {gonetParticipant.GONetId}, CodeGenerationId: {gonetParticipant.CodeGenerationId}, " +
-                                        $"GONetIdAtInstantiation: {gonetIdAtInstantiation}. Adding to awaiting queue.");
+                    // DIAGNOSTIC LOGGING: Track companion map issues
+                    GONetLog.Error($"[BUNDLE-ABORT-COMPANION-MAP] ⚠️ BUNDLE ABORTED - No companion map ⚠️ " +
+                                  $"GONetId: {gonetParticipant.GONetId}, " +
+                                  $"InstantiationId: {gonetIdAtInstantiation}, " +
+                                  $"CodeGenerationId: {gonetParticipant.CodeGenerationId}, " +
+                                  $"Channel: {(channelQuality == QosType.Reliable ? "Reliable" : "Unreliable")}, " +
+                                  $"IsClient: {IsClient}, " +
+                                  $"MyAuthorityId: {MyAuthorityId}");
 
-                        // Add to awaiting queue - will be processed when companion is ready
-                        if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
-                        {
-                            gnpsAwaitingCompanion.Add(gonetParticipant);
-                        }
-
-                        // IMPORTANT: Don't throw exception - just skip this bundle and wait for next one
-                        // The participant will be re-synced once companion is ready
-                        return;
-                    }
-                    else
-                    {
-                        // Unreliable data - safe to skip (next update will arrive soon)
-                        GONetLog.Debug($"[SYNC] Unreliable sync data received before companion ready - GONetId: {gonetParticipant.GONetId}, skipping.");
-                        return;
-                    }
+                    // CRITICAL: Throw exception to trigger deferral system instead of aborting entire bundle
+                    // Using `return` here drops ENTIRE bundle, losing sync data for all subsequent participants
+                    throw new GONetParticipantNotReadyException(
+                        $"Sync companion map not created yet for CodeGenerationId {gonetParticipant.CodeGenerationId}",
+                        gonetIdAtInstantiation);
                 }
 
                 GONetParticipant_AutoMagicalSyncCompanion_Generated syncCompanion;
@@ -8700,24 +8753,19 @@ namespace GONet
                 {
                     // Companion not registered yet for this specific participant instance
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
-                    if (channelQuality == QosType.Reliable)
-                    {
-                        // CRITICAL: Do NOT access gonetParticipant.name here - participant may be destroyed
-                        GONetLog.Warning($"[SYNC] Reliable sync bundle received but sync companion not found in map. " +
-                                        $"GONetId: {gonetParticipant.GONetId}, GONetIdAtInstantiation: {gonetParticipant._GONetIdAtInstantiation}. " +
-                                        $"Adding to awaiting queue.");
 
-                        if (!gnpsAwaitingCompanion.Contains(gonetParticipant))
-                        {
-                            gnpsAwaitingCompanion.Add(gonetParticipant);
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        GONetLog.Debug($"[SYNC] Unreliable sync data received before companion registered - GONetId: {gonetParticipant.GONetId}, skipping.");
-                        return;
-                    }
+                    // DIAGNOSTIC LOGGING: Track companion not in map
+                    GONetLog.Error($"[BUNDLE-ABORT-COMPANION-MISSING] ⚠️ BUNDLE ABORTED - Companion not in map ⚠️ " +
+                                  $"GONetId: {gonetParticipant.GONetId}, " +
+                                  $"InstantiationId: {gonetParticipant._GONetIdAtInstantiation}, " +
+                                  $"Channel: {(channelQuality == QosType.Reliable ? "Reliable" : "Unreliable")}, " +
+                                  $"IsClient: {IsClient}, " +
+                                  $"MyAuthorityId: {MyAuthorityId}");
+
+                    // CRITICAL: Throw exception to trigger deferral system instead of aborting entire bundle
+                    throw new GONetParticipantNotReadyException(
+                        $"Sync companion not registered for GONetId {gonetParticipant.GONetId}",
+                        gonetIdAtInstantiation);
                 }
 
                 // DEFENSIVE CHECK (NEW - SYNC BUNDLE GONETREADY RACE CONDITION FIX):
@@ -8944,6 +8992,19 @@ namespace GONet
 
                 var disabledEvent = new GONetParticipantDisabledEvent(gonetParticipant);
                 EventBus.Publish<IGONetEvent>(disabledEvent); // make sure this comes before gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId); or else the GNP will not be found to attach to the envelope and the subscription handlers will not have what they are expecing
+
+                // DIAGNOSTIC LOGGING: Track participant removal from maps
+                bool wasInGONetIdMap = gonetParticipantByGONetIdMap.ContainsKey(gonetParticipant.GONetId);
+                bool wasInInstantiationMap = gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetParticipant.GONetIdAtInstantiation);
+                string gameObjectName = (gonetParticipant.gameObject != null) ? gonetParticipant.gameObject.name : "<null>";
+
+                GONetLog.Info($"[PARTICIPANT-REMOVED] 🗑️ GONetId: {gonetParticipant.GONetId}, " +
+                             $"InstantiationId: {gonetParticipant.GONetIdAtInstantiation}, " +
+                             $"GameObject: '{gameObjectName}', " +
+                             $"IsServer: {IsServer}, " +
+                             $"MyAuthorityId: {MyAuthorityId}, " +
+                             $"WasInGONetIdMap: {wasInGONetIdMap}, " +
+                             $"WasInInstantiationMap: {wasInInstantiationMap}");
 
                 // CRITICAL FIX: Remove from BOTH maps to prevent "destroyed but still in maps" errors
                 gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);

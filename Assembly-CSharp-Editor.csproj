@@ -113,6 +113,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetSyncBundleDeferralTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetProjectSettingsInitializer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetContentSnapshot.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetDespawnedParticipantHandlingTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSyncSettingsProfileCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestBase.cs" />

@@ -1,0 +1,49 @@
+# Test Case: Mixed High-Load Spawning (Bug Reproduction)
+# This test reproduces the exact scenario that triggers the bug:
+# - Mixed object types (projectiles with physics cubes + beacons)
+# - High spawn rate
+# - Sustained load over time
+#
+# User reported: Single-type spawning works, but MIXED + HIGH LOAD fails
+
+name: Mixed High-Load Spawn Test
+description: Reproduces white beacon / stuck projectile bug with mixed high-load spawning
+require_clients: 1
+despawn_wait: 20
+
+# Initial setup
+wait_clients: 1
+log: ========== Mixed High-Load Test START ==========
+log: REPRODUCING: User's exact failure scenario
+
+# Phase 1: Rapid mixed spawning (projectiles + beacons)
+log: PHASE 1: Rapid mixed spawning (14+ objects per burst)
+log: Click = 14 projectiles with physics cubes
+log: R key = 6 beacons
+human_action: Rapidly alternate: CLICK, R, CLICK, R, CLICK, R (do this 5 times) - Press SPACE when done
+wait: 2
+log: Massive mixed spawn complete - physics cubes falling/despawning
+
+# Phase 2: Continue spawning while physics cubes despawn
+log: PHASE 2: Continue spawning (critical window - physics cubes dying)
+human_action: Keep spawning: CLICK, R, CLICK, R (3 more times) - Press SPACE when done
+wait: 1
+log: ⚠️ CRITICAL: If bug present, objects should start showing symptoms NOW
+
+# Phase 3: Observation
+log: PHASE 3: Observe for symptoms
+human_action: Look for WHITE BEACONS, STUCK PROJECTILES, or FLOATING OBJECTS - Press SPACE when observed
+log: Did you see the bug symptoms? (white beacons / stuck projectiles)
+
+# Phase 4: Final spawn to confirm
+log: PHASE 4: Final spawn batch to confirm persistent issue
+human_action: Spawn 10 more beacons (R key twice) - do they appear white? Press SPACE
+log: If symptoms persist, bug is ACTIVE
+
+# Phase 5: Wait for despawn
+log: PHASE 5: Wait for all objects to despawn
+wait_despawn: 20
+
+log: ========== Mixed High-Load Test COMPLETE ==========
+log: EXPECTED: White beacons / stuck projectiles appeared in Phase 2-4
+log: ROOT CAUSE: Physics cube despawns causing bundle aborts
