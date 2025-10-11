@@ -209,6 +209,30 @@ namespace GONet
         [Range(1, 50)]
         public int maxBundlesProcessedPerGONetReadyCallback = 10;
 
+        [Header("GONetId Reuse Protection")]
+        [Tooltip("Time in seconds to wait after an object despawns before allowing its GONetId to be reused.\n\n" +
+                "PURPOSE:\n" +
+                "Prevents GONetId reuse while despawn messages are still in flight across the network.\n" +
+                "If a GONetId is reused too quickly, despawn messages for the old object may arrive\n" +
+                "after a new object has already claimed that ID, causing the wrong object to despawn.\n\n" +
+                "RECOMMENDED VALUES:\n" +
+                "• LAN (low latency): 2-3 seconds\n" +
+                "• Internet (normal): 5 seconds (default)\n" +
+                "• High latency/packet loss: 10-15 seconds\n\n" +
+                "HOW IT WORKS:\n" +
+                "• When an object despawns, its GONetId is marked with a timestamp\n" +
+                "• The ID cannot be reused until this delay has elapsed\n" +
+                "• Ensures all despawn messages have been delivered and processed\n" +
+                "• Based on network RTT + safety margin for packet reordering\n\n" +
+                "SYMPTOMS OF TOO-LOW VALUE:\n" +
+                "• 'Despawn event received but no matching GONetParticipant found' warnings\n" +
+                "• Objects stuck on client after server despawns them\n" +
+                "• Wrong objects getting despawned (premature destroys)\n\n" +
+                "Default: 5 seconds (handles typical internet latency)\n" +
+                "Range: 1-30 seconds")]
+        [Range(1f, 30f)]
+        public float gonetIdReuseDelaySeconds = 5f;
+
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 
@@ -608,6 +632,9 @@ namespace GONet
 
             // Process deferred RPCs - handle cases where GONetParticipants weren't available during initial processing
             GONetEventBus.ProcessDeferredRpcs();
+
+            // GONetId Reuse Prevention: Periodic cleanup of expired despawned GONetIds
+            GONetMain.CleanupExpiredDespawnedGONetIds();
         }
 
         /// <summary>

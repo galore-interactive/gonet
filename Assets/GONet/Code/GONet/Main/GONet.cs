@@ -1108,6 +1108,28 @@ namespace GONet
         /// </summary>
         private static long _unreliablePacketDropCount = 0;
 
+        #region GONetId Reuse Prevention (TTL Tracking)
+
+        /// <summary>
+        /// Tracks GONetIds that were recently despawned with their despawn timestamp.
+        /// Prevents GONetId reuse while despawn messages are still in flight across the network.
+        ///
+        /// KEY: GONetId (composed value with authority)
+        /// VALUE: Despawn time in seconds (GONetMain.Time.ElapsedSeconds)
+        ///
+        /// TTL is configured via GONetGlobal.gonetIdReuseDelaySeconds (default: 5 seconds).
+        /// IDs are removed from this map after TTL expires during periodic cleanup.
+        /// </summary>
+        private static readonly Dictionary<uint, double> recentlyDespawnedGONetIds = new Dictionary<uint, double>(200);
+
+        /// <summary>
+        /// Tracks last cleanup time for <see cref="recentlyDespawnedGONetIds"/>.
+        /// Cleanup runs periodically (every 30 seconds) to remove expired entries.
+        /// </summary>
+        private static double? _lastGONetIdReuseCleanupTime;
+
+        #endregion
+
         /// <summary>
         /// Count of unreliable packets dropped since last log message.
         /// Resets to 0 after logging (every 100 drops).
@@ -7314,33 +7336,57 @@ namespace GONet
             {
                 uint batchId;
                 bool shouldRequestNewBatch;
-                bool success = GONetIdBatchManager.Client_TryAllocateNextId(out batchId, out shouldRequestNewBatch);
 
-                if (success)
+                // GONetId Reuse Prevention: Loop until we find a batch ID that's not recently despawned
+                int reusePrevention_attemptCount = 0;
+                const int MAX_REUSE_PREVENTION_ATTEMPTS = 200; // Should never need this many, but prevent infinite loop
+
+                do
                 {
-                    if (shouldRequestNewBatch)
+                    bool success = GONetIdBatchManager.Client_TryAllocateNextId(out batchId, out shouldRequestNewBatch);
+
+                    if (!success)
                     {
-                        Client_RequestNewGONetIdBatch();
+                        // CRITICAL: This should NEVER be reached if using Client_TryInstantiate API correctly
+                        // The dangerous fallback code has been removed and replaced with limbo mode system
+                        // If you hit this exception, you are:
+                        // 1. Using Client_InstantiateToBeRemotelyControlledByMe (old API) during batch exhaustion, OR
+                        // 2. Calling Instantiate_MarkToBeRemotelyControlled directly (internal API - don't do this)
+                        //
+                        // SOLUTION: Use Client_TryInstantiateToBeRemotelyControlledByMe instead
+                        // This will handle batch exhaustion gracefully via limbo mode
+                        throw new InvalidOperationException(
+                            "[GONetIdBatch] CRITICAL: No batch IDs available for client spawn! " +
+                            "This means you're using the OLD API during batch exhaustion. " +
+                            "REQUIRED FIX: Replace Client_InstantiateToBeRemotelyControlledByMe() with Client_TryInstantiateToBeRemotelyControlledByMe(). " +
+                            "The Try version handles batch exhaustion via limbo mode. " +
+                            $"Current state: {GONetIdBatchManager.Client_GetDiagnostics()}");
                     }
-                    return batchId;
-                }
-                else
-                {
-                    // CRITICAL: This should NEVER be reached if using Client_TryInstantiate API correctly
-                    // The dangerous fallback code has been removed and replaced with limbo mode system
-                    // If you hit this exception, you are:
-                    // 1. Using Client_InstantiateToBeRemotelyControlledByMe (old API) during batch exhaustion, OR
-                    // 2. Calling Instantiate_MarkToBeRemotelyControlled directly (internal API - don't do this)
-                    //
-                    // SOLUTION: Use Client_TryInstantiateToBeRemotelyControlledByMe instead
-                    // This will handle batch exhaustion gracefully via limbo mode
-                    throw new InvalidOperationException(
-                        "[GONetIdBatch] CRITICAL: No batch IDs available for client spawn! " +
-                        "This means you're using the OLD API during batch exhaustion. " +
-                        "REQUIRED FIX: Replace Client_InstantiateToBeRemotelyControlledByMe() with Client_TryInstantiateToBeRemotelyControlledByMe(). " +
-                        "The Try version handles batch exhaustion via limbo mode. " +
-                        $"Current state: {GONetIdBatchManager.Client_GetDiagnostics()}");
-                }
+
+                    // Compose GONetId to check reuse eligibility (client-spawned objects get server authority)
+                    uint composedGONetId = unchecked((uint)(batchId << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED)) | OwnerAuthorityId_Server;
+
+                    if (CanReuseGONetId(composedGONetId))
+                    {
+                        // This ID is safe to use - not recently despawned
+                        if (shouldRequestNewBatch)
+                        {
+                            Client_RequestNewGONetIdBatch();
+                        }
+                        return batchId;
+                    }
+
+                    // This ID is recently despawned - skip it and try next one
+                    // (CanReuseGONetId already logged warning about skipping)
+                    reusePrevention_attemptCount++;
+
+                } while (reusePrevention_attemptCount < MAX_REUSE_PREVENTION_ATTEMPTS);
+
+                // If we exhausted attempts, something is very wrong
+                GONetLog.Error($"[GONetId-Reuse] CRITICAL: Exhausted {MAX_REUSE_PREVENTION_ATTEMPTS} batch IDs - all recently despawned! " +
+                              $"This should NEVER happen. Batch size: {GONetIdBatchManager.Client_GetDiagnostics()}. " +
+                              $"Using potentially unsafe ID: {batchId}");
+                return batchId; // Return last attempted ID as fallback (better than crash)
             }
 
             // SERVER or CLIENT (non-remotely-controlled): Regular ID assignment
@@ -7352,6 +7398,21 @@ namespace GONet
                 while (GONetIdBatchManager.Server_IsIdInAnyBatch(lastAssignedGONetIdRaw))
                 {
                     ++lastAssignedGONetIdRaw;
+                }
+
+                // GONetId Reuse Prevention: Server-assigned IDs also need reuse checking
+                uint composedGONetId_server = unchecked((uint)(lastAssignedGONetIdRaw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED)) | OwnerAuthorityId_Server;
+                while (!CanReuseGONetId(composedGONetId_server))
+                {
+                    ++lastAssignedGONetIdRaw;
+
+                    // Re-check batch collision after increment
+                    while (GONetIdBatchManager.Server_IsIdInAnyBatch(lastAssignedGONetIdRaw))
+                    {
+                        ++lastAssignedGONetIdRaw;
+                    }
+
+                    composedGONetId_server = unchecked((uint)(lastAssignedGONetIdRaw << GONetParticipant.GONET_ID_BIT_COUNT_UNUSED)) | OwnerAuthorityId_Server;
                 }
             }
 
@@ -9202,6 +9263,119 @@ namespace GONet
             doAction();
         }
 
+        #region GONetId Reuse Prevention Methods
+
+        /// <summary>
+        /// Marks a GONetId as recently despawned, preventing immediate reuse.
+        /// Called automatically from OnDisable_StopMonitoringForAutoMagicalNetworking.
+        ///
+        /// The GONetId will remain unavailable for reuse until the configured TTL expires
+        /// (GONetGlobal.gonetIdReuseDelaySeconds, default 5 seconds).
+        /// </summary>
+        /// <param name="gonetId">The GONetId being despawned</param>
+        internal static void MarkGONetIdDespawned(uint gonetId)
+        {
+            if (gonetId == GONetParticipant.GONetId_Unset)
+            {
+                return; // Don't track unset IDs
+            }
+
+            double despawnTime = Time.ElapsedSeconds;
+            recentlyDespawnedGONetIds[gonetId] = despawnTime;
+
+            GONetLog.Debug($"[GONetId-Reuse] Marked GONetId {gonetId} as despawned at {despawnTime:F3}s (TTL: {GetGONetIdReuseDelay():F1}s)");
+        }
+
+        /// <summary>
+        /// Checks if a GONetId can be safely reused (TTL has expired).
+        /// Used by GONetIdBatchManager during ID allocation.
+        /// </summary>
+        /// <param name="gonetId">The GONetId to check</param>
+        /// <returns>True if ID can be reused, false if still in cooldown period</returns>
+        internal static bool CanReuseGONetId(uint gonetId)
+        {
+            if (!recentlyDespawnedGONetIds.TryGetValue(gonetId, out double despawnTime))
+            {
+                return true; // Not in recently despawned map, safe to reuse
+            }
+
+            double elapsed = Time.ElapsedSeconds - despawnTime;
+            double reuseDelay = GetGONetIdReuseDelay();
+
+            if (elapsed >= reuseDelay)
+            {
+                // TTL expired, remove from map and allow reuse
+                recentlyDespawnedGONetIds.Remove(gonetId);
+                GONetLog.Debug($"[GONetId-Reuse] GONetId {gonetId} TTL expired ({elapsed:F3}s >= {reuseDelay:F1}s), allowing reuse");
+                return true;
+            }
+
+            // Still in cooldown period
+            GONetLog.Warning($"[GONetId-Reuse] ⚠️  GONetId {gonetId} reuse prevented - TTL not expired ({elapsed:F3}s / {reuseDelay:F1}s remaining: {reuseDelay - elapsed:F3}s)");
+            return false;
+        }
+
+        /// <summary>
+        /// Gets the configured GONetId reuse delay from GONetGlobal.
+        /// Falls back to 5 seconds if GONetGlobal not available.
+        /// </summary>
+        private static double GetGONetIdReuseDelay()
+        {
+            var gonetGlobal = GONetGlobal.Instance;
+            if (gonetGlobal != null)
+            {
+                return gonetGlobal.gonetIdReuseDelaySeconds;
+            }
+            return 5.0; // Default fallback
+        }
+
+        /// <summary>
+        /// Periodic cleanup of expired GONetIds from recentlyDespawnedGONetIds map.
+        /// Runs every 30 seconds to prevent unbounded growth.
+        /// Called from Update() main loop.
+        /// </summary>
+        internal static void CleanupExpiredDespawnedGONetIds()
+        {
+            const double CLEANUP_INTERVAL_SECONDS = 30.0;
+
+            double now = Time.ElapsedSeconds;
+
+            // Initialize or check cleanup interval
+            if (!_lastGONetIdReuseCleanupTime.HasValue ||
+                (now - _lastGONetIdReuseCleanupTime.Value) >= CLEANUP_INTERVAL_SECONDS)
+            {
+                _lastGONetIdReuseCleanupTime = now;
+
+                if (recentlyDespawnedGONetIds.Count == 0)
+                {
+                    return; // Nothing to clean
+                }
+
+                double reuseDelay = GetGONetIdReuseDelay();
+                List<uint> toRemove = new List<uint>(recentlyDespawnedGONetIds.Count);
+
+                foreach (var kvp in recentlyDespawnedGONetIds)
+                {
+                    double elapsed = now - kvp.Value;
+                    if (elapsed >= reuseDelay)
+                    {
+                        toRemove.Add(kvp.Key);
+                    }
+                }
+
+                if (toRemove.Count > 0)
+                {
+                    foreach (uint id in toRemove)
+                    {
+                        recentlyDespawnedGONetIds.Remove(id);
+                    }
+                    GONetLog.Info($"[GONetId-Reuse] Cleaned up {toRemove.Count} expired despawned GONetIds (map size now: {recentlyDespawnedGONetIds.Count})");
+                }
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Call me in the <paramref name="gonetParticipant"/>'s OnDisable method.
         /// </summary>
@@ -9249,6 +9423,9 @@ namespace GONet
 
                 // Cleanup: Clear any deferred RPCs for this GONetId to prevent infinite defer loops on GONetId reuse
                 GONetEventBus.ClearDeferredRpcsForGONetId(gonetParticipant.GONetId);
+
+                // GONetId Reuse Prevention: Mark this GONetId as recently despawned to prevent immediate reuse
+                MarkGONetIdDespawned(gonetParticipant.GONetId);
             }
         }
 

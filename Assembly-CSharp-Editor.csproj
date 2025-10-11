@@ -66,6 +66,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncVerificationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ChannelInterleavingTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusHolisticTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetIdReusePreventionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableEndpointTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOTestWrapper.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetIdBatchManagerTests.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\BitByBitByteArrayBuilderTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetRuntimeComponentInitializerEditor.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetAuthorityDeserializationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestHelpers.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetAdaptivePoolScalerTests.cs" />
