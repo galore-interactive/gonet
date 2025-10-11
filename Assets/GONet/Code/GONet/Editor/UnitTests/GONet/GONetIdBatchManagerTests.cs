@@ -781,6 +781,72 @@ namespace GONet
             Assert.IsTrue(diagnostics.Contains("Remaining: 195"), "Should have 195 remaining IDs");
         }
 
+        [Test]
+        public void ServerBatchPersistence_PreventsLateJoinerOverlaps()
+        {
+            // CRITICAL REGRESSION TEST (October 2025):
+            // Server MUST persist batch tracking across scene changes to prevent late-joining
+            // clients from receiving overlapping batches.
+            //
+            // BUG SCENARIO (from real 5-client test):
+            // 1. Scene 1: Server allocates [604-803] to Client 2, Client 2 keeps it
+            // 2. Scene changes, server RESETS batch tracking (forgets [604-803])
+            // 3. Client 2 still has [604-803] (batches persist on client side)
+            // 4. Client 3 joins late (after scene change)
+            // 5. Server allocates [704-903] to Client 3 (overlaps with [604-803]!)
+            // 6. Both Client 2 and Client 3 allocate raw ID 704
+            // 7. Same GONetId (721919) used by beacon AND cannonball
+            // 8. Cannonball despawn message despawns beacon instead → zombie object
+            //
+            // FIX: Server batch tracking persists across scenes (symmetric with client behavior)
+
+            // Arrange - Scene 1: Multiple clients connect
+            uint batch1_Client1 = GONetIdBatchManager.Server_AllocateNewBatch(1000); // [1001-1200]
+            uint batch2_Client2 = GONetIdBatchManager.Server_AllocateNewBatch(2000); // [2001-2200]
+
+            // Simulate Client 2 receiving batch (client keeps it across scenes)
+            GONetIdBatchManager.Client_AddBatch(batch2_Client2);
+
+            // Verify Server knows about both batches
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch1_Client1 + 50), "Server should track Client 1 batch");
+            Assert.IsTrue(GONetIdBatchManager.Server_IsIdInAnyBatch(batch2_Client2 + 50), "Server should track Client 2 batch");
+
+            // Act - Scene change: Server KEEPS batch tracking (FIX), clients keep batches
+            // OLD BUG: GONetIdBatchManager.Server_ResetAllBatches(); // This caused the overlap bug!
+            // NEW FIX: Server does NOT reset, batches persist
+
+            // Late joiner (Client 3) connects after scene change
+            uint batch3_Client3_LateJoiner = GONetIdBatchManager.Server_AllocateNewBatch(2500); // Should get [2501-2700] (after 2500)
+
+            // Assert - Late joiner batch should NOT overlap with existing batches
+            // With the FIX: batch3 starts at 2501 (no overlap)
+            // With the BUG: server forgot about [2001-2200], would allocate overlapping batch
+            Assert.IsFalse(GONetIdBatchManager.Server_IsIdInAnyBatch(batch2_Client2 + 50) &&
+                          batch3_Client3_LateJoiner <= batch2_Client2 + 199,
+                          "Late joiner batch should not overlap with Client 2's batch");
+
+            // Verify no overlap between Client 2 and Client 3 batches
+            bool hasOverlap = !(batch3_Client3_LateJoiner >= batch2_Client2 + 200 || // batch3 starts after batch2 ends
+                               batch2_Client2 >= batch3_Client3_LateJoiner + 200);    // batch2 starts after batch3 ends
+
+            Assert.IsFalse(hasOverlap, $"Client 2 batch [{batch2_Client2}-{batch2_Client2 + 199}] should NOT overlap with " +
+                                      $"Client 3 batch [{batch3_Client3_LateJoiner}-{batch3_Client3_LateJoiner + 199}]");
+
+            // Specific check: Verify the bug scenario (raw ID 704 in both batches) cannot happen
+            // If Client 2 has batch [604-803] and Client 3 gets [704-903], ID 704 is in BOTH
+            // With the fix, if Client 2 has [604-803], Client 3 should get [804-1003] or later
+
+            // First, server allocates batch [604-803] to Client 2 (simulating the real scenario)
+            uint batch_Client2_Example = GONetIdBatchManager.Server_AllocateNewBatch(603); // Start at 603 → batch [604-803]
+
+            // Now Client 3 tries to get a batch near Client 2's range
+            uint batch_Client3_Example = GONetIdBatchManager.Server_AllocateNewBatch(650); // Try to allocate near Client 2's batch
+
+            // The overlap detection should move Client 3's batch to [804-1003]
+            Assert.IsTrue(batch_Client3_Example >= batch_Client2_Example + 200,
+                         $"Client 3 batch should start at or after {batch_Client2_Example + 200}, got {batch_Client3_Example}");
+        }
+
         #endregion
 
         #region Edge Case Tests

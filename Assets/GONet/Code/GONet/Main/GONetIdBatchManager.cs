@@ -15,10 +15,24 @@ namespace GONet
     /// 3. Clients consume batches sequentially (6000, 6001, 6002...)
     /// 4. Batches are exhausted and removed when all IDs used
     /// 5. New batches requested automatically when 50% IDs remain (threshold = batchSize / 2)
-    /// 6. Scene changes reset client batch state completely
+    /// 6. BOTH server and client batch state PERSISTS across scene changes (symmetric behavior)
+    ///
+    /// SCENE CHANGE BEHAVIOR (CRITICAL FIX - October 2025):
+    /// - Server keeps batch tracking across scenes (prevents overlapping batch allocations)
+    /// - Clients keep their batches across scenes (design intent - batches are global)
+    /// - MUST BE SYMMETRIC: If clients keep batches but server resets, late-joining clients
+    ///   can receive overlapping batches causing zombie objects (same GONetId reused)
+    ///
+    /// MEMORY/ID SPACE LIMITS:
+    /// - GONetId space: 4,194,304 IDs (22 bits for raw ID)
+    /// - Max batches: 20,971 (200 IDs/batch)
+    /// - Memory cost: ~8 bytes per batch (trivial even for 1000+ clients)
+    /// - Realistic usage: 100 clients × 1000 spawns = 100K IDs (2.5% of space)
+    /// - Batches released on client disconnect (natural recycling)
+    /// - Will NOT exhaust in any realistic game scenario
     ///
     /// BATCH SIZE CONFIGURATION:
-    /// - Configured in GONet Project Settings
+    /// - Configured in GONetGlobal.client_GONetIdBatchSize (runtime)
     /// - Range: 100-1000 IDs per batch
     /// - Default: 200 (good for typical games with projectiles)
     /// - Larger batches = fewer limbo occurrences but more ID space used
@@ -217,7 +231,21 @@ namespace GONet
         }
 
         /// <summary>
-        /// SERVER: Clears all batch allocations (called on scene change or shutdown).
+        /// SERVER: Clears all batch allocations.
+        ///
+        /// IMPORTANT (October 2025): Do NOT call on scene change!
+        /// - Batches persist across scenes to prevent overlapping allocations
+        /// - Only call on full server shutdown/restart
+        /// - Calling on scene change causes late-joining clients to receive overlapping batches
+        ///
+        /// USE CASES:
+        /// - Server shutdown/restart
+        /// - Unit test cleanup (TearDown)
+        /// - Manual admin command to reset batch state
+        ///
+        /// NOT FOR:
+        /// - Scene changes (batches persist across scenes)
+        /// - Individual client disconnect (use Server_ReleaseBatch instead)
         /// </summary>
         public static void Server_ResetAllBatches()
         {

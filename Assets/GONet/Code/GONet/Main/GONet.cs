@@ -458,15 +458,34 @@ namespace GONet
 
         private static void OnSceneLoadCompleted_ProcessDeferredSpawns(string sceneName, LoadSceneMode mode)
         {
-            // CRITICAL: Reset GONetId batch state on scene change to prevent stale ID reuse
-            // NOTE: Only reset SERVER batches - clients keep their batches across scenes since
-            // batch IDs are global and don't need to be scene-specific
+            // CRITICAL FIX (October 2025): NEVER reset batch tracking on scene change
+            //
+            // WHY: Server and clients must have symmetric behavior - both persist batches across scenes.
+            // If server resets but clients don't, late-joining clients can receive overlapping batches
+            // because server "forgets" about batches allocated before the scene change.
+            //
+            // EXAMPLE BUG SCENARIO:
+            // 1. Server allocates batch [604-803] to Client 2 before scene change
+            // 2. Scene changes, server resets batch tracking (forgets [604-803])
+            // 3. Client 2 keeps batch [604-803] (by design)
+            // 4. Client 3 joins late, server allocates [704-903] (overlaps with Client 2's [604-803]!)
+            // 5. Both clients allocate raw ID 704 → same GONetId → zombie objects
+            //
+            // MEMORY/ID SPACE ANALYSIS:
+            // - Memory cost: ~8 bytes per batch (1 uint), trivial even for 1000+ clients
+            // - GONetId space: 4,194,304 IDs available (22 bits), 200 IDs per batch = 20,971 max batches
+            // - Realistic usage: 100 clients × 1000 spawns = 100K IDs used (2.5% of space)
+            // - Batches released on client disconnect (natural recycling in long-running servers)
+            //
+            // DECISION: Server batch tracking persists across scenes, matching client behavior.
+            // Only reset on full disconnect/shutdown.
             if (mode == LoadSceneMode.Single)
             {
                 if (IsServer)
                 {
-                    GONetIdBatchManager.Server_ResetAllBatches();
-                    GONetLog.Info($"[GONetIdBatch] SERVER reset batch state on scene change (LoadSceneMode.Single): {sceneName}");
+                    // REMOVED: Server batch reset on scene change (caused overlapping batch bug)
+                    // GONetIdBatchManager.Server_ResetAllBatches();
+                    GONetLog.Info($"[GONetIdBatch] SERVER kept batches on scene change (LoadSceneMode.Single): {sceneName}");
                 }
                 if (IsClient)
                 {
