@@ -2015,43 +2015,98 @@ namespace GONet
             }
         }
 
+        /// <summary>
+        /// PRODUCTION-READY EVENT BROADCAST FRAMEWORK
+        ///
+        /// Robustly iterates all GONetBehaviours and invokes a callback for each, with:
+        /// - Unity fake null protection (destroyed objects during iteration)
+        /// - Per-behaviour exception isolation (one failure doesn't break pipeline)
+        /// - Detailed error logging with context
+        /// - Safe enumerator disposal (handles DestroyImmediate mid-iteration)
+        ///
+        /// Added 2025-10-11 to replace brittle direct iteration pattern in lifecycle event handlers.
+        /// </summary>
+        /// <param name="callback">Action to invoke for each behaviour. Exceptions are caught and logged.</param>
+        /// <param name="eventName">Name of event being broadcast (for error logging context)</param>
+        /// <param name="gonetParticipant">Related GONetParticipant (for error logging context)</param>
+        private static void BroadcastToAllGONetBehaviours_Robust(
+            System.Action<GONetBehaviour> callback,
+            string eventName,
+            GONetParticipant gonetParticipant)
+        {
+            int successCount = 0;
+            int failureCount = 0;
+            int nullSkipCount = 0;
+
+            using (var enumerator = allGONetBehaviours.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    GONetBehaviour behaviour = enumerator.Current;
+
+                    // DEFENSIVE: Unity fake null check (object destroyed during iteration)
+                    if (behaviour == null)
+                    {
+                        nullSkipCount++;
+                        continue;
+                    }
+
+                    // ROBUST: Per-behaviour try-catch - one exception doesn't break pipeline
+                    try
+                    {
+                        callback(behaviour);
+                        successCount++;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        failureCount++;
+
+                        // DETAILED ERROR LOGGING: Include full context for debugging
+                        GONetLog.Error(
+                            $"[GONet-EventBroadcast] EXCEPTION in {eventName} handler for GONetBehaviour '{behaviour.GetType().Name}' " +
+                            $"(GameObject: {behaviour.gameObject?.name ?? "NULL"}) " +
+                            $"processing GONetParticipant '{gonetParticipant?.gameObject?.name ?? "NULL"}' " +
+                            $"(GONetId: {gonetParticipant?.GONetId ?? 0})\n" +
+                            $"Exception: {ex.Message}\n" +
+                            $"StackTrace:\n{ex.StackTrace}");
+                    }
+                }
+            }
+
+            // DIAGNOSTIC: Log if failures occurred (only when there were actual errors)
+            if (failureCount > 0)
+            {
+                GONetLog.Warning(
+                    $"[GONet-EventBroadcast] {eventName} completed with ERRORS: " +
+                    $"Success={successCount}, Failures={failureCount}, NullSkipped={nullSkipCount}");
+            }
+        }
+
         private static void OnEnabledGNPEvent(GONetEventEnvelope<GONetParticipantEnabledEvent> eventEnvelope)
         {
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    gnBehaviour.OnGONetParticipantEnabled(gonetParticipant);
-                }
-            }
+            BroadcastToAllGONetBehaviours_Robust(
+                behaviour => behaviour.OnGONetParticipantEnabled(gonetParticipant),
+                nameof(OnEnabledGNPEvent),
+                gonetParticipant);
         }
 
         private static void OnStartedGNPEvent(GONetEventEnvelope<GONetParticipantStartedEvent> eventEnvelope)
         {
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    gnBehaviour.OnGONetParticipantStarted(gonetParticipant);
-                }
-            }
+            BroadcastToAllGONetBehaviours_Robust(
+                behaviour => behaviour.OnGONetParticipantStarted(gonetParticipant),
+                nameof(OnStartedGNPEvent),
+                gonetParticipant);
         }
 
         private static void OnDeserializeInitAllCompletedGNPEvent(GONetEventEnvelope<GONetParticipantDeserializeInitAllCompletedEvent> eventEnvelope)
         {
             GONetParticipant gonetParticipant = eventEnvelope.GONetParticipant;
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    gnBehaviour.OnGONetParticipantDeserializeInitAllCompleted(gonetParticipant);
-                }
-            }
+            BroadcastToAllGONetBehaviours_Robust(
+                behaviour => behaviour.OnGONetParticipantDeserializeInitAllCompleted(gonetParticipant),
+                nameof(OnDeserializeInitAllCompletedGNPEvent),
+                gonetParticipant);
 
             // LIFECYCLE GATE: Mark deserialization complete and check if OnGONetReady can fire
             // This replaces the old direct broadcast - now uses the centralized gate check
@@ -2082,14 +2137,11 @@ namespace GONet
             ClearParticipantSpawnScene(gonetParticipant);
             definedInSceneParticipantInstanceIDs.Remove(gonetParticipant.GetInstanceID());
 
-            using (var en = allGONetBehaviours.GetEnumerator())
-            {
-                while (en.MoveNext())
-                {
-                    GONetBehaviour gnBehaviour = en.Current;
-                    gnBehaviour.OnGONetParticipantDisabled(gonetParticipant);
-                }
-            }
+            // ROBUST: Use production-ready broadcast framework
+            BroadcastToAllGONetBehaviours_Robust(
+                behaviour => behaviour.OnGONetParticipantDisabled(gonetParticipant),
+                nameof(OnDisabledGNPEvent),
+                gonetParticipant);
         }
 
         /// <summary>
@@ -2495,6 +2547,12 @@ namespace GONet
             };
 
             singleProducerSendQueues.queueForWork.Enqueue(networkData);
+
+            // DIAGNOSTIC: Track outgoing packet by channel
+            // Added 2025-10-11 to investigate packet saturation during rapid spawning
+            GONetChannel outgoingChannel = GONetChannel.ById(channelId);
+            bool isOutgoingReliable = outgoingChannel.QualityOfService == QosType.Reliable;
+            IncrementOutgoingPacketCounter(isOutgoingReliable);
 
             // Track successful packet sends for drop rate calculation
             System.Threading.Interlocked.Increment(ref _successfulPacketSendCount);
@@ -3070,9 +3128,166 @@ namespace GONet
                     }
                 }
                 // END of late update loop
+
+                // DIAGNOSTIC: Frame-end metrics for packet processing and deserialization
+                // Added 2025-10-11 to investigate DeserializeInitAllCompleted event delivery during rapid spawning
+                LogFrameEndMetrics_IfAppropriate();
             }
         }
         // END of Update_DoTheHeavyLifting_IfAppropriate method
+
+        /// <summary>
+        /// DIAGNOSTIC: Enhanced frame-end metrics for packet processing pipeline analysis.
+        /// Added 2025-10-11 to investigate packet saturation during rapid spawning.
+        ///
+        /// Tracks PER-FRAME and BY-CHANNEL:
+        /// - INCOMING: Packets received, queued (awaiting process), processed this frame
+        /// - OUTGOING: Packets sent this frame (reliable vs unreliable breakdown)
+        /// - PARTICIPANTS: Waiting for deserialization
+        /// - EVENTS: DeserializeInitAllCompleted published
+        ///
+        /// Channel breakdown helps identify which pipeline saturates first.
+        /// </summary>
+        private static int _lastLoggedFrame_FrameEndMetrics = -1;
+        private static int _deserializeInitEventsPublishedThisFrame = 0;
+
+        // Per-frame counters for incoming packet tracking
+        private static int _incomingPacketsProcessedThisFrame_Reliable = 0;
+        private static int _incomingPacketsProcessedThisFrame_Unreliable = 0;
+
+        // Per-frame counters for outgoing packet tracking
+        private static int _outgoingPacketsSentThisFrame_Reliable = 0;
+        private static int _outgoingPacketsSentThisFrame_Unreliable = 0;
+
+        /// <summary>
+        /// DIAGNOSTIC: Call when processing an incoming packet to track throughput by channel.
+        /// </summary>
+        internal static void IncrementIncomingPacketCounter(bool isReliable)
+        {
+            if (isReliable)
+                _incomingPacketsProcessedThisFrame_Reliable++;
+            else
+                _incomingPacketsProcessedThisFrame_Unreliable++;
+        }
+
+        /// <summary>
+        /// DIAGNOSTIC: Call when sending an outgoing packet to track throughput by channel.
+        /// </summary>
+        internal static void IncrementOutgoingPacketCounter(bool isReliable)
+        {
+            if (isReliable)
+                _outgoingPacketsSentThisFrame_Reliable++;
+            else
+                _outgoingPacketsSentThisFrame_Unreliable++;
+        }
+
+        /// <summary>
+        /// DIAGNOSTIC: Call whenever a DeserializeInitAllCompleted event is published to track event rate.
+        /// </summary>
+        internal static void IncrementDeserializeInitEventCounter()
+        {
+            _deserializeInitEventsPublishedThisFrame++;
+        }
+
+        private static void LogFrameEndMetrics_IfAppropriate()
+        {
+            int currentFrame = UnityEngine.Time.frameCount;
+
+            // Only log once per frame (defensive check)
+            if (_lastLoggedFrame_FrameEndMetrics == currentFrame)
+            {
+                return;
+            }
+            _lastLoggedFrame_FrameEndMetrics = currentFrame;
+
+            // === 1. INCOMING PACKET METRICS (by channel) ===
+            int incomingQueued_Reliable = 0;
+            int incomingQueued_Unreliable = 0;
+            int incomingProcessed_Reliable = _incomingPacketsProcessedThisFrame_Reliable;
+            int incomingProcessed_Unreliable = _incomingPacketsProcessedThisFrame_Unreliable;
+
+            // Count packets currently queued awaiting processing (approx - queue doesn't track reliability)
+            int totalQueuedPackets = 0;
+            using (var enumerator = singleProducerReceiveQueuesByThread.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    SingleProducerQueues singleProducerReceiveQueues = enumerator.Current.Value;
+                    ConcurrentQueue<NetworkData> incomingNetworkData = singleProducerReceiveQueues.queueForWork;
+                    totalQueuedPackets += incomingNetworkData.Count;
+                }
+            }
+
+            // Reset counters for next frame
+            _incomingPacketsProcessedThisFrame_Reliable = 0;
+            _incomingPacketsProcessedThisFrame_Unreliable = 0;
+
+            // === 2. OUTGOING PACKET METRICS (by channel) ===
+            int outgoingSent_Reliable = _outgoingPacketsSentThisFrame_Reliable;
+            int outgoingSent_Unreliable = _outgoingPacketsSentThisFrame_Unreliable;
+
+            // Count packets currently queued awaiting send
+            int totalQueuedOutgoing = 0;
+            using (var enumerator = singleProducerSendQueuesByThread.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    SingleProducerQueues singleProducerSendQueues = enumerator.Current.Value;
+                    totalQueuedOutgoing += singleProducerSendQueues.queueForWork.Count;
+                }
+            }
+
+            // Reset counters for next frame
+            _outgoingPacketsSentThisFrame_Reliable = 0;
+            _outgoingPacketsSentThisFrame_Unreliable = 0;
+
+            // === 3. PARTICIPANT DESERIALIZATION STATE ===
+            int participantsWaitingForDeserialize = 0;
+            int totalParticipants = 0;
+
+            using (var enumerator = gonetParticipantByGONetIdMap.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    GONetParticipant participant = enumerator.Current.Value;
+                    if (participant != null)
+                    {
+                        totalParticipants++;
+                        if (participant.requiresDeserializeInit && !participant.didDeserializeInitComplete)
+                        {
+                            participantsWaitingForDeserialize++;
+                        }
+                    }
+                }
+            }
+
+            // === 4. EVENT BUS METRICS ===
+            int eventBusQueueDepth = EventBus != null ? EventBus.GetApproximateQueueDepth() : 0;
+            int deserializeInitEventsPublished = _deserializeInitEventsPublishedThisFrame;
+            _deserializeInitEventsPublishedThisFrame = 0; // Reset for next frame
+
+            // === 5. LOG IF INTERESTING (avoid spam during idle) ===
+            // Threshold: Processing activity OR queues building up OR participants waiting
+            const int ACTIVITY_THRESHOLD = 0; // Log whenever there's ANY activity
+            bool hasActivity =
+                (incomingProcessed_Reliable + incomingProcessed_Unreliable) > ACTIVITY_THRESHOLD ||
+                (outgoingSent_Reliable + outgoingSent_Unreliable) > ACTIVITY_THRESHOLD ||
+                totalQueuedPackets > 5 ||
+                totalQueuedOutgoing > 5 ||
+                participantsWaitingForDeserialize > 0 ||
+                deserializeInitEventsPublished > 0;
+
+            if (hasActivity)
+            {
+                GONetLog.Info(
+                    $"[FRAME-METRICS] Frame {currentFrame}: " +
+                    $"IN={{Processed:R{incomingProcessed_Reliable}/U{incomingProcessed_Unreliable}, Queued:{totalQueuedPackets}}} | " +
+                    $"OUT={{Sent:R{outgoingSent_Reliable}/U{outgoingSent_Unreliable}, Queued:{totalQueuedOutgoing}}} | " +
+                    $"Waiting={participantsWaitingForDeserialize}/{totalParticipants} | " +
+                    $"EventBus={eventBusQueueDepth} | " +
+                    $"DeserInitPub={deserializeInitEventsPublished}");
+            }
+        }
 
         /// <summary>
         /// EARLY FRAME UPDATE: UpdateAfterGONetReady for all ready GONetParticipantCompanionBehaviours.
@@ -4613,6 +4828,12 @@ namespace GONet
         /// </summary>
         private static void ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL(NetworkData networkData, bool isProcessingFromQueue = false)
         {
+            // DIAGNOSTIC: Track incoming packet processing by channel
+            // Added 2025-10-11 to investigate packet saturation during rapid spawning
+            GONetChannel channel = GONetChannel.ById(networkData.channelId);
+            bool isReliable = channel.QualityOfService == QosType.Reliable;
+            IncrementIncomingPacketCounter(isReliable);
+
             // DEBUG: Log EVERY message that enters this function on Channel 8
             // NOTE: This logs every message processing (hundreds per second)
             // To enable, add LOG_NETWORK_VERBOSE to Player Settings → Scripting Define Symbols
@@ -5056,7 +5277,20 @@ namespace GONet
             instance.IsOKToStartAutoMagicalProcessing = true;
 
             // LIFECYCLE GATE: Remote spawns require DeserializeInitAllCompleted before OnGONetReady
-            instance.MarkRequiresDeserializeInit();
+            // CRITICAL FIX 2025-10-11: Authority instances (IsMine=True) do NOT need deserialization!
+            // They are the source of truth, not receiving sync data from elsewhere.
+            // Only non-authority instances (IsMine=False) need to wait for initial sync data from remote authority.
+            //
+            // Example: Client spawns projectile with server authority
+            //   - Client's instance: IsMine=False (not authority) → MUST wait for server sync data
+            //   - Server's instance: IsMine=True (IS authority) → NO deserialization needed!
+            //
+            // Before this fix: Server instances got stuck waiting for events that would never come
+            // After this fix: Server instances skip deserialization, OnGONetReady fires immediately after Start()
+            if (!instance.IsMine)
+            {
+                instance.MarkRequiresDeserializeInit();
+            }
 
             // Track which scene this GNP was spawned in
             string spawnSceneName = GONetSceneManager.GetSceneIdentifier(instance.gameObject);

@@ -137,6 +137,7 @@ namespace GONet
                     GONetLog.Info($"[GONetLocal] GONetLocal is ready (IsMine: {gonetLocal.GONetParticipant.IsMine}), publishing DeserializeInitAllCompleted");
                     var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetLocal.GONetParticipant);
                     GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                    GONetMain.IncrementDeserializeInitEventCounter(); // DIAGNOSTIC: Track event publication rate
                 }
                 else
                 {
@@ -156,6 +157,7 @@ namespace GONet
                         GONetLog.Info($"[GONetLocal] Participant '{gnp.name}' (GONetId: {gnp.GONetId}) is now ready after GONetLocal became available, publishing DeserializeInitAllCompleted");
                         var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gnp);
                         GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                        GONetMain.IncrementDeserializeInitEventCounter(); // DIAGNOSTIC: Track event publication rate
                     }
                     else
                     {
@@ -206,6 +208,7 @@ namespace GONet
                         GONetLog.Info($"[GONetLocal] Runtime-spawned participant '{gonetParticipant.name}' (GONetId: {gonetParticipant.GONetId}) is ready, publishing DeserializeInitAllCompleted");
                         var deserializeInitEvent = new GONetParticipantDeserializeInitAllCompletedEvent(gonetParticipant);
                         GONetMain.EventBus.Publish<IGONetEvent>(deserializeInitEvent);
+                        GONetMain.IncrementDeserializeInitEventCounter(); // DIAGNOSTIC: Track event publication rate
                     }
                     else
                     {

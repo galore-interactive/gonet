@@ -621,7 +621,98 @@ namespace GONet
 
         private void OnApplicationQuit()
         {
+            // DIAGNOSTIC DUMP: Log lifecycle state of ALL GONetParticipants before shutdown
+            // This helps us understand what prevented OnGONetReady from firing
+            DumpLifecycleStateDiagnostics();
+
             GONetMain.Shutdown();
+        }
+
+        /// <summary>
+        /// Diagnostic dump of all GONetParticipants showing which lifecycle gates prevented OnGONetReady.
+        /// Called on application quit to capture final state for analysis.
+        /// </summary>
+        private void DumpLifecycleStateDiagnostics()
+        {
+            try
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder(4096);
+                sb.AppendLine("========================================");
+                sb.AppendLine("[QUIT-DIAGNOSTIC] Application quitting - dumping GONetParticipant lifecycle states");
+                sb.AppendLine("========================================");
+
+                // Find ALL GONetParticipants (even destroyed ones might still exist)
+                GONetParticipant[] allParticipants = UnityEngine.Object.FindObjectsOfType<GONetParticipant>(includeInactive: true);
+
+                sb.AppendLine($"[QUIT-DIAGNOSTIC] Found {allParticipants.Length} total GONetParticipants");
+                sb.AppendLine();
+
+                int neverFiredOnGONetReady = 0;
+                int awakeIncomplete = 0;
+                int startIncomplete = 0;
+                int deserializeIncomplete = 0;
+                int missingGONetId = 0;
+                int missingAuthority = 0;
+
+                foreach (var participant in allParticipants)
+                {
+                    if (participant == null) continue; // Unity fake null check
+
+                    bool firedReady = participant.didOnGONetReadyFire;
+                    if (!firedReady)
+                    {
+                        neverFiredOnGONetReady++;
+
+                        // Log detailed state for participants that never fired OnGONetReady
+                        sb.AppendLine($"[QUIT-DIAGNOSTIC] NEVER FIRED OnGONetReady:");
+                        sb.AppendLine($"  InstanceID: {participant.GetInstanceID()}");
+                        sb.AppendLine($"  GameObject: {participant.gameObject.name}");
+                        sb.AppendLine($"  GONetId: {participant.GONetId} (Unset={participant.GONetId == GONetParticipant.GONetId_Unset})");
+                        sb.AppendLine($"  OwnerAuthorityId: {participant.OwnerAuthorityId} (Unset={participant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset})");
+                        sb.AppendLine($"  IsMine: {participant.IsMine}");
+                        sb.AppendLine($"  WasInstantiated: {participant.WasInstantiated}");
+                        sb.AppendLine($"  IsInternallyConfigured: {participant.IsInternallyConfigured}");
+                        sb.AppendLine($"  LIFECYCLE GATES:");
+                        sb.AppendLine($"    didAwakeComplete: {participant.didAwakeComplete}");
+                        sb.AppendLine($"    didStartComplete: {participant.didStartComplete}");
+                        sb.AppendLine($"    requiresDeserializeInit: {participant.requiresDeserializeInit}");
+                        sb.AppendLine($"    didDeserializeInitComplete: {participant.didDeserializeInitComplete}");
+                        sb.AppendLine($"    didOnGONetReadyFire: {participant.didOnGONetReadyFire}");
+                        sb.AppendLine($"  CLIENT LIMBO STATE:");
+                        sb.AppendLine($"    client_isInLimbo: {participant.client_isInLimbo}");
+                        sb.AppendLine();
+
+                        // Count failure reasons
+                        if (!participant.didAwakeComplete) awakeIncomplete++;
+                        if (!participant.didStartComplete) startIncomplete++;
+                        if (participant.requiresDeserializeInit && !participant.didDeserializeInitComplete) deserializeIncomplete++;
+                        if (participant.GONetId == GONetParticipant.GONetId_Unset) missingGONetId++;
+                        if (participant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset) missingAuthority++;
+                    }
+                }
+
+                // Summary statistics
+                sb.AppendLine("========================================");
+                sb.AppendLine("[QUIT-DIAGNOSTIC] SUMMARY:");
+                sb.AppendLine($"  Total participants: {allParticipants.Length}");
+                sb.AppendLine($"  OnGONetReady fired: {allParticipants.Length - neverFiredOnGONetReady}");
+                sb.AppendLine($"  OnGONetReady NEVER fired: {neverFiredOnGONetReady}");
+                sb.AppendLine();
+                sb.AppendLine("  Failure breakdown (participants may have multiple issues):");
+                sb.AppendLine($"    didAwakeComplete = false: {awakeIncomplete}");
+                sb.AppendLine($"    didStartComplete = false: {startIncomplete}");
+                sb.AppendLine($"    Deserialization incomplete: {deserializeIncomplete}");
+                sb.AppendLine($"    GONetId unset: {missingGONetId}");
+                sb.AppendLine($"    OwnerAuthorityId unset: {missingAuthority}");
+                sb.AppendLine("========================================");
+
+                // Output entire diagnostic as ONE log statement
+                GONetLog.Info(sb.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[QUIT-DIAGNOSTIC] Exception during lifecycle dump: {ex.Message}\n{ex.StackTrace}");
+            }
         }
 
         private System.Collections.IEnumerator CacheDesignTimeMetadata_ThenContinueInit()
@@ -934,13 +1025,20 @@ namespace GONet
             CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds);
         }
 
-        /* uncomment this to log all of these for debugging:
+        /// <summary>
+        /// UNIVERSAL LOGGING: Captures OnGONetReady for ALL GONet participants (beacons, projectiles, physics cubes, etc.).
+        /// This is the central coordinator that sees every participant's lifecycle, providing consistent logging
+        /// regardless of companion script type or GameObject.
+        ///
+        /// Used for comprehensive log analysis to track OnGONetReady timing, frame delays, and reliability metrics.
+        /// InstanceID enables correlation with Awake() events for complete lifecycle tracking.
+        /// </summary>
         public override void OnGONetReady(GONetParticipant gonetParticipant)
         {
             base.OnGONetReady(gonetParticipant);
 
-            GONetLog.Info($"[GONetGlobal] OnGONetReady() called! GNP info - GONetId: {gonetParticipant.GONetId}, name: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}");
+            // Log with InstanceID for Awake correlation and GONetId for other analysis
+            GONetLog.Info($"[GONetGlobal] ✅ OnGONetReady FIRED - InstanceID: {gonetParticipant.GetInstanceID()}, GONetId: {gonetParticipant.GONetId}, GameObject: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}");
         }
-        */
     }
 }

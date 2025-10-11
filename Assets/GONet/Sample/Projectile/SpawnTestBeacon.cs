@@ -52,9 +52,12 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
     {
         base.OnGONetReady();
 
-        // This parameterless override is ONLY called for THIS beacon's participant (not catch-up calls)
-        spawnTime = Time.time;
-        GONetLog.Info($"[TestBeacon] ✅ OnGONetReady FIRED - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime}");
+        // CRITICAL: Use GONet synchronized time instead of Unity Time.time!
+        // Unity Time.time is local and differs between server/client due to network delays.
+        // GONetMain.Time.ElapsedSeconds is synchronized across all peers by the server.
+        // This ensures all machines calculate the same age and display the same color.
+        spawnTime = (float)GONetMain.Time.ElapsedSeconds;
+        GONetLog.Info($"[TestBeacon] ✅ OnGONetReady FIRED - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime} (GONet synced time)");
     }
 
     /// <summary>
@@ -119,7 +122,8 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
         }
 
         // Update visual age indicator on ALL clients (everyone sees age progression)
-        float age = Time.time - spawnTime;
+        // CRITICAL: Use GONet synchronized time for age calculation to ensure consistent colors across all peers
+        float age = (float)GONetMain.Time.ElapsedSeconds - spawnTime;
         float normalizedAge = Mathf.Clamp01(age / lifetime);
 
         // DIAGNOSTIC: Log first 5 Update() calls and then every 60 frames

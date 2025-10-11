@@ -566,6 +566,15 @@ namespace GONet
         private readonly ConcurrentQueue<IGONetEvent> publishASAPQueue = new ConcurrentQueue<IGONetEvent>();
 
         /// <summary>
+        /// DIAGNOSTIC: Gets approximate count of events queued for async publishing.
+        /// Added 2025-10-11 to investigate DeserializeInitAllCompleted event delivery during rapid spawning.
+        /// </summary>
+        internal int GetApproximateQueueDepth()
+        {
+            return publishASAPQueue.Count;
+        }
+
+        /// <summary>
         /// Unlike <see cref="Publish{T}(T, ushort?)"/>, you can call this on any thread and if its not <see cref="GONetMain.IsUnityMainThread"/>
         /// it will be published as soon as the main thread notices it (later this frame or next frame).
         /// </summary>

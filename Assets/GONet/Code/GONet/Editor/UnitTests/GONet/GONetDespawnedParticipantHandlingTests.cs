@@ -61,8 +61,8 @@ namespace GONet
             }
 
             // Clean up any test participants from static map
-            GONet.gonetParticipantByGONetIdMap.Clear();
-            GONet.gonetParticipantByGONetIdAtInstantiationMap.Clear();
+            GONetMain.gonetParticipantByGONetIdMap.Clear();
+            GONetMain.gonetParticipantByGONetIdAtInstantiationMap.Clear();
         }
 
         #region Unity Fake Null Detection Tests
@@ -102,7 +102,7 @@ namespace GONet
             participant.GONetId = testGONetId;
 
             // Simulate registration in map (sync processing looks here for validation)
-            GONet.gonetParticipantByGONetIdMap[testGONetId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[testGONetId] = participant;
 
             // Act - Destroy GameObject BUT leave in map (simulates everythingMap not cleaned up)
             Object.DestroyImmediate(testObj);
@@ -118,7 +118,7 @@ namespace GONet
                 "Sync processing should skip destroyed participant (Unity fake null check)");
 
             // Cleanup
-            GONet.gonetParticipantByGONetIdMap.Remove(testGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(testGONetId);
         }
 
         #endregion
@@ -197,22 +197,22 @@ namespace GONet
             participant.GONetId = testGONetId;
 
             // Simulate normal state: participant in map
-            GONet.gonetParticipantByGONetIdMap[testGONetId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[testGONetId] = participant;
 
             // Assert - Participant is in map (normal state)
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "Participant should be in map initially");
 
             // Act - Simulate despawn: remove from map (OnDisable does this at line 8972)
-            GONet.gonetParticipantByGONetIdMap.Remove(testGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(testGONetId);
 
             // Assert - Participant is NOT in map (despawned state)
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "Participant should NOT be in map after despawn");
 
             // Assert - This is the check that prevents sync processing:
             // if (!gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId)) { continue; }
-            bool shouldSkipInSyncProcessing = !GONet.gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId);
+            bool shouldSkipInSyncProcessing = !GONetMain.gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId);
             Assert.IsTrue(shouldSkipInSyncProcessing,
                 "Sync processing should skip participant not in map (despawned)");
 
@@ -240,24 +240,24 @@ namespace GONet
             participant.GONetId = testGONetId;
 
             // Simulate normal state: in all maps
-            GONet.gonetParticipantByGONetIdMap[testGONetId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[testGONetId] = participant;
 
             // Assert - Participant is active
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "Active participant is in gonetParticipantByGONetIdMap");
 
             // Act - Simulate OnDisable: remove from main maps (but NOT everythingMap)
-            GONet.gonetParticipantByGONetIdMap.Remove(testGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(testGONetId);
 
             // Assert - Participant removed from main map
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "OnDisable removes from gonetParticipantByGONetIdMap");
 
             // Assert - ORIGINAL BUG: Sync thread would still iterate everythingMap
             // and find this participant, appending its InstantiationId to syncValuesToSend
             // The FIX checks if participant is in gonetParticipantByGONetIdMap:
             bool wouldBeIncludedInSyncBundleWithoutFix = true; // everythingMap still has it
-            bool isIncludedInSyncBundleWithFix = GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId);
+            bool isIncludedInSyncBundleWithFix = GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId);
 
             Assert.IsTrue(wouldBeIncludedInSyncBundleWithoutFix,
                 "ORIGINAL BUG: Sync thread would include despawned participant (still in everythingMap)");
@@ -280,7 +280,7 @@ namespace GONet
             // RATIONALE: Map is shared, OnDisable runs on BOTH authority and non-authority sides
 
             // Assert - Map is static (declared at line 1088 in GONet.cs)
-            Assert.IsNotNull(GONet.gonetParticipantByGONetIdMap,
+            Assert.IsNotNull(GONetMain.gonetParticipantByGONetIdMap,
                 "gonetParticipantByGONetIdMap should be static and accessible");
 
             // Arrange - Create two participants (simulating different authorities)
@@ -295,27 +295,27 @@ namespace GONet
             clientParticipant.GONetId = clientGONetId;
 
             // Act - Add both to static map (same map for all authorities)
-            GONet.gonetParticipantByGONetIdMap[serverGONetId] = serverParticipant;
-            GONet.gonetParticipantByGONetIdMap[clientGONetId] = clientParticipant;
+            GONetMain.gonetParticipantByGONetIdMap[serverGONetId] = serverParticipant;
+            GONetMain.gonetParticipantByGONetIdMap[clientGONetId] = clientParticipant;
 
             // Assert - Both in same static map
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(serverGONetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(serverGONetId),
                 "Server-authority participant in static map");
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(clientGONetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(clientGONetId),
                 "Client-authority participant in static map");
 
             // Act - Remove server participant (simulates despawn on server)
-            GONet.gonetParticipantByGONetIdMap.Remove(serverGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(serverGONetId);
 
             // Assert - Validation works for server-authority despawn
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(serverGONetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(serverGONetId),
                 "Server-authority despawn detected via map check");
 
             // Act - Remove client participant (simulates despawn on client)
-            GONet.gonetParticipantByGONetIdMap.Remove(clientGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(clientGONetId);
 
             // Assert - Validation works for client-authority despawn
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(clientGONetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(clientGONetId),
                 "Client-authority despawn detected via map check");
 
             // Cleanup
@@ -346,17 +346,17 @@ namespace GONet
             participant.GONetId = testGONetId;
 
             // Simulate authority state: in map
-            GONet.gonetParticipantByGONetIdMap[testGONetId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[testGONetId] = participant;
 
             // Assert - Authority can process sync data (in map)
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "Authority finds participant in map, would include in sync processing");
 
             // Act - Despawn: remove from map
-            GONet.gonetParticipantByGONetIdMap.Remove(testGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(testGONetId);
 
             // Assert - Authority now skips sync processing (not in map)
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(testGONetId),
                 "Authority detects despawn, skips sync processing (prevents sending despawned data)");
 
             // Cleanup
@@ -387,28 +387,28 @@ namespace GONet
             uint gonetId = 327679;
             uint instantiationId = 327679;
             participant.GONetId = gonetId;
-            participant.GONetIdAtInstantiation = instantiationId;
+            participant._GONetIdAtInstantiation = instantiationId; // Access internal field directly in test
 
             // Simulate normal state: in map
-            GONet.gonetParticipantByGONetIdMap[gonetId] = participant;
-            GONet.gonetParticipantByGONetIdAtInstantiationMap[instantiationId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[gonetId] = participant;
+            GONetMain.gonetParticipantByGONetIdAtInstantiationMap[instantiationId] = participant;
 
             // Assert - GetCurrentGONetIdByIdAtInstantiation works (returns correct GONetId)
-            uint lookedUpGONetId = GONet.GetCurrentGONetIdByIdAtInstantiation(instantiationId);
+            uint lookedUpGONetId = GONetMain.GetCurrentGONetIdByIdAtInstantiation(instantiationId);
             Assert.AreEqual(gonetId, lookedUpGONetId,
                 "GetCurrentGONetIdByIdAtInstantiation returns correct GONetId when participant active");
 
             // Act - Simulate despawn: remove from maps
-            GONet.gonetParticipantByGONetIdMap.Remove(gonetId);
-            GONet.gonetParticipantByGONetIdAtInstantiationMap.Remove(instantiationId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(gonetId);
+            GONetMain.gonetParticipantByGONetIdAtInstantiationMap.Remove(instantiationId);
 
             // Assert - GetCurrentGONetIdByIdAtInstantiation returns 0 (GONetId_Unset)
-            uint lookedUpAfterDespawn = GONet.GetCurrentGONetIdByIdAtInstantiation(instantiationId);
+            uint lookedUpAfterDespawn = GONetMain.GetCurrentGONetIdByIdAtInstantiation(instantiationId);
             Assert.AreEqual(GONetParticipant.GONetId_Unset, lookedUpAfterDespawn,
                 "GetCurrentGONetIdByIdAtInstantiation returns 0 after despawn (ORIGINAL BUG TRIGGER)");
 
             // Assert - FIX: Sync processing checks map before appending to bundle
-            bool wouldBeIncludedInSyncBundleWithFix = GONet.gonetParticipantByGONetIdMap.ContainsKey(gonetId);
+            bool wouldBeIncludedInSyncBundleWithFix = GONetMain.gonetParticipantByGONetIdMap.ContainsKey(gonetId);
             Assert.IsFalse(wouldBeIncludedInSyncBundleWithFix,
                 "FIX: Sync processing skips despawned participant, InstantiationId NOT sent to client");
 
@@ -437,17 +437,18 @@ namespace GONet
             GameObject activeParticipant1 = new GameObject("ActiveParticipant1");
             var active1 = activeParticipant1.AddComponent<GONetParticipant>();
             active1.GONetId = 10001;
-            GONet.gonetParticipantByGONetIdMap[10001] = active1;
+            GONetMain.gonetParticipantByGONetIdMap[10001] = active1;
 
             GameObject despawnedParticipant = new GameObject("DespawnedParticipant");
             var despawned = despawnedParticipant.AddComponent<GONetParticipant>();
             despawned.GONetId = 327679; // The despawned one from logs
-            // NOT in map (already despawned)
+            // NOT in map (already despawned) - remove from map if setter added it
+            GONetMain.gonetParticipantByGONetIdMap.Remove(327679);
 
             GameObject activeParticipant2 = new GameObject("ActiveParticipant2");
             var active2 = activeParticipant2.AddComponent<GONetParticipant>();
             active2.GONetId = 10003;
-            GONet.gonetParticipantByGONetIdMap[10003] = active2;
+            GONetMain.gonetParticipantByGONetIdMap[10003] = active2;
 
             // Simulate server sync processing WITHOUT FIX:
             // - Iterates everythingMap: finds all 3 participants
@@ -463,9 +464,9 @@ namespace GONet
             // - active2: in map → include ✅
             // - Only 2 participants appended to syncValuesToSend
             int participantsIncludedWithFix = 0;
-            if (GONet.gonetParticipantByGONetIdMap.ContainsKey(active1.GONetId)) participantsIncludedWithFix++;
-            if (GONet.gonetParticipantByGONetIdMap.ContainsKey(despawned.GONetId)) participantsIncludedWithFix++;
-            if (GONet.gonetParticipantByGONetIdMap.ContainsKey(active2.GONetId)) participantsIncludedWithFix++;
+            if (GONetMain.gonetParticipantByGONetIdMap.ContainsKey(active1.GONetId)) participantsIncludedWithFix++;
+            if (GONetMain.gonetParticipantByGONetIdMap.ContainsKey(despawned.GONetId)) participantsIncludedWithFix++;
+            if (GONetMain.gonetParticipantByGONetIdMap.ContainsKey(active2.GONetId)) participantsIncludedWithFix++;
 
             // Assert - WITHOUT FIX: All 3 included, despawned one causes bundle abort, active2 loses sync data
             Assert.AreEqual(3, participantsIncludedWithoutFix,
@@ -481,8 +482,8 @@ namespace GONet
                 "WITH FIX: active2 receives sync data (no bundle abort, no collateral damage)");
 
             // Cleanup
-            GONet.gonetParticipantByGONetIdMap.Remove(10001);
-            GONet.gonetParticipantByGONetIdMap.Remove(10003);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(10001);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(10003);
             Object.DestroyImmediate(activeParticipant1);
             Object.DestroyImmediate(despawnedParticipant);
             Object.DestroyImmediate(activeParticipant2);
@@ -515,22 +516,22 @@ namespace GONet
             uint gonetId = 327679;
             uint instantiationId = 327679;
             participant.GONetId = gonetId;
-            participant.GONetIdAtInstantiation = instantiationId;
+            participant._GONetIdAtInstantiation = instantiationId; // Access internal field directly in test
 
             // T+31.58s: Spawn (add to maps)
-            GONet.gonetParticipantByGONetIdMap[gonetId] = participant;
-            GONet.gonetParticipantByGONetIdAtInstantiationMap[instantiationId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[gonetId] = participant;
+            GONetMain.gonetParticipantByGONetIdAtInstantiationMap[instantiationId] = participant;
 
             // Assert - CannonBall is active, sync processing would include it
-            Assert.IsTrue(GONet.gonetParticipantByGONetIdMap.ContainsKey(gonetId),
+            Assert.IsTrue(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(gonetId),
                 "T+31.58s: CannonBall spawned, active in map");
 
             // T+45.62s: Despawn (remove from maps)
-            GONet.gonetParticipantByGONetIdMap.Remove(gonetId);
-            GONet.gonetParticipantByGONetIdAtInstantiationMap.Remove(instantiationId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(gonetId);
+            GONetMain.gonetParticipantByGONetIdAtInstantiationMap.Remove(instantiationId);
 
             // Assert - CannonBall is despawned, sync processing should skip it
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(gonetId),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(gonetId),
                 "T+45.62s: CannonBall despawned, removed from map (OnDisable)");
 
             // Simulate sync processing WITHOUT FIX (every frame for 26 seconds):
@@ -547,7 +548,7 @@ namespace GONet
             // - BUT: Checks gonetParticipantByGONetIdMap → NOT FOUND → continue; (skip!)
             // - InstantiationId: 327679 NOT appended to bundle
             // - Client never receives it → zero bundle aborts
-            bool isIncludedWithFix = GONet.gonetParticipantByGONetIdMap.ContainsKey(gonetId);
+            bool isIncludedWithFix = GONetMain.gonetParticipantByGONetIdMap.ContainsKey(gonetId);
             int estimatedBundleAbortsWithFix = 0; // Fix prevents all aborts
 
             // Assert - WITHOUT FIX: 599 bundle aborts over 26 seconds
@@ -594,33 +595,33 @@ namespace GONet
             p4.GONetId = 389119;
 
             // Add all to map (active)
-            GONet.gonetParticipantByGONetIdMap[327679] = p1;
-            GONet.gonetParticipantByGONetIdMap[351231] = p2;
-            GONet.gonetParticipantByGONetIdMap[349183] = p3;
-            GONet.gonetParticipantByGONetIdMap[389119] = p4;
+            GONetMain.gonetParticipantByGONetIdMap[327679] = p1;
+            GONetMain.gonetParticipantByGONetIdMap[351231] = p2;
+            GONetMain.gonetParticipantByGONetIdMap[349183] = p3;
+            GONetMain.gonetParticipantByGONetIdMap[389119] = p4;
 
             // Assert - All active
-            Assert.AreEqual(4, GONet.gonetParticipantByGONetIdMap.Count,
+            Assert.AreEqual(4, GONetMain.gonetParticipantByGONetIdMap.Count,
                 "All 4 participants active in map");
 
             // Act - Despawn all 4 sequentially
-            GONet.gonetParticipantByGONetIdMap.Remove(327679);
-            GONet.gonetParticipantByGONetIdMap.Remove(351231);
-            GONet.gonetParticipantByGONetIdMap.Remove(349183);
-            GONet.gonetParticipantByGONetIdMap.Remove(389119);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(327679);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(351231);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(349183);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(389119);
 
             // Assert - All despawned, none in map
-            Assert.AreEqual(0, GONet.gonetParticipantByGONetIdMap.Count,
+            Assert.AreEqual(0, GONetMain.gonetParticipantByGONetIdMap.Count,
                 "All 4 participants despawned, removed from map");
 
             // Assert - WITH FIX: None would be included in sync bundles
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(327679),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(327679),
                 "327679 skipped in sync processing (prevented 599 bundle aborts)");
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(351231),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(351231),
                 "351231 skipped in sync processing (prevented 118 bundle aborts)");
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(349183),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(349183),
                 "349183 skipped in sync processing (prevented 63 bundle aborts)");
-            Assert.IsFalse(GONet.gonetParticipantByGONetIdMap.ContainsKey(389119),
+            Assert.IsFalse(GONetMain.gonetParticipantByGONetIdMap.ContainsKey(389119),
                 "389119 skipped in sync processing (prevented 62 bundle aborts)");
 
             // Assert - TOTAL: Fix prevented 942 bundle aborts from logs
@@ -653,7 +654,7 @@ namespace GONet
             var participant = testObj.AddComponent<GONetParticipant>();
             uint testGONetId = 77777;
             participant.GONetId = testGONetId;
-            GONet.gonetParticipantByGONetIdMap[testGONetId] = participant;
+            GONetMain.gonetParticipantByGONetIdMap[testGONetId] = participant;
 
             // Act - Perform validation checks (same as fix)
             System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -661,7 +662,7 @@ namespace GONet
             {
                 bool check1 = (participant == null);
                 bool check2 = (participant.GONetId == GONetParticipant.GONetId_Unset);
-                bool check3 = !GONet.gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId);
+                bool check3 = !GONetMain.gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId);
                 bool shouldSkip = check1 || check2 || check3;
             }
             stopwatch.Stop();
@@ -671,7 +672,7 @@ namespace GONet
                 "10,000 validation checks should complete in < 10ms (negligible overhead per participant)");
 
             // Cleanup
-            GONet.gonetParticipantByGONetIdMap.Remove(testGONetId);
+            GONetMain.gonetParticipantByGONetIdMap.Remove(testGONetId);
             Object.DestroyImmediate(testObj);
         }
 

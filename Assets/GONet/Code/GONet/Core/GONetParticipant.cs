@@ -813,6 +813,10 @@ namespace GONet
         {
             if (Application.isPlaying)
             {
+                // EARLIEST LIFECYCLE POINT: Log with InstanceID for correlation (GONetId not yet available)
+                // InstanceID allows correlation between Awake → OnGONetReady events in log analysis
+                GONetLog.Info($"[GONetParticipant] 🔵 Awake() START - InstanceID: {GetInstanceID()}, GameObject: {gameObject.name}");
+
                 StartCoroutine(AwakeCoroutine());
             }
 #if UNITY_EDITOR
