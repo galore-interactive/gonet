@@ -335,7 +335,7 @@ namespace GONet
 
                     uint remainingIds = client_totalIdsAllocated - client_totalIdsUsed;
                     int threshold = GetBatchRequestThreshold();
-                    GONetLog.Info($"[GONetIdBatch] CLIENT allocated GONetId {gonetIdRaw} | Remaining in batch: {client_activeBatches[0].RemainingCount} | Total remaining: {remainingIds}");
+                    //GONetLog.Info($"[GONetIdBatch] CLIENT allocated GONetId {gonetIdRaw} | Remaining in batch: {client_activeBatches[0].RemainingCount} | Total remaining: {remainingIds}");
 
                     // Check if we should request more batches (only once when dropping below threshold)
                     if (remainingIds < threshold && !client_hasRequestedBatch)

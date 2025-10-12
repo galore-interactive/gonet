@@ -3172,7 +3172,7 @@ namespace GONet
 
                 // DIAGNOSTIC: Frame-end metrics for packet processing and deserialization
                 // Added 2025-10-11 to investigate DeserializeInitAllCompleted event delivery during rapid spawning
-                LogFrameEndMetrics_IfAppropriate();
+                //LogFrameEndMetrics_IfAppropriate();
             }
         }
         // END of Update_DoTheHeavyLifting_IfAppropriate method
@@ -5258,7 +5258,7 @@ namespace GONet
 
             if (templateMetadata != null && !string.IsNullOrWhiteSpace(templateMetadata.Location))
             {
-                GONetLog.Debug($"Instantiate_Remote: Pre-setting metadata on template '{template.name}' - Location: '{templateMetadata.Location}', CodeGenId: {templateMetadata.CodeGenerationId}");
+                //GONetLog.Debug($"Instantiate_Remote: Pre-setting metadata on template '{template.name}' - Location: '{templateMetadata.Location}', CodeGenId: {templateMetadata.CodeGenerationId}");
 
                 // Check if template already has metadata to avoid overwriting
                 if (!template.IsDesignTimeMetadataInitd)
@@ -5296,7 +5296,7 @@ namespace GONet
                     instance.IsDesignTimeMetadataInitd = true;
                 }
 
-                GONetLog.Debug($"Instantiate_Remote: Instance '{instance.gameObject.name}' metadata - Location: '{instance.DesignTimeLocation}', CodeGenId: {instance.CodeGenerationId}, IsInitd: {instance.IsDesignTimeMetadataInitd}");
+                //GONetLog.Debug($"Instantiate_Remote: Instance '{instance.gameObject.name}' metadata - Location: '{instance.DesignTimeLocation}', CodeGenId: {instance.CodeGenerationId}, IsInitd: {instance.IsDesignTimeMetadataInitd}");
             }
 
             if (!string.IsNullOrWhiteSpace(instantiateEvent.InstanceName))
@@ -7841,7 +7841,7 @@ namespace GONet
             if (gonetParticipant != null && !string.IsNullOrEmpty(sceneName))
             {
                 participantInstanceID_to_SpawnSceneName[gonetParticipant.GetInstanceID()] = sceneName;
-                GONetLog.Debug($"[SceneTracking] Recorded spawned GNP '{gonetParticipant.gameObject.name}' in scene '{sceneName}'");
+                //GONetLog.Debug($"[SceneTracking] Recorded spawned GNP '{gonetParticipant.gameObject.name}' in scene '{sceneName}'");
             }
         }
 
@@ -8864,7 +8864,7 @@ namespace GONet
             {
                 uint gonetId = GONetParticipant.GONetId_InitialAssignment_CustomSerializer.Instance.Deserialize(bitStream_headerAlreadyRead).System_UInt32;
 
-                GONetLog.Debug($"Deserialized GONetId: {gonetId} at stream position (pre: {streamPositionBytes_preGonetId}, post: {bitStream_headerAlreadyRead.Position_Bytes})");
+                //GONetLog.Debug($"Deserialized GONetId: {gonetId} at stream position (pre: {streamPositionBytes_preGonetId}, post: {bitStream_headerAlreadyRead.Position_Bytes})");
 
                 if (GONetParticipant.DoesGONetIdContainAllComponents(gonetId))
                 {
@@ -9302,7 +9302,7 @@ namespace GONet
             double despawnTime = Time.ElapsedSeconds;
             recentlyDespawnedGONetIds[gonetId] = despawnTime;
 
-            GONetLog.Debug($"[GONetId-Reuse] Marked GONetId {gonetId} as despawned at {despawnTime:F3}s (TTL: {GetGONetIdReuseDelay():F1}s)");
+            //GONetLog.Debug($"[GONetId-Reuse] Marked GONetId {gonetId} as despawned at {despawnTime:F3}s (TTL: {GetGONetIdReuseDelay():F1}s)");
         }
 
         /// <summary>
@@ -9420,6 +9420,7 @@ namespace GONet
                 var disabledEvent = new GONetParticipantDisabledEvent(gonetParticipant);
                 EventBus.Publish<IGONetEvent>(disabledEvent); // make sure this comes before gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId); or else the GNP will not be found to attach to the envelope and the subscription handlers will not have what they are expecing
 
+                /*
                 // DIAGNOSTIC LOGGING: Track participant removal from maps
                 bool wasInGONetIdMap = gonetParticipantByGONetIdMap.ContainsKey(gonetParticipant.GONetId);
                 bool wasInInstantiationMap = gonetParticipantByGONetIdAtInstantiationMap.ContainsKey(gonetParticipant.GONetIdAtInstantiation);
@@ -9432,6 +9433,7 @@ namespace GONet
                              $"MyAuthorityId: {MyAuthorityId}, " +
                              $"WasInGONetIdMap: {wasInGONetIdMap}, " +
                              $"WasInInstantiationMap: {wasInInstantiationMap}");
+                */
 
                 // CRITICAL FIX: Remove from BOTH maps to prevent "destroyed but still in maps" errors
                 gonetParticipantByGONetIdMap.Remove(gonetParticipant.GONetId);
@@ -9541,28 +9543,18 @@ namespace GONet
         /// </summary>
         public static bool IsGONetReady(GONetParticipant gonetParticipant)
         {
-            bool isBeaconDiagnostic = gonetParticipant != null && gonetParticipant.gameObject != null && gonetParticipant.gameObject.name.Contains("TestBeacon");
-
             // Check basic participant initialization
             if (gonetParticipant == null ||
                 gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset ||
                 gonetParticipant.gonetId_raw == GONetParticipant.GONetIdRaw_Unset ||
                 !gonetParticipant.IsInternallyConfigured)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED basic checks for '{gonetParticipant?.gameObject?.name}' - null? {gonetParticipant == null}, AuthorityUnset? {gonetParticipant?.OwnerAuthorityId == OwnerAuthorityId_Unset}, IdUnset? {gonetParticipant?.gonetId_raw == GONetParticipant.GONetIdRaw_Unset}, InternallyConfigured? {gonetParticipant?.IsInternallyConfigured}");
-                }
                 return false;
             }
 
             // Check client/server status is known
             if (!IsClientVsServerStatusKnown)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Client/Server status not yet known");
-                }
                 return false;
             }
 
@@ -9571,19 +9563,11 @@ namespace GONet
             {
                 if (GONetClient == null)
                 {
-                    if (isBeaconDiagnostic)
-                    {
-                        GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetClient is NULL");
-                    }
                     return false; // Client but no client instance - not ready
                 }
 
                 if (!GONetClient.IsInitializedWithServer)
                 {
-                    if (isBeaconDiagnostic)
-                    {
-                        GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetClient NOT initialized with server yet");
-                    }
                     return false; // Client exists but not initialized with server
                 }
             }
@@ -9591,10 +9575,6 @@ namespace GONet
             // Check GONetLocal lookup is available
             if (GONetLocal.LookupByAuthorityId == null)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetLocal.LookupByAuthorityId is NULL");
-                }
                 return false;
             }
 
@@ -9603,48 +9583,27 @@ namespace GONet
             GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
             if (local == null)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - GONetLocal lookup for AuthorityId {gonetParticipant.OwnerAuthorityId} returned NULL");
-                }
                 return false;
             }
 
             // LIFECYCLE GATE: Check Unity lifecycle completion (Awake, Start)
             if (!gonetParticipant.didAwakeComplete || !gonetParticipant.didStartComplete)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Unity lifecycle incomplete - Awake: {gonetParticipant.didAwakeComplete}, Start: {gonetParticipant.didStartComplete}");
-                }
                 return false; // Unity lifecycle not yet complete
             }
 
             // LIFECYCLE GATE: Check deserialization requirement (if needed for remote objects)
             if (gonetParticipant.requiresDeserializeInit && !gonetParticipant.didDeserializeInitComplete)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Waiting for DeserializeInit (requiresDeserializeInit: {gonetParticipant.requiresDeserializeInit}, didDeserializeInitComplete: {gonetParticipant.didDeserializeInitComplete})");
-                }
                 return false; // Waiting for remote sync data (DeserializeInitAllCompleted)
             }
 
             // LIFECYCLE GATE: Ensure not in limbo state (client batch exhaustion edge case)
             if (gonetParticipant.Client_IsInLimbo)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[IsGONetReady] ❌ FAILED for '{gonetParticipant.gameObject.name}' - Still in limbo (waiting for GONetId batch)");
-                }
                 return false; // Still waiting for GONetId batch from server
             }
 
-            // ALL CHECKS PASSED!
-            if (isBeaconDiagnostic)
-            {
-                GONetLog.Info($"[IsGONetReady] ✅ SUCCESS for '{gonetParticipant.gameObject.name}' (GONetId: {gonetParticipant.GONetId}) - All lifecycle gates passed!");
-            }
             return true;
         }
 
@@ -9657,40 +9616,20 @@ namespace GONet
         /// </summary>
         internal static void CheckAndPublishOnGONetReady_IfAllConditionsMet(GONetParticipant gonetParticipant)
         {
-            bool isBeaconDiagnostic = gonetParticipant != null && gonetParticipant.gameObject != null && gonetParticipant.gameObject.name.Contains("TestBeacon");
-
-            if (isBeaconDiagnostic)
-            {
-                GONetLog.Info($"[CheckAndPublishOnGONetReady] Called for '{gonetParticipant.gameObject.name}' (GONetId: {gonetParticipant.GONetId}) - didOnGONetReadyFire: {gonetParticipant.didOnGONetReadyFire}");
-            }
-
             // Prevent duplicate calls - OnGONetReady should only fire once
             if (gonetParticipant.didOnGONetReadyFire)
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[CheckAndPublishOnGONetReady] Skipping '{gonetParticipant.gameObject.name}' - already fired");
-                }
                 return; // Already fired, nothing to do
             }
 
             // Check if all prerequisites are met (delegates to IsGONetReady)
             if (!IsGONetReady(gonetParticipant))
             {
-                if (isBeaconDiagnostic)
-                {
-                    GONetLog.Info($"[CheckAndPublishOnGONetReady] Not ready yet for '{gonetParticipant.gameObject.name}' - waiting for prerequisites");
-                }
                 return; // Not ready yet, wait for next milestone
             }
 
             // All conditions met! Mark as fired and broadcast OnGONetReady to all GONetBehaviours
             gonetParticipant.didOnGONetReadyFire = true;
-
-            if (isBeaconDiagnostic)
-            {
-                GONetLog.Info($"[CheckAndPublishOnGONetReady] 🎯 Broadcasting OnGONetReady for '{gonetParticipant.gameObject.name}' to {allGONetBehaviours.Count} behaviours");
-            }
 
             // Broadcast OnGONetReady to all registered GONetBehaviours
             using (var en = allGONetBehaviours.GetEnumerator())

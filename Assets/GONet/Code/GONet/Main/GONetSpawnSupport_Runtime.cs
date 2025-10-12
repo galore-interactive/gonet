@@ -527,7 +527,7 @@ namespace GONet
             DesignTimeMetadata prefabMetadata = GetDesignTimeMetadata(prefab, force: true);
             if (prefabMetadata != null && !string.IsNullOrWhiteSpace(prefabMetadata.Location))
             {
-                GONetLog.Debug($"Instantiate_MarkToBeRemotelyControlled: Copying metadata from prefab '{prefab.name}' - Location: {prefabMetadata.Location}");
+                //GONetLog.Debug($"Instantiate_MarkToBeRemotelyControlled: Copying metadata from prefab '{prefab.name}' - Location: {prefabMetadata.Location}");
                 DesignTimeMetadata instanceMetadata = new DesignTimeMetadata
                 {
                     Location = prefabMetadata.Location,

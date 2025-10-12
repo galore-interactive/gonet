@@ -125,7 +125,7 @@ namespace GONet
             // Already on main thread - nothing to do
             if (Thread.CurrentThread.ManagedThreadId == mainThreadId)
             {
-                GONetLog.Debug("[THREADING] Already on Unity main thread");
+                //GONetLog.Debug("[THREADING] Already on Unity main thread");
                 return;
             }
 

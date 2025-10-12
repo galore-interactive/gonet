@@ -650,7 +650,7 @@ namespace GONet
         {
             // DIAGNOSTIC DUMP: Log lifecycle state of ALL GONetParticipants before shutdown
             // This helps us understand what prevented OnGONetReady from firing
-            DumpLifecycleStateDiagnostics();
+            //DumpLifecycleStateDiagnostics();
 
             GONetMain.Shutdown();
         }
@@ -1065,7 +1065,7 @@ namespace GONet
             base.OnGONetReady(gonetParticipant);
 
             // Log with InstanceID for Awake correlation and GONetId for other analysis
-            GONetLog.Info($"[GONetGlobal] ✅ OnGONetReady FIRED - InstanceID: {gonetParticipant.GetInstanceID()}, GONetId: {gonetParticipant.GONetId}, GameObject: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}");
+            //GONetLog.Info($"[GONetGlobal] ✅ OnGONetReady FIRED - InstanceID: {gonetParticipant.GetInstanceID()}, GONetId: {gonetParticipant.GONetId}, GameObject: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}");
         }
     }
 }
