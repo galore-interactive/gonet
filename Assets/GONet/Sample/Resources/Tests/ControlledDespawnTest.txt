@@ -1,0 +1,50 @@
+# Test Case: Controlled Manual Despawn (Test B from Investigation)
+# This test spawns beacons (no physics cubes), manually destroys some on client,
+# then continues spawning to see if manual despawn triggers bundle abort symptoms.
+#
+# HYPOTHESIS: ANY client-side despawn (not just physics cubes) causes bundle aborts
+# if server hasn't been notified yet.
+
+name: Controlled Manual Despawn Test
+description: Tests if manual client-side despawn causes sync bundle aborts
+require_clients: 1
+despawn_wait: 10
+
+# Initial setup
+wait_clients: 1
+log: ========== Controlled Despawn Test START ==========
+log: GOAL: Test if ANY client despawn (not just physics) causes bundle aborts
+
+# Phase 1: Spawn beacons (no physics cubes)
+log: PHASE 1: Spawn 10 beacons from CLIENT
+spawn_client: 1, count=10
+wait: 2
+log: 10 beacons spawned - all should be visible with color
+
+# Phase 2: Manually destroy 3 beacons on client
+log: PHASE 2: Manual destruction simulation
+human_action: Go to CLIENT console and note GONetIds of 3 random beacons, then press SPACE
+wait: 1
+log: ⚠️ SIMULATED: Imagine those 3 beacons were just destroyed on client
+log: (In real scenario, physics cubes auto-destroy here)
+log: Server still thinks they exist, includes them in sync bundles
+
+# Phase 3: Spawn MORE beacons while "dead" beacons in bundles
+log: PHASE 3: Spawn 10 MORE beacons (while server sending bundles with dead IDs)
+spawn_client: 1, count=10
+wait: 1
+log: If Hypothesis correct, these NEW beacons should show symptoms
+
+# Phase 4: Observation window
+log: PHASE 4: Check if NEW beacons appear normal or stuck/white
+human_action: Observe the 10 beacons from Phase 3 - do they look normal? Press SPACE when done
+log: Manually verify: Did Phase 3 beacons work correctly?
+
+# Phase 5: Wait for all to despawn
+log: PHASE 5: Wait for all beacons to despawn
+wait_despawn: 40
+verify_despawned: all
+
+log: ========== Controlled Despawn Test COMPLETE ==========
+log: NOTE: This test SIMULATES despawn (can't actually destroy from test script)
+log: For REAL test, we need code to programmatically destroy beacons on client

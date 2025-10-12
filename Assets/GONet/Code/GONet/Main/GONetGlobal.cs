@@ -84,25 +84,52 @@ namespace GONet
         [Range(100, 1000)]
         public int client_GONetIdBatchSize = 200;
 
-        [Header("Congestion Management")]
-        [Tooltip("Maximum concurrent packet operations before flow control kicks in.\n\n" +
-                "This controls the size of the packet pool used for network send operations.\n" +
-                "When pool utilization exceeds UnreliableDropThreshold, unreliable packets are dropped.\n\n" +
+        [Header("Congestion Management - Adaptive Scaling")]
+        [Tooltip("⭐ ADAPTIVE POOL SIZING (Recommended)\n\n" +
+                "When TRUE (default): Pool size automatically scales based on network demand.\n" +
+                "• Scales UP when utilization exceeds 75% (prevents drops)\n" +
+                "• Scales DOWN when utilization stays below 25% (conserves memory)\n" +
+                "• Warns aggressively when memory/bandwidth limits approached\n" +
+                "• Respects maxPacketsPerTick as absolute ceiling (safety cap)\n\n" +
+                "When FALSE: Manual control - pool fixed at maxPacketsPerTick.\n" +
+                "• For experts who need precise bandwidth control\n" +
+                "• For bandwidth-constrained scenarios (mobile, low-end servers)\n\n" +
+                "GONet Philosophy: \"Do what the user wants, warn when risky\"\n" +
+                "Default: TRUE (auto-scale for best user experience)")]
+        public bool enableAdaptivePoolScaling = true;
+
+        [Tooltip("Starting pool size for adaptive scaling (when enableAdaptivePoolScaling=true).\n\n" +
+                "Adaptive scaling will grow/shrink from this baseline:\n" +
+                "• Grows when utilization >75% (up to maxPacketsPerTick ceiling)\n" +
+                "• Shrinks when utilization <25% (down to this minimum)\n\n" +
                 "CONFIGURATION GUIDELINES:\n" +
-                "• Small Co-op (2-8 players): 500-1000\n" +
-                "• Battle Royale (50-100 players): 2000-5000\n" +
-                "• MMO (100+ players): 5000-10000\n\n" +
-                "SYMPTOMS OF TOO LOW:\n" +
-                "• Objects stuck at spawn position (position sync dropped)\n" +
-                "• 'Ring buffer is full' warnings in logs\n" +
-                "• High unreliable packet drop rate (>5%)\n\n" +
-                "SYMPTOMS OF TOO HIGH:\n" +
-                "• Increased memory usage (each slot uses ~1-12KB depending on message size)\n" +
-                "• No benefit if network bandwidth is the bottleneck\n\n" +
-                "Default: 1000 (suitable for small-medium games)\n" +
-                "Range: 100-20000")]
-        [Range(100, 20000)]
-        public int maxPacketsPerTick = 1000;
+                "• Small Co-op (2-8 players): 500\n" +
+                "• Battle Royale (50-100 players): 1500\n" +
+                "• MMO (100+ players): 3000\n\n" +
+                "NOTE: When enableAdaptivePoolScaling=false, this value is ignored and\n" +
+                "maxPacketsPerTick is used as a fixed pool size.\n\n" +
+                "Default: 1000 (suitable for most games)\n" +
+                "Range: 100-10000")]
+        [Range(100, 10000)]
+        public int adaptivePoolBaselineSize = 1000;
+
+        [Tooltip("ABSOLUTE MAXIMUM pool size (safety ceiling for adaptive scaling).\n\n" +
+                "When enableAdaptivePoolScaling=TRUE:\n" +
+                "• Pool can never grow beyond this limit (prevents runaway memory)\n" +
+                "• Aggressive warnings logged when approaching this ceiling\n" +
+                "• Recommended: 10x your baseline (e.g., baseline=1000 → max=10000)\n\n" +
+                "When enableAdaptivePoolScaling=FALSE:\n" +
+                "• This IS the fixed pool size (no scaling occurs)\n\n" +
+                "EXPERT OVERRIDE: Lower this to cap bandwidth in constrained scenarios:\n" +
+                "• Mobile clients with limited bandwidth\n" +
+                "• Low-end servers with strict memory budgets\n" +
+                "• Development/testing with artificial constraints\n\n" +
+                "⚠️ WARNING: Setting this TOO LOW will cause packet drops!\n" +
+                "SYMPTOMS: Objects stuck at spawn, high drop rates, 'Pool exhausted' errors\n\n" +
+                "Default: 20000 (generous ceiling for auto-scaling)\n" +
+                "Range: 100-100000")]
+        [Range(100, 100000)]
+        public int maxPacketsPerTick = 20000;
 
         [Tooltip("Start dropping unreliable packets when pool utilization exceeds this percentage.\n\n" +
                 "Flow control threshold to prevent packet pool exhaustion.\n" +
@@ -136,6 +163,75 @@ namespace GONet
                 "• Throttled logging (batches drops to avoid spam)\n\n" +
                 "Default: Enabled (helps identify congestion issues)")]
         public bool enableCongestionLogging = true;
+
+        [Header("Sync Bundle Handling - OnGONetReady Race Condition")]
+        [Tooltip("DEFAULT: false (DROP bundles if participant not ready - industry standard).\n\n" +
+                "When enabled, reliable sync bundles will be queued and retried once if participant hasn't completed OnGONetReady.\n\n" +
+                "WHEN TO ENABLE:\n" +
+                "• Turn-based games where every state change must be received\n" +
+                "• Zero data loss is critical (e.g., ownership changes, inventory updates)\n\n" +
+                "WHEN TO LEAVE DISABLED (DEFAULT):\n" +
+                "• Action games with high-frequency updates (positions, rotations)\n" +
+                "• Unreliable bundles are ALWAYS dropped regardless of this setting\n" +
+                "• Authority re-sends updated state 30-60 times/sec (auto-recovery)\n" +
+                "• Value blending smooths over 1-2 dropped frames\n\n" +
+                "AUTHORITY-AGNOSTIC:\n" +
+                "• Works on clients AND servers receiving sync data\n" +
+                "• Handles ALL network topologies (client→server, server→client, peer-to-peer)\n\n" +
+                "Default: false (matches industry standards - FishNet, Mirror)")]
+        public bool deferSyncBundlesWaitingForGONetReady = false;
+
+        [Tooltip("Maximum sync bundles to queue per receiver while waiting for participants to complete OnGONetReady.\n\n" +
+                "TYPICAL VALUES:\n" +
+                "• Awake() completes in 1-2 frames typically\n" +
+                "• At 200 spawns/sec, only 6-12 bundles queued\n" +
+                "• Queue size of 100 handles extreme burst scenarios\n\n" +
+                "FIFO DROP POLICY:\n" +
+                "• When queue fills, oldest bundles are dropped to make room\n" +
+                "• Warning logged prompting you to increase limit or disable deferral\n\n" +
+                "Only used when deferSyncBundlesWaitingForGONetReady=true.\n\n" +
+                "Default: 100 bundles\n" +
+                "Range: 10-500")]
+        [Range(10, 500)]
+        public int maxSyncBundlesWaitingForGONetReady = 100;
+
+        [Tooltip("Maximum bundles to process per OnGONetReady callback (prevents frame stutter during burst processing).\n\n" +
+                "PERFORMANCE RATIONALE:\n" +
+                "• OnGONetReady fires for EVERY participant that becomes ready\n" +
+                "• Processing all queued bundles at once would cause frame stutter during mass spawns\n" +
+                "• Remaining bundles will be processed in subsequent OnGONetReady callbacks\n\n" +
+                "TUNING:\n" +
+                "• Higher (20-50): Faster queue drainage, but potential frame spikes\n" +
+                "• Lower (5-10): Smoother frame times, but slower queue drainage\n\n" +
+                "Only used when deferSyncBundlesWaitingForGONetReady=true.\n\n" +
+                "Default: 10 bundles/callback\n" +
+                "Range: 1-50")]
+        [Range(1, 50)]
+        public int maxBundlesProcessedPerGONetReadyCallback = 10;
+
+        [Header("GONetId Reuse Protection")]
+        [Tooltip("Time in seconds to wait after an object despawns before allowing its GONetId to be reused.\n\n" +
+                "PURPOSE:\n" +
+                "Prevents GONetId reuse while despawn messages are still in flight across the network.\n" +
+                "If a GONetId is reused too quickly, despawn messages for the old object may arrive\n" +
+                "after a new object has already claimed that ID, causing the wrong object to despawn.\n\n" +
+                "RECOMMENDED VALUES:\n" +
+                "• LAN (low latency): 2-3 seconds\n" +
+                "• Internet (normal): 5 seconds (default)\n" +
+                "• High latency/packet loss: 10-15 seconds\n\n" +
+                "HOW IT WORKS:\n" +
+                "• When an object despawns, its GONetId is marked with a timestamp\n" +
+                "• The ID cannot be reused until this delay has elapsed\n" +
+                "• Ensures all despawn messages have been delivered and processed\n" +
+                "• Based on network RTT + safety margin for packet reordering\n\n" +
+                "SYMPTOMS OF TOO-LOW VALUE:\n" +
+                "• 'Despawn event received but no matching GONetParticipant found' warnings\n" +
+                "• Objects stuck on client after server despawns them\n" +
+                "• Wrong objects getting despawned (premature destroys)\n\n" +
+                "Default: 5 seconds (handles typical internet latency)\n" +
+                "Range: 1-30 seconds")]
+        [Range(1f, 30f)]
+        public float gonetIdReuseDelaySeconds = 5f;
 
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
@@ -536,6 +632,9 @@ namespace GONet
 
             // Process deferred RPCs - handle cases where GONetParticipants weren't available during initial processing
             GONetEventBus.ProcessDeferredRpcs();
+
+            // GONetId Reuse Prevention: Periodic cleanup of expired despawned GONetIds
+            GONetMain.CleanupExpiredDespawnedGONetIds();
         }
 
         /// <summary>
@@ -549,7 +648,98 @@ namespace GONet
 
         private void OnApplicationQuit()
         {
+            // DIAGNOSTIC DUMP: Log lifecycle state of ALL GONetParticipants before shutdown
+            // This helps us understand what prevented OnGONetReady from firing
+            //DumpLifecycleStateDiagnostics();
+
             GONetMain.Shutdown();
+        }
+
+        /// <summary>
+        /// Diagnostic dump of all GONetParticipants showing which lifecycle gates prevented OnGONetReady.
+        /// Called on application quit to capture final state for analysis.
+        /// </summary>
+        private void DumpLifecycleStateDiagnostics()
+        {
+            try
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder(4096);
+                sb.AppendLine("========================================");
+                sb.AppendLine("[QUIT-DIAGNOSTIC] Application quitting - dumping GONetParticipant lifecycle states");
+                sb.AppendLine("========================================");
+
+                // Find ALL GONetParticipants (even destroyed ones might still exist)
+                GONetParticipant[] allParticipants = UnityEngine.Object.FindObjectsOfType<GONetParticipant>(includeInactive: true);
+
+                sb.AppendLine($"[QUIT-DIAGNOSTIC] Found {allParticipants.Length} total GONetParticipants");
+                sb.AppendLine();
+
+                int neverFiredOnGONetReady = 0;
+                int awakeIncomplete = 0;
+                int startIncomplete = 0;
+                int deserializeIncomplete = 0;
+                int missingGONetId = 0;
+                int missingAuthority = 0;
+
+                foreach (var participant in allParticipants)
+                {
+                    if (participant == null) continue; // Unity fake null check
+
+                    bool firedReady = participant.didOnGONetReadyFire;
+                    if (!firedReady)
+                    {
+                        neverFiredOnGONetReady++;
+
+                        // Log detailed state for participants that never fired OnGONetReady
+                        sb.AppendLine($"[QUIT-DIAGNOSTIC] NEVER FIRED OnGONetReady:");
+                        sb.AppendLine($"  InstanceID: {participant.GetInstanceID()}");
+                        sb.AppendLine($"  GameObject: {participant.gameObject.name}");
+                        sb.AppendLine($"  GONetId: {participant.GONetId} (Unset={participant.GONetId == GONetParticipant.GONetId_Unset})");
+                        sb.AppendLine($"  OwnerAuthorityId: {participant.OwnerAuthorityId} (Unset={participant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset})");
+                        sb.AppendLine($"  IsMine: {participant.IsMine}");
+                        sb.AppendLine($"  WasInstantiated: {participant.WasInstantiated}");
+                        sb.AppendLine($"  IsInternallyConfigured: {participant.IsInternallyConfigured}");
+                        sb.AppendLine($"  LIFECYCLE GATES:");
+                        sb.AppendLine($"    didAwakeComplete: {participant.didAwakeComplete}");
+                        sb.AppendLine($"    didStartComplete: {participant.didStartComplete}");
+                        sb.AppendLine($"    requiresDeserializeInit: {participant.requiresDeserializeInit}");
+                        sb.AppendLine($"    didDeserializeInitComplete: {participant.didDeserializeInitComplete}");
+                        sb.AppendLine($"    didOnGONetReadyFire: {participant.didOnGONetReadyFire}");
+                        sb.AppendLine($"  CLIENT LIMBO STATE:");
+                        sb.AppendLine($"    client_isInLimbo: {participant.client_isInLimbo}");
+                        sb.AppendLine();
+
+                        // Count failure reasons
+                        if (!participant.didAwakeComplete) awakeIncomplete++;
+                        if (!participant.didStartComplete) startIncomplete++;
+                        if (participant.requiresDeserializeInit && !participant.didDeserializeInitComplete) deserializeIncomplete++;
+                        if (participant.GONetId == GONetParticipant.GONetId_Unset) missingGONetId++;
+                        if (participant.OwnerAuthorityId == GONetMain.OwnerAuthorityId_Unset) missingAuthority++;
+                    }
+                }
+
+                // Summary statistics
+                sb.AppendLine("========================================");
+                sb.AppendLine("[QUIT-DIAGNOSTIC] SUMMARY:");
+                sb.AppendLine($"  Total participants: {allParticipants.Length}");
+                sb.AppendLine($"  OnGONetReady fired: {allParticipants.Length - neverFiredOnGONetReady}");
+                sb.AppendLine($"  OnGONetReady NEVER fired: {neverFiredOnGONetReady}");
+                sb.AppendLine();
+                sb.AppendLine("  Failure breakdown (participants may have multiple issues):");
+                sb.AppendLine($"    didAwakeComplete = false: {awakeIncomplete}");
+                sb.AppendLine($"    didStartComplete = false: {startIncomplete}");
+                sb.AppendLine($"    Deserialization incomplete: {deserializeIncomplete}");
+                sb.AppendLine($"    GONetId unset: {missingGONetId}");
+                sb.AppendLine($"    OwnerAuthorityId unset: {missingAuthority}");
+                sb.AppendLine("========================================");
+
+                // Output entire diagnostic as ONE log statement
+                GONetLog.Info(sb.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Error($"[QUIT-DIAGNOSTIC] Exception during lifecycle dump: {ex.Message}\n{ex.StackTrace}");
+            }
         }
 
         private System.Collections.IEnumerator CacheDesignTimeMetadata_ThenContinueInit()
@@ -862,13 +1052,20 @@ namespace GONet
             CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds);
         }
 
-        /* uncomment this to log all of these for debugging:
+        /// <summary>
+        /// UNIVERSAL LOGGING: Captures OnGONetReady for ALL GONet participants (beacons, projectiles, physics cubes, etc.).
+        /// This is the central coordinator that sees every participant's lifecycle, providing consistent logging
+        /// regardless of companion script type or GameObject.
+        ///
+        /// Used for comprehensive log analysis to track OnGONetReady timing, frame delays, and reliability metrics.
+        /// InstanceID enables correlation with Awake() events for complete lifecycle tracking.
+        /// </summary>
         public override void OnGONetReady(GONetParticipant gonetParticipant)
         {
             base.OnGONetReady(gonetParticipant);
 
-            GONetLog.Info($"[GONetGlobal] OnGONetReady() called! GNP info - GONetId: {gonetParticipant.GONetId}, name: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}");
+            // Log with InstanceID for Awake correlation and GONetId for other analysis
+            //GONetLog.Info($"[GONetGlobal] ✅ OnGONetReady FIRED - InstanceID: {gonetParticipant.GetInstanceID()}, GONetId: {gonetParticipant.GONetId}, GameObject: {gonetParticipant.name}, IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}");
         }
-        */
     }
 }

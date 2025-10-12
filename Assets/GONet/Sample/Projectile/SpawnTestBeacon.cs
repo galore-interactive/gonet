@@ -34,7 +34,7 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
     {
         base.Awake();
 
-        GONetLog.Info($"[TestBeacon] Awake() called - GameObject: {gameObject.name}, InstanceID: {GetInstanceID()}");
+        //GONetLog.Info($"[TestBeacon] Awake() called - GameObject: {gameObject.name}, InstanceID: {GetInstanceID()}");
 
         if (beaconRenderer == null)
         {
@@ -45,16 +45,19 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
     protected override void Start()
     {
         base.Start();
-        GONetLog.Info($"[TestBeacon] Start() called - GameObject: {gameObject.name}, GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
+        //GONetLog.Info($"[TestBeacon] Start() called - GameObject: {gameObject.name}, GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
     }
 
     public override void OnGONetReady()
     {
         base.OnGONetReady();
 
-        // This parameterless override is ONLY called for THIS beacon's participant (not catch-up calls)
-        spawnTime = Time.time;
-        GONetLog.Info($"[TestBeacon] ✅ OnGONetReady FIRED - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime}");
+        // CRITICAL: Use GONet synchronized time instead of Unity Time.time!
+        // Unity Time.time is local and differs between server/client due to network delays.
+        // GONetMain.Time.ElapsedSeconds is synchronized across all peers by the server.
+        // This ensures all machines calculate the same age and display the same color.
+        spawnTime = (float)GONetMain.Time.ElapsedSeconds;
+        //GONetLog.Info($"[TestBeacon] ✅ OnGONetReady FIRED - GONetId: {GONetParticipant.GONetId}, IsMine: {IsMine}, Owner: {GONetParticipant.OwnerAuthorityId}, Position: {transform.position}, SpawnTime: {spawnTime} (GONet synced time)");
     }
 
     /// <summary>
@@ -111,22 +114,23 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
         if (spawnTime == 0)
         {
             // DIAGNOSTIC: Log waiting state (first 5 calls only to avoid spam)
-            if (updateCallCount <= 5)
-            {
-                GONetLog.Info($"[TestBeacon] Update #{updateCallCount} - ⏳ WAITING for OnGONetReady to initialize spawnTime - GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
-            }
+            //if (updateCallCount <= 5)
+            //{
+            //    GONetLog.Info($"[TestBeacon] Update #{updateCallCount} - ⏳ WAITING for OnGONetReady to initialize spawnTime - GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
+            //}
             return; // Skip this frame - not ready yet
         }
 
         // Update visual age indicator on ALL clients (everyone sees age progression)
-        float age = Time.time - spawnTime;
+        // CRITICAL: Use GONet synchronized time for age calculation to ensure consistent colors across all peers
+        float age = (float)GONetMain.Time.ElapsedSeconds - spawnTime;
         float normalizedAge = Mathf.Clamp01(age / lifetime);
 
         // DIAGNOSTIC: Log first 5 Update() calls and then every 60 frames
-        if (updateCallCount <= 5 || updateCallCount % 60 == 0)
-        {
-            GONetLog.Info($"[TestBeacon] Update #{updateCallCount} - spawnTime: {spawnTime}, age: {age:F2}s, normalizedAge: {normalizedAge:F2}, GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
-        }
+        //if (updateCallCount <= 5 || updateCallCount % 60 == 0)
+        //{
+        //    GONetLog.Info($"[TestBeacon] Update #{updateCallCount} - spawnTime: {spawnTime}, age: {age:F2}s, normalizedAge: {normalizedAge:F2}, GONetId: {(GONetParticipant != null ? GONetParticipant.GONetId.ToString() : "NULL")}, IsMine: {(GONetParticipant != null ? IsMine.ToString() : "NULL")}");
+        //}
 
         // Three-stage color: Green → Yellow → Red
         Color currentColor;
@@ -167,21 +171,21 @@ public class SpawnTestBeacon : GONetParticipantCompanionBehaviour
         // Server despawns when lifetime expires (only server owns these)
         if (GONetMain.IsServer && IsMine && age >= lifetime)
         {
-            GONetLog.Info($"[TestBeacon] ⚠️ Server despawning beacon after {age:F2}s (lifetime: {lifetime}s) - GONetId: {GONetParticipant.GONetId}");
+            //GONetLog.Info($"[TestBeacon] ⚠️ Server despawning beacon after {age:F2}s (lifetime: {lifetime}s) - GONetId: {GONetParticipant.GONetId}");
             Destroy(gameObject);
         }
     }
 
     protected override void OnDestroy()
     {
-        if (GONetParticipant != null)
-        {
-            GONetLog.Info($"[TestBeacon] ❌ OnDestroy called - GONetId: {GONetParticipant.GONetId}, IsMine: {GONetParticipant.IsMine}, spawnTime: {spawnTime}, age: {Time.time - spawnTime:F2}s");
-        }
-        else
-        {
-            GONetLog.Info($"[TestBeacon] ❌ OnDestroy called - GONetParticipant is NULL (object was destroyed before GONet initialized)");
-        }
+        //if (GONetParticipant != null)
+        //{
+        //    GONetLog.Info($"[TestBeacon] ❌ OnDestroy called - GONetId: {GONetParticipant.GONetId}, IsMine: {GONetParticipant.IsMine}, spawnTime: {spawnTime}, age: {Time.time - spawnTime:F2}s");
+        //}
+        //else
+        //{
+        //    GONetLog.Info($"[TestBeacon] ❌ OnDestroy called - GONetParticipant is NULL (object was destroyed before GONet initialized)");
+        //}
         base.OnDestroy();
     }
 }

@@ -53,8 +53,13 @@ namespace GONet.Sample
             // movement doesn't start until direction is properly initialized.
             movementDirection = transform.forward;
 
-            // DIAGNOSTIC: Log initial movement direction
-            GONetLog.Info($"[Projectile] Awake() - '{gameObject.name}' - movementDirection set to: {movementDirection}, transform.forward: {transform.forward}, transform.position: {transform.position}, transform.rotation: {transform.rotation.eulerAngles}");
+            /*
+            // DIAGNOSTIC: Log initial movement direction AND spawn event
+            GONetLog.Info($"[PROJECTILE-SPAWN] 🚀 GONetId will be assigned soon, " +
+                         $"GameObject: '{gameObject.name}', " +
+                         $"Position: {transform.position}, " +
+                         $"MovementDirection: {movementDirection}");
+            */
 
             InitSutffForSupportingHoveringDuplicate();
         }
@@ -83,15 +88,15 @@ namespace GONet.Sample
             if (!hasLoggedOwnershipOnce)
             {
                 hasLoggedOwnershipOnce = true;
-                GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) FIRST UpdateAfterGONetReady - " +
-                    $"IsMine: {gonetParticipant.IsMine}, " +
-                    $"OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, " +
-                    $"MyAuthorityId: {GONetMain.MyAuthorityId}, " +
-                    $"IsServer: {GONetMain.IsServer}, " +
-                    $"IsClient: {GONetMain.IsClient}, " +
-                    $"startSpeed: {startSpeed}, " +
-                    $"speed: {speed}, " +
-                    $"movementDirection: {movementDirection}");
+                //GONetLog.Debug($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) FIRST UpdateAfterGONetReady - " +
+                //    $"IsMine: {gonetParticipant.IsMine}, " +
+                //    $"OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, " +
+                //    $"MyAuthorityId: {GONetMain.MyAuthorityId}, " +
+                //    $"IsServer: {GONetMain.IsServer}, " +
+                //    $"IsClient: {GONetMain.IsClient}, " +
+                //    $"startSpeed: {startSpeed}, " +
+                //    $"speed: {speed}, " +
+                //    $"movementDirection: {movementDirection}");
             }
 
             if (gonetParticipant.IsMine)
@@ -134,10 +139,14 @@ namespace GONet.Sample
                 }
                 else
                 {
-                    // DIAGNOSTIC: Log despawn decision
-                    GONetLog.Warning($"[Projectile] '{gameObject.name}' (GONetId: {gonetParticipant.GONetId}) DESPAWNING - " +
-                        $"speed: {speed}, -startSpeed: {-startSpeed}, despawnTimer: {despawnTimer:F2}s, " +
-                        $"IsMine: {gonetParticipant.IsMine}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}");
+                    // DIAGNOSTIC: Log despawn decision with GONetId tracking
+                    //GONetLog.Debug($"[PROJECTILE-DESPAWN] 💥 GONetId: {gonetParticipant.GONetId}, " +
+                    //    $"GameObject: '{gameObject.name}', " +
+                    //    $"Lifetime: {despawnTimer:F2}s, " +
+                    //    $"Speed: {speed:F2} (threshold: {-startSpeed:F2}), " +
+                    //    $"IsMine: {gonetParticipant.IsMine}, " +
+                    //    $"OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, " +
+                    //    $"IsServer: {GONetMain.IsServer}");
 
                     Destroy(gameObject); // avoid having an ever growing list of things going when they go off screen and cannot be seen
                 }
@@ -174,10 +183,12 @@ namespace GONet.Sample
             //GONetLog.Debug("buffer capacity: " + buffer_capacitySize);
         }
 
-        protected override void Start()
+        public override void OnGONetReady()
         {
-            base.Start();
+            base.OnGONetReady();
 
+            // CRITICAL: Subscribe to events in OnGONetReady (NOT Start) to ensure gonetParticipant is initialized
+            // Under heavy load, Start() can fire before OnGONetReady, causing NullReferenceException
             GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
         }
 

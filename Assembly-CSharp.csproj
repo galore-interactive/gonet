@@ -100,6 +100,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Client_GONetIdBatchLimboMode.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileBackedDictionary.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Main\GONetAdaptivePoolScaler.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\SocketContext.cs" />
     <Compile Include="Assets\Amazon\Scripts\GameLift.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Safe64.Dirty.cs" />
@@ -216,15 +217,19 @@
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\StreamingAssets\GONet\Start_README.txt" />
     <None Include="Assets\Amazon\Plugins\System.Runtime.CompilerServices.Unsafe.xml" />
+    <None Include="Assets\GONet\Sample\Utilities\LogAnalysis\README.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Masking.shader" />
+    <None Include="Assets\GONet\Sample\Resources\Tests\MixedHighLoadTest.txt" />
     <None Include="Assets\StreamingAssets\GONet\Start_CLIENT_BAT.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF Overlay.shader" />
+    <None Include="Assets\GONet\Sample\Resources\Tests\ControlledDespawnTest.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Fonts\LiberationSans - OFL.txt" />
     <None Include="Assets\GONet\Sample\Resources\Tests\SpawnSyncBugTest.txt" />
     <None Include="Assets\Amazon\Plugins\AWSSDK.Core.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\Amazon\Plugins\System.Memory.xml" />
+    <None Include="Assets\GONet\Sample\Resources\Tests\PhysicsCubeDespawnTest.txt" />
     <None Include="Assets\GONet\Third-Party Notices.txt.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
   </ItemGroup>

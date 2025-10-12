@@ -813,6 +813,10 @@ namespace GONet
         {
             if (Application.isPlaying)
             {
+                // EARLIEST LIFECYCLE POINT: Log with InstanceID for correlation (GONetId not yet available)
+                // InstanceID allows correlation between Awake → OnGONetReady events in log analysis
+                //GONetLog.Info($"[GONetParticipant] 🔵 Awake() START - InstanceID: {GetInstanceID()}, GameObject: {gameObject.name}");
+
                 StartCoroutine(AwakeCoroutine());
             }
 #if UNITY_EDITOR
@@ -934,7 +938,7 @@ namespace GONet
                 else
                 {
                     // DIAGNOSTIC: Log BEFORE changes (WARNING level so it's never filtered)
-                    GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] BEFORE kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
+                    //GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] BEFORE kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
 
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
@@ -946,12 +950,12 @@ namespace GONet
                     // them from blocking GONet's value blending system from applying synced positions.
                     if (myRigidBody.constraints != RigidbodyConstraints.None)
                     {
-                        GONetLog.Warning($"[GONetParticipant] Clearing Rigidbody constraints on non-authority '{name}' (GONetId: {GONetId}) - was: {myRigidBody.constraints}");
+                        //GONetLog.Warning($"[GONetParticipant] Clearing Rigidbody constraints on non-authority '{name}' (GONetId: {GONetId}) - was: {myRigidBody.constraints}");
                         myRigidBody.constraints = RigidbodyConstraints.None;
                     }
 
                     // DIAGNOSTIC: Log AFTER changes
-                    GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] AFTER kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
+                    //GONetLog.Warning($"[GONetParticipant][DIAGNOSTIC] AFTER kinematic change - '{name}' (GONetId: {GONetId}) isKinematic={myRigidBody.isKinematic}, useGravity={myRigidBody.useGravity}, constraints={myRigidBody.constraints}");
                     }
                 }
 

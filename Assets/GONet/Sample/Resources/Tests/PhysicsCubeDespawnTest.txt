@@ -1,0 +1,50 @@
+# Test Case: Physics Cube Despawn Timing (Hypothesis A)
+# This test isolates the physics cube auto-despawn behavior to see if it
+# causes sync bundle aborts that affect other objects.
+#
+# HYPOTHESIS: When physics cubes fall out of view and auto-despawn on client,
+# server doesn't know yet and continues sending sync bundles with dead GONetIds,
+# causing bundle aborts that prevent OTHER objects from receiving updates.
+
+name: Physics Cube Despawn Timing Test
+description: Tests if physics cube despawns cause sync bundle aborts affecting other objects
+require_clients: 1
+despawn_wait: 5
+
+# Initial setup
+wait_clients: 1
+log: ========== Physics Cube Despawn Test START ==========
+log: GOAL: Isolate physics cube despawn as root cause of bundle aborts
+
+# Phase 1: Spawn projectiles with physics cubes (trigger scenario)
+log: PHASE 1: Spawn 10 projectiles (with physics cubes)
+human_action: Click mouse 10 times to spawn projectiles with physics cubes
+wait: 1
+log: Projectiles spawned - physics cubes should start falling
+
+# Phase 2: Wait for physics cubes to fall and despawn
+log: PHASE 2: Wait 2 seconds for physics cubes to fall out of view
+wait: 2
+log: ⚠️ CRITICAL MOMENT: Physics cubes likely despawned on client by now
+
+# Phase 3: Spawn MORE projectiles while old physics cubes are "dead"
+log: PHASE 3: Spawn 10 MORE projectiles (while old physics cubes despawned on client)
+human_action: Click mouse 10 more times rapidly
+wait: 1
+log: If Hypothesis A correct, NEW projectiles should appear stuck/white
+
+# Phase 4: Observation window
+log: PHASE 4: Observe projectiles for 5 seconds
+human_action: Watch for WHITE BEACONS or STUCK PROJECTILES - press SPACE when done observing
+log: Did you see white beacons or stuck projectiles? (manually verify)
+
+# Phase 5: Wait for all to despawn
+log: PHASE 5: Wait for all objects to despawn naturally
+wait_despawn: 15
+
+log: ========== Physics Cube Despawn Test COMPLETE ==========
+log: EXPECTED OUTCOME if Hypothesis A correct:
+log:   - Projectiles spawned in Phase 3 appeared white/stuck
+log:   - Sync bundles aborted due to dead physics cube GONetIds
+log: EXPECTED OUTCOME if Hypothesis A incorrect:
+log:   - All projectiles worked fine, no white/stuck objects
