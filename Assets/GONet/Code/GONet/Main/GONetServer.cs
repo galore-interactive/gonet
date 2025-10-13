@@ -39,6 +39,13 @@ namespace GONet
         readonly ConcurrentQueue<RemoteClient> newlyConnectedClients = new ConcurrentQueue<RemoteClient>();
         readonly ConcurrentQueue<RemoteClient> newlyDisconnectedClients = new ConcurrentQueue<RemoteClient>();
 
+        /// <summary>
+        /// PHASE 2 FIX: Round-robin starting index for client processing fairness.
+        /// Prevents "last client penalty" where clients processed later in list experience cumulative processing delay.
+        /// Rotates each broadcast cycle to ensure all clients get "first" position equally over time.
+        /// </summary>
+        public int nextClientProcessingStartIndex = 0;
+
         public delegate void ClientActionDelegate(GONetConnection_ServerToClient gonetConnection_ServerToClient);
         /// <summary>
         /// This *will* be called from main Unity thread.

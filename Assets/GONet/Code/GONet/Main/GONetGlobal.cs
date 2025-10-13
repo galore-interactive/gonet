@@ -308,6 +308,12 @@ namespace GONet
 
         protected override void Awake()
         {
+            // PHASE 2 FIX: Force Application.runInBackground = true for multiplayer servers/clients
+            // This ensures servers keep processing network traffic even when Unity window loses focus
+            // Critical for dedicated servers and multi-instance local testing (editor + builds)
+            // Without this, unfocused instances pause and cause timeouts/disconnects
+            Application.runInBackground = true;
+
             // Self-destroying singleton pattern: Prevent duplicate GONetGlobal instances
             if (instance != null && instance != this)
             {

@@ -1823,8 +1823,16 @@ namespace GONet
             GONetConnection_ServerToClient remoteClientConnection = null;
             uint count = _gonetServer.numConnections;
 
-            for (int i = 0; i < count; ++i)
+            // PHASE 2 FIX: Round-robin client processing to distribute server-side delay fairly
+            // Without this, clients processed later in list experience cumulative processing delay
+            // (e.g., Client 1: 10ms RTT, Client 5: 180ms RTT due to 170ms processing delay)
+            // Round-robin starting index ensures all clients get "first" position equally over time
+            int startIndex = _gonetServer.nextClientProcessingStartIndex;
+            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+
+            for (int offset = 0; offset < count; ++offset)
             {
+                int i = (startIndex + offset) % (int)count;
                 remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
                 if (remoteClientConnection.OwnerAuthorityId != remoteSourceAuthorityId)
                 {
@@ -2467,8 +2475,14 @@ namespace GONet
         private static void Server_SendBytesToNonSourceClients(byte[] messageBytes, int bytesUsedCount, GONetConnection sourceClientConnection, byte channelId)
         {
             uint count = _gonetServer.numConnections;
-            for (int i = 0; i < count; ++i)
+
+            // PHASE 2 FIX: Round-robin client processing to distribute server-side delay fairly
+            int startIndex = _gonetServer.nextClientProcessingStartIndex;
+            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+
+            for (int offset = 0; offset < count; ++offset)
             {
+                int i = (startIndex + offset) % (int)count;
                 GONetConnection_ServerToClient remoteClientConnection = _gonetServer.remoteClients[i].ConnectionToClient;
                 if (remoteClientConnection.OwnerAuthorityId != sourceClientConnection.OwnerAuthorityId)
                 {
@@ -8308,8 +8322,14 @@ namespace GONet
                             //  (see ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL-Server_SendBytesToNonSourceClients).
                             SerializeWhole_BundleOfChoice(syncValuesForBundles, myThread_valueChangeSerializationArrayPool, MyAuthorityId, relatedElapsedTicks, chosenBundleType, out bundleFragments);
 
-                            for (int iConnection = 0; iConnection < _gonetServer.numConnections; ++iConnection)
+                            // PHASE 2 FIX: Round-robin client processing to distribute server-side delay fairly
+                            int numConnections = (int)_gonetServer.numConnections;
+                            int startIndex = _gonetServer.nextClientProcessingStartIndex;
+                            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % numConnections;
+
+                            for (int offset = 0; offset < numConnections; ++offset)
                             {
+                                int iConnection = (startIndex + offset) % numConnections;
                                 GONetConnection_ServerToClient gONetConnection_ServerToClient = _gonetServer.remoteClients[iConnection].ConnectionToClient;
                                 GONetRemoteClient remoteClient = _gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId);
                                 bool isInitialized = remoteClient.IsInitializedWithServer;
