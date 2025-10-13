@@ -68,8 +68,8 @@ namespace GONet.Tests.ReliableNetcode
             ReliableEndpoint endpoint = CreateReliableEndpoint();
             endpoint.Update(time);
 
-            // Flood with 400 messages to overflow sendBuffer (256) into messageQueue (~144 queued)
-            const int MESSAGE_COUNT = 400;
+            // Flood with 1600 messages to overflow sendBuffer (1024) into messageQueue (~576 queued)
+            const int MESSAGE_COUNT = 1600;
             byte[] messageData = new byte[200];
 
             for (int i = 0; i < MESSAGE_COUNT; i++)
@@ -88,11 +88,11 @@ namespace GONet.Tests.ReliableNetcode
             var sendBuffer = sendBufferField.GetValue(reliableChannel);
 
             int initialQueueCount = messageQueue.Count;
-            UnityEngine.Debug.Log($"Initial: {MESSAGE_COUNT} messages sent, {initialQueueCount} queued (expected ~144)");
+            UnityEngine.Debug.Log($"Initial: {MESSAGE_COUNT} messages sent, {initialQueueCount} queued (expected ~576)");
 
             // Simulate ACKs by clearing sendBuffer space using RemoveEntries
             var removeEntriesMethod = sendBuffer.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
-            removeEntriesMethod.Invoke(sendBuffer, new object[] { 0, 255 }); // Clear all 256 entries
+            removeEntriesMethod.Invoke(sendBuffer, new object[] { 0, 1023 }); // Clear all 1024 entries (Phase 1A: 256→1024)
 
             // Now do ONE update - should dequeue up to 100 messages
             time += dt;
@@ -117,7 +117,8 @@ namespace GONet.Tests.ReliableNetcode
         }
 
         /// <summary>
-        /// Test 3: Verify sendBuffer size is 256 (architectural assumption for overflow tests).
+        /// Test 3: Verify sendBuffer size is 1024 (increased from 256 in Phase 1A fix).
+        /// Phase 1A increased capacity to handle realistic production burst scenarios.
         /// </summary>
         [Test]
         public void TestSendBuffer_SizeIs256()
@@ -126,11 +127,11 @@ namespace GONet.Tests.ReliableNetcode
             string filePath = "Assets/GONet/Code/ReliableNetcode/MessageChannel.cs";
             string sourceCode = System.IO.File.ReadAllText(filePath);
 
-            // Verify sendBuffer size = 256
-            Assert.IsTrue(sourceCode.Contains("sendBuffer = new SequenceBuffer<BufferedPacket>(256)"),
-                "sendBuffer size should be 256 in MessageChannel.cs");
+            // Verify sendBuffer size = 1024 (Phase 1A fix)
+            Assert.IsTrue(sourceCode.Contains("sendBuffer = new SequenceBuffer<BufferedPacket>(1024)"),
+                "sendBuffer size should be 1024 in MessageChannel.cs (Phase 1A fix from 256 → 1024)");
 
-            UnityEngine.Debug.Log("✓ sendBuffer size validated: 256");
+            UnityEngine.Debug.Log("✓ sendBuffer size validated: 1024 (Phase 1A fix)");
         }
 
         /// <summary>
@@ -165,7 +166,7 @@ namespace GONet.Tests.ReliableNetcode
             var sendBufferField = reliableChannel1.GetType().GetField("sendBuffer", BindingFlags.NonPublic | BindingFlags.Instance);
             var sendBuffer1 = sendBufferField.GetValue(reliableChannel1);
             var removeEntriesMethod = sendBuffer1.GetType().GetMethod("RemoveEntries", BindingFlags.Public | BindingFlags.Instance);
-            removeEntriesMethod.Invoke(sendBuffer1, new object[] { 0, 255 });
+            removeEntriesMethod.Invoke(sendBuffer1, new object[] { 0, 1023 }); // Phase 1A: 256→1024
 
             var stopwatch1 = System.Diagnostics.Stopwatch.StartNew();
             time += dt;
@@ -192,7 +193,7 @@ namespace GONet.Tests.ReliableNetcode
             var channels2 = (MessageChannel[])channelsField.GetValue(endpoint2);
             var reliableChannel2 = channels2[0];
             var sendBuffer2 = sendBufferField.GetValue(reliableChannel2);
-            removeEntriesMethod.Invoke(sendBuffer2, new object[] { 0, 255 });
+            removeEntriesMethod.Invoke(sendBuffer2, new object[] { 0, 1023 }); // Phase 1A: 256→1024
 
             var stopwatch2 = System.Diagnostics.Stopwatch.StartNew();
             time += dt;
@@ -229,8 +230,8 @@ namespace GONet.Tests.ReliableNetcode
             ReliableEndpoint endpoint = CreateReliableEndpoint();
             endpoint.Update(time);
 
-            // Send 400 messages to overflow queue (~144 queued)
-            const int MESSAGE_COUNT = 400;
+            // Send 1600 messages to overflow queue (~576 queued)
+            const int MESSAGE_COUNT = 1600;
             byte[] messageData = new byte[200];
             for (int i = 0; i < MESSAGE_COUNT; i++)
             {

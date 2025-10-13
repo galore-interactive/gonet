@@ -90,6 +90,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetLimboModeTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableChannelMessageQueueExhaustionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\AdvancedTimeSyncIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLocalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\Editor\ClassTypeReferencePropertyDrawer.cs" />
