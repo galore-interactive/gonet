@@ -133,13 +133,16 @@ namespace GONet.Editor
             var profilePaths = GetAllSyncProfilePaths().ToArray();
             var addressableSettings = GatherAddressableSettings(prefabPaths);
 
+            // CRITICAL: Extract scene data on main thread BEFORE Task.Run() because EditorSceneManager APIs require main thread
+            var sceneDataList = ExtractAllSceneData(scenePaths);
+
             UnityEngine.Debug.Log($"GONet: Content snapshot discovery - Prefabs: {prefabPaths.Length}, Scenes: {scenePaths.Length}, Profiles: {profilePaths.Length}, Addressable Settings: {addressableSettings.Count}");
 
             // Then run content analysis in parallel on background threads
             var tasks = new List<Task>
             {
                 Task.Run(() => PopulatePrefabHashesFromPaths(snapshot, prefabPaths)),
-                Task.Run(() => PopulateSceneHashesFromPaths(snapshot, scenePaths)),
+                Task.Run(() => PopulateSceneHashesFromSceneData(snapshot, sceneDataList)),
                 Task.Run(() => PopulateSyncProfileHashesFromPaths(snapshot, profilePaths)),
                 Task.Run(() => PopulateConfigObjectHashes(snapshot)),
                 Task.Run(() => PopulateAddressableSettingsFromData(snapshot, addressableSettings))
@@ -269,27 +272,55 @@ namespace GONet.Editor
         private static void PopulateSceneHashes(ContentSnapshot snapshot)
         {
             var scenePaths = GetAllGONetScenePaths();
-            PopulateSceneHashesFromPaths(snapshot, scenePaths.ToArray());
+            var sceneDataList = ExtractAllSceneData(scenePaths.ToArray());
+            PopulateSceneHashesFromSceneData(snapshot, sceneDataList);
         }
 
-        private static void PopulateSceneHashesFromPaths(ContentSnapshot snapshot, string[] scenePaths)
+        /// <summary>
+        /// Extracts GONet data from all scenes on the MAIN THREAD.
+        /// MUST be called on main thread because EditorSceneManager APIs require main thread.
+        /// </summary>
+        private static List<(string path, GONetSceneData data)> ExtractAllSceneData(string[] scenePaths)
         {
-            var results = new ConcurrentDictionary<string, string>();
+            var sceneDataList = new List<(string path, GONetSceneData data)>();
 
-            Parallel.ForEach(scenePaths, scenePath =>
+            foreach (string scenePath in scenePaths)
             {
                 try
                 {
                     var sceneData = ExtractSceneGONetData(scenePath);
                     if (sceneData != null)
                     {
-                        string hash = ComputeContentHash(sceneData);
-                        results[scenePath] = hash;
+                        sceneDataList.Add((scenePath, sceneData));
                     }
                 }
                 catch (Exception ex)
                 {
-                    GONetLog.Warning($"Error processing scene {scenePath}: {ex.Message}");
+                    GONetLog.Warning($"Error extracting scene data from {scenePath}: {ex.Message}");
+                }
+            }
+
+            return sceneDataList;
+        }
+
+        /// <summary>
+        /// Computes hashes for pre-extracted scene data in parallel on background threads.
+        /// Thread-safe because hash computation doesn't touch Unity APIs.
+        /// </summary>
+        private static void PopulateSceneHashesFromSceneData(ContentSnapshot snapshot, List<(string path, GONetSceneData data)> sceneDataList)
+        {
+            var results = new ConcurrentDictionary<string, string>();
+
+            Parallel.ForEach(sceneDataList, sceneDataTuple =>
+            {
+                try
+                {
+                    string hash = ComputeContentHash(sceneDataTuple.data);
+                    results[sceneDataTuple.path] = hash;
+                }
+                catch (Exception ex)
+                {
+                    GONetLog.Warning($"Error computing hash for scene {sceneDataTuple.path}: {ex.Message}");
                 }
             });
 

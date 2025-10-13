@@ -120,6 +120,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetContentSnapshot.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetDespawnedParticipantHandlingTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSyncSettingsProfileCustomInspector.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\GONetPlayModeSceneCleanup.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetSpawnSupport_DesignTime.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetSpawnDespawnLifecycleTests.cs" />
