@@ -97,7 +97,7 @@ namespace GONet
 
         #endregion
 
-        protected GONetConnection()
+        protected GONetConnection(int maxReliableQueueSize = 2000) : base(maxReliableQueueSize)
         {
             ReceiveCallback = OnReceiveCallback;
         }
@@ -185,7 +185,40 @@ namespace GONet
             Utils.BitConverter.GetBytes(bytesUsedCount, messageBytes_withHeader, sizeof(GONetChannelId));
             Buffer.BlockCopy(messageBytes, 0, messageBytes_withHeader, headerSize, bytesUsedCount);
 
-            base.SendMessage(messageBytes_withHeader, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
+            try
+            {
+                base.SendMessage(messageBytes_withHeader, bodySize_withHeader, channel.QualityOfService); // IMPORTANT: this should be the ONLY call to this method in all of GONet! including user codebases!
+            }
+            catch (ReliableQueueExhaustedException ex)
+            {
+                // CRITICAL: Reliable message queue exhausted - message dropped
+                // This indicates severe network congestion or sustained high message rate
+                GONetLog.Error(
+                    $"[RELIABLE-QUEUE-EXHAUSTION] Reliable message queue exhausted and message DROPPED. " +
+                    $"Queue: {ex.CurrentQueueDepth}/{ex.MaxQueueSize} messages. " +
+                    $"Dropped message: {ex.DroppedMessageSize} bytes on channel {ex.ChannelId}. " +
+                    $"Connection: Authority {OwnerAuthorityId}, RTT: {RTTMilliseconds:F1}ms. " +
+                    $"\n\n" +
+                    $"WHAT THIS MEANS:\n" +
+                    $"• Reliable messages (spawns, RPCs, critical state) are being sent faster than network can deliver them\n" +
+                    $"• This is EXTREMELY RARE - requires sustained 100+ messages/sec + high packet loss + slow ACKs\n" +
+                    $"• The dropped message will NOT be delivered (spawn events, RPCs will fail)\n" +
+                    $"\n" +
+                    $"SOLUTIONS:\n" +
+                    $"1. Increase 'Max Reliable Message Queue Size' in GONetGlobal inspector (current: {ex.MaxQueueSize})\n" +
+                    $"   - For high-latency connections: Increase to 5000-10000\n" +
+                    $"   - For rapid spawning scenarios: Increase to 3000-5000\n" +
+                    $"2. Reduce message send rate:\n" +
+                    $"   - Batch spawn requests (spawn 10 objects every 0.1s instead of 100 instantly)\n" +
+                    $"   - Throttle RPC calls\n" +
+                    $"   - Use unreliable channels for non-critical data (position updates)\n" +
+                    $"3. Investigate network conditions:\n" +
+                    $"   - Check packet loss (current: {PacketLoss:F2}%)\n" +
+                    $"   - Check RTT/latency (current: {RTTMilliseconds:F1}ms)\n" +
+                    $"   - Consider network quality issues\n" +
+                    $"\n" +
+                    $"See: ReliableQueueExhaustedException documentation for detailed analysis.");
+            }
 
             { // memory management:
                 SerializationUtils.ReturnByteArray(messageBytes_withHeader);
@@ -245,7 +278,7 @@ namespace GONet
 
         public ClientState State => client.State;
 
-        public GONetConnection_ClientToServer(Client client) : base()
+        public GONetConnection_ClientToServer(Client client, int maxReliableQueueSize = 2000) : base(maxReliableQueueSize)
         {
             this.client = client;
 
@@ -354,7 +387,7 @@ namespace GONet
 
         public EndPoint RemoteClientEndPoint => remoteClient.RemoteEndpoint;
 
-        public GONetConnection_ServerToClient(RemoteClient remoteClient) : base()
+        public GONetConnection_ServerToClient(RemoteClient remoteClient, int maxReliableQueueSize = 2000) : base(maxReliableQueueSize)
         {
             this.remoteClient = remoteClient;
 

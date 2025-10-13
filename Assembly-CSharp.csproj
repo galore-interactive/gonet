@@ -86,6 +86,7 @@
     <Compile Include="Assets\GONet\Sample\CircularMotion.cs" />
     <Compile Include="Assets\GONet\Sample\GONetTestScriptExecutor.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\Generated\SyncEvent_GeneratedTypes.cs" />
+    <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableQueueExhaustedException.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\TokenFactory.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileUtils.cs" />
     <Compile Include="Assets\GONet\Sample\ExitButtonUI.cs" />

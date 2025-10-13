@@ -179,7 +179,7 @@ namespace GONet
                 return;
             }
 
-            LoadScene_Internal(sceneName, -1, SceneLoadType.BuildSettings, mode, true, 100);
+            LoadScene_Internal(sceneName, -1, SceneLoadType.BuildSettings, mode, true, 100, GONetMain.MyAuthorityId);
         }
 
         /// <summary>
@@ -203,7 +203,7 @@ namespace GONet
                 return;
             }
 
-            LoadScene_Internal(sceneName, buildIndex, SceneLoadType.BuildSettings, mode, true, 100);
+            LoadScene_Internal(sceneName, buildIndex, SceneLoadType.BuildSettings, mode, true, 100, GONetMain.MyAuthorityId);
         }
 
         /// <summary>
@@ -249,7 +249,7 @@ namespace GONet
                 return;
             }
 
-            LoadScene_Internal(sceneName, -1, SceneLoadType.Addressables, mode, activateOnLoad, priority);
+            LoadScene_Internal(sceneName, -1, SceneLoadType.Addressables, mode, activateOnLoad, priority, GONetMain.MyAuthorityId);
         }
 
         /// <summary>

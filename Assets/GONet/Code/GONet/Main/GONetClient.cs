@@ -139,7 +139,8 @@ namespace GONet
         {
             this.client = new();
 
-            connectionToServer = new GONetConnection_ClientToServer(client);
+            int maxQueueSize = GONetGlobal.Instance != null ? GONetGlobal.Instance.maxReliableMessageQueueSize : 2000;
+            connectionToServer = new GONetConnection_ClientToServer(client, maxQueueSize);
 
             client.OnStateChanged += OnStateChanged_BubbleEventUp;
             client.TickBeginning += Client_TickBeginning_PossibleSeparateThread;

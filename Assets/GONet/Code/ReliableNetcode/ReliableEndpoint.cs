@@ -69,11 +69,11 @@ namespace ReliableNetcode
 		// the reliable channel
 		private ReliableMessageChannel _reliableChannel;
 
-		public ReliableEndpoint()
+		public ReliableEndpoint(int maxReliableQueueSize = 2000)
 		{
 			time = DateTime.UtcNow.GetTotalSeconds();
 
-			_reliableChannel = new ReliableMessageChannel() { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage };
+			_reliableChannel = new ReliableMessageChannel(maxReliableQueueSize) { TransmitCallback = this.transmitMessage, ReceiveCallback = this.receiveMessage };
 
 			messageChannels = new MessageChannel[]
 			{
@@ -82,7 +82,7 @@ namespace ReliableNetcode
 			};
 		}
 
-		public ReliableEndpoint(uint index) : this()
+		public ReliableEndpoint(uint index, int maxReliableQueueSize = 2000) : this(maxReliableQueueSize)
 		{
 			Index = index;
 		}

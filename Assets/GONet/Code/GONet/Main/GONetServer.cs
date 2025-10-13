@@ -260,7 +260,8 @@ namespace GONet
         {
             if (numConnections < MaxClientCount)
             {
-                GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client);
+                int maxQueueSize = GONetGlobal.Instance != null ? GONetGlobal.Instance.maxReliableMessageQueueSize : 2000;
+                GONetConnection_ServerToClient gonetConnection_ServerToClient = new GONetConnection_ServerToClient(client, maxQueueSize);
                 GONetRemoteClient remoteClient = new GONetRemoteClient(client, gonetConnection_ServerToClient);
                 remoteClients.Add(remoteClient);
                 ++numConnections;

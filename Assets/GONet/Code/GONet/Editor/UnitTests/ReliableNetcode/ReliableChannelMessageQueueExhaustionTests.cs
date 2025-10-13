@@ -986,5 +986,175 @@ namespace GONet.Tests.ReliableNetcode
 
             LogTestProgress("Test PASSED - All reliable messages arrived under worst-case production load");
         }
+
+        /// <summary>
+        /// TEST 17: Verify ReliableQueueExhaustedException is thrown when queue limit reached.
+        /// Validates that the exception-based approach alerts users to queue exhaustion.
+        /// This should PASS after fix (exception infrastructure in place).
+        /// </summary>
+        [Test]
+        public void QueueExhaustion_ThrowsException_WithDiagnosticInfo()
+        {
+            LogTestProgress("=== TEST 17: QueueExhaustion_ThrowsException_WithDiagnosticInfo ===");
+            LogTestProgress("GOAL: Verify ReliableQueueExhaustedException is thrown when queue limit reached");
+            LogTestProgress("EXPECTED: ✅ PASS (after fix) - Exception thrown with diagnostic info");
+
+            // Create endpoint with small queue size for testing (10 messages)
+            var endpoint = new ReliableEndpoint(maxReliableQueueSize: 10);
+            bool exceptionThrown = false;
+            ReliableQueueExhaustedException caughtException = null;
+
+            // Set up receive callback (required for endpoint to work)
+            endpoint.ReceiveCallback = (buffer, length) => { };
+
+            try
+            {
+                // Fill sendBuffer AND exceed queue limit
+                // sendBuffer capacity = 1024, but we'll block ACKs so it fills immediately
+                // Then messageQueue will fill (capacity = 10)
+                // 11th message should throw exception
+
+                LogTestProgress("Attempting to send 1100 messages (1024 sendBuffer + 10 queue + 66 should throw)...");
+
+                for (int i = 0; i < 1100; i++)
+                {
+                    byte[] msg = new byte[300];
+                    msg[0] = (byte)(i & 0xFF);
+                    msg[1] = (byte)((i >> 8) & 0xFF);
+
+                    try
+                    {
+                        endpoint.SendMessage(msg, msg.Length, QosType.Reliable);
+                    }
+                    catch (ReliableQueueExhaustedException ex)
+                    {
+                        exceptionThrown = true;
+                        caughtException = ex;
+                        LogTestProgress($"Exception thrown at message #{i + 1}");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Unexpected exception type: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            // CRITICAL ASSERTION: Exception MUST be thrown when queue exhausted
+            Assert.IsTrue(exceptionThrown,
+                "ReliableQueueExhaustedException was NOT thrown when queue exhausted! " +
+                "Silent drops will cause spawn propagation failures.");
+
+            Assert.IsNotNull(caughtException, "Exception object should not be null");
+
+            // Validate exception properties contain diagnostic information
+            LogTestProgress($"Exception details:");
+            LogTestProgress($"  CurrentQueueDepth: {caughtException.CurrentQueueDepth}");
+            LogTestProgress($"  MaxQueueSize: {caughtException.MaxQueueSize}");
+            LogTestProgress($"  DroppedMessageSize: {caughtException.DroppedMessageSize}");
+            LogTestProgress($"  ChannelId: {caughtException.ChannelId}");
+            LogTestProgress($"  Message: {caughtException.Message}");
+
+            Assert.AreEqual(10, caughtException.CurrentQueueDepth,
+                "CurrentQueueDepth should equal queue limit when exhausted");
+
+            Assert.AreEqual(10, caughtException.MaxQueueSize,
+                "MaxQueueSize should match configured value (10)");
+
+            Assert.AreEqual(300, caughtException.DroppedMessageSize,
+                "DroppedMessageSize should match test message size (300 bytes)");
+
+            Assert.AreEqual((int)QosType.Reliable, caughtException.ChannelId,
+                "ChannelId should be Reliable (0)");
+
+            Assert.IsTrue(caughtException.Message.Contains("Reliable message queue exhausted"),
+                "Exception message should contain 'Reliable message queue exhausted'");
+
+            Assert.IsTrue(caughtException.Message.Contains("10/10 messages"),
+                "Exception message should show queue depth (10/10)");
+
+            Assert.IsTrue(caughtException.Message.Contains("Increase maxReliableMessageQueueSize"),
+                "Exception message should provide solution (increase queue size)");
+
+            LogTestProgress("Test PASSED - ReliableQueueExhaustedException thrown with correct diagnostic info");
+        }
+
+        /// <summary>
+        /// TEST 18: Verify configurable queue size works correctly.
+        /// Ensures users can increase queue size via GONetGlobal configuration.
+        /// This should PASS after fix (configuration plumbing in place).
+        /// </summary>
+        [Test]
+        public void QueueSize_Configurable_ViaConstructor()
+        {
+            LogTestProgress("=== TEST 18: QueueSize_Configurable_ViaConstructor ===");
+            LogTestProgress("GOAL: Verify queue size is configurable via constructor parameter");
+            LogTestProgress("EXPECTED: ✅ PASS (after fix) - Larger queue size prevents exhaustion");
+
+            // Test with SMALL queue size (100)
+            LogTestProgress("Testing with SMALL queue size (100)...");
+            var endpoint1 = new ReliableEndpoint(maxReliableQueueSize: 100);
+            endpoint1.ReceiveCallback = (buffer, length) => { };
+
+            bool exception1 = false;
+            int messages1 = 0;
+            try
+            {
+                // Send 1200 messages (should exhaust at 1024 sendBuffer + 100 queue = 1124)
+                // The 1125th message should trigger the exception
+                for (int i = 0; i < 1200; i++)
+                {
+                    byte[] msg = new byte[300];
+                    endpoint1.SendMessage(msg, msg.Length, QosType.Reliable);
+                    messages1++;
+                }
+            }
+            catch (ReliableQueueExhaustedException)
+            {
+                exception1 = true;
+            }
+
+            LogTestProgress($"  Small (100): Exception thrown = {exception1}, Messages sent before exhaustion = {messages1}");
+
+            // Test with LARGER queue size (500)
+            LogTestProgress("Testing with LARGER queue size (500)...");
+            var endpoint2 = new ReliableEndpoint(maxReliableQueueSize: 500);
+            endpoint2.ReceiveCallback = (buffer, length) => { };
+
+            bool exception2 = false;
+            int messages2 = 0;
+            try
+            {
+                // Send 1200 messages (should NOT exhaust: 1024 sendBuffer + 500 queue = 1524)
+                for (int i = 0; i < 1200; i++)
+                {
+                    byte[] msg = new byte[300];
+                    endpoint2.SendMessage(msg, msg.Length, QosType.Reliable);
+                    messages2++;
+                }
+            }
+            catch (ReliableQueueExhaustedException)
+            {
+                exception2 = true;
+            }
+
+            LogTestProgress($"  Larger (500): Exception thrown = {exception2}, Messages sent = {messages2}");
+
+            // ASSERTION: Small size (100) should exhaust when sending 1200 messages
+            Assert.IsTrue(exception1,
+                $"Small queue size (100) should exhaust when sending 1200 messages " +
+                $"(1024 sendBuffer + 100 queue = 1124 capacity). Sent {messages1} before exhaustion.");
+
+            // ASSERTION: Larger size (500) should NOT exhaust with 1200 messages
+            Assert.IsFalse(exception2,
+                $"Larger queue size (500) should NOT exhaust when sending 1200 messages " +
+                $"(1024 sendBuffer + 500 queue = 1524 capacity > 1200 sent). Sent {messages2} messages.");
+
+            // Verify the smaller queue exhausted earlier than larger queue
+            Assert.Less(messages1, messages2,
+                "Smaller queue should exhaust with fewer messages than larger queue");
+
+            LogTestProgress("Test PASSED - Queue size is configurable and works correctly");
+        }
     }
 }

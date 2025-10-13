@@ -146,8 +146,12 @@ namespace ReliableNetcode
         private double lastQueueDepthLogTime = 0.0;
         private int lastLoggedQueueDepth = 0;
 
-        public ReliableMessageChannel()
+        // Configurable maximum queue size (prevents unbounded memory growth)
+        private readonly int maxMessageQueueSize;
+
+        public ReliableMessageChannel(int maxQueueSize = 2000)
         {
+            maxMessageQueueSize = maxQueueSize;
             config = ReliableConfig.DefaultConfig();
             config.TransmitPacketCallback = (buffer, size) => {
                 TransmitCallback(buffer, size);
@@ -358,22 +362,21 @@ namespace ReliableNetcode
             if (sendBufferSize == sendBuffer.Size) {
                 // PHASE 1B FIX: Bounds checking to prevent unbounded messageQueue growth
                 // In extreme edge cases (sustained 100+ spawns/sec + high packet loss), messageQueue could grow without limit
-                // This safety valve prevents memory exhaustion by dropping messages when queue exceeds threshold
-                // Threshold: 2000 messages = ~2.4MB (1200 bytes/message average)
-                // Increased from 500 → 2000 after Test 16 revealed 500 was too restrictive for worst-case scenarios:
-                //   - 400 reliable messages + 300 unreliable + 150ms RTT + mixed traffic
-                //   - With 1024 sendBuffer, messageQueue can temporarily hold up to ~1000 during ACK lag
+                // This safety valve prevents memory exhaustion by throwing an exception when queue exceeds threshold
+                // Threshold: Configurable via maxMessageQueueSize (default 2000 messages = ~2.4MB at 1200 bytes/message average)
                 // NOTE: This is EXTREMELY RARE - requires sustained burst + high packet loss + slow ACKs simultaneously
                 // See: INVESTIGATION_BATCH_MESSAGE_LOSS_2025-10-12.md Section 8.1
-                const int MAX_MESSAGE_QUEUE_SIZE = 2000;
 
-                if (messageQueue.Count >= MAX_MESSAGE_QUEUE_SIZE)
+                if (messageQueue.Count >= maxMessageQueueSize)
                 {
-                    // CRITICAL: Queue overflow - connection unhealthy, ACKs not arriving
+                    // CRITICAL: Queue exhaustion - throw exception to allow higher-level handling
                     // This indicates severe network degradation (>90% packet loss) or server overload
-                    // Drop message to prevent memory exhaustion (makes implicit behavior explicit)
-                    // TODO: Add telemetry/logging for this edge case (Phase 1D)
-                    return;
+                    // Exception will be caught at GONet layer for error logging and diagnostics
+                    throw new ReliableQueueExhaustedException(
+                        currentQueueDepth: messageQueue.Count,
+                        maxQueueSize: maxMessageQueueSize,
+                        droppedMessageSize: bufferLength,
+                        channelId: ChannelID);
                 }
 
                 ByteBuffer tempBuff = ObjPool<ByteBuffer>.Get();

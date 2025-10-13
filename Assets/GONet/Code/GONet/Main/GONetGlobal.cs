@@ -233,6 +233,32 @@ namespace GONet
         [Range(1f, 30f)]
         public float gonetIdReuseDelaySeconds = 5f;
 
+        [Header("Reliable Message Queue")]
+        [Tooltip("Maximum reliable message queue size before messages are dropped (lower-level transport setting).\n\n" +
+                "PURPOSE:\n" +
+                "When reliable messages are sent faster than they can be transmitted and acknowledged,\n" +
+                "they queue up waiting for sendBuffer space. This setting prevents unbounded memory growth.\n\n" +
+                "WHEN EXHAUSTION OCCURS:\n" +
+                "• [RELIABLE-QUEUE-EXHAUSTION] error will be logged\n" +
+                "• Message will be DROPPED (spawn events, RPCs, etc. will fail silently)\n" +
+                "• This is EXTREMELY RARE - requires sustained burst + high packet loss + slow ACKs\n\n" +
+                "COMMON CAUSES:\n" +
+                "• Sustained 100+ messages/sec + high packet loss (>10%)\n" +
+                "• Very high RTT (>250ms) with slow ACKs\n" +
+                "• SendBuffer full (1024 capacity) AND continued high message rate\n\n" +
+                "RECOMMENDED VALUES:\n" +
+                "• LAN/Low latency: 1000-2000 (default: 2000)\n" +
+                "• Internet/Normal latency: 2000-5000\n" +
+                "• High latency/packet loss: 5000-10000\n\n" +
+                "SYMPTOMS OF EXHAUSTION:\n" +
+                "• Spawn events never propagate (objects appear only on one client)\n" +
+                "• RPCs fail to deliver\n" +
+                "• [RELIABLE-QUEUE-EXHAUSTION] errors in logs\n\n" +
+                "Default: 2000 messages\n" +
+                "Range: 1000-10000")]
+        [Range(1000, 10000)]
+        public int maxReliableMessageQueueSize = 2000;
+
         [Tooltip("GONet needs to know immediately on start of the program whether or not this game instance is a client or the server in order to initialize properly.  When using the provided Start_CLIENT.bat and Start_SERVER.bat files with builds, that will be taken care of for you.  However, when using the editor as a client (connecting to a server build), setting this flag to true is the only way for GONet to know immediately this game instance is a client.  If you run in the editor and see errors in the log on start up (e.g., \"[Log:Error] (Thread:1) (29 Dec 2019 20:24:06.970) (frame:-1s) (GONetEventBus handler error) Event Type: GONet.GONetParticipantStartedEvent\"), then it is likely because you are running as a client and this flag is not set to true.")]
         public bool shouldAttemptAutoStartAsClient = true;
 

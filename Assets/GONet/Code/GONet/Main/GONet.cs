@@ -1828,7 +1828,10 @@ namespace GONet
             // (e.g., Client 1: 10ms RTT, Client 5: 180ms RTT due to 170ms processing delay)
             // Round-robin starting index ensures all clients get "first" position equally over time
             int startIndex = _gonetServer.nextClientProcessingStartIndex;
-            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+            if (count > 0)
+            {
+                _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+            }
 
             for (int offset = 0; offset < count; ++offset)
             {
@@ -2478,7 +2481,10 @@ namespace GONet
 
             // PHASE 2 FIX: Round-robin client processing to distribute server-side delay fairly
             int startIndex = _gonetServer.nextClientProcessingStartIndex;
-            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+            if (count > 0)
+            {
+                _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % (int)count;
+            }
 
             for (int offset = 0; offset < count; ++offset)
             {
@@ -8325,7 +8331,10 @@ namespace GONet
                             // PHASE 2 FIX: Round-robin client processing to distribute server-side delay fairly
                             int numConnections = (int)_gonetServer.numConnections;
                             int startIndex = _gonetServer.nextClientProcessingStartIndex;
-                            _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % numConnections;
+                            if (numConnections > 0)
+                            {
+                                _gonetServer.nextClientProcessingStartIndex = (startIndex + 1) % numConnections;
+                            }
 
                             for (int offset = 0; offset < numConnections; ++offset)
                             {
