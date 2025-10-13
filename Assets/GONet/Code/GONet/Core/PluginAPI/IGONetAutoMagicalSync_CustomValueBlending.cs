@@ -2616,14 +2616,24 @@ namespace GONet.PluginAPI
                                 }
                                 else
                                 {
-                                    // Bezier extrapolation code (simplified for brevity)
-                                    unsafe
+                                    // Linear extrapolation with 2 values
+                                    NumericValueChangeSnapshot justBeforeBase = valueBuffer[iBase + 1];
+                                    Vector3 justBeforeBaseValue = justBeforeBase.numericValue.UnityEngine_Vector3;
+
+                                    float elapsedTimeSinceBase = (float)TimeSpan.FromTicks(atElapsedTicks - baseSnap.elapsedTicksAtChange).TotalSeconds;
+                                    float timeBetweenSnapshots = (float)TimeSpan.FromTicks(baseSnap.elapsedTicksAtChange - justBeforeBase.elapsedTicksAtChange).TotalSeconds;
+
+                                    if (timeBetweenSnapshots > 0)
                                     {
-                                        fixed (NumericValueChangeSnapshot* bufferPtr = valueBuffer)
-                                        {
-                                            // ... (existing bezier code)
-                                            // Make sure to set rawBlendedValue before smoothing
-                                        }
+                                        Vector3 velocity = (baseValue - justBeforeBaseValue) / timeBetweenSnapshots;
+                                        blendedValue = baseValue + velocity * elapsedTimeSinceBase;
+                                        rawBlendedValue = blendedValue.UnityEngine_Vector3;
+                                    }
+                                    else
+                                    {
+                                        // No time between snapshots - use base value
+                                        blendedValue = baseValue;
+                                        rawBlendedValue = baseValue;
                                     }
                                 }
 
