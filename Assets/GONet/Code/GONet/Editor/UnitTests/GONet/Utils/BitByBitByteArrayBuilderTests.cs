@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.TestTools; // For LogAssert
 
 namespace GONet.Utils
 {
@@ -888,7 +889,13 @@ namespace GONet.Utils
                         }
                     case FloatType:
                         {
-                            builder.WriteFloat((float)test.Item1);
+                            float floatValue = (float)test.Item1;
+                            // Expect warning log if value exceeds ±1,000,000
+                            if (floatValue > 1000000f || floatValue < -1000000f)
+                            {
+                                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Float value exceeds reasonable bounds.*"));
+                            }
+                            builder.WriteFloat(floatValue);
                             break;
                         }
                     case UIntType:
@@ -930,7 +937,18 @@ namespace GONet.Utils
                     case FloatType:
                         {
                             float read = builderR.ReadFloat();
-                            Assert.AreEqual((float)test.Item1, read);
+                            // Expect clamped value if original exceeds ±1,000,000
+                            float originalValue = (float)test.Item1;
+                            float expected = originalValue;
+                            if (originalValue > 1000000f)
+                            {
+                                expected = 1000000f;
+                            }
+                            else if (originalValue < -1000000f)
+                            {
+                                expected = -1000000f;
+                            }
+                            Assert.AreEqual(expected, read);
                             break;
                         }
                     case UIntType:
@@ -1003,6 +1021,13 @@ namespace GONet.Utils
         {
             byte[] writerData = new byte[100];
             BitWriter builder = new BitWriter(writerData, writerData.Length);
+
+            // Expect warning log if value exceeds ±1,000,000
+            if (value > 1000000f || value < -1000000f)
+            {
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Float value exceeds reasonable bounds.*"));
+            }
+
             builder.WriteFloat(value);
             builder.FlushBits();
 
@@ -1010,7 +1035,18 @@ namespace GONet.Utils
             BitReader builderR = new BitReader(builder.Data, builder.BytesWritten);
             float read = builderR.ReadFloat();
 
-            Assert.AreEqual(value, read);
+            // Expect clamped value if original exceeds ±1,000,000
+            float expected = value;
+            if (value > 1000000f)
+            {
+                expected = 1000000f;
+            }
+            else if (value < -1000000f)
+            {
+                expected = -1000000f;
+            }
+
+            Assert.AreEqual(expected, read);
         }
 
         private void PerformIndividualTest(uint value, int bitCount = 32)

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine; // Assuming UnityEngine stubs or mocks if running outside Unity
+using UnityEngine.TestTools; // For LogAssert
 
 namespace GONet.Tests
 {
@@ -263,6 +264,10 @@ namespace GONet.Tests
             var sub2 = eventBus.Subscribe<BaseEvent>(BasicHandler); // Should still run
 
             var ev = new BaseEvent { BaseData = "ExceptionTest" };
+
+            // Expect the error log that GONetEventBus will produce when handler throws
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex(".*GONetEventBus handler error.*"));
+
             int exceptionCount = eventBus.Publish(ev);
 
             Assert.AreEqual(1, exceptionCount, "Publish should report 1 exception.");
