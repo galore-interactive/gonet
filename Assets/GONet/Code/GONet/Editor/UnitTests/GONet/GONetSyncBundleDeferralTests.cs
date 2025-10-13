@@ -159,154 +159,315 @@ namespace GONet
 
         #endregion
 
-        #region Integration Tests (Conceptual - Would require full GONet infrastructure)
+        #region Integration Tests (Require Unity PlayMode + GONet Runtime)
 
-        // NOTE: The following tests are conceptual and would require full GONet initialization
-        // to run properly. They document the expected behavior for manual/integration testing.
+        // NOTE: These integration tests require full GONet runtime infrastructure and Unity PlayMode.
+        // They test the complete deferral flow with actual networking and participant lifecycle.
+        //
+        // REQUIRED INFRASTRUCTURE:
+        // 1. Unity PlayMode test environment ([UnityTest] attribute)
+        // 2. GONet server + client test harness (see NetcodeIOTestBase pattern)
+        // 3. Test prefabs with GONetParticipant components
+        // 4. Network simulation for timing control
+        //
+        // IMPLEMENTATION PRIORITY:
+        // 1. [P0] DeferralEnabled_ReliableBundle_RetryAfterReady_Succeeds (core happy path)
+        // 2. [P0] DeferralDisabled_ReliableBundle_ParticipantNotReady_DropsBundle (default behavior)
+        // 3. [P1] DeferralEnabled_QueueFull_DropsOldest (edge case handling)
+        // 4. [P1] IncrementalProcessing_LimitsPerCallback (performance characteristic)
+        // 5. [P2] DeferralEnabled_ReliableBundle_RetryStillNotReady_Drops (lifecycle bug detection)
+        //
+        // TIME ESTIMATE: ~2-3 days for full implementation
 
-        /*
         [Test]
-        public void DeferralDisabled_UnreliableBundle_ParticipantNotReady_DropsBundle()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_DeferralEnabled_ReliableBundle_RetryAfterReady_Succeeds()
         {
-            // SCENARIO: Default behavior (deferral disabled)
-            // - Unreliable sync bundle arrives
-            // - Participant exists but didAwakeComplete=false
-            // - EXPECTED: Bundle dropped, no queue, no retry
-            // - RATIONALE: Transient state, next update arrives in 16-33ms anyway
+            // SCENARIO: Core happy path - deferred bundle processed after participant ready (P0)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Server spawns test prefab (simple cube with GONetParticipant + synced position)
+            //
+            // TEST FLOW:
+            // 1. Server changes cube position to (10, 0, 0)
+            // 2. Server sends reliable sync bundle to client
+            // 3. Bundle arrives at client BEFORE client's cube completes Awake()
+            //    - Trigger this by: Spawning multiple objects to delay Awake, or injecting delay in Awake
+            // 4. Bundle triggers GONetParticipantNotReadyException (didAwakeComplete=false)
+            // 5. Bundle deferred to incomingNetworkData_waitingForGONetReady queue
+            //    - Verify: GONet.incomingNetworkData_waitingForGONetReady.Count == 1
+            // 6. Wait for client's cube to complete Awake() → OnGONetReady fires
+            // 7. ProcessDeferredSyncBundlesWaitingForGONetReady() called automatically
+            // 8. Bundle dequeued and processed successfully
+            //    - Verify: GONet.incomingNetworkData_waitingForGONetReady.Count == 0
+            //    - Verify: Client cube position == (10, 0, 0)
+            //
+            // ASSERTIONS:
+            // - Bundle was queued (not dropped)
+            // - Bundle processed after OnGONetReady
+            // - Final state synchronized correctly
+            // - No errors logged
+            //
+            // IMPLEMENTATION NOTE:
+            // Use coroutine with yield return null to wait for Awake completion.
+            // Monitor GONetLog for "[GONETREADY-QUEUE] Deferred reliable sync bundle" message.
         }
 
         [Test]
-        public void DeferralDisabled_ReliableBundle_ParticipantNotReady_DropsBundle()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_DeferralDisabled_ReliableBundle_ParticipantNotReady_DropsBundle()
         {
-            // SCENARIO: Default behavior (deferral disabled)
-            // - Reliable sync bundle arrives
-            // - Participant exists but didAwakeComplete=false
-            // - EXPECTED: Bundle dropped, no queue, no retry
-            // - RATIONALE: Authority re-sends state 30-60 times/sec, auto-recovery
+            // SCENARIO: Default behavior - bundles dropped when participant not ready (P0)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Ensure deferral DISABLED (default): GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = false
+            // 3. Server spawns test prefab
+            //
+            // TEST FLOW:
+            // 1. Server changes cube position to (10, 0, 0)
+            // 2. Server sends reliable sync bundle to client
+            // 3. Bundle arrives at client BEFORE client's cube completes Awake()
+            // 4. Bundle triggers GONetParticipantNotReadyException
+            // 5. Bundle DROPPED (not queued)
+            //    - Verify: GONet.incomingNetworkData_waitingForGONetReady.Count == 0
+            // 6. Wait for client's cube to complete Awake()
+            // 7. Server continues sending position updates (authority re-sends state)
+            // 8. Client eventually receives subsequent update and syncs position
+            //
+            // ASSERTIONS:
+            // - Bundle was NOT queued (dropped)
+            // - Client position eventually syncs from subsequent updates
+            // - GONetLog shows "[GONETREADY-DROP] Dropped sync bundle" message
+            //
+            // RATIONALE:
+            // - Matches industry standards (FishNet, Mirror)
+            // - Authority re-sends state 30-60 times/sec → auto-recovery
+            // - Zero performance overhead
         }
 
         [Test]
-        public void DeferralEnabled_UnreliableBundle_ParticipantNotReady_DropsBundle()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_DeferralEnabled_UnreliableBundle_AlwaysDropped()
         {
-            // SCENARIO: Deferral enabled but unreliable channel
-            // - Unreliable sync bundle arrives
-            // - Participant exists but didAwakeComplete=false
-            // - EXPECTED: Bundle dropped (unreliable ALWAYS drops, by design)
-            // - RATIONALE: Deferral only applies to reliable channels
+            // SCENARIO: Unreliable bundles NEVER deferred, even with deferral enabled (P1)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Server spawns test prefab with unreliable sync field
+            //
+            // TEST FLOW:
+            // 1. Server changes unreliable field value
+            // 2. Server sends UNRELIABLE sync bundle to client
+            // 3. Bundle arrives before participant ready
+            // 4. Bundle DROPPED (not queued, even though deferral enabled)
+            //    - Verify: GONet.incomingNetworkData_waitingForGONetReady.Count == 0
+            //
+            // ASSERTIONS:
+            // - Unreliable bundle not queued (by design)
+            // - GONetLog shows "[GONETREADY-DROP]" with channel info
+            //
+            // RATIONALE:
+            // - Unreliable data is transient by nature
+            // - Queueing defeats purpose of unreliable channel
         }
 
         [Test]
-        public void DeferralEnabled_ReliableBundle_ParticipantNotReady_QueuesBundle()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_DeferralEnabled_QueueFull_DropsOldest()
         {
-            // SCENARIO: Opt-in deferral for reliable bundles
-            // - testGlobal.deferSyncBundlesWaitingForGONetReady = true
-            // - Reliable sync bundle arrives
-            // - Participant exists but didAwakeComplete=false
-            // - EXPECTED: Bundle queued in incomingNetworkData_waitingForGONetReady
-            // - shouldReturnToPool = false (queue owns byte array)
+            // SCENARIO: Queue capacity exceeded - FIFO drop policy (P1)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Set small queue size: GONetGlobal.Instance.maxSyncBundlesWaitingForGONetReady = 5
+            //
+            // TEST FLOW:
+            // 1. Server spawns 10 test cubes rapidly (faster than client Awake can complete)
+            // 2. Server sends position updates for all 10 cubes
+            // 3. All bundles arrive before participants ready
+            // 4. First 5 bundles queued successfully
+            // 5. 6th bundle arrives → oldest bundle (1st) dropped, 6th queued
+            // 6. 7th bundle arrives → oldest bundle (2nd) dropped, 7th queued
+            // 7. Monitor GONetLog for warning:
+            //    "[GONETREADY-QUEUE] Queue full (5 bundles)! Dropping OLDEST deferred bundle"
+            //
+            // ASSERTIONS:
+            // - Queue never exceeds maxSyncBundlesWaitingForGONetReady
+            // - Oldest bundles dropped (FIFO policy)
+            // - Warning logged with suggestion to increase queue size
+            // - Byte arrays from dropped bundles returned to pool (no memory leak)
+            //
+            // MEMORY LEAK CHECK:
+            // - Track pool size before/after test
+            // - Verify all borrowed byte arrays returned
         }
 
         [Test]
-        public void DeferralEnabled_ReliableBundle_RetryAfterReady_Succeeds()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_IncrementalProcessing_LimitsPerCallback()
         {
-            // SCENARIO: Deferred bundle processed after participant ready
-            // - Bundle queued (participant not ready initially)
-            // - Participant completes Awake() → didAwakeComplete=true
-            // - CheckAndPublishOnGONetReady() fires → ProcessDeferredSyncBundlesWaitingForGONetReady()
-            // - EXPECTED: Bundle dequeued, processed successfully
-            // - Byte array returned to pool after success
+            // SCENARIO: Prevent frame stutter during mass spawns (P1)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Set processing limit: GONetGlobal.Instance.maxBundlesProcessedPerGONetReadyCallback = 5
+            //
+            // TEST FLOW:
+            // 1. Server spawns 20 test cubes rapidly
+            // 2. Server sends sync bundles for all 20 cubes
+            // 3. All bundles arrive before participants ready → 20 bundles queued
+            // 4. First participant completes Awake() → OnGONetReady fires
+            // 5. ProcessDeferredSyncBundlesWaitingForGONetReady() processes 5 bundles (hits limit)
+            //    - Verify: Queue size drops from 20 to 15
+            // 6. Second participant completes Awake() → processes 5 more bundles
+            //    - Verify: Queue size drops from 15 to 10
+            // 7. Continue until queue empty
+            //
+            // ASSERTIONS:
+            // - No more than maxBundlesProcessedPerGONetReadyCallback processed per OnGONetReady
+            // - Queue gradually drains across multiple callbacks
+            // - GONetLog shows incremental progress:
+            //   "[GONETREADY-QUEUE] Processed 5 deferred bundles, 0 dropped, 15 remaining in queue"
+            //
+            // PERFORMANCE MEASUREMENT:
+            // - Measure frame time during processing
+            // - Should not spike significantly (frame stutter prevention)
         }
 
         [Test]
-        public void DeferralEnabled_ReliableBundle_RetryStillNotReady_Drops()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_DeferralEnabled_RetryStillNotReady_Drops()
         {
-            // SCENARIO: Participant STILL not ready after 1+ frames (lifecycle bug)
-            // - Bundle queued (participant not ready)
-            // - ProcessDeferredSyncBundlesWaitingForGONetReady() called
-            // - isProcessingFromQueue=true → GONetParticipantNotReadyException thrown again
-            // - EXPECTED: Bundle dropped, error logged (lifecycle bug detected)
+            // SCENARIO: Participant STILL not ready after retry - lifecycle bug detection (P2)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Create BUGGY test prefab that never completes Awake():
+            //    - GONetParticipant with didAwakeComplete manually kept false
+            //    - Or syncCompanion set to null in Start()
+            //
+            // TEST FLOW:
+            // 1. Server spawns buggy prefab
+            // 2. Server sends sync bundle
+            // 3. Bundle arrives, participant not ready → queued
+            // 4. Participant's OnGONetReady fires (but still broken somehow)
+            // 5. ProcessDeferredSyncBundlesWaitingForGONetReady() calls ProcessIncomingBytes with isProcessingFromQueue=true
+            // 6. Participant STILL not ready → GONetParticipantNotReadyException thrown again
+            // 7. Exception handler detects isProcessingFromQueue=true → DROPS bundle (not requeue)
+            // 8. GONetLog.Error logged:
+            //    "[GONETREADY-QUEUE] Sync bundle still has unready participant... after retry. This indicates an OnGONetReady lifecycle bug."
+            //
+            // ASSERTIONS:
+            // - Bundle not requeued (infinite retry prevented)
+            // - Error logged identifying lifecycle bug
             // - Byte array returned to pool
+            //
+            // PURPOSE:
+            // - Detect bugs in OnGONetReady lifecycle implementation
+            // - Prevent infinite retry loops
         }
 
         [Test]
-        public void DeferralEnabled_QueueFull_DropsOldest()
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_ParticipantDestroyed_BeforeRetry_DropsGracefully()
         {
-            // SCENARIO: Queue capacity exceeded (FIFO drop policy)
-            // - testGlobal.maxSyncBundlesWaitingForGONetReady = 100
-            // - 100 bundles already queued
-            // - 101st bundle arrives (participant still not ready)
-            // - EXPECTED: Oldest bundle dequeued and dropped
-            // - Oldest bundle's byte array returned to pool
-            // - 101st bundle queued
-            // - Warning logged prompting user to increase queue size
-        }
-
-        [Test]
-        public void IncrementalProcessing_LimitsPerCallback()
-        {
-            // SCENARIO: Prevent frame stutter during mass spawns
-            // - testGlobal.maxBundlesProcessedPerGONetReadyCallback = 10
-            // - 50 bundles queued (waiting for participants)
-            // - ProcessDeferredSyncBundlesWaitingForGONetReady() called
-            // - EXPECTED: Only 10 bundles processed in this call
-            // - 40 bundles remain in queue for next OnGONetReady callback
-            // - Prevents frame spike from processing all 50 at once
-        }
-
-        [Test]
-        public void PoolSafety_BundleDropped_ByteArrayReturned()
-        {
-            // SCENARIO: Memory leak prevention (critical!)
-            // - Bundle deferred → NetworkData.messageBytes borrowed from pool
-            // - Bundle dropped (unreliable, or queue full, or retry failed)
-            // - EXPECTED: Byte array MUST be returned to pool via queueForPostWorkResourceReturn
-            // - Failure to return = pool exhaustion = allocation spikes
-        }
-
-        [Test]
-        public void PoolSafety_BundleProcessed_ByteArrayReturned()
-        {
-            // SCENARIO: Memory leak prevention (critical!)
-            // - Bundle deferred → NetworkData.messageBytes borrowed from pool
-            // - Bundle processed successfully after retry
-            // - EXPECTED: Byte array MUST be returned to pool
-            // - ProcessIncomingBytes_QueuedNetworkData_MainThread_INTERNAL handles return
-        }
-
-        [Test]
-        public void AuthorityAgnostic_ClientReceives_Works()
-        {
-            // SCENARIO: Client receiving sync bundles from server
-            // - Client spawns object locally (client authority initially)
-            // - Server assumes authority (IsMine=False on client)
-            // - Server sends sync bundle → arrives before client's Awake completes
-            // - EXPECTED: Deferral works (if enabled), or drops (if disabled)
-        }
-
-        [Test]
-        public void AuthorityAgnostic_ServerReceives_Works()
-        {
-            // SCENARIO: Server receiving sync bundles from client
-            // - Client spawns object → sends to server
-            // - Server receives spawn event → instantiates locally
-            // - Client sends sync bundle → arrives before server's Awake completes
-            // - EXPECTED: Deferral works (if enabled), or drops (if disabled)
-            // - NOT client-only - works for ALL receivers
-        }
-
-        [Test]
-        public void ParticipantDestroyed_BeforeRetry_DropsGracefully()
-        {
-            // SCENARIO: Edge case - participant despawned while bundle queued
-            // - Bundle queued (participant not ready)
-            // - Participant destroyed (despawn event)
-            // - ProcessDeferredSyncBundlesWaitingForGONetReady() called
-            // - GetGONetParticipantById() returns null
-            // - EXPECTED: KeyNotFoundException caught, bundle dropped
+            // SCENARIO: Edge case - participant despawned while bundle queued (P2)
+            //
+            // SETUP:
+            // 1. Start GONet server + single client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            //
+            // TEST FLOW:
+            // 1. Server spawns test cube
+            // 2. Server sends sync bundle to client
+            // 3. Bundle arrives before participant ready → queued
+            // 4. Server immediately despawns cube (before client Awake completes)
+            // 5. Client receives despawn event → destroys participant GameObject
+            // 6. Client's OnGONetReady fires for other participant
+            // 7. ProcessDeferredSyncBundlesWaitingForGONetReady() tries to process queued bundle
+            // 8. GetGONetParticipantById() returns null (participant destroyed)
+            // 9. KeyNotFoundException caught → bundle dropped gracefully
+            //
+            // ASSERTIONS:
+            // - No crash (exception caught)
+            // - Bundle dropped cleanly
             // - Byte array returned to pool
-            // - No crash, clean failure
+            // - No errors logged (expected behavior for rapid spawn/despawn)
         }
-        */
+
+        [Test]
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_AuthorityAgnostic_ClientToServer_Works()
+        {
+            // SCENARIO: Deferral works server-side when receiving from client (P1)
+            //
+            // SETUP:
+            // 1. Start GONet server + client
+            // 2. Enable deferral on SERVER: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            //
+            // TEST FLOW:
+            // 1. Client spawns object (client authority initially)
+            // 2. Server receives spawn event → begins instantiation
+            // 3. Client immediately sends sync bundle (position update)
+            // 4. Bundle arrives at server BEFORE server's instantiation completes Awake()
+            // 5. Server defers bundle (participant not ready)
+            // 6. Server's participant completes Awake() → OnGONetReady
+            // 7. Deferred bundle processed on server
+            //
+            // ASSERTIONS:
+            // - Deferral works on server (not client-only feature)
+            // - Server correctly receives client's sync data after retry
+            //
+            // PURPOSE:
+            // - Verify authority-agnostic implementation
+            // - Server can defer bundles just like clients
+        }
+
+        [Test]
+        [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
+        public void Integration_MemoryLeakStressTest_AllByteArraysReturned()
+        {
+            // SCENARIO: Stress test - verify no memory leaks under all code paths (P1)
+            //
+            // SETUP:
+            // 1. Start GONet server + client
+            // 2. Enable deferral: GONetGlobal.Instance.deferSyncBundlesWaitingForGONetReady = true
+            // 3. Set small queue size to trigger drops: maxSyncBundlesWaitingForGONetReady = 10
+            // 4. Record initial pool sizes
+            //
+            // TEST FLOW:
+            // 1. Spawn 100 objects rapidly (mix of reliable/unreliable sync)
+            // 2. Trigger ALL code paths:
+            //    - Bundles queued (reliable, participant not ready)
+            //    - Bundles dropped (unreliable, participant not ready)
+            //    - Queue overflow (oldest bundles dropped)
+            //    - Successful processing (bundles processed after ready)
+            //    - Retry failure (bundles dropped after still not ready)
+            // 3. Wait for all processing to complete
+            // 4. Force GC.Collect()
+            // 5. Check pool sizes
+            //
+            // ASSERTIONS:
+            // - All borrowed byte arrays returned to pool
+            // - Pool sizes match initial state (no leaks)
+            // - No unexpected allocations
+            //
+            // CRITICAL:
+            // - Memory leak in deferral path = pool exhaustion = allocation spikes
+            // - MUST verify byte arrays returned in ALL paths:
+            //   - Drop (unreliable or deferral disabled)
+            //   - Queue overflow (oldest dropped)
+            //   - Retry success (processed)
+            //   - Retry failure (dropped after retry)
+        }
+
 
         #endregion
 
