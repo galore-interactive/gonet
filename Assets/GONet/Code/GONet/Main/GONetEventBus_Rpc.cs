@@ -6412,34 +6412,47 @@ namespace GONet
                 }
                 else if (GONetMain.IsServer)
                 {
-                    // Server: Validate, route, and generate delivery report
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with empty parameters array
+                        object[] parameters = new object[0];
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult);
+                    }
+
+                    // Server: Validate, route, and generate delivery report (sync fallback)
 
                     // Validate targets
-                    RpcValidationResult validationResult;
+                    RpcValidationResult syncValidationResult;
                     if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
                         validators.TryGetValue(methodName, out var validatorObj) &&
                         validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
                         paramCounts.TryGetValue(methodName, out var paramCount))
                     {
-                        validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
+                        syncValidationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, null);
                     }
                     else
                     {
-                        validationResult = Server_DefaultValidation(targetBuffer, targetCount);
+                        syncValidationResult = Server_DefaultValidation(targetBuffer, targetCount);
                     }
 
                     // Store validation report if significant
                     ulong reportId = 0;
-                    var deniedTargets = validationResult.GetDeniedTargetsList(targetBuffer);
-                    if (deniedTargets.Length > 0 || validationResult.ModifiedData != null)
+                    var deniedTargets = syncValidationResult.GetDeniedTargetsList(targetBuffer);
+                    if (deniedTargets.Length > 0 || syncValidationResult.ModifiedData != null)
                     {
-                        reportId = StoreValidationReport(validationResult);
+                        reportId = StoreValidationReport(syncValidationResult);
                     }
 
                     // Route to allowed targets
-                    if (validationResult.TargetCount > 0)
+                    if (syncValidationResult.TargetCount > 0)
                     {
-                        for (int i = 0; i < validationResult.TargetCount; i++)
+                        for (int i = 0; i < syncValidationResult.TargetCount; i++)
                         {
                             var rpcEvent = RpcEvent.Borrow();
                             rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
@@ -6453,14 +6466,14 @@ namespace GONet
                     }
 
                     // Create delivery report
-                    var allowedTargets = validationResult.GetAllowedTargetsList(targetBuffer);
+                    var allowedTargets = syncValidationResult.GetAllowedTargetsList(targetBuffer);
 
                     var deliveryReport = new RpcDeliveryReport
                     {
                         DeliveredTo = allowedTargets,
                         FailedDelivery = deniedTargets,
-                        FailureReason = validationResult.DenialReason,
-                        WasModified = validationResult.ModifiedData != null,
+                        FailureReason = syncValidationResult.DenialReason,
+                        WasModified = syncValidationResult.ModifiedData != null,
                         ValidationReportId = reportId
                     };
 
@@ -6518,8 +6531,20 @@ namespace GONet
                 }
                 else if (GONetMain.IsServer)
                 {
-                    // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with strongly-typed parameters
+                        object[] parameters = new object[] { arg1 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1);
+                    }
+
+                    // Fall back to sync validation or default
                     var data = new RpcData1<T1> { Arg1 = arg1 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6576,8 +6601,20 @@ namespace GONet
                 }
                 else if (GONetMain.IsServer)
                 {
-                    // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with strongly-typed parameters
+                        object[] parameters = new object[] { arg1, arg2 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2);
+                    }
+
+                    // Fall back to sync validation or default
                     var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6634,8 +6671,20 @@ namespace GONet
                 }
                 else if (GONetMain.IsServer)
                 {
-                    // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with strongly-typed parameters
+                        object[] parameters = new object[] { arg1, arg2, arg3 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3);
+                    }
+
+                    // Fall back to sync validation or default
                     var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6692,8 +6741,20 @@ namespace GONet
                 }
                 else if (GONetMain.IsServer)
                 {
-                    // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with strongly-typed parameters
+                        object[] parameters = new object[] { arg1, arg2, arg3, arg4 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4);
+                    }
+
+                    // Fall back to sync validation or default
                     var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6821,7 +6882,21 @@ namespace GONet
                 else if (GONetMain.IsServer)
                 {
                     // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with object array (to support SetValidatedOverride modifications)
+                        object[] parameters = new object[] { arg1, arg2, arg3, arg4, arg5, arg6 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result and apply any parameter modifications
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
+
+                    // Fall back to SYNC validation - serialize first, then validate with byte[]
                     var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6879,7 +6954,21 @@ namespace GONet
                 else if (GONetMain.IsServer)
                 {
                     // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with object array (to support SetValidatedOverride modifications)
+                        object[] parameters = new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result and apply any parameter modifications
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
+
+                    // Fall back to SYNC validation - serialize first, then validate with byte[]
                     var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
                     int bytesUsed;
                     bool needsReturn;
@@ -6939,7 +7028,21 @@ namespace GONet
                 else if (GONetMain.IsServer)
                 {
                     // Server: Validate, route, and generate delivery report
-                    // Serialize for validation
+
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+                    {
+                        // Invoke async validator with object array (to support SetValidatedOverride modifications)
+                        object[] parameters = new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 };
+                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                        // Handle validation result and apply any parameter modifications
+                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                    }
+
+                    // Fall back to SYNC validation - serialize first, then validate with byte[]
                     var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
                     int bytesUsed;
                     bool needsReturn;
@@ -7182,6 +7285,774 @@ namespace GONet
             }
 
             // Create delivery report
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 0-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult)
+        {
+            // Convert bool array to allowed/denied lists
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            // No parameters to modify for 0-param RPCs
+
+            // Store validation report if significant
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                // 1. Check if server is a target and execute ONCE locally
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                // 2. Send directly to remote clients
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 1-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                }
+            }
+
+            var data = new RpcData1<T1> { Arg1 = arg1 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 2-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                }
+            }
+
+            var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 3-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2, T3 arg3)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                    if (overrides.ContainsKey(2)) arg3 = (T3)overrides[2];
+                }
+            }
+
+            var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 4-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3, T4>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                    if (overrides.ContainsKey(2)) arg3 = (T3)overrides[2];
+                    if (overrides.ContainsKey(3)) arg4 = (T4)overrides[3];
+                }
+            }
+
+            var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 6-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3, T4, T5, T6>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                    if (overrides.ContainsKey(2)) arg3 = (T3)overrides[2];
+                    if (overrides.ContainsKey(3)) arg4 = (T4)overrides[3];
+                    if (overrides.ContainsKey(4)) arg5 = (T5)overrides[4];
+                    if (overrides.ContainsKey(5)) arg6 = (T6)overrides[5];
+                }
+            }
+
+            var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 7-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3, T4, T5, T6, T7>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                    if (overrides.ContainsKey(2)) arg3 = (T3)overrides[2];
+                    if (overrides.ContainsKey(3)) arg4 = (T4)overrides[3];
+                    if (overrides.ContainsKey(4)) arg5 = (T5)overrides[4];
+                    if (overrides.ContainsKey(5)) arg6 = (T6)overrides[5];
+                    if (overrides.ContainsKey(6)) arg7 = (T7)overrides[6];
+                }
+            }
+
+            var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.WasModified,
+                ValidationReportId = reportId
+            };
+        }
+
+        // 8-param async validation handler
+        private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3, T4, T5, T6, T7, T8>(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
+            T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        {
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            if (validationResult.WasModified)
+            {
+                var overrides = validationResult.GetValidatedOverrides();
+                if (overrides != null)
+                {
+                    if (overrides.ContainsKey(0)) arg1 = (T1)overrides[0];
+                    if (overrides.ContainsKey(1)) arg2 = (T2)overrides[1];
+                    if (overrides.ContainsKey(2)) arg3 = (T3)overrides[2];
+                    if (overrides.ContainsKey(3)) arg4 = (T4)overrides[3];
+                    if (overrides.ContainsKey(4)) arg5 = (T5)overrides[4];
+                    if (overrides.ContainsKey(5)) arg6 = (T6)overrides[5];
+                    if (overrides.ContainsKey(6)) arg7 = (T7)overrides[6];
+                    if (overrides.ContainsKey(7)) arg8 = (T8)overrides[7];
+                }
+            }
+
+            var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
+            int bytesUsed;
+            bool needsReturn;
+            byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.WasModified)
+            {
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = serialized;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = serialized;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return();
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
             return new RpcDeliveryReport
             {
                 DeliveredTo = allowedList.ToArray(),
