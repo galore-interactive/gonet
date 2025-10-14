@@ -1232,8 +1232,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         GONetLog.Info($"[CHAT-DEBUG] SendCurrentMessage called. Mode: {currentChatMode}, Participants count: {participants.Count}, GONetId: {gonetParticipant?.GONetId ?? 0}, IsMine: {gonetParticipant?.IsMine ?? false}");
 
-        // Filter profanity locally if server (client-side preview only - real filtering happens server-side)
-        string finalContent = GONetMain.IsServer ? FilterProfanity(currentInputText) : currentInputText;
+        // Let the server-side validator handle ALL filtering (no client-side pre-filtering)
+        string finalContent = currentInputText;
 
         // Set up targets based on mode
         HashSet<ushort> uniqueTargets = new HashSet<ushort>(); // Use HashSet to prevent duplicates
