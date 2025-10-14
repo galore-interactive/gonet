@@ -788,7 +788,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
     /// <param name="recipients">Array of recipient authority IDs for proper message filtering</param>
     /// <returns>Delivery report indicating successful/failed deliveries</returns>
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
+    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
         await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
@@ -884,6 +885,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <summary>
     /// Custom RPC validation method demonstrating GONet's new validation system capabilities.
     /// This method shows how to implement server-side validation with content modification.
+    /// Synchronous version of <see cref="ValidateMessageAsync(string, string, ChatType, ushort, ushort[])"/>
     ///
     /// Validation Features Demonstrated:
     /// - Target authorization based on connection status
@@ -973,7 +975,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     }
 
     /// <summary>
-    /// ASYNC version of ValidateMessage - demonstrates non-blocking RPC validation with async/await.
+    /// ASYNC version of <see cref="ValidateMessage(ref string, ref string, ref ChatType, ref ushort, ref ushort[])"/> - 
+    ///    demonstrates non-blocking RPC validation with async/await.
     /// This method performs the same validation as ValidateMessage but without blocking the Unity main thread.
     ///
     /// Key Differences from Sync Version:
