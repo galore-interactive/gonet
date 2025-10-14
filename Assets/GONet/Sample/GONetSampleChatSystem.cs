@@ -1017,16 +1017,20 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         ushort fromUserId,     // [3]
         ushort[] recipients)   // [4]
     {
+        GONetLog.Info($"[CHAT VALIDATION] ValidateMessageAsync ENTERED - content: '{content}', channel: '{channelName}', type: {messageType}, fromUser: {fromUserId}, recipients: {recipients?.Length ?? 0}");
+
         // Get the pre-allocated validation result from the context
         var validationContext = GONetMain.EventBus.GetValidationContext();
         if (!validationContext.HasValue)
         {
+            GONetLog.Warning($"[CHAT VALIDATION] NO VALIDATION CONTEXT - returning allow-all");
             // Fallback if no validation context (shouldn't happen in normal flow)
             var resultAllow = RpcValidationResult.CreatePreAllocated(1);
             resultAllow.AllowAll();
             return resultAllow;
         }
 
+        GONetLog.Info($"[CHAT VALIDATION] Got validation context, targetCount={validationContext.Value.TargetCount}");
         var result = validationContext.Value.GetValidationResult();
 
         // Check which targets are connected and set the bool array accordingly
@@ -1057,24 +1061,33 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         try
         {
             string originalContent = content;
+            GONetLog.Info($"[CHAT VALIDATION] Starting async profanity filter for content: '{originalContent}'");
 
             // Perform async profanity filtering (non-blocking)
             string filteredContent = await FilterProfanityAsync(originalContent);
 
+            GONetLog.Info($"[CHAT VALIDATION] Profanity filter returned: '{filteredContent}' (original: '{originalContent}', modified: {filteredContent != originalContent})");
+
             if (filteredContent != originalContent)
             {
+                GONetLog.Info($"[CHAT VALIDATION] CONTENT WAS MODIFIED - using SetValidatedOverride");
                 // Message was modified - use SetValidatedOverride API
                 result.SetValidatedOverride(0, filteredContent);  // Parameter index 0 = content
 
                 // Note: result.WasModified is automatically set to true by SetValidatedOverride()
                 // The framework will serialize all params (original + overrides) into ModifiedData
             }
+            else
+            {
+                GONetLog.Info($"[CHAT VALIDATION] Content was NOT modified (clean message)");
+            }
         }
         catch (Exception ex)
         {
-            GONetLog.Error($"Failed to filter message content (async): {ex.Message}");
+            GONetLog.Error($"[CHAT VALIDATION] Failed to filter message content (async): {ex.Message}");
         }
 
+        GONetLog.Info($"[CHAT VALIDATION] ValidateMessageAsync RETURNING - WasModified={result.WasModified}");
         return result;
     }
 
