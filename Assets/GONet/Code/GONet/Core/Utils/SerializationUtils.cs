@@ -90,6 +90,7 @@ namespace GONet.Utils
                     arrayPool.Return(borrowed);
                     return true;
                 }
+                catch (InvalidOperationException) { }
                 catch (NotBorrowedFromPoolException) { }
                 catch (NullReferenceException) { }
             }
