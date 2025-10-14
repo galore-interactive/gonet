@@ -17,6 +17,7 @@ using GONet.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
@@ -539,6 +540,52 @@ namespace GONet
                 var result = RpcValidationResult.CreatePreAllocated(targetCount);
                 result.AllowAll();
                 return result;
+            }
+        }
+
+        /// <summary>
+        /// Detects if a validation method is async by checking its return type.
+        /// </summary>
+        /// <param name="method">The validation method to inspect</param>
+        /// <returns>True if the method returns Task&lt;RpcValidationResult&gt;, false otherwise</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsAsyncValidator(MethodInfo method)
+        {
+            if (method == null) return false;
+
+            Type returnType = method.ReturnType;
+
+            // Check if return type is Task<RpcValidationResult>
+            return returnType.IsGenericType &&
+                   returnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                   returnType.GetGenericArguments()[0] == typeof(RpcValidationResult);
+        }
+
+        /// <summary>
+        /// Invokes an async validator method and returns the Task.
+        /// </summary>
+        /// <param name="method">The async validator method to invoke</param>
+        /// <param name="instance">The component instance</param>
+        /// <param name="parameters">The parameter array (already deserialized)</param>
+        /// <returns>Task that completes with the RpcValidationResult</returns>
+        private static Task<RpcValidationResult> InvokeAsyncValidatorAsync(MethodInfo method, object instance, object[] parameters)
+        {
+            try
+            {
+                // Invoke the async validator method
+                object resultObj = method.Invoke(instance, parameters);
+
+                // Cast to Task<RpcValidationResult>
+                return (Task<RpcValidationResult>)resultObj;
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"Error invoking async validator {method.Name} on {instance.GetType().Name}: {ex}");
+
+                // Return failed task with error result
+                var result = RpcValidationResult.CreatePreAllocated(0);
+                result.DenyAll($"Async validator invocation failed: {ex.Message}");
+                return Task.FromResult(result);
             }
         }
 
