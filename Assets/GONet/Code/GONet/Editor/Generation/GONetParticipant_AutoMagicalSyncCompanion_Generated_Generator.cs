@@ -2041,13 +2041,43 @@ namespace GONet.Generation
 
             if (hasValidation)
             {
-                // Register sync validators (delegates)
-                sb.AppendLine("                if (EnhancedValidators != null && EnhancedValidators.Count > 0)");
-                sb.AppendLine($"                    GONetMain.EventBus.RegisterEnhancedValidators(typeof({className}), EnhancedValidators, ValidatorParameterCounts);");
+                // Check if we have sync validators (EnhancedValidators dictionary was generated)
+                bool hasSyncValidators = derivedRpcMethods.Any(m =>
+                {
+                    var attr = m.GetCustomAttribute<TargetRpcAttribute>();
+                    if (attr != null && !string.IsNullOrEmpty(attr.ValidationMethodName))
+                    {
+                        var valMethod = componentType.GetMethod(attr.ValidationMethodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        return valMethod != null && !IsAsyncValidationMethod(valMethod) && HasMatchingValidationSignature(m, valMethod);
+                    }
+                    return false;
+                });
 
-                // Register async validators (MethodInfo)
-                sb.AppendLine("                if (AsyncValidators != null && AsyncValidators.Count > 0)");
-                sb.AppendLine($"                    GONetMain.EventBus.RegisterAsyncValidators(typeof({className}), AsyncValidators, ValidatorParameterCounts);");
+                // Check if we have async validators (AsyncValidators dictionary was generated)
+                bool hasAsyncValidators = derivedRpcMethods.Any(m =>
+                {
+                    var attr = m.GetCustomAttribute<TargetRpcAttribute>();
+                    if (attr != null && !string.IsNullOrEmpty(attr.ValidationMethodName))
+                    {
+                        var valMethod = componentType.GetMethod(attr.ValidationMethodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        return valMethod != null && IsAsyncValidationMethod(valMethod) && HasMatchingValidationSignature(m, valMethod);
+                    }
+                    return false;
+                });
+
+                // Register sync validators (only if they exist)
+                if (hasSyncValidators)
+                {
+                    sb.AppendLine("                if (EnhancedValidators != null && EnhancedValidators.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterEnhancedValidators(typeof({className}), EnhancedValidators, ValidatorParameterCounts);");
+                }
+
+                // Register async validators (only if they exist)
+                if (hasAsyncValidators)
+                {
+                    sb.AppendLine("                if (AsyncValidators != null && AsyncValidators.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterAsyncValidators(typeof({className}), AsyncValidators, ValidatorParameterCounts);");
+                }
             }
 
             sb.AppendLine("                RegisterRpcHandlers();");
