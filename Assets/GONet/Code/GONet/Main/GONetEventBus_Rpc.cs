@@ -610,6 +610,10 @@ namespace GONet
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, object>> enhancedValidatorsByType = new();
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, int>> validatorParameterCounts = new();
 
+        // Async validator storage: MethodInfo for reflection-based async invocation
+        // Stored separately because async validators cannot be compiled to delegates (Task<T> return type)
+        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<string, MethodInfo>> asyncValidatorsByType = new();
+
         // Performance optimization: Cache compiled validators to eliminate reflection overhead
         private readonly ConcurrentDictionary<string, CompiledValidator> compiledValidatorCache = new();
 
@@ -661,6 +665,23 @@ namespace GONet
             var concurrentParamCounts = new ConcurrentDictionary<string, int>(parameterCounts);
 
             enhancedValidatorsByType.AddOrUpdate(type, concurrentValidators, (key, existing) => concurrentValidators);
+            validatorParameterCounts.AddOrUpdate(type, concurrentParamCounts, (key, existing) => concurrentParamCounts);
+        }
+
+        /// <summary>
+        /// Registers async validation methods for a component type.
+        /// Thread-safe registration of async validators that return Task&lt;RpcValidationResult&gt;.
+        /// </summary>
+        /// <param name="type">Component type to register validators for</param>
+        /// <param name="asyncValidators">Dictionary of method name to MethodInfo</param>
+        /// <param name="parameterCounts">Dictionary of method name to parameter count</param>
+        public void RegisterAsyncValidators(Type type, Dictionary<string, MethodInfo> asyncValidators, Dictionary<string, int> parameterCounts)
+        {
+            // Convert to concurrent dictionaries for thread-safe access during RPC processing
+            var concurrentAsyncValidators = new ConcurrentDictionary<string, MethodInfo>(asyncValidators);
+            var concurrentParamCounts = new ConcurrentDictionary<string, int>(parameterCounts);
+
+            asyncValidatorsByType.AddOrUpdate(type, concurrentAsyncValidators, (key, existing) => concurrentAsyncValidators);
             validatorParameterCounts.AddOrUpdate(type, concurrentParamCounts, (key, existing) => concurrentParamCounts);
         }
 
