@@ -1807,6 +1807,9 @@ namespace GONet.Generation
             // Generate validation delegates (only derived)
             GenerateValidationDelegates(sb, componentType, derivedRpcMethods);
 
+            // Generate deserialization delegates for async validation (only derived, only with parameters)
+            GenerateDeserializationDelegates(sb, componentType, derivedRpcMethods);
+
             GenerateMetadataDictionaryWithBase(sb, componentType, baseRpcMethods, derivedRpcMethods);
 
             // Generate dispatcher methods (only for derived)
@@ -2041,8 +2044,49 @@ namespace GONet.Generation
 
             if (hasValidation)
             {
-                sb.AppendLine("                if (EnhancedValidators.Count > 0)");
-                sb.AppendLine($"                    GONetMain.EventBus.RegisterEnhancedValidators(typeof({className}), EnhancedValidators, ValidatorParameterCounts);");
+                // Check if we have sync validators (EnhancedValidators dictionary was generated)
+                bool hasSyncValidators = derivedRpcMethods.Any(m =>
+                {
+                    var attr = m.GetCustomAttribute<TargetRpcAttribute>();
+                    if (attr != null && !string.IsNullOrEmpty(attr.ValidationMethodName))
+                    {
+                        var valMethod = componentType.GetMethod(attr.ValidationMethodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        return valMethod != null && !IsAsyncValidationMethod(valMethod) && HasMatchingValidationSignature(m, valMethod);
+                    }
+                    return false;
+                });
+
+                // Check if we have async validators (AsyncValidators dictionary was generated)
+                bool hasAsyncValidators = derivedRpcMethods.Any(m =>
+                {
+                    var attr = m.GetCustomAttribute<TargetRpcAttribute>();
+                    if (attr != null && !string.IsNullOrEmpty(attr.ValidationMethodName))
+                    {
+                        var valMethod = componentType.GetMethod(attr.ValidationMethodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        return valMethod != null && IsAsyncValidationMethod(valMethod) && HasMatchingValidationSignature(m, valMethod);
+                    }
+                    return false;
+                });
+
+                // Register sync validators (only if they exist)
+                if (hasSyncValidators)
+                {
+                    sb.AppendLine("                if (EnhancedValidators != null && EnhancedValidators.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterEnhancedValidators(typeof({className}), EnhancedValidators, ValidatorParameterCounts);");
+                }
+
+                // Register async validators (only if they exist)
+                if (hasAsyncValidators)
+                {
+                    sb.AppendLine("                if (AsyncValidators != null && AsyncValidators.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterAsyncValidators(typeof({className}), AsyncValidators, ValidatorParameterCounts);");
+
+                    // Register deserialization and serialization delegates for async validators with parameters
+                    sb.AppendLine("                if (RpcDeserializers != null && RpcDeserializers.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterRpcDeserializers(typeof({className}), RpcDeserializers);");
+                    sb.AppendLine("                if (RpcSerializers != null && RpcSerializers.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterRpcSerializers(typeof({className}), RpcSerializers);");
+                }
             }
 
             sb.AppendLine("                RegisterRpcHandlers();");
@@ -2124,8 +2168,10 @@ namespace GONet.Generation
 
         private static void GenerateValidationDelegates(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
         {
-            // First collect all validation info
-            var validatorInfo = new List<(MethodInfo method, TargetRpcAttribute attr, int paramCount)>();
+            // First collect all validation info, separating sync and async validators
+            var syncValidatorInfo = new List<(MethodInfo rpcMethod, MethodInfo validationMethod, TargetRpcAttribute attr, int paramCount)>();
+            var asyncValidatorInfo = new List<(MethodInfo rpcMethod, MethodInfo validationMethod, TargetRpcAttribute attr, int paramCount)>();
+
             foreach (var method in rpcMethods)
             {
                 var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
@@ -2137,72 +2183,206 @@ namespace GONet.Generation
                     if (validationMethod != null && HasMatchingValidationSignature(method, validationMethod))
                     {
                         var paramCount = method.GetParameters().Length;
-                        validatorInfo.Add((method, targetAttr, paramCount));
+
+                        // Separate sync and async validators
+                        if (IsAsyncValidationMethod(validationMethod))
+                        {
+                            asyncValidatorInfo.Add((method, validationMethod, targetAttr, paramCount));
+                        }
+                        else
+                        {
+                            syncValidatorInfo.Add((method, validationMethod, targetAttr, paramCount));
+                        }
                     }
                 }
             }
 
-            // Generate parameter count metadata dictionary
-            sb.AppendLine("        // Parameter count metadata for validators");
+            // Generate parameter count metadata dictionary (shared by sync and async validators)
+            sb.AppendLine("        // Parameter count metadata for validators (sync and async)");
             sb.AppendLine("        private static readonly Dictionary<string, int> ValidatorParameterCounts = ");
             sb.AppendLine("            new Dictionary<string, int>");
             sb.AppendLine("        {");
 
-            foreach (var (method, targetAttr, paramCount) in validatorInfo)
+            foreach (var (rpcMethod, validationMethod, targetAttr, paramCount) in syncValidatorInfo)
             {
-                sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}), {paramCount} }},");
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), {paramCount} }},");
+            }
+            foreach (var (rpcMethod, validationMethod, targetAttr, paramCount) in asyncValidatorInfo)
+            {
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), {paramCount} }},");
             }
 
             sb.AppendLine("        };");
             sb.AppendLine();
 
-            // Generate validation delegates dictionary
-            sb.AppendLine("        // Validation delegates that return full validation results with parameter-specific signatures");
-            sb.AppendLine("        private static readonly Dictionary<string, object> EnhancedValidators = ");
-            sb.AppendLine("            new Dictionary<string, object>");
-            sb.AppendLine("        {");
-
-            foreach (var (method, targetAttr, paramCount) in validatorInfo)
+            // Generate SYNC validation delegates dictionary
+            if (syncValidatorInfo.Count > 0)
             {
-                var rpcParams = method.GetParameters();
+                sb.AppendLine("        // SYNC validation delegates (RpcValidationResult with ref parameters)");
+                sb.AppendLine("        private static readonly Dictionary<string, object> EnhancedValidators = ");
+                sb.AppendLine("            new Dictionary<string, object>");
+                sb.AppendLine("        {");
 
-                sb.AppendLine($"            {{ nameof({componentType.Name}.{method.Name}),");
-
-                // Generate appropriate delegate based on parameter count
-                switch (paramCount)
+                foreach (var (rpcMethod, validationMethod, targetAttr, paramCount) in syncValidatorInfo)
                 {
-                    case 0:
-                        GenerateZeroParamValidator(sb, componentType, method, targetAttr);
-                        break;
-                    case 1:
-                        GenerateOneParamValidator(sb, componentType, method, targetAttr, rpcParams[0]);
-                        break;
-                    case 2:
-                        GenerateTwoParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 3:
-                        GenerateThreeParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 4:
-                        GenerateFourParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 5:
-                        GenerateFiveParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 6:
-                        GenerateSixParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 7:
-                        GenerateSevenParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    case 8:
-                        GenerateEightParamValidator(sb, componentType, method, targetAttr, rpcParams);
-                        break;
-                    default:
-                        throw new InvalidOperationException($"Validation methods with {paramCount} parameters are not currently supported. Maximum is 8 parameters.");
+                    var rpcParams = rpcMethod.GetParameters();
+
+                    sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}),");
+
+                    // Generate appropriate delegate based on parameter count
+                    switch (paramCount)
+                    {
+                        case 0:
+                            GenerateZeroParamValidator(sb, componentType, rpcMethod, targetAttr);
+                            break;
+                        case 1:
+                            GenerateOneParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams[0]);
+                            break;
+                        case 2:
+                            GenerateTwoParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 3:
+                            GenerateThreeParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 4:
+                            GenerateFourParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 5:
+                            GenerateFiveParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 6:
+                            GenerateSixParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 7:
+                            GenerateSevenParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        case 8:
+                            GenerateEightParamValidator(sb, componentType, rpcMethod, targetAttr, rpcParams);
+                            break;
+                        default:
+                            throw new InvalidOperationException($"Validation methods with {paramCount} parameters are not currently supported. Maximum is 8 parameters.");
+                    }
+
+                    sb.AppendLine("            },");
                 }
 
-                sb.AppendLine("            },");
+                sb.AppendLine("        };");
+                sb.AppendLine();
+            }
+
+            // Generate ASYNC validation MethodInfo dictionary
+            if (asyncValidatorInfo.Count > 0)
+            {
+                sb.AppendLine("        // ASYNC validation MethodInfo registry (Task<RpcValidationResult> without ref parameters)");
+                sb.AppendLine("        private static readonly Dictionary<string, System.Reflection.MethodInfo> AsyncValidators = ");
+                sb.AppendLine("            new Dictionary<string, System.Reflection.MethodInfo>");
+                sb.AppendLine("        {");
+
+                foreach (var (rpcMethod, validationMethod, targetAttr, paramCount) in asyncValidatorInfo)
+                {
+                    sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), ");
+                    sb.AppendLine($"              typeof({componentType.Name}).GetMethod(nameof({componentType.Name}.{validationMethod.Name}), ");
+                    sb.AppendLine($"                  System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance) }},");
+                }
+
+                sb.AppendLine("        };");
+                sb.AppendLine();
+            }
+        }
+
+        /// <summary>
+        /// Generates typed deserialization delegates for RPC parameters.
+        /// These delegates are used by async validation to deserialize byte[] -> object[] with correct types.
+        /// </summary>
+        private static void GenerateDeserializationDelegates(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
+        {
+            // Collect all TargetRPCs that have async validators with parameters
+            var rpcMethodsWithAsyncValidators = new List<(MethodInfo rpcMethod, int paramCount)>();
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.ValidationMethodName))
+                {
+                    var validationMethod = componentType.GetMethod(targetAttr.ValidationMethodName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    if (validationMethod != null && IsAsyncValidationMethod(validationMethod))
+                    {
+                        var paramCount = method.GetParameters().Length;
+                        if (paramCount > 0) // Only generate for methods with parameters
+                        {
+                            rpcMethodsWithAsyncValidators.Add((method, paramCount));
+                        }
+                    }
+                }
+            }
+
+            // Only generate if we have async validators with parameters
+            if (rpcMethodsWithAsyncValidators.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine("        // Typed deserialization delegates for async validation");
+            sb.AppendLine("        // These delegates convert byte[] -> object[] using the correct RpcDataN types");
+            sb.AppendLine("        private static readonly Dictionary<string, System.Func<byte[], object[]>> RpcDeserializers = ");
+            sb.AppendLine("            new Dictionary<string, System.Func<byte[], object[]>>");
+            sb.AppendLine("        {");
+
+            foreach (var (rpcMethod, paramCount) in rpcMethodsWithAsyncValidators)
+            {
+                string dataTypeName = GetParameterDataStructName(rpcMethod);
+                var parameters = rpcMethod.GetParameters();
+
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), (data) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                var deserialized = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+                sb.Append("                return new object[] { ");
+
+                // Generate array of parameter accesses
+                for (int i = 0; i < paramCount; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append($"deserialized.{parameters[i].Name}");
+                }
+
+                sb.AppendLine(" };");
+                sb.AppendLine("            }},");
+            }
+
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Generate serialization delegates for the same methods
+            sb.AppendLine("        // Typed serialization delegates for async validation (parameter modification)");
+            sb.AppendLine("        // These delegates convert object[] -> byte[] using the correct RpcDataN types");
+            sb.AppendLine("        private static readonly Dictionary<string, System.Func<object[], byte[]>> RpcSerializers = ");
+            sb.AppendLine("            new Dictionary<string, System.Func<object[], byte[]>>");
+            sb.AppendLine("        {");
+
+            foreach (var (rpcMethod, paramCount) in rpcMethodsWithAsyncValidators)
+            {
+                string dataTypeName = GetParameterDataStructName(rpcMethod);
+                var parameters = rpcMethod.GetParameters();
+
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), (args) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                var data = new {dataTypeName}");
+                sb.AppendLine("                {");
+
+                // Generate property assignments
+                for (int i = 0; i < paramCount; i++)
+                {
+                    string paramType = GetFriendlyTypeName(parameters[i].ParameterType);
+                    sb.AppendLine($"                    {parameters[i].Name} = ({paramType})args[{i}],");
+                }
+
+                sb.AppendLine("                };");
+                sb.AppendLine("                int bytesUsed;");
+                sb.AppendLine("                bool needsReturn;");
+                sb.AppendLine("                return SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);");
+                sb.AppendLine("            }},");
             }
 
             sb.AppendLine("        };");
@@ -2211,26 +2391,64 @@ namespace GONet.Generation
 
         private static bool HasMatchingValidationSignature(MethodInfo rpcMethod, MethodInfo validationMethod)
         {
-            if (validationMethod.ReturnType != typeof(RpcValidationResult))
-                return false;
-
-            var rpcParams = rpcMethod.GetParameters();
-            var valParams = validationMethod.GetParameters();
-
-            if (rpcParams.Length != valParams.Length)
-                return false;
-
-            for (int i = 0; i < rpcParams.Length; i++)
+            // Check for sync validator: RpcValidationResult with ref parameters
+            if (validationMethod.ReturnType == typeof(RpcValidationResult))
             {
-                if (!valParams[i].ParameterType.IsByRef)
+                var rpcParams = rpcMethod.GetParameters();
+                var valParams = validationMethod.GetParameters();
+
+                if (rpcParams.Length != valParams.Length)
                     return false;
 
-                var valType = valParams[i].ParameterType.GetElementType();
-                if (valType != rpcParams[i].ParameterType)
-                    return false;
+                for (int i = 0; i < rpcParams.Length; i++)
+                {
+                    if (!valParams[i].ParameterType.IsByRef)
+                        return false;
+
+                    var valType = valParams[i].ParameterType.GetElementType();
+                    if (valType != rpcParams[i].ParameterType)
+                        return false;
+                }
+
+                return true;
             }
 
-            return true;
+            // Check for async validator: Task<RpcValidationResult> WITHOUT ref parameters
+            if (validationMethod.ReturnType.IsGenericType &&
+                validationMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                validationMethod.ReturnType.GetGenericArguments()[0] == typeof(RpcValidationResult))
+            {
+                var rpcParams = rpcMethod.GetParameters();
+                var valParams = validationMethod.GetParameters();
+
+                if (rpcParams.Length != valParams.Length)
+                    return false;
+
+                for (int i = 0; i < rpcParams.Length; i++)
+                {
+                    // Async validators CANNOT have ref parameters (C# limitation)
+                    if (valParams[i].ParameterType.IsByRef)
+                        return false;
+
+                    // Parameter types must match exactly (no ref)
+                    if (valParams[i].ParameterType != rpcParams[i].ParameterType)
+                        return false;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Determines if a validation method is async based on its return type.
+        /// </summary>
+        private static bool IsAsyncValidationMethod(MethodInfo validationMethod)
+        {
+            return validationMethod.ReturnType.IsGenericType &&
+                   validationMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                   validationMethod.ReturnType.GetGenericArguments()[0] == typeof(RpcValidationResult);
         }
 
         private static void GenerateZeroParamValidator(StringBuilder sb, Type componentType, MethodInfo method, TargetRpcAttribute targetAttr)
@@ -3063,15 +3281,21 @@ namespace GONet.Generation
                 }
                 else
                 {
-                    // Check return type
-                    if (validationMethod.ReturnType != typeof(RpcValidationResult))
+                    // Check if this is an async validator (Task<RpcValidationResult>) or sync (RpcValidationResult)
+                    bool isAsyncValidator = validationMethod.ReturnType.IsGenericType &&
+                                           validationMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                                           validationMethod.ReturnType.GetGenericArguments()[0] == typeof(RpcValidationResult);
+                    bool isSyncValidator = validationMethod.ReturnType == typeof(RpcValidationResult);
+
+                    if (!isAsyncValidator && !isSyncValidator)
                     {
-                        errors.Add($"ERROR: {methodId} - Validation method '{targetAttr.ValidationMethodName}' must return RpcValidationResult");
+                        errors.Add($"ERROR: {methodId} - Validation method '{targetAttr.ValidationMethodName}' must return RpcValidationResult or Task<RpcValidationResult>");
                         errors.Add($"  Current return type: {validationMethod.ReturnType.Name}");
-                        errors.Add($"  FIX: Change return type to RpcValidationResult");
+                        errors.Add($"  FIX (sync): internal RpcValidationResult {targetAttr.ValidationMethodName}(ref T1 param1, ref T2 param2, ...)");
+                        errors.Add($"  FIX (async): internal async Task<RpcValidationResult> {targetAttr.ValidationMethodName}Async(T1 param1, T2 param2, ...) // NO ref");
                     }
 
-                    // Check parameters match with ref
+                    // Check parameters match
                     var rpcParams = method.GetParameters();
                     var validationParams = validationMethod.GetParameters();
 
@@ -3080,7 +3304,14 @@ namespace GONet.Generation
                         errors.Add($"ERROR: {methodId} - Validation method parameter count mismatch");
                         errors.Add($"  RPC has {rpcParams.Length} parameters");
                         errors.Add($"  Validation method has {validationParams.Length} parameters");
-                        errors.Add($"  FIX: Validation method must have the same parameters as the RPC, but passed by ref");
+                        if (isSyncValidator)
+                        {
+                            errors.Add($"  FIX (sync): Validation method must have the same parameters as the RPC, but passed by ref");
+                        }
+                        else if (isAsyncValidator)
+                        {
+                            errors.Add($"  FIX (async): Validation method must have the same parameters as the RPC, WITHOUT ref (C# async limitation)");
+                        }
                     }
                     else
                     {
@@ -3090,34 +3321,62 @@ namespace GONet.Generation
                             var rpcParam = rpcParams[i];
                             var valParam = validationParams[i];
 
-                            // Check if ref
-                            if (!valParam.ParameterType.IsByRef)
+                            if (isSyncValidator)
                             {
-                                errors.Add($"ERROR: {methodId} - Validation parameter '{valParam.Name}' at position {i} must be passed by ref");
-                                errors.Add($"  Current: {valParam.ParameterType.Name} {valParam.Name}");
-                                errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
-                                hasParameterErrors = true;
-                                continue;
+                                // SYNC validators: require 'ref' keyword
+                                if (!valParam.ParameterType.IsByRef)
+                                {
+                                    errors.Add($"ERROR: {methodId} - SYNC validation parameter '{valParam.Name}' at position {i} must be passed by ref");
+                                    errors.Add($"  Current: {valParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  OR: Convert to async validator (Task<RpcValidationResult> with NO ref parameters)");
+                                    hasParameterErrors = true;
+                                    continue;
+                                }
+
+                                // Check type matches (accounting for ref)
+                                var valParamType = valParam.ParameterType.GetElementType();
+                                if (valParamType != rpcParam.ParameterType)
+                                {
+                                    errors.Add($"ERROR: {methodId} - Validation parameter type mismatch at position {i}");
+                                    errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
+                                    errors.Add($"  Validation parameter: {valParamType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    hasParameterErrors = true;
+                                }
+                            }
+                            else if (isAsyncValidator)
+                            {
+                                // ASYNC validators: MUST NOT have 'ref' keyword (C# limitation)
+                                if (valParam.ParameterType.IsByRef)
+                                {
+                                    errors.Add($"ERROR: {methodId} - ASYNC validation parameter '{valParam.Name}' at position {i} CANNOT use ref keyword");
+                                    errors.Add($"  C# does not allow ref parameters in async methods");
+                                    errors.Add($"  Current: ref {valParam.ParameterType.GetElementType().Name} {valParam.Name}");
+                                    errors.Add($"  FIX: {rpcParam.ParameterType.Name} {valParam.Name} // Remove 'ref'");
+                                    errors.Add($"  To modify parameters, use: result.SetValidatedOverride(index, newValue)");
+                                    hasParameterErrors = true;
+                                    continue;
+                                }
+
+                                // Check type matches (no ref, so direct comparison)
+                                if (valParam.ParameterType != rpcParam.ParameterType)
+                                {
+                                    errors.Add($"ERROR: {methodId} - Async validation parameter type mismatch at position {i}");
+                                    errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
+                                    errors.Add($"  Validation parameter: {valParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    hasParameterErrors = true;
+                                }
                             }
 
-                            // Check type matches (accounting for ref)
-                            var valParamType = valParam.ParameterType.GetElementType();
-                            if (valParamType != rpcParam.ParameterType)
-                            {
-                                errors.Add($"ERROR: {methodId} - Validation parameter type mismatch at position {i}");
-                                errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
-                                errors.Add($"  Validation parameter: {valParamType.Name} {valParam.Name}");
-                                errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
-                                hasParameterErrors = true;
-                            }
-
-                            // Warn about name mismatch
+                            // Warn about name mismatch (applies to both sync and async)
                             if (valParam.Name != rpcParam.Name)
                             {
                                 errors.Add($"WARNING: {methodId} - Parameter name mismatch at position {i}");
                                 errors.Add($"  RPC parameter name: {rpcParam.Name}");
                                 errors.Add($"  Validation parameter name: {valParam.Name}");
-                                errors.Add($"  Consider using the same name for clarity");
+                                errors.Add($"  RECOMMENDED: Use matching names for clarity (especially important for async validators using SetValidatedOverride by index)");
                             }
                         }
 

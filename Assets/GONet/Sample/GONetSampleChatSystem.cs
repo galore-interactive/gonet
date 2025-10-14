@@ -788,7 +788,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
     /// <param name="recipients">Array of recipient authority IDs for proper message filtering</param>
     /// <returns>Delivery report indicating successful/failed deliveries</returns>
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
+    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
         await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
@@ -884,6 +885,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <summary>
     /// Custom RPC validation method demonstrating GONet's new validation system capabilities.
     /// This method shows how to implement server-side validation with content modification.
+    /// Synchronous version of <see cref="ValidateMessageAsync(string, string, ChatType, ushort, ushort[])"/>
     ///
     /// Validation Features Demonstrated:
     /// - Target authorization based on connection status
@@ -910,16 +912,20 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <returns>Validation result with allowed targets and optional modifications</returns>
     internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId, ref ushort[] recipients)
     {
+        GONetLog.Info($"[SYNC VALIDATION] ValidateMessage ENTERED - content: '{content}', channel: '{channelName}', type: {messageType}, fromUser: {fromUserId}, recipients: {recipients?.Length ?? 0}");
+
         // Get the pre-allocated validation result from the context
         var validationContext = GONetMain.EventBus.GetValidationContext();
         if (!validationContext.HasValue)
         {
+            GONetLog.Warning($"[SYNC VALIDATION] NO VALIDATION CONTEXT - returning allow-all");
             // Fallback if no validation context (shouldn't happen in normal flow)
             var resultAllow = RpcValidationResult.CreatePreAllocated(1);
             resultAllow.AllowAll();
             return resultAllow;
         }
 
+        GONetLog.Info($"[SYNC VALIDATION] Got validation context, targetCount={validationContext.Value.TargetCount}");
         var result = validationContext.Value.GetValidationResult();
 
         // Check which targets are connected and set the bool array accordingly
@@ -950,11 +956,16 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         try
         {
             string originalContent = content;
+            GONetLog.Info($"[SYNC VALIDATION] Starting profanity filter for content: '{originalContent}'");
+
             // Use web API filtering with aggressive timeouts (max 2 seconds total)
             string filteredContent = FilterProfanityWithShortTimeout(content);
 
+            GONetLog.Info($"[SYNC VALIDATION] Profanity filter returned: '{filteredContent}' (original: '{originalContent}', modified: {filteredContent != originalContent})");
+
             if (filteredContent != originalContent)
             {
+                GONetLog.Info($"[SYNC VALIDATION] CONTENT WAS MODIFIED - setting ref parameter");
                 // Message was modified, need to serialize the modified data
                 content = filteredContent;
                 result.WasModified = true;
@@ -966,10 +977,248 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
         catch (Exception ex)
         {
-            GONetLog.Error($"Failed to filter message content: {ex.Message}");
+            GONetLog.Error($"[SYNC VALIDATION] Failed to filter message content: {ex.Message}\nStack: {ex.StackTrace}");
         }
 
+        GONetLog.Info($"[SYNC VALIDATION] ValidateMessage RETURNING - WasModified={result.WasModified}");
         return result;
+    }
+
+    /// <summary>
+    /// ASYNC version of <see cref="ValidateMessage(ref string, ref string, ref ChatType, ref ushort, ref ushort[])"/> - 
+    ///    demonstrates non-blocking RPC validation with async/await.
+    /// This method performs the same validation as ValidateMessage but without blocking the Unity main thread.
+    ///
+    /// Key Differences from Sync Version:
+    /// - Returns Task&lt;RpcValidationResult&gt; instead of RpcValidationResult
+    /// - Parameters do NOT use 'ref' keyword (C# async limitation)
+    /// - Uses SetValidatedOverride(index, value) API to modify parameters
+    /// - Can perform async I/O without blocking (profanity API calls, database lookups, etc.)
+    ///
+    /// CRITICAL: When async validators modify parameters, they MUST use SetValidatedOverride()
+    /// because 'ref' parameters are not allowed in async methods. The framework will serialize
+    /// all parameters (original + overrides) after validation completes.
+    ///
+    /// Performance Comparison:
+    /// - Sync validator with Thread.Sleep(2000): Blocks Unity for 2 seconds (FREEZES GAME)
+    /// - Async validator with await Task.Delay(2000): Non-blocking, game runs smoothly
+    ///
+    /// Use Cases for Async Validators:
+    /// - Web API calls (profanity filtering, content moderation)
+    /// - Database lookups (permissions, ban lists, player data)
+    /// - File I/O operations (logging, audit trails)
+    /// - Cryptographic operations (signature verification, encryption)
+    /// - Any operation that would block the main thread in sync version
+    ///
+    /// To use this async validator instead of the sync one, change the TargetRpc attribute:
+    /// [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true,
+    ///            validationMethod: nameof(ValidateMessageAsync))]
+    /// </summary>
+    /// <param name="content">Message content (index 0 - modify via SetValidatedOverride)</param>
+    /// <param name="channelName">Channel name (index 1)</param>
+    /// <param name="messageType">Message type (index 2)</param>
+    /// <param name="fromUserId">Sender ID (index 3)</param>
+    /// <param name="recipients">Recipients array (index 4)</param>
+    /// <returns>Task that completes with validation result</returns>
+    internal async Task<RpcValidationResult> ValidateMessageAsync(
+        string content,        // [0] - No 'ref' keyword!
+        string channelName,    // [1]
+        ChatType messageType,  // [2]
+        ushort fromUserId,     // [3]
+        ushort[] recipients)   // [4]
+    {
+        GONetLog.Info($"[CHAT VALIDATION] ValidateMessageAsync ENTERED - content: '{content}', channel: '{channelName}', type: {messageType}, fromUser: {fromUserId}, recipients: {recipients?.Length ?? 0}");
+
+        // Get the pre-allocated validation result from the context
+        var validationContext = GONetMain.EventBus.GetValidationContext();
+        if (!validationContext.HasValue)
+        {
+            GONetLog.Warning($"[CHAT VALIDATION] NO VALIDATION CONTEXT - returning allow-all");
+            // Fallback if no validation context (shouldn't happen in normal flow)
+            var resultAllow = RpcValidationResult.CreatePreAllocated(1);
+            resultAllow.AllowAll();
+            return resultAllow;
+        }
+
+        GONetLog.Info($"[CHAT VALIDATION] Got validation context, targetCount={validationContext.Value.TargetCount}");
+        var result = validationContext.Value.GetValidationResult();
+
+        // Check which targets are connected and set the bool array accordingly
+        bool hasAnyDenied = false;
+        var targetAuthorityIds = validationContext.Value.TargetAuthorityIds;
+
+        for (int i = 0; i < validationContext.Value.TargetCount; i++)
+        {
+            ushort target = targetAuthorityIds[i];
+            if (participants.Any(p => p.AuthorityId == target && p.Status == ConnectionStatus.Connected))
+            {
+                result.AllowedTargets[i] = true;
+            }
+            else
+            {
+                result.AllowedTargets[i] = false;
+                hasAnyDenied = true;
+            }
+        }
+
+        // Set denial reason if any targets were denied
+        if (hasAnyDenied)
+        {
+            result.DenialReason = "Some recipients are not connected";
+        }
+
+        // ASYNC profanity filtering - THIS IS NON-BLOCKING!
+        try
+        {
+            string originalContent = content;
+            GONetLog.Info($"[CHAT VALIDATION] Starting async profanity filter for content: '{originalContent}'");
+
+            // Perform async profanity filtering (non-blocking)
+            string filteredContent = await FilterProfanityAsync(originalContent);
+
+            GONetLog.Info($"[CHAT VALIDATION] Profanity filter returned: '{filteredContent}' (original: '{originalContent}', modified: {filteredContent != originalContent})");
+
+            if (filteredContent != originalContent)
+            {
+                GONetLog.Info($"[CHAT VALIDATION] CONTENT WAS MODIFIED - using SetValidatedOverride");
+                // Message was modified - use SetValidatedOverride API
+                result.SetValidatedOverride(0, filteredContent);  // Parameter index 0 = content
+
+                // Note: result.WasModified is automatically set to true by SetValidatedOverride()
+                // The framework will serialize all params (original + overrides) into ModifiedData
+            }
+            else
+            {
+                GONetLog.Info($"[CHAT VALIDATION] Content was NOT modified (clean message)");
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Error($"[CHAT VALIDATION] Failed to filter message content (async): {ex.Message}");
+        }
+
+        GONetLog.Info($"[CHAT VALIDATION] ValidateMessageAsync RETURNING - WasModified={result.WasModified}");
+        return result;
+    }
+
+    /// <summary>
+    /// Async profanity filter using web APIs without blocking Unity main thread.
+    /// This demonstrates proper async/await patterns for I/O-bound operations.
+    /// </summary>
+    private async Task<string> FilterProfanityAsync(string input)
+    {
+        if (!GONetMain.IsServer)
+            return input;
+
+        // Try PurgoMalum API first (with timeout)
+        try
+        {
+            string result = await TryPurgoMalumAsync(input);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] PurgoMalum async failed: {ex.Message}");
+        }
+
+        // Try profanity.dev as backup (with timeout)
+        try
+        {
+            string result = await TryProfanityDevAsync(input);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] Profanity.dev async failed: {ex.Message}");
+        }
+
+        // Fall back to local filtering
+        return FilterProfanityLocal(input);
+    }
+
+    private async Task<string> TryPurgoMalumAsync(string input)
+    {
+        try
+        {
+            string url = $"https://www.purgomalum.com/service/plain?text={UnityWebRequest.EscapeURL(input)}";
+
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = 2; // 2 second timeout
+
+                // ASYNC web request - does NOT block Unity main thread!
+                var operation = request.SendWebRequest();
+                await operation; // Await the async operation
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    return request.downloadHandler.text;
+                }
+                else
+                {
+                    GONetLog.Warning($"[Server] PurgoMalum async request failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] PurgoMalum async exception: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<string> TryProfanityDevAsync(string input)
+    {
+        try
+        {
+            string jsonPayload = $"{{\"message\":\"{input.Replace("\"", "\\\"")}\"}}";
+
+            using (UnityWebRequest request = new UnityWebRequest("https://vector.profanity.dev", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 2; // 2 second timeout
+
+                // ASYNC web request - does NOT block Unity main thread!
+                var operation = request.SendWebRequest();
+                await operation; // Await the async operation
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    // Parse JSON response - simple parsing for now
+                    string response = request.downloadHandler.text;
+                    if (response.Contains("\""))
+                    {
+                        var start = response.IndexOf("\"") + 1;
+                        var end = response.LastIndexOf("\"");
+                        if (end > start)
+                        {
+                            return response.Substring(start, end - start);
+                        }
+                    }
+                    return input; // If we can't parse response, return original (assume clean)
+                }
+                else
+                {
+                    GONetLog.Warning($"[Server] Profanity.dev async request failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] Profanity.dev async exception: {ex.Message}");
+            return null;
+        }
     }
 
     #endregion
@@ -983,8 +1232,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
         GONetLog.Info($"[CHAT-DEBUG] SendCurrentMessage called. Mode: {currentChatMode}, Participants count: {participants.Count}, GONetId: {gonetParticipant?.GONetId ?? 0}, IsMine: {gonetParticipant?.IsMine ?? false}");
 
-        // Filter profanity locally if server (client-side preview only - real filtering happens server-side)
-        string finalContent = GONetMain.IsServer ? FilterProfanity(currentInputText) : currentInputText;
+        // Let the server-side validator handle ALL filtering (no client-side pre-filtering)
+        string finalContent = currentInputText;
 
         // Set up targets based on mode
         HashSet<ushort> uniqueTargets = new HashSet<ushort>(); // Use HashSet to prevent duplicates
@@ -1138,39 +1387,53 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     // Synchronous web API filtering with aggressive timeouts (max 2 seconds total)
     private string FilterProfanityWithShortTimeout(string input)
     {
+        GONetLog.Info($"[PROFANITY FILTER] FilterProfanityWithShortTimeout called, IsServer={GONetMain.IsServer}, input='{input}'");
+
         if (!GONetMain.IsServer)
+        {
+            GONetLog.Info($"[PROFANITY FILTER] Not server - returning input unchanged");
             return input;
+        }
 
         // Try PurgoMalum first with synchronous approach
         try
         {
+            GONetLog.Info($"[PROFANITY FILTER] Attempting PurgoMalum sync...");
             string result = TryPurgoMalumSync(input);
             if (result != null)
             {
+                GONetLog.Info($"[PROFANITY FILTER] PurgoMalum sync SUCCESS - result: '{result}'");
                 return result;
             }
+            GONetLog.Info($"[PROFANITY FILTER] PurgoMalum sync returned null - trying next service");
         }
         catch (Exception ex)
         {
-            GONetLog.Warning($"[Server] PurgoMalum sync failed: {ex.Message}");
+            GONetLog.Warning($"[PROFANITY FILTER] PurgoMalum sync EXCEPTION: {ex.Message}");
         }
 
         // Try profanity.dev as backup
         try
         {
+            GONetLog.Info($"[PROFANITY FILTER] Attempting Profanity.dev sync...");
             string result = TryProfanityDevSync(input);
             if (result != null)
             {
+                GONetLog.Info($"[PROFANITY FILTER] Profanity.dev sync SUCCESS - result: '{result}'");
                 return result;
             }
+            GONetLog.Info($"[PROFANITY FILTER] Profanity.dev sync returned null - falling back to local");
         }
         catch (Exception ex)
         {
-            GONetLog.Warning($"[Server] Profanity.dev sync failed: {ex.Message}");
+            GONetLog.Warning($"[PROFANITY FILTER] Profanity.dev sync EXCEPTION: {ex.Message}");
         }
 
         // Fall back to local filtering
-        return FilterProfanityLocal(input);
+        GONetLog.Info($"[PROFANITY FILTER] Using LOCAL filtering as fallback");
+        string localResult = FilterProfanityLocal(input);
+        GONetLog.Info($"[PROFANITY FILTER] Local filter result: '{localResult}'");
+        return localResult;
     }
 
     private string TryPurgoMalumSync(string input)
