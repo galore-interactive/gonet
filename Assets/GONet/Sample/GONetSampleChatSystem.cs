@@ -791,6 +791,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
+        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
+
         // Get context - this should always be available in an RPC
         GONetRpcContext context = GONetEventBus.GetCurrentRpcContext();
 
@@ -813,6 +815,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY))]
     internal async Task<RpcDeliveryReport> SendMessage_TEST()
     {
+        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
         return default;
     }
 

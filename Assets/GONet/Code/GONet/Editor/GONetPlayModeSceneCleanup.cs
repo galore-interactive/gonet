@@ -119,6 +119,13 @@ namespace GONet.Editor
             // Remove runtime-loaded scenes from hierarchy
             foreach (Scene scene in scenesToRemove)
             {
+                // Unity doesn't allow closing the last scene - check before attempting removal
+                if (SceneManager.sceneCount <= 1)
+                {
+                    GONetLog.Warning($"[PlayModeSceneCleanup] Cannot close '{scene.name}' - it's the only scene in hierarchy. Unity requires at least one scene to be loaded.");
+                    continue;
+                }
+
                 GONetLog.Info($"[PlayModeSceneCleanup] Removing runtime-loaded scene '{scene.name}' (path: '{scene.path}') from hierarchy after exiting play mode");
 
                 try
@@ -143,7 +150,15 @@ namespace GONet.Editor
                 }
                 catch (System.Exception ex)
                 {
-                    GONetLog.Warning($"[PlayModeSceneCleanup] Exception while closing scene '{scene.name}': {ex.Message}");
+                    // Catch Unity's "cannot close last scene" error gracefully
+                    if (ex.Message.Contains("Unloading the last loaded scene"))
+                    {
+                        GONetLog.Warning($"[PlayModeSceneCleanup] Unity prevented closing '{scene.name}' because it's the last scene. This is expected behavior.");
+                    }
+                    else
+                    {
+                        GONetLog.Warning($"[PlayModeSceneCleanup] Exception while closing scene '{scene.name}': {ex.Message}");
+                    }
                 }
             }
 

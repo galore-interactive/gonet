@@ -199,6 +199,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     [ServerRpc(IsMineRequired = false)]
     internal async Task<ClaimResult> RequestClaim()
     {
+        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
+
         var context = GONetEventBus.GetCurrentRpcContext();
 
         if (ClaimedByAuthorityId != GONetMain.OwnerAuthorityId_Unset)
@@ -238,6 +240,8 @@ public class ClaimableObjectViaRpcs : GONetParticipantCompanionBehaviour
     [ServerRpc(IsMineRequired = false)]
     internal async Task<bool> RequestRelease()
     {
+        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
+
         var context = GONetEventBus.GetCurrentRpcContext();
 
         if (ClaimedByAuthorityId != context.SourceAuthorityId)

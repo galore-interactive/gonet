@@ -794,7 +794,11 @@ namespace GONet
 
         private static void Return(RpcEvent evt)
         {
-            SerializationUtils.TryReturnByteArray(evt.Data); // may or may not be borrowed from there
+            // NOTE: We DO NOT return evt.Data to the byte array pool here because:
+            // 1. The Data array may be a shared reference from persistent events (see HandlePersistentRpcForMe)
+            // 2. The byte array lifecycle is managed separately from the event object lifecycle
+            // 3. Byte arrays are returned at deserialization boundaries, not at event pooling boundaries
+            // Attempting to return Data here causes "array not borrowed from pool" exceptions.
 
             evt.OccurredAtElapsedTicks = 0;
             evt.RpcId = 0;
@@ -830,7 +834,11 @@ namespace GONet
 
         private static void Return(RpcResponseEvent evt)
         {
-            SerializationUtils.TryReturnByteArray(evt.Data); // may or may not be borrowed from there
+            // NOTE: We DO NOT return evt.Data to the byte array pool here because:
+            // 1. The Data array may be a shared reference or borrowed from elsewhere in the pipeline
+            // 2. The byte array lifecycle is managed separately from the event object lifecycle
+            // 3. Byte arrays are returned at deserialization boundaries, not at event pooling boundaries
+            // Attempting to return Data here causes "array not borrowed from pool" exceptions.
 
             evt.OccurredAtElapsedTicks = 0;
             evt.CorrelationId = 0;
@@ -867,7 +875,11 @@ namespace GONet
 
         private static void Return(RoutedRpcEvent evt)
         {
-            SerializationUtils.TryReturnByteArray(evt.Data);
+            // NOTE: We DO NOT return evt.Data to the byte array pool here because:
+            // 1. The Data array may be a shared reference from persistent events (see HandlePersistentRpcForMe)
+            // 2. The byte array lifecycle is managed separately from the event object lifecycle
+            // 3. Byte arrays are returned at deserialization boundaries, not at event pooling boundaries
+            // Attempting to return Data here causes "array not borrowed from pool" exceptions.
 
             evt.OccurredAtElapsedTicks = 0;
             evt.RpcId = 0;

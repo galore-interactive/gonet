@@ -99,6 +99,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ChannelIsolationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncActualBehaviorTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetSceneManagerIntegrationTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\RpcEventPoolingMemoryTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetProjectSettings.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\SpawnBurstTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\RingBufferTests.cs" />
@@ -143,6 +144,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetParticipantCompanionBehaviourCustomInspector.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\RpcEventPoolingSoakTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate.tt" />
