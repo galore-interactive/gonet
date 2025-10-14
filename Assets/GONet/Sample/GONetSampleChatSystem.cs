@@ -788,8 +788,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
     /// <param name="recipients">Array of recipient authority IDs for proper message filtering</param>
     /// <returns>Delivery report indicating successful/failed deliveries</returns>
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
-    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
+    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
         await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously

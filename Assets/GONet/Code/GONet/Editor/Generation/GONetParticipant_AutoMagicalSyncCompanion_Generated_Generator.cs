@@ -1807,6 +1807,9 @@ namespace GONet.Generation
             // Generate validation delegates (only derived)
             GenerateValidationDelegates(sb, componentType, derivedRpcMethods);
 
+            // Generate deserialization delegates for async validation (only derived, only with parameters)
+            GenerateDeserializationDelegates(sb, componentType, derivedRpcMethods);
+
             GenerateMetadataDictionaryWithBase(sb, componentType, baseRpcMethods, derivedRpcMethods);
 
             // Generate dispatcher methods (only for derived)
@@ -2077,6 +2080,12 @@ namespace GONet.Generation
                 {
                     sb.AppendLine("                if (AsyncValidators != null && AsyncValidators.Count > 0)");
                     sb.AppendLine($"                    GONetMain.EventBus.RegisterAsyncValidators(typeof({className}), AsyncValidators, ValidatorParameterCounts);");
+
+                    // Register deserialization and serialization delegates for async validators with parameters
+                    sb.AppendLine("                if (RpcDeserializers != null && RpcDeserializers.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterRpcDeserializers(typeof({className}), RpcDeserializers);");
+                    sb.AppendLine("                if (RpcSerializers != null && RpcSerializers.Count > 0)");
+                    sb.AppendLine($"                    GONetMain.EventBus.RegisterRpcSerializers(typeof({className}), RpcSerializers);");
                 }
             }
 
@@ -2279,6 +2288,105 @@ namespace GONet.Generation
                 sb.AppendLine("        };");
                 sb.AppendLine();
             }
+        }
+
+        /// <summary>
+        /// Generates typed deserialization delegates for RPC parameters.
+        /// These delegates are used by async validation to deserialize byte[] -> object[] with correct types.
+        /// </summary>
+        private static void GenerateDeserializationDelegates(StringBuilder sb, Type componentType, IEnumerable<MethodInfo> rpcMethods)
+        {
+            // Collect all TargetRPCs that have async validators with parameters
+            var rpcMethodsWithAsyncValidators = new List<(MethodInfo rpcMethod, int paramCount)>();
+
+            foreach (var method in rpcMethods)
+            {
+                var targetAttr = method.GetCustomAttribute<TargetRpcAttribute>();
+                if (targetAttr != null && !string.IsNullOrEmpty(targetAttr.ValidationMethodName))
+                {
+                    var validationMethod = componentType.GetMethod(targetAttr.ValidationMethodName,
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    if (validationMethod != null && IsAsyncValidationMethod(validationMethod))
+                    {
+                        var paramCount = method.GetParameters().Length;
+                        if (paramCount > 0) // Only generate for methods with parameters
+                        {
+                            rpcMethodsWithAsyncValidators.Add((method, paramCount));
+                        }
+                    }
+                }
+            }
+
+            // Only generate if we have async validators with parameters
+            if (rpcMethodsWithAsyncValidators.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine("        // Typed deserialization delegates for async validation");
+            sb.AppendLine("        // These delegates convert byte[] -> object[] using the correct RpcDataN types");
+            sb.AppendLine("        private static readonly Dictionary<string, System.Func<byte[], object[]>> RpcDeserializers = ");
+            sb.AppendLine("            new Dictionary<string, System.Func<byte[], object[]>>");
+            sb.AppendLine("        {");
+
+            foreach (var (rpcMethod, paramCount) in rpcMethodsWithAsyncValidators)
+            {
+                string dataTypeName = GetParameterDataStructName(rpcMethod);
+                var parameters = rpcMethod.GetParameters();
+
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), (data) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                var deserialized = SerializationUtils.DeserializeFromBytes<{dataTypeName}>(data);");
+                sb.Append("                return new object[] { ");
+
+                // Generate array of parameter accesses
+                for (int i = 0; i < paramCount; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append($"deserialized.{parameters[i].Name}");
+                }
+
+                sb.AppendLine(" };");
+                sb.AppendLine("            }},");
+            }
+
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Generate serialization delegates for the same methods
+            sb.AppendLine("        // Typed serialization delegates for async validation (parameter modification)");
+            sb.AppendLine("        // These delegates convert object[] -> byte[] using the correct RpcDataN types");
+            sb.AppendLine("        private static readonly Dictionary<string, System.Func<object[], byte[]>> RpcSerializers = ");
+            sb.AppendLine("            new Dictionary<string, System.Func<object[], byte[]>>");
+            sb.AppendLine("        {");
+
+            foreach (var (rpcMethod, paramCount) in rpcMethodsWithAsyncValidators)
+            {
+                string dataTypeName = GetParameterDataStructName(rpcMethod);
+                var parameters = rpcMethod.GetParameters();
+
+                sb.AppendLine($"            {{ nameof({componentType.Name}.{rpcMethod.Name}), (args) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                var data = new {dataTypeName}");
+                sb.AppendLine("                {");
+
+                // Generate property assignments
+                for (int i = 0; i < paramCount; i++)
+                {
+                    string paramType = GetFriendlyTypeName(parameters[i].ParameterType);
+                    sb.AppendLine($"                    {parameters[i].Name} = ({paramType})args[{i}],");
+                }
+
+                sb.AppendLine("                };");
+                sb.AppendLine("                int bytesUsed;");
+                sb.AppendLine("                bool needsReturn;");
+                sb.AppendLine("                return SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);");
+                sb.AppendLine("            }},");
+            }
+
+            sb.AppendLine("        };");
+            sb.AppendLine();
         }
 
         private static bool HasMatchingValidationSignature(MethodInfo rpcMethod, MethodInfo validationMethod)
