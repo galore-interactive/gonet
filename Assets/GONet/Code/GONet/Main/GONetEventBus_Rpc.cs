@@ -697,14 +697,21 @@ namespace GONet
             if (asyncValidatorsByType.TryGetValue(componentType, out var asyncDict) &&
                 asyncDict.TryGetValue(rpcMethodName, out var asyncValidatorMethod))
             {
-                // TODO: Set up validation context (Task 2.3)
-                // var validationContext = new RpcValidationContext { ... };
-                // SetValidationContext(validationContext);
+                // Set up validation context for async validator
+                var result = RpcValidationResult.CreatePreAllocated(targetCount);
+                var validationContext = new RpcValidationContext
+                {
+                    SourceAuthorityId = sourceAuthorityId,
+                    TargetAuthorityIds = targetAuthorityIds,
+                    TargetCount = targetCount,
+                    PreAllocatedResult = result
+                };
+                SetValidationContext(validationContext);
 
                 try
                 {
                     // Invoke async validator - THIS AWAITS WITHOUT BLOCKING UNITY MAIN THREAD!
-                    RpcValidationResult result = await InvokeAsyncValidatorAsync(
+                    result = await InvokeAsyncValidatorAsync(
                         asyncValidatorMethod,
                         component,
                         rpcParameters);
@@ -717,8 +724,8 @@ namespace GONet
                 }
                 finally
                 {
-                    // TODO: Clear validation context (Task 2.3)
-                    // ClearValidationContext();
+                    // Clear validation context to prevent leaks across RPCs
+                    ClearValidationContext();
                 }
             }
             else
