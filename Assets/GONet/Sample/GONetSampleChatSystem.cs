@@ -788,8 +788,8 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <param name="fromUserId">Original sender's authority ID for proper attribution</param>
     /// <param name="recipients">Array of recipient authority IDs for proper message filtering</param>
     /// <returns>Delivery report indicating successful/failed deliveries</returns>
-    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
+    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage))] // if you want synchronous version
+    //[TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessageAsync))]
     internal async Task<RpcDeliveryReport> SendMessage(string content, string channelName, ChatType messageType, ushort fromUserId, ushort[] recipients)
     {
         await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
@@ -912,16 +912,20 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     /// <returns>Validation result with allowed targets and optional modifications</returns>
     internal RpcValidationResult ValidateMessage(ref string content, ref string channelName, ref ChatType messageType, ref ushort fromUserId, ref ushort[] recipients)
     {
+        GONetLog.Info($"[SYNC VALIDATION] ValidateMessage ENTERED - content: '{content}', channel: '{channelName}', type: {messageType}, fromUser: {fromUserId}, recipients: {recipients?.Length ?? 0}");
+
         // Get the pre-allocated validation result from the context
         var validationContext = GONetMain.EventBus.GetValidationContext();
         if (!validationContext.HasValue)
         {
+            GONetLog.Warning($"[SYNC VALIDATION] NO VALIDATION CONTEXT - returning allow-all");
             // Fallback if no validation context (shouldn't happen in normal flow)
             var resultAllow = RpcValidationResult.CreatePreAllocated(1);
             resultAllow.AllowAll();
             return resultAllow;
         }
 
+        GONetLog.Info($"[SYNC VALIDATION] Got validation context, targetCount={validationContext.Value.TargetCount}");
         var result = validationContext.Value.GetValidationResult();
 
         // Check which targets are connected and set the bool array accordingly
@@ -952,11 +956,16 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         try
         {
             string originalContent = content;
+            GONetLog.Info($"[SYNC VALIDATION] Starting profanity filter for content: '{originalContent}'");
+
             // Use web API filtering with aggressive timeouts (max 2 seconds total)
             string filteredContent = FilterProfanityWithShortTimeout(content);
 
+            GONetLog.Info($"[SYNC VALIDATION] Profanity filter returned: '{filteredContent}' (original: '{originalContent}', modified: {filteredContent != originalContent})");
+
             if (filteredContent != originalContent)
             {
+                GONetLog.Info($"[SYNC VALIDATION] CONTENT WAS MODIFIED - setting ref parameter");
                 // Message was modified, need to serialize the modified data
                 content = filteredContent;
                 result.WasModified = true;
@@ -968,9 +977,10 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         }
         catch (Exception ex)
         {
-            GONetLog.Error($"Failed to filter message content: {ex.Message}");
+            GONetLog.Error($"[SYNC VALIDATION] Failed to filter message content: {ex.Message}\nStack: {ex.StackTrace}");
         }
 
+        GONetLog.Info($"[SYNC VALIDATION] ValidateMessage RETURNING - WasModified={result.WasModified}");
         return result;
     }
 
@@ -1377,39 +1387,53 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     // Synchronous web API filtering with aggressive timeouts (max 2 seconds total)
     private string FilterProfanityWithShortTimeout(string input)
     {
+        GONetLog.Info($"[PROFANITY FILTER] FilterProfanityWithShortTimeout called, IsServer={GONetMain.IsServer}, input='{input}'");
+
         if (!GONetMain.IsServer)
+        {
+            GONetLog.Info($"[PROFANITY FILTER] Not server - returning input unchanged");
             return input;
+        }
 
         // Try PurgoMalum first with synchronous approach
         try
         {
+            GONetLog.Info($"[PROFANITY FILTER] Attempting PurgoMalum sync...");
             string result = TryPurgoMalumSync(input);
             if (result != null)
             {
+                GONetLog.Info($"[PROFANITY FILTER] PurgoMalum sync SUCCESS - result: '{result}'");
                 return result;
             }
+            GONetLog.Info($"[PROFANITY FILTER] PurgoMalum sync returned null - trying next service");
         }
         catch (Exception ex)
         {
-            GONetLog.Warning($"[Server] PurgoMalum sync failed: {ex.Message}");
+            GONetLog.Warning($"[PROFANITY FILTER] PurgoMalum sync EXCEPTION: {ex.Message}");
         }
 
         // Try profanity.dev as backup
         try
         {
+            GONetLog.Info($"[PROFANITY FILTER] Attempting Profanity.dev sync...");
             string result = TryProfanityDevSync(input);
             if (result != null)
             {
+                GONetLog.Info($"[PROFANITY FILTER] Profanity.dev sync SUCCESS - result: '{result}'");
                 return result;
             }
+            GONetLog.Info($"[PROFANITY FILTER] Profanity.dev sync returned null - falling back to local");
         }
         catch (Exception ex)
         {
-            GONetLog.Warning($"[Server] Profanity.dev sync failed: {ex.Message}");
+            GONetLog.Warning($"[PROFANITY FILTER] Profanity.dev sync EXCEPTION: {ex.Message}");
         }
 
         // Fall back to local filtering
-        return FilterProfanityLocal(input);
+        GONetLog.Info($"[PROFANITY FILTER] Using LOCAL filtering as fallback");
+        string localResult = FilterProfanityLocal(input);
+        GONetLog.Info($"[PROFANITY FILTER] Local filter result: '{localResult}'");
+        return localResult;
     }
 
     private string TryPurgoMalumSync(string input)
