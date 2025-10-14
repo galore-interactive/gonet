@@ -6538,7 +6538,7 @@ namespace GONet
                     int bytesUsed;
                     bool needsReturn;
                     byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                    return (TResult)(object)await Server_SendToValidatedTargetsWithDataDoReportingAsync(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
@@ -6746,6 +6746,127 @@ namespace GONet
                 paramCounts.TryGetValue(methodName, out var paramCount))
             {
                 // Invoke validator based on parameter count
+                validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
+            }
+            else
+            {
+                // Default validation - allow all
+                validationResult = RpcValidationResult.CreatePreAllocated(targetCount);
+                validationResult.AllowAll();
+            }
+
+            // Convert bool array to allowed/denied lists
+            var allowedList = new List<ushort>(targetCount);
+            var deniedList = new List<ushort>(targetCount);
+
+            for (int i = 0; i < validationResult.TargetCount; i++)
+            {
+                if (validationResult.AllowedTargets[i])
+                    allowedList.Add(targetBuffer[i]);
+                else
+                    deniedList.Add(targetBuffer[i]);
+            }
+
+            // Store validation report if significant
+            ulong reportId = 0;
+            if (deniedList.Count > 0 || validationResult.ModifiedData != null)
+            {
+                // Store the full validation result for later retrieval
+                reportId = StoreValidationReport(validationResult);
+            }
+
+            try
+            {
+                // Use the validated/modified data if available
+                byte[] dataToUse = validationResult.ModifiedData ?? serialized;
+
+                // 1. Check if server is a target and execute ONCE locally
+                bool serverIsTarget = allowedList.Contains(GONetMain.MyAuthorityId);
+
+                if (serverIsTarget)
+                {
+                    // Execute locally ONCE
+                    var rpcEvent = RpcEvent.Borrow();
+                    rpcEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    rpcEvent.GONetId = instance.GONetParticipant.GONetId;
+                    rpcEvent.Data = dataToUse;
+                    rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+
+                    // Publish with self as target - this executes local handlers
+                    Publish(rpcEvent, targetClientAuthorityId: GONetMain.MyAuthorityId, shouldPublishReliably: metadata.IsReliable);
+
+                    // Remove server from allowed list for remote sending
+                    allowedList.Remove(GONetMain.MyAuthorityId);
+                }
+
+                // 2. Send directly to remote clients WITHOUT triggering local handlers
+                if (allowedList.Count > 0)
+                {
+                    var remoteEvent = RpcEvent.Borrow();
+                    remoteEvent.RpcId = GetRpcId(instance.GetType(), methodName);
+                    remoteEvent.GONetId = instance.GONetParticipant.GONetId;
+                    remoteEvent.Data = dataToUse;
+                    remoteEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    remoteEvent.IsSingularRecipientOnly = true;
+
+                    // Send to all remote targets efficiently
+                    var allowedArray = allowedList.ToArray();
+                    GONetMain.Server_SendEventToSpecificRemoteConnections(
+                        remoteEvent,
+                        allowedArray,
+                        allowedArray.Length,
+                        metadata.IsReliable);
+
+                    remoteEvent.Return(); // Return event to pool manually
+                }
+            }
+            finally
+            {
+                if (needsReturn)
+                {
+                    SerializationUtils.ReturnByteArray(serialized);
+                }
+
+                // Return the bool array to the pool
+                if (validationResult.AllowedTargets != null)
+                {
+                    RpcValidationArrayPool.ReturnAllowedTargets(validationResult.AllowedTargets);
+                }
+            }
+
+            // Create delivery report
+            return new RpcDeliveryReport
+            {
+                DeliveredTo = allowedList.ToArray(),
+                FailedDelivery = deniedList.ToArray(),
+                FailureReason = validationResult.DenialReason,
+                WasModified = validationResult.ModifiedData != null,
+                ValidationReportId = reportId
+            };
+        }
+
+        private async Task<RpcDeliveryReport> Server_SendToValidatedTargetsWithDataDoReportingAsync(
+            GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
+            ushort[] targetBuffer, int targetCount,
+            byte[] serialized, int bytesUsed, bool needsReturn)
+        {
+            // Check for ASYNC validators first, then fall back to sync validators
+            RpcValidationResult validationResult;
+
+            // Try async validators first
+            if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
+                asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
+            {
+                // Invoke ASYNC validator
+                validationResult = await ValidateRpcAsync(asyncValidatorMethod, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
+            }
+            // Fall back to sync validators
+            else if (enhancedValidatorsByType.TryGetValue(instance.GetType(), out var validators) &&
+                     validators.TryGetValue(methodName, out var validatorObj) &&
+                     validatorParameterCounts.TryGetValue(instance.GetType(), out var paramCounts) &&
+                     paramCounts.TryGetValue(methodName, out var paramCount))
+            {
+                // Invoke SYNC validator
                 validationResult = InvokeValidator(validatorObj, paramCount, instance, GONetMain.MyAuthorityId, targetBuffer, targetCount, serialized);
             }
             else
