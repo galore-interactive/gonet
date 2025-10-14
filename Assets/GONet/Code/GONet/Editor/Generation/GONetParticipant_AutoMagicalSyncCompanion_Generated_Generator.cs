@@ -3173,15 +3173,21 @@ namespace GONet.Generation
                 }
                 else
                 {
-                    // Check return type
-                    if (validationMethod.ReturnType != typeof(RpcValidationResult))
+                    // Check if this is an async validator (Task<RpcValidationResult>) or sync (RpcValidationResult)
+                    bool isAsyncValidator = validationMethod.ReturnType.IsGenericType &&
+                                           validationMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>) &&
+                                           validationMethod.ReturnType.GetGenericArguments()[0] == typeof(RpcValidationResult);
+                    bool isSyncValidator = validationMethod.ReturnType == typeof(RpcValidationResult);
+
+                    if (!isAsyncValidator && !isSyncValidator)
                     {
-                        errors.Add($"ERROR: {methodId} - Validation method '{targetAttr.ValidationMethodName}' must return RpcValidationResult");
+                        errors.Add($"ERROR: {methodId} - Validation method '{targetAttr.ValidationMethodName}' must return RpcValidationResult or Task<RpcValidationResult>");
                         errors.Add($"  Current return type: {validationMethod.ReturnType.Name}");
-                        errors.Add($"  FIX: Change return type to RpcValidationResult");
+                        errors.Add($"  FIX (sync): internal RpcValidationResult {targetAttr.ValidationMethodName}(ref T1 param1, ref T2 param2, ...)");
+                        errors.Add($"  FIX (async): internal async Task<RpcValidationResult> {targetAttr.ValidationMethodName}Async(T1 param1, T2 param2, ...) // NO ref");
                     }
 
-                    // Check parameters match with ref
+                    // Check parameters match
                     var rpcParams = method.GetParameters();
                     var validationParams = validationMethod.GetParameters();
 
@@ -3190,7 +3196,14 @@ namespace GONet.Generation
                         errors.Add($"ERROR: {methodId} - Validation method parameter count mismatch");
                         errors.Add($"  RPC has {rpcParams.Length} parameters");
                         errors.Add($"  Validation method has {validationParams.Length} parameters");
-                        errors.Add($"  FIX: Validation method must have the same parameters as the RPC, but passed by ref");
+                        if (isSyncValidator)
+                        {
+                            errors.Add($"  FIX (sync): Validation method must have the same parameters as the RPC, but passed by ref");
+                        }
+                        else if (isAsyncValidator)
+                        {
+                            errors.Add($"  FIX (async): Validation method must have the same parameters as the RPC, WITHOUT ref (C# async limitation)");
+                        }
                     }
                     else
                     {
@@ -3200,34 +3213,62 @@ namespace GONet.Generation
                             var rpcParam = rpcParams[i];
                             var valParam = validationParams[i];
 
-                            // Check if ref
-                            if (!valParam.ParameterType.IsByRef)
+                            if (isSyncValidator)
                             {
-                                errors.Add($"ERROR: {methodId} - Validation parameter '{valParam.Name}' at position {i} must be passed by ref");
-                                errors.Add($"  Current: {valParam.ParameterType.Name} {valParam.Name}");
-                                errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
-                                hasParameterErrors = true;
-                                continue;
+                                // SYNC validators: require 'ref' keyword
+                                if (!valParam.ParameterType.IsByRef)
+                                {
+                                    errors.Add($"ERROR: {methodId} - SYNC validation parameter '{valParam.Name}' at position {i} must be passed by ref");
+                                    errors.Add($"  Current: {valParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  OR: Convert to async validator (Task<RpcValidationResult> with NO ref parameters)");
+                                    hasParameterErrors = true;
+                                    continue;
+                                }
+
+                                // Check type matches (accounting for ref)
+                                var valParamType = valParam.ParameterType.GetElementType();
+                                if (valParamType != rpcParam.ParameterType)
+                                {
+                                    errors.Add($"ERROR: {methodId} - Validation parameter type mismatch at position {i}");
+                                    errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
+                                    errors.Add($"  Validation parameter: {valParamType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    hasParameterErrors = true;
+                                }
+                            }
+                            else if (isAsyncValidator)
+                            {
+                                // ASYNC validators: MUST NOT have 'ref' keyword (C# limitation)
+                                if (valParam.ParameterType.IsByRef)
+                                {
+                                    errors.Add($"ERROR: {methodId} - ASYNC validation parameter '{valParam.Name}' at position {i} CANNOT use ref keyword");
+                                    errors.Add($"  C# does not allow ref parameters in async methods");
+                                    errors.Add($"  Current: ref {valParam.ParameterType.GetElementType().Name} {valParam.Name}");
+                                    errors.Add($"  FIX: {rpcParam.ParameterType.Name} {valParam.Name} // Remove 'ref'");
+                                    errors.Add($"  To modify parameters, use: result.SetValidatedOverride(index, newValue)");
+                                    hasParameterErrors = true;
+                                    continue;
+                                }
+
+                                // Check type matches (no ref, so direct comparison)
+                                if (valParam.ParameterType != rpcParam.ParameterType)
+                                {
+                                    errors.Add($"ERROR: {methodId} - Async validation parameter type mismatch at position {i}");
+                                    errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
+                                    errors.Add($"  Validation parameter: {valParam.ParameterType.Name} {valParam.Name}");
+                                    errors.Add($"  FIX: {rpcParam.ParameterType.Name} {valParam.Name}");
+                                    hasParameterErrors = true;
+                                }
                             }
 
-                            // Check type matches (accounting for ref)
-                            var valParamType = valParam.ParameterType.GetElementType();
-                            if (valParamType != rpcParam.ParameterType)
-                            {
-                                errors.Add($"ERROR: {methodId} - Validation parameter type mismatch at position {i}");
-                                errors.Add($"  RPC parameter: {rpcParam.ParameterType.Name} {rpcParam.Name}");
-                                errors.Add($"  Validation parameter: {valParamType.Name} {valParam.Name}");
-                                errors.Add($"  FIX: ref {rpcParam.ParameterType.Name} {valParam.Name}");
-                                hasParameterErrors = true;
-                            }
-
-                            // Warn about name mismatch
+                            // Warn about name mismatch (applies to both sync and async)
                             if (valParam.Name != rpcParam.Name)
                             {
                                 errors.Add($"WARNING: {methodId} - Parameter name mismatch at position {i}");
                                 errors.Add($"  RPC parameter name: {rpcParam.Name}");
                                 errors.Add($"  Validation parameter name: {valParam.Name}");
-                                errors.Add($"  Consider using the same name for clarity");
+                                errors.Add($"  RECOMMENDED: Use matching names for clarity (especially important for async validators using SetValidatedOverride by index)");
                             }
                         }
 
