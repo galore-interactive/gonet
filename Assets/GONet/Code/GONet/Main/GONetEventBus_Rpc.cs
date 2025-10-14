@@ -692,49 +692,61 @@ namespace GONet
             object[] rpcParameters)
         {
             Type componentType = component.GetType();
+            GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync called for {componentType.Name}.{rpcMethodName}, targetCount={targetCount}, params={rpcParameters?.Length ?? 0}");
 
             // Check if async validator is registered for this RPC method
-            if (asyncValidatorsByType.TryGetValue(componentType, out var asyncDict) &&
-                asyncDict.TryGetValue(rpcMethodName, out var asyncValidatorMethod))
+            bool hasAsyncDict = asyncValidatorsByType.TryGetValue(componentType, out var asyncDict);
+            GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync - asyncValidatorsByType.TryGetValue({componentType.Name}) = {hasAsyncDict}");
+
+            if (hasAsyncDict)
             {
-                // Set up validation context for async validator
-                var result = RpcValidationResult.CreatePreAllocated(targetCount);
-                var validationContext = new RpcValidationContext
-                {
-                    SourceAuthorityId = sourceAuthorityId,
-                    TargetAuthorityIds = targetAuthorityIds,
-                    TargetCount = targetCount,
-                    PreAllocatedResult = result
-                };
-                SetValidationContext(validationContext);
+                bool hasMethod = asyncDict.TryGetValue(rpcMethodName, out var asyncValidatorMethod);
+                GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync - asyncDict.TryGetValue({rpcMethodName}) = {hasMethod}");
 
-                try
+                if (hasMethod)
                 {
-                    // Invoke async validator - THIS AWAITS WITHOUT BLOCKING UNITY MAIN THREAD!
-                    result = await InvokeAsyncValidatorAsync(
-                        asyncValidatorMethod,
-                        component,
-                        rpcParameters);
+                    GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync - INVOKING {componentType.Name}.{asyncValidatorMethod.Name}");
 
-                    // NOTE: ModifiedData serialization is caller's responsibility
-                    // Caller must check result.WasModified and result.GetValidatedOverrides()
-                    // and serialize using appropriate method (MemoryPack, SerializationUtils, etc.)
+                    // Set up validation context for async validator
+                    var result = RpcValidationResult.CreatePreAllocated(targetCount);
+                    var validationContext = new RpcValidationContext
+                    {
+                        SourceAuthorityId = sourceAuthorityId,
+                        TargetAuthorityIds = targetAuthorityIds,
+                        TargetCount = targetCount,
+                        PreAllocatedResult = result
+                    };
+                    SetValidationContext(validationContext);
 
-                    return result;
-                }
-                finally
-                {
-                    // Clear validation context to prevent leaks across RPCs
-                    ClearValidationContext();
+                    try
+                    {
+                        // Invoke async validator - THIS AWAITS WITHOUT BLOCKING UNITY MAIN THREAD!
+                        result = await InvokeAsyncValidatorAsync(
+                            asyncValidatorMethod,
+                            component,
+                            rpcParameters);
+
+                        GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync - validator returned WasModified={result.WasModified}");
+
+                        // NOTE: ModifiedData serialization is caller's responsibility
+                        // Caller must check result.WasModified and result.GetValidatedOverrides()
+                        // and serialize using appropriate method (MemoryPack, SerializationUtils, etc.)
+
+                        return result;
+                    }
+                    finally
+                    {
+                        // Clear validation context to prevent leaks across RPCs
+                        ClearValidationContext();
+                    }
                 }
             }
-            else
-            {
-                // No async validator registered - return default allow-all result
-                var result = RpcValidationResult.CreatePreAllocated(targetCount);
-                result.AllowAll();
-                return result;
-            }
+
+            // No async validator registered - return default allow-all result
+            GONetLog.Info($"[ASYNC VALIDATION DEBUG] ValidateRpcAsync - NO VALIDATOR FOUND, returning allow-all for {componentType.Name}.{rpcMethodName}");
+            var defaultResult = RpcValidationResult.CreatePreAllocated(targetCount);
+            defaultResult.AllowAll();
+            return defaultResult;
         }
 
 
@@ -825,12 +837,20 @@ namespace GONet
         /// <param name="parameterCounts">Dictionary of method name to parameter count</param>
         public void RegisterAsyncValidators(Type type, Dictionary<string, MethodInfo> asyncValidators, Dictionary<string, int> parameterCounts)
         {
+            GONetLog.Info($"[ASYNC VALIDATION DEBUG] RegisterAsyncValidators called for {type.Name} with {asyncValidators.Count} validators: [{string.Join(", ", asyncValidators.Keys)}]");
+
             // Convert to concurrent dictionaries for thread-safe access during RPC processing
             var concurrentAsyncValidators = new ConcurrentDictionary<string, MethodInfo>(asyncValidators);
             var concurrentParamCounts = new ConcurrentDictionary<string, int>(parameterCounts);
 
             asyncValidatorsByType.AddOrUpdate(type, concurrentAsyncValidators, (key, existing) => concurrentAsyncValidators);
             validatorParameterCounts.AddOrUpdate(type, concurrentParamCounts, (key, existing) => concurrentParamCounts);
+
+            GONetLog.Info($"[ASYNC VALIDATION DEBUG] After registration, asyncValidatorsByType contains {asyncValidatorsByType.Count} types");
+            foreach (var kvp in asyncValidatorsByType)
+            {
+                GONetLog.Info($"[ASYNC VALIDATION DEBUG]   - {kvp.Key.Name}: {kvp.Value.Count} methods");
+            }
         }
 
         // Send delivery report back to caller
@@ -6533,27 +6553,41 @@ namespace GONet
                 else if (GONetMain.IsServer)
                 {
                     // Server: Validate, route, and generate delivery report
-                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
-                    if (asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators) &&
-                        asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod))
-                    {
-                        // Invoke async validator with strongly-typed parameters
-                        object[] parameters = new object[] { arg1, arg2, arg3, arg4, arg5 };
-                        var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+                    GONetLog.Info($"[ASYNC VALIDATION DEBUG] HandleTargetRpcWithDeliveryReportAsync<5 params> - Server path for {instance.GetType().Name}.{methodName}");
 
-                        // Handle validation result
-                        return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
-                            instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4, arg5);
-                    }
-                    else
+                    // Check for ASYNC validators first - validate BEFORE serialization with strongly-typed parameters
+                    bool hasAsyncValidators = asyncValidatorsByType.TryGetValue(instance.GetType(), out var asyncValidators);
+                    GONetLog.Info($"[ASYNC VALIDATION DEBUG] asyncValidatorsByType.TryGetValue({instance.GetType().Name}) = {hasAsyncValidators}, asyncValidatorsByType.Count = {asyncValidatorsByType.Count}");
+
+                    if (hasAsyncValidators)
                     {
-                        // Fall back to sync validation or default
-                        var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
-                        int bytesUsed;
-                        bool needsReturn;
-                        byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
-                        return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
+                        GONetLog.Info($"[ASYNC VALIDATION DEBUG] asyncValidators for {instance.GetType().Name} contains {asyncValidators.Count} methods: [{string.Join(", ", asyncValidators.Keys)}]");
+                        bool hasMethodValidator = asyncValidators.TryGetValue(methodName, out var asyncValidatorMethod);
+                        GONetLog.Info($"[ASYNC VALIDATION DEBUG] asyncValidators.TryGetValue({methodName}) = {hasMethodValidator}");
+
+                        if (hasMethodValidator)
+                        {
+                            GONetLog.Info($"[ASYNC VALIDATION DEBUG] INVOKING ASYNC VALIDATOR: {instance.GetType().Name}.{asyncValidatorMethod.Name}");
+
+                            // Invoke async validator with strongly-typed parameters
+                            object[] parameters = new object[] { arg1, arg2, arg3, arg4, arg5 };
+                            var validationResult = await ValidateRpcAsync(instance, methodName, GONetMain.MyAuthorityId, targetBuffer, targetCount, parameters);
+
+                            GONetLog.Info($"[ASYNC VALIDATION DEBUG] Async validation complete. WasModified={validationResult.WasModified}, DenialReason={validationResult.DenialReason ?? "null"}");
+
+                            // Handle validation result
+                            return (TResult)(object)await Server_ProcessValidatedTargetsWithDataDoReportingAsync(
+                                instance, methodName, metadata, targetBuffer, targetCount, validationResult, arg1, arg2, arg3, arg4, arg5);
+                        }
                     }
+
+                    // Fall back to sync validation or default
+                    GONetLog.Info($"[ASYNC VALIDATION DEBUG] NO ASYNC VALIDATOR - falling back to sync validation for {instance.GetType().Name}.{methodName}");
+                    var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
+                    int bytesUsed;
+                    bool needsReturn;
+                    byte[] serialized = SerializationUtils.SerializeToBytes(data, out bytesUsed, out needsReturn);
+                    return (TResult)(object)Server_SendToValidatedTargetsWithDataDoReporting(instance, methodName, metadata, targetBuffer, targetCount, serialized, bytesUsed, needsReturn);
                 }
                 return default(TResult);
             }
