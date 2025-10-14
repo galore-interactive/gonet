@@ -1421,6 +1421,22 @@ namespace GONet
             {
                 Array.Copy(evt.TargetAuthorities, targetBuffer, evt.TargetCount);
 
+                // TODO: Add async validator support for client-initiated TargetRPCs
+                // Currently only sync validators work in this code path because:
+                // 1. This is a non-async method (event handler)
+                // 2. We only have serialized byte[] data, not strongly-typed parameters
+                // 3. Would need to deserialize based on parameter count (complex without generics)
+                //
+                // WORKAROUND: Server-initiated TargetRPCs DO support async validation via HandleTargetRpcWithDeliveryReportAsync
+                // For client-initiated RPCs with async validation needs, consider having the server initiate the validated RPC
+
+                // Check for async validators and log limitation if found
+                if (asyncValidatorsByType.TryGetValue(componentType, out var asyncValidators) &&
+                    asyncValidators.ContainsKey(methodName))
+                {
+                    GONetLog.Warning($"[ASYNC VALIDATION] Client-initiated TargetRpc {componentType.Name}.{methodName} has async validator but this code path only supports SYNC validators. Falling back to basic validation.");
+                }
+
                 // Use enhanced validation system for profanity filtering and other validation
                 RpcValidationResult validationResult;
                 if (enhancedValidatorsByType.TryGetValue(componentType, out var validators) &&
@@ -1428,11 +1444,13 @@ namespace GONet
                     validatorParameterCounts.TryGetValue(componentType, out var paramCounts) &&
                     paramCounts.TryGetValue(methodName, out var paramCount))
                 {
+                    GONetLog.Info($"[SYNC VALIDATION] Using SYNC validator for client-initiated TargetRpc {componentType.Name}.{methodName}");
                     // Invoke enhanced validator (with profanity filtering)
                     validationResult = InvokeValidator(validatorObj, paramCount, component, sourceAuthority, targetBuffer, evt.TargetCount, evt.Data);
                 }
                 else
                 {
+                    GONetLog.Info($"[VALIDATION] No validators found for {componentType.Name}.{methodName}, using basic connection check");
                     // Fallback to basic connection validation
                     validationResult = RpcValidationResult.CreatePreAllocated(evt.TargetCount);
                     for (int i = 0; i < evt.TargetCount; i++)
