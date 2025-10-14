@@ -972,6 +972,229 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         return result;
     }
 
+    /// <summary>
+    /// ASYNC version of ValidateMessage - demonstrates non-blocking RPC validation with async/await.
+    /// This method performs the same validation as ValidateMessage but without blocking the Unity main thread.
+    ///
+    /// Key Differences from Sync Version:
+    /// - Returns Task&lt;RpcValidationResult&gt; instead of RpcValidationResult
+    /// - Parameters do NOT use 'ref' keyword (C# async limitation)
+    /// - Uses SetValidatedOverride(index, value) API to modify parameters
+    /// - Can perform async I/O without blocking (profanity API calls, database lookups, etc.)
+    ///
+    /// CRITICAL: When async validators modify parameters, they MUST use SetValidatedOverride()
+    /// because 'ref' parameters are not allowed in async methods. The framework will serialize
+    /// all parameters (original + overrides) after validation completes.
+    ///
+    /// Performance Comparison:
+    /// - Sync validator with Thread.Sleep(2000): Blocks Unity for 2 seconds (FREEZES GAME)
+    /// - Async validator with await Task.Delay(2000): Non-blocking, game runs smoothly
+    ///
+    /// Use Cases for Async Validators:
+    /// - Web API calls (profanity filtering, content moderation)
+    /// - Database lookups (permissions, ban lists, player data)
+    /// - File I/O operations (logging, audit trails)
+    /// - Cryptographic operations (signature verification, encryption)
+    /// - Any operation that would block the main thread in sync version
+    ///
+    /// To use this async validator instead of the sync one, change the TargetRpc attribute:
+    /// [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true,
+    ///            validationMethod: nameof(ValidateMessageAsync))]
+    /// </summary>
+    /// <param name="content">Message content (index 0 - modify via SetValidatedOverride)</param>
+    /// <param name="channelName">Channel name (index 1)</param>
+    /// <param name="messageType">Message type (index 2)</param>
+    /// <param name="fromUserId">Sender ID (index 3)</param>
+    /// <param name="recipients">Recipients array (index 4)</param>
+    /// <returns>Task that completes with validation result</returns>
+    internal async Task<RpcValidationResult> ValidateMessageAsync(
+        string content,        // [0] - No 'ref' keyword!
+        string channelName,    // [1]
+        ChatType messageType,  // [2]
+        ushort fromUserId,     // [3]
+        ushort[] recipients)   // [4]
+    {
+        // Get the pre-allocated validation result from the context
+        var validationContext = GONetMain.EventBus.GetValidationContext();
+        if (!validationContext.HasValue)
+        {
+            // Fallback if no validation context (shouldn't happen in normal flow)
+            var resultAllow = RpcValidationResult.CreatePreAllocated(1);
+            resultAllow.AllowAll();
+            return resultAllow;
+        }
+
+        var result = validationContext.Value.GetValidationResult();
+
+        // Check which targets are connected and set the bool array accordingly
+        bool hasAnyDenied = false;
+        var targetAuthorityIds = validationContext.Value.TargetAuthorityIds;
+
+        for (int i = 0; i < validationContext.Value.TargetCount; i++)
+        {
+            ushort target = targetAuthorityIds[i];
+            if (participants.Any(p => p.AuthorityId == target && p.Status == ConnectionStatus.Connected))
+            {
+                result.AllowedTargets[i] = true;
+            }
+            else
+            {
+                result.AllowedTargets[i] = false;
+                hasAnyDenied = true;
+            }
+        }
+
+        // Set denial reason if any targets were denied
+        if (hasAnyDenied)
+        {
+            result.DenialReason = "Some recipients are not connected";
+        }
+
+        // ASYNC profanity filtering - THIS IS NON-BLOCKING!
+        try
+        {
+            string originalContent = content;
+
+            // Perform async profanity filtering (non-blocking)
+            string filteredContent = await FilterProfanityAsync(originalContent);
+
+            if (filteredContent != originalContent)
+            {
+                // Message was modified - use SetValidatedOverride API
+                result.SetValidatedOverride(0, filteredContent);  // Parameter index 0 = content
+
+                // Note: result.WasModified is automatically set to true by SetValidatedOverride()
+                // The framework will serialize all params (original + overrides) into ModifiedData
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Error($"Failed to filter message content (async): {ex.Message}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Async profanity filter using web APIs without blocking Unity main thread.
+    /// This demonstrates proper async/await patterns for I/O-bound operations.
+    /// </summary>
+    private async Task<string> FilterProfanityAsync(string input)
+    {
+        if (!GONetMain.IsServer)
+            return input;
+
+        // Try PurgoMalum API first (with timeout)
+        try
+        {
+            string result = await TryPurgoMalumAsync(input);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] PurgoMalum async failed: {ex.Message}");
+        }
+
+        // Try profanity.dev as backup (with timeout)
+        try
+        {
+            string result = await TryProfanityDevAsync(input);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] Profanity.dev async failed: {ex.Message}");
+        }
+
+        // Fall back to local filtering
+        return FilterProfanityLocal(input);
+    }
+
+    private async Task<string> TryPurgoMalumAsync(string input)
+    {
+        try
+        {
+            string url = $"https://www.purgomalum.com/service/plain?text={UnityWebRequest.EscapeURL(input)}";
+
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = 2; // 2 second timeout
+
+                // ASYNC web request - does NOT block Unity main thread!
+                var operation = request.SendWebRequest();
+                await operation; // Await the async operation
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    return request.downloadHandler.text;
+                }
+                else
+                {
+                    GONetLog.Warning($"[Server] PurgoMalum async request failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] PurgoMalum async exception: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<string> TryProfanityDevAsync(string input)
+    {
+        try
+        {
+            string jsonPayload = $"{{\"message\":\"{input.Replace("\"", "\\\"")}\"}}";
+
+            using (UnityWebRequest request = new UnityWebRequest("https://vector.profanity.dev", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 2; // 2 second timeout
+
+                // ASYNC web request - does NOT block Unity main thread!
+                var operation = request.SendWebRequest();
+                await operation; // Await the async operation
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    // Parse JSON response - simple parsing for now
+                    string response = request.downloadHandler.text;
+                    if (response.Contains("\""))
+                    {
+                        var start = response.IndexOf("\"") + 1;
+                        var end = response.LastIndexOf("\"");
+                        if (end > start)
+                        {
+                            return response.Substring(start, end - start);
+                        }
+                    }
+                    return input; // If we can't parse response, return original (assume clean)
+                }
+                else
+                {
+                    GONetLog.Warning($"[Server] Profanity.dev async request failed: {request.error}");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            GONetLog.Warning($"[Server] Profanity.dev async exception: {ex.Message}");
+            return null;
+        }
+    }
+
     #endregion
 
     #region Helper Methods
