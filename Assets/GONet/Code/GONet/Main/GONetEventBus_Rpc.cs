@@ -640,7 +640,7 @@ namespace GONet
         /// <summary>
         /// Async validation pipeline for RPCs with async validators.
         /// Invokes async validator without blocking Unity main thread, applies parameter overrides,
-        /// and returns validation result with modified data.
+        /// and returns validation result with WasModified flag and override dictionary.
         /// </summary>
         /// <param name="component">Component instance containing the validator method</param>
         /// <param name="rpcMethodName">Name of the RPC method being validated</param>
@@ -648,8 +648,7 @@ namespace GONet
         /// <param name="targetAuthorityIds">Array of target authority IDs</param>
         /// <param name="targetCount">Number of valid targets in the array</param>
         /// <param name="rpcParameters">Deserialized RPC parameters (already extracted from byte[])</param>
-        /// <param name="serializeDelegate">Serialization delegate from generated code for re-serializing params</param>
-        /// <returns>Task that completes with validation result (with ModifiedData if params changed)</returns>
+        /// <returns>Task that completes with validation result (with override dictionary if params changed)</returns>
         /// <remarks>
         /// <para><b>Async Flow (Non-Blocking):</b></para>
         /// <list type="number">
@@ -657,23 +656,27 @@ namespace GONet
         /// <item>Set validation context (sourceAuthority, targets) for validator access</item>
         /// <item>Invoke async validator via reflection → AWAITS without blocking Unity thread</item>
         /// <item>Check if validator set parameter overrides via SetValidatedOverride()</item>
-        /// <item>If overrides present, serialize ALL params (original + overrides) into ModifiedData</item>
-        /// <item>Clear validation context and return result</item>
+        /// <item>Return result with WasModified flag and override dictionary</item>
+        /// <item>Clear validation context</item>
         /// </list>
+        ///
+        /// <para><b>IMPORTANT - ModifiedData Handling:</b></para>
+        /// This method does NOT set ModifiedData. The caller must handle serialization of overrides
+        /// if result.WasModified is true. This is because serialization format is context-dependent
+        /// (MemoryPack for generated code, SerializationUtils for runtime).
         ///
         /// <para><b>Performance:</b></para>
         /// <list type="bullet">
         /// <item>Async validation: 0-2000ms (I/O-bound, non-blocking)</item>
-        /// <item>Parameter merging: ~0.05ms for 1-8 params</item>
-        /// <item>Serialization overhead: ~0.10ms (delegate call + MemoryPack)</item>
-        /// <item>Total added overhead: ~0.15ms vs ~2000ms saved from non-blocking = 13,333x improvement</item>
+        /// <item>Overhead: ~0.05ms (reflection invocation)</item>
+        /// <item>Net improvement: Eliminates 2000ms blocking from main thread</item>
         /// </list>
         ///
         /// <para><b>Integration Points:</b></para>
         /// <list type="bullet">
         /// <item>Called from: RPC processing pipeline (HandleTargetRpcEvent, etc.) when async validator detected</item>
         /// <item>Calls: InvokeAsyncValidatorAsync() for reflection-based async invocation</item>
-        /// <item>Calls: SerializeParamsWithOverrides() when result.WasModified &amp;&amp; overrides present</item>
+        /// <item>Caller responsibility: Serialize overrides into ModifiedData if WasModified=true</item>
         /// </list>
         ///
         /// <para><b>Error Handling:</b></para>
@@ -686,8 +689,7 @@ namespace GONet
             ushort sourceAuthorityId,
             ushort[] targetAuthorityIds,
             int targetCount,
-            object[] rpcParameters,
-            Func<object[], byte[]> serializeDelegate)
+            object[] rpcParameters)
         {
             Type componentType = component.GetType();
 
@@ -707,14 +709,9 @@ namespace GONet
                         component,
                         rpcParameters);
 
-                    // Apply validated overrides to ModifiedData if validator modified params
-                    if (result.WasModified && result.GetValidatedOverrides() != null)
-                    {
-                        result.ModifiedData = SerializeParamsWithOverrides(
-                            rpcParameters,
-                            result.GetValidatedOverrides(),
-                            serializeDelegate);
-                    }
+                    // NOTE: ModifiedData serialization is caller's responsibility
+                    // Caller must check result.WasModified and result.GetValidatedOverrides()
+                    // and serialize using appropriate method (MemoryPack, SerializationUtils, etc.)
 
                     return result;
                 }
