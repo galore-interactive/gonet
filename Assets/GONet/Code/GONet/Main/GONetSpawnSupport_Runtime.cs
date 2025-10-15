@@ -51,6 +51,12 @@ namespace GONet
         private static bool isDesignTimeMetadataCachingComplete = false;
         private static readonly List<GONetParticipant> deferredLookupQueue = new List<GONetParticipant>();
 
+        /// <summary>
+        /// Cached reference to the DesignTimeMetadataLibrary for fast index-based lookups.
+        /// Used for bandwidth optimization in spawn events (ushort index vs full string location).
+        /// </summary>
+        private static DesignTimeMetadataLibrary cachedMetadataLibrary = null;
+
 #if ADDRESSABLES_AVAILABLE
         private static readonly Dictionary<string, GONetParticipant> addressablePrefabCache = new Dictionary<string, GONetParticipant>(100);
         private static readonly HashSet<string> loadingAddressableKeys = new HashSet<string>();
@@ -91,6 +97,7 @@ namespace GONet
             {
                 string fileContentsJson = fileContentsTask.Result;
                 DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                cachedMetadataLibrary = library; // Cache for index-based lookups
                 return library.Entries;
             }
 #else
@@ -99,6 +106,7 @@ namespace GONet
             {
                 string fileContentsJson = File.ReadAllText(fullPath);
                 DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                cachedMetadataLibrary = library; // Cache for index-based lookups
                 return library.Entries;
             }
 #endif
@@ -176,6 +184,7 @@ namespace GONet
             yield return LoadFileFromWeb_Coroutine(fullPath, (fileContentsJson) =>
                 {
                     DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                    cachedMetadataLibrary = library; // Cache for index-based lookups
                     processResults(library.Entries);
                 });
             IsDesignTimeMetadataCached = true; // IMPORTANT: TODO FIXME this being in a coroutine is problematic because of what is waiting for this to be true...ought to block the main thread actually.....we should do this on another thread and block main thread until it this is true
@@ -187,6 +196,7 @@ namespace GONet
             {
                 string fileContentsJson = File.ReadAllText(fullPath);
                 DesignTimeMetadataLibrary library = JsonUtility.FromJson<DesignTimeMetadataLibrary>(fileContentsJson);
+                cachedMetadataLibrary = library; // Cache for index-based lookups
                 processResults(library.Entries);
             }
             IsDesignTimeMetadataCached = true;
@@ -960,6 +970,52 @@ namespace GONet
             }
 
             return metadata.Location;
+        }
+
+        /// <summary>
+        /// Gets the 16-bit index for a design time location.
+        /// BANDWIDTH OPTIMIZATION: Use this instead of sending full location strings (2 bytes vs 40-80 bytes).
+        /// Returns ushort.MaxValue if location not found or library not loaded.
+        /// </summary>
+        public static ushort GetDesignTimeLocationIndex(string location)
+        {
+            if (cachedMetadataLibrary == null)
+            {
+                GONetLog.Warning("DesignTimeMetadataLibrary not loaded yet. Call CacheAllProjectDesignTimeMetadata first.");
+                return ushort.MaxValue;
+            }
+
+            return cachedMetadataLibrary.GetIndexForLocation(location);
+        }
+
+        /// <summary>
+        /// Gets the design time location for a 16-bit index.
+        /// BANDWIDTH OPTIMIZATION: Use this to decode received indices back to location strings.
+        /// Returns null if index is invalid or library not loaded.
+        /// </summary>
+        public static string GetDesignTimeLocationFromIndex(ushort index)
+        {
+            if (cachedMetadataLibrary == null)
+            {
+                GONetLog.Warning("DesignTimeMetadataLibrary not loaded yet. Call CacheAllProjectDesignTimeMetadata first.");
+                return null;
+            }
+
+            return cachedMetadataLibrary.GetLocationForIndex(index);
+        }
+
+        /// <summary>
+        /// Gets the 16-bit index for a GONetParticipant's design time location.
+        /// BANDWIDTH OPTIMIZATION: Use this in spawn events (2 bytes vs 40-80 bytes).
+        /// Returns ushort.MaxValue if participant metadata not found or library not loaded.
+        /// </summary>
+        public static ushort GetDesignTimeLocationIndex(GONetParticipant gONetParticipant, bool force = false)
+        {
+            string location = GetDesignTimeMetadata_Location(gONetParticipant, force);
+            if (string.IsNullOrWhiteSpace(location))
+                return ushort.MaxValue;
+
+            return GetDesignTimeLocationIndex(location);
         }
     }
 

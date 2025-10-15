@@ -244,5 +244,36 @@ namespace GONet.Generation
     public class DesignTimeMetadataLibrary
     {
         public DesignTimeMetadata[] Entries;
+
+        /// <summary>
+        /// Gets the 16-bit index for a given design time location.
+        /// This is used for bandwidth optimization in spawn events (2 bytes vs 40-80 bytes).
+        /// Returns ushort.MaxValue if location not found.
+        /// </summary>
+        public ushort GetIndexForLocation(string location)
+        {
+            if (Entries == null || string.IsNullOrWhiteSpace(location))
+                return ushort.MaxValue;
+
+            for (int i = 0; i < Entries.Length; i++)
+            {
+                if (Entries[i].Location == location)
+                    return (ushort)i;
+            }
+
+            return ushort.MaxValue;
+        }
+
+        /// <summary>
+        /// Gets the design time location for a given index.
+        /// Returns null if index is invalid.
+        /// </summary>
+        public string GetLocationForIndex(ushort index)
+        {
+            if (Entries == null || index >= Entries.Length || index == ushort.MaxValue)
+                return null;
+
+            return Entries[index].Location;
+        }
     }
 }

@@ -302,10 +302,49 @@ namespace GONet
         public long OccurredAtElapsedTicks { get; set; }
 
         /// <summary>
-        /// this is the information necessary to lookup the source <see cref="UnityEngine.GameObject"/> from which to use as the template in order to call <see cref="UnityEngine.Object.Instantiate(UnityEngine.Object)"/>.
-        /// TODO add the persisted int->string lookup table that is updated each time a new design time location is encountered (at design time...duh)..so this can be an int!
+        /// BANDWIDTH OPTIMIZATION: 16-bit index into DesignTimeMetadata.json instead of full string location.
+        /// Saves 38-78 bytes per spawn event (2 bytes vs 40-80 bytes).
+        /// ushort.MaxValue (65535) indicates invalid/legacy value - use <see cref="DesignTimeLocation"/> fallback.
         /// </summary>
-        public string DesignTimeLocation;
+        public ushort DesignTimeLocationIndex;
+
+        /// <summary>
+        /// BACKWARDS COMPATIBILITY: Legacy full string location.
+        /// Prefer using <see cref="DesignTimeLocationIndex"/> for bandwidth savings.
+        /// Use this property for compatibility and debugging.
+        /// When reading: If DesignTimeLocationIndex is valid (!= ushort.MaxValue), returns location from index lookup.
+        /// When writing: Also updates DesignTimeLocationIndex from location string.
+        /// </summary>
+        [MemoryPackIgnore]
+        public string DesignTimeLocation
+        {
+            get
+            {
+                // If index is valid, decode it to location string
+                if (DesignTimeLocationIndex != ushort.MaxValue)
+                {
+                    string location = GONetSpawnSupport_Runtime.GetDesignTimeLocationFromIndex(DesignTimeLocationIndex);
+                    if (!string.IsNullOrWhiteSpace(location))
+                        return location;
+                }
+
+                // Fallback to stored string (backwards compatibility for old events)
+                return _legacyDesignTimeLocation;
+            }
+            set
+            {
+                // Update both index and legacy string
+                _legacyDesignTimeLocation = value;
+                DesignTimeLocationIndex = GONetSpawnSupport_Runtime.GetDesignTimeLocationIndex(value);
+            }
+        }
+
+        /// <summary>
+        /// Internal backing field for backwards compatibility.
+        /// NOT SERIALIZED - only used for in-memory compatibility layer.
+        /// </summary>
+        [MemoryPackIgnore]
+        private string _legacyDesignTimeLocation;
 
         public uint GONetId;
 
