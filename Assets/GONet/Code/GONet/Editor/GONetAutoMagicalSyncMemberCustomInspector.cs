@@ -474,19 +474,59 @@ See Client_GONetIdBatchLimboMode enum for different limbo mode behaviors.";
 
                         GUI.enabled = guiEnabledPrevious_inner;
 
+                        // Check if Rigidbody physics interpolation will be used
+                        bool hasRigidbody = targetGONetParticipant.GetComponent<Rigidbody>() != null || targetGONetParticipant.GetComponent<Rigidbody2D>() != null;
+                        bool isRigidBodyOwnerControlled = targetGONetParticipant.IsRigidBodyOwnerOnlyControlled;
+
                         { // IsPositionSyncd:
+                            const string POSITION_TT = @"Enable to synchronize position across the network.
+
+IMPORTANT - Rigidbody Physics Interpolation:
+When 'Is Rigid Body Owner Only Controlled' is checked AND a Rigidbody component exists, Unity's physics interpolation handles smooth rendering on non-authority clients instead of GONet's value blending system.
+
+How it works:
+- Authority (IsMine=true): Physics simulation runs normally
+- Non-authority (IsMine=false): Rigidbody set to kinematic, Unity interpolation enabled
+- Network updates applied via Rigidbody.MovePosition() for physics-aware rendering
+- Unity's Rigidbody.interpolation smooths motion between network updates
+
+Profile settings below still control sync frequency and reliability, but value blending is handled by Unity's physics system when using Rigidbody.";
+
+                            string positionTooltip = (hasRigidbody && isRigidBodyOwnerControlled)
+                                ? POSITION_TT
+                                : "Enable to synchronize position across the network.";
+
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Position Syncd"), GUILayout.MaxWidth(150));
-                            SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsPositionSyncd)}");
-                            EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
+                            GUIContent positionLabel = new GUIContent(string.Concat("Is Position Syncd"), positionTooltip);
+                            EditorGUILayout.LabelField(positionLabel, GUILayout.MaxWidth(150));
+                            SerializedProperty positionProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsPositionSyncd)}");
+                            EditorGUILayout.PropertyField(positionProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
                             DrawGONetSyncProfileTemplateButton(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_POSITION);
                             EditorGUILayout.EndHorizontal();
                         }
                         { // IsRotationSyncd:
+                            const string ROTATION_TT = @"Enable to synchronize rotation across the network.
+
+IMPORTANT - Rigidbody Physics Interpolation:
+When 'Is Rigid Body Owner Only Controlled' is checked AND a Rigidbody component exists, Unity's physics interpolation handles smooth rendering on non-authority clients instead of GONet's value blending system.
+
+How it works:
+- Authority (IsMine=true): Physics simulation runs normally
+- Non-authority (IsMine=false): Rigidbody set to kinematic, Unity interpolation enabled
+- Network updates applied via Rigidbody.MoveRotation() for physics-aware rendering
+- Unity's Rigidbody.interpolation smooths motion between network updates
+
+Profile settings below still control sync frequency and reliability, but value blending is handled by Unity's physics system when using Rigidbody.";
+
+                            string rotationTooltip = (hasRigidbody && isRigidBodyOwnerControlled)
+                                ? ROTATION_TT
+                                : "Enable to synchronize rotation across the network.";
+
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField(string.Concat("Is Rotation Syncd"), GUILayout.MaxWidth(150));
-                            SerializedProperty serializedProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsRotationSyncd)}");
-                            EditorGUILayout.PropertyField(serializedProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
+                            GUIContent rotationLabel = new GUIContent(string.Concat("Is Rotation Syncd"), rotationTooltip);
+                            EditorGUILayout.LabelField(rotationLabel, GUILayout.MaxWidth(150));
+                            SerializedProperty rotationProperty = serializedObject.FindProperty($"{nameof(GONetParticipant.IsRotationSyncd)}");
+                            EditorGUILayout.PropertyField(rotationProperty, GUIContent.none, false, GUILayout.MaxWidth(50)); // IMPORTANT: without this, editing would never save/persist changes!
                             DrawGONetSyncProfileTemplateButton(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___TRANSFORM_ROTATION);
                             EditorGUILayout.EndHorizontal();
                         }
