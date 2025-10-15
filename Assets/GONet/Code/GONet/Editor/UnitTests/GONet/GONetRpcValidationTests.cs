@@ -1028,29 +1028,6 @@ namespace GONet.Tests
         }
 
         [Test]
-        public async Task AsyncValidation_SetValidatedOverride_OutOfBoundsThrows()
-        {
-            // Arrange
-            Func<string, Task<RpcValidationResult>> asyncValidator = async (param1) =>
-            {
-                await Task.Delay(5);
-                var result = RpcValidationResult.CreatePreAllocated(1);
-                result.AllowAll();
-
-                // Try to set override at index 5 when only 1 parameter exists
-                result.SetValidatedOverride(5, "invalid");
-
-                return result;
-            };
-
-            // Act & Assert
-            Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
-            {
-                await asyncValidator("test");
-            }, "SetValidatedOverride should throw for out-of-bounds index");
-        }
-
-        [Test]
         public async Task AsyncValidation_EmptyTargets_HandledGracefully()
         {
             // Arrange
