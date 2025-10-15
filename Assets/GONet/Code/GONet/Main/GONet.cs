@@ -6311,11 +6311,23 @@ namespace GONet
                 if (participant.client_limboRigidbody != null)
                 {
                     participant.client_limboRigidbody.isKinematic = participant.client_limboRigidbodyWasKinematic;
+
+                    // Enable interpolation for smooth rendering if non-authority
+                    if (!participant.IsMine)
+                    {
+                        participant.client_limboRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+                    }
                 }
 
                 if (participant.client_limboRigidbody2D != null)
                 {
                     participant.client_limboRigidbody2D.bodyType = participant.client_limboRigidbody2DOriginalType;
+
+                    // Enable interpolation for smooth rendering if non-authority
+                    if (!participant.IsMine)
+                    {
+                        participant.client_limboRigidbody2D.interpolation = RigidbodyInterpolation2D.Interpolate;
+                    }
                 }
 
                 GONetLog.Info($"[ClientLimbo] Re-enabled rendering/physics on '{participantName}'");
@@ -6814,7 +6826,12 @@ namespace GONet
                             $"bufferSize:{mostRecentChanges_usedSize}");
                         */
 
-                        syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
+                        // Try to apply via Rigidbody.MovePosition/MoveRotation for smooth physics rendering
+                        // Falls back to standard SetAutoMagicalSyncValue if no Rigidbody or not position/rotation
+                        if (!TryApplyBlendedValue_UsingRigidbodyIfPresent(blendedValue))
+                        {
+                            syncCompanion.SetAutoMagicalSyncValue(index, blendedValue);
+                        }
 
                         //if (hasAwaitingAtRest)
                         //{
@@ -6836,6 +6853,66 @@ namespace GONet
                     //}
                 }
                 //if (Input.GetKeyDown(KeyCode.L)) GONetLog.Append_FlushDebug("**************************************************   something strange happened \n");
+            }
+
+            /// <summary>
+            /// Attempts to apply blended value using Rigidbody.MovePosition/MoveRotation if a Rigidbody exists.
+            /// This respects Unity's Rigidbody interpolation for smooth rendering on non-authority clients.
+            /// NOTE: Relies on implementation detail that position/rotation sync values use GONetMain.IsPositionNotSyncd/IsRotationNotSyncd as their ShouldSkipSync delegates.
+            /// </summary>
+            /// <returns>True if applied via Rigidbody, false if no Rigidbody or not a position/rotation field</returns>
+            private bool TryApplyBlendedValue_UsingRigidbodyIfPresent(GONetSyncableValue blendedValue)
+            {
+                GONetParticipant participant = syncCompanion.gonetParticipant;
+
+                // Only apply for non-authority (IsMine = false)
+                if (participant.IsMine)
+                    return false;
+
+                // Check if this is position or rotation by matching the skip sync function
+                // This is an implementation detail but avoids string comparisons
+                bool isPosition = syncAttribute_ShouldSkipSync == GONetMain.IsPositionNotSyncd;
+                bool isRotation = syncAttribute_ShouldSkipSync == GONetMain.IsRotationNotSyncd;
+
+                if (!isPosition && !isRotation)
+                    return false;
+
+                // Try Rigidbody (3D)
+                Rigidbody rb = participant.GetComponent<Rigidbody>();
+                if (rb != null && rb.isKinematic)
+                {
+                    if (isPosition)
+                    {
+                        rb.MovePosition(blendedValue.UnityEngine_Vector3);
+                        return true;
+                    }
+                    else if (isRotation)
+                    {
+                        rb.MoveRotation(blendedValue.UnityEngine_Quaternion);
+                        return true;
+                    }
+                }
+
+                // Try Rigidbody2D
+                Rigidbody2D rb2D = participant.GetComponent<Rigidbody2D>();
+                if (rb2D != null && rb2D.bodyType == RigidbodyType2D.Kinematic)
+                {
+                    if (isPosition)
+                    {
+                        rb2D.MovePosition(blendedValue.UnityEngine_Vector3);
+                        return true;
+                    }
+                    else if (isRotation)
+                    {
+                        // Rigidbody2D.MoveRotation takes float (Z-axis rotation in degrees)
+                        // Extract Z component from Quaternion
+                        float zRotation = blendedValue.UnityEngine_Quaternion.eulerAngles.z;
+                        rb2D.MoveRotation(zRotation);
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             /// <summary>

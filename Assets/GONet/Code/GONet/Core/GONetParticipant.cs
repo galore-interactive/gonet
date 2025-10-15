@@ -943,6 +943,10 @@ namespace GONet
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
 
+                    // Enable Unity's Rigidbody interpolation for smooth rendering on non-authority clients
+                    // This works with GONet's value blending to provide smooth motion between network updates
+                    myRigidBody.interpolation = RigidbodyInterpolation.Interpolate;
+
                     // Clear constraints when becoming kinematic on non-authority clients
                     // Rationale: Constraints are for physics simulation only. Since kinematic rigidbodies
                     // are manually positioned (not physics-driven), constraints shouldn't apply.
@@ -972,6 +976,9 @@ namespace GONet
                         myRigidBody2D.bodyType = RigidbodyType2D.Kinematic;
                         myRigidBody2D.isKinematic = true;
                         myRigidBody2D.simulated = false;
+
+                        // Enable Unity's Rigidbody2D interpolation for smooth rendering on non-authority clients
+                        myRigidBody2D.interpolation = RigidbodyInterpolation2D.Interpolate;
                     }
                 }
             }
