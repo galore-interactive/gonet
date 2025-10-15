@@ -141,9 +141,17 @@ public class ProjectileSpawner : GONetBehaviour
                     // Create rotation that points in the spread direction
                     Quaternion spreadRotation = Quaternion.LookRotation(spreadDirection, transform.up);
 
-                    // Spawn using batch-aware API (now delegates internally to Try version with limbo fallback)
-                    GONetParticipant gnp =
-                        GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, spreadRotation);
+                    GONetParticipant gnp = default;
+                    bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 0.5f;
+                    if (shouldClientOwn)
+                    {
+                        gnp = Instantiate(projectilPrefab, transform.position, spreadRotation);
+                    }
+                    else
+                    {
+                        // Spawn using batch-aware API (now delegates internally to Try version with limbo fallback)
+                        gnp = GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, spreadRotation);
+                    }
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
                 }
 
