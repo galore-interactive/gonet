@@ -870,7 +870,7 @@ namespace GONet
             public bool isKinematic;
             public bool useGravity;
         }
-        Rigidbody myRigidBody;
+        public Rigidbody myRigidBody;
         RigidBodySettings myRigidbodySettingsAtStart;
 
         struct RigidBody2DSettings
@@ -879,7 +879,7 @@ namespace GONet
             public bool simulated;
             public RigidbodyType2D bodyType;
         }
-        Rigidbody2D myRigidBody2D;
+        public Rigidbody2D myRigidBody2D;
         RigidBody2DSettings myRigidbody2DSettingsAtStart;
 
         private void Start()

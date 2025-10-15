@@ -6861,12 +6861,18 @@ namespace GONet
             /// NOTE: Relies on implementation detail that position/rotation sync values use GONetMain.IsPositionNotSyncd/IsRotationNotSyncd as their ShouldSkipSync delegates.
             /// </summary>
             /// <returns>True if applied via Rigidbody, false if no Rigidbody or not a position/rotation field</returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private bool TryApplyBlendedValue_UsingRigidbodyIfPresent(GONetSyncableValue blendedValue)
             {
                 GONetParticipant participant = syncCompanion.gonetParticipant;
 
-                // Only apply for non-authority (IsMine = false)
+                // EARLY EXIT: Only apply for non-authority (IsMine = false)
                 if (participant.IsMine)
+                    return false;
+
+                // EARLY EXIT: Only proceed if there's a cached Rigidbody (3D or 2D)
+                // This check avoids expensive function pointer comparisons when no physics body exists
+                if (participant.myRigidBody == null && participant.myRigidBody2D == null)
                     return false;
 
                 // Check if this is position or rotation by matching the skip sync function
@@ -6877,8 +6883,8 @@ namespace GONet
                 if (!isPosition && !isRotation)
                     return false;
 
-                // Try Rigidbody (3D)
-                Rigidbody rb = participant.GetComponent<Rigidbody>();
+                // Try Rigidbody (3D) - use cached reference
+                Rigidbody rb = participant.myRigidBody;
                 if (rb != null && rb.isKinematic)
                 {
                     if (isPosition)
@@ -6893,8 +6899,8 @@ namespace GONet
                     }
                 }
 
-                // Try Rigidbody2D
-                Rigidbody2D rb2D = participant.GetComponent<Rigidbody2D>();
+                // Try Rigidbody2D - use cached reference
+                Rigidbody2D rb2D = participant.myRigidBody2D;
                 if (rb2D != null && rb2D.bodyType == RigidbodyType2D.Kinematic)
                 {
                     if (isPosition)
