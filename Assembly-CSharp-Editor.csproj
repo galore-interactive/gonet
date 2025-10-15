@@ -70,6 +70,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableEndpointTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOTestWrapper.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetIdBatchManagerTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusPerformanceTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\DualStackConnectionTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\MemoryPack\MemoryPackTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncChaosTests.cs" />

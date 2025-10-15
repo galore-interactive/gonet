@@ -31,6 +31,60 @@ public class ProjectileSpawner : GONetBehaviour
     private readonly Dictionary<uint, Vector3> lastKnownPositions = new Dictionary<uint, Vector3>();
     private readonly Dictionary<uint, float> lastMovementTime = new Dictionary<uint, float>();
 
+    /// <summary>
+    /// PERFORMANCE OPTIMIZATION: Single centralized subscription for ALL projectile transform updates.
+    /// Instead of N projectiles each subscribing individually (N handler invocations per frame),
+    /// we have 1 subscription that dispatches to the correct projectile (1 handler invocation + fast lookup).
+    ///
+    /// Benefits:
+    /// - Reduces event bus overhead (1 subscription vs N subscriptions)
+    /// - Reduces handler invocation overhead (1 call vs N calls in event bus loop)
+    /// - Fast O(1) lookup via GONetId → Projectile mapping
+    /// - Centralized lifecycle management (no per-projectile subscribe/unsubscribe)
+    /// </summary>
+    private readonly Dictionary<uint, Projectile> projectilesByGONetId = new Dictionary<uint, Projectile>(100);
+    private Subscription<SyncEvent_ValueChangeProcessed> centralizedTransformSubscription;
+
+    /// <summary>
+    /// PERFORMANCE OPTIMIZATION: Initialize centralized event subscription on first projectile spawn.
+    /// This replaces per-projectile subscriptions (N subscriptions) with a single subscription + dispatch pattern.
+    /// </summary>
+    private void Start()
+    {
+        // Subscribe once to ALL transform position sync events
+        // Filter: Only process events from local authority (not remote) for ANY projectile
+        centralizedTransformSubscription = GONetMain.EventBus.Subscribe(
+            SyncEvent_GeneratedTypes.SyncEvent_Transform_position,
+            OnAnyProjectileTransformSync,
+            filter: e => !e.IsSourceRemote // We'll do GONetParticipant check in handler for O(1) lookup
+        );
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up centralized subscription
+        centralizedTransformSubscription?.Dispose();
+    }
+
+    /// <summary>
+    /// PERFORMANCE OPTIMIZATION: Centralized handler for ALL projectile transform sync events.
+    /// Instead of each projectile having its own handler, we have one handler that dispatches to the correct projectile.
+    ///
+    /// Cost: O(1) dictionary lookup + delegate call
+    /// Old cost: O(N) event bus loop calling N handlers
+    /// </summary>
+    private void OnAnyProjectileTransformSync(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+    {
+        uint gonetId = eventEnvelope.Event.GONetId;
+
+        // Fast O(1) lookup: Is this event for one of our tracked projectiles?
+        if (projectilesByGONetId.TryGetValue(gonetId, out Projectile projectile))
+        {
+            // Dispatch to the specific projectile's handler
+            projectile.OnSendingMyTransform(eventEnvelope);
+        }
+    }
+
     public override void OnGONetReady(GONetParticipant gonetParticipant) // NOTE:  OnGONetReady is the recommended approach for v1.5+ (instead of OnGONetParticipantEnabled/Started/Etc..
     {
         base.OnGONetReady(gonetParticipant);
@@ -39,6 +93,9 @@ public class ProjectileSpawner : GONetBehaviour
         {
             Projectile projectile = gonetParticipant.GetComponent<Projectile>();
             projectiles.Add(projectile);
+
+            // PERFORMANCE OPTIMIZATION: Register projectile for centralized event dispatching
+            projectilesByGONetId[gonetParticipant.GONetId] = projectile;
 
             // DIAGNOSTIC: Log when projectile is added to tracking list
             //GONetLog.Info($"[ProjectileSpawner] OnGONetReady() called for '{projectile.name}' (GONetId: {gonetParticipant.GONetId}) - IsMine: {gonetParticipant.IsMine}, Owner: {gonetParticipant.OwnerAuthorityId}, IsServer: {GONetMain.IsServer}, projectiles.Count: {projectiles.Count}");
@@ -69,6 +126,9 @@ public class ProjectileSpawner : GONetBehaviour
         if (projectile != null)
         {
             projectiles.Remove(projectile);
+
+            // PERFORMANCE OPTIMIZATION: Unregister from centralized event dispatching
+            projectilesByGONetId.Remove(gonetParticipant.GONetId);
         }
 
         // Also remove from addressableParticipants list (for Physics Cube Projectiles)

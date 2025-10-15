@@ -187,9 +187,15 @@ namespace GONet.Sample
         {
             base.OnGONetReady();
 
-            // CRITICAL: Subscribe to events in OnGONetReady (NOT Start) to ensure gonetParticipant is initialized
-            // Under heavy load, Start() can fire before OnGONetReady, causing NullReferenceException
-            GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position, OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
+            // PERFORMANCE OPTIMIZATION: Individual projectile subscriptions removed.
+            // ProjectileSpawner now handles a single centralized subscription for ALL projectiles,
+            // dispatching events to individual projectiles via OnSendingMyTransform().
+            //
+            // OLD APPROACH (N subscriptions, N handler invocations per frame):
+            //   GONetMain.EventBus.Subscribe(SyncEvent_GeneratedTypes.SyncEvent_Transform_position,
+            //       OnSendingMyTransform, e => !e.IsSourceRemote && e.GONetParticipant == gonetParticipant);
+            //
+            // NEW APPROACH: See ProjectileSpawner.OnAnyProjectileTransformSync()
         }
 
         private void Time_TimeSetFromAuthority(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks)
@@ -197,7 +203,11 @@ namespace GONet.Sample
             simulatedNonAuthorityTime.SetFromAuthority(toElapsedTicks);
         }
 
-        private void OnSendingMyTransform(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
+        /// <summary>
+        /// PERFORMANCE OPTIMIZATION: Made public so ProjectileSpawner can dispatch events here.
+        /// Called by ProjectileSpawner.OnAnyProjectileTransformSync() via centralized event subscription.
+        /// </summary>
+        public void OnSendingMyTransform(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
         {
             //GONetLog.Debug("sending my transform: " + eventEnvelope.Event.valueNew + " time: " + eventEnvelope.Event.OccurredAtElapsedSeconds);
 
