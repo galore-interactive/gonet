@@ -365,8 +365,12 @@ MonoBehaviour:
   RemotelyControlledByAuthorityId: 0
   IsRigidBodyOwnerOnlyControlled: 0
   ShouldHideDuringRemoteInstantiate: 1
+  AutoDontDestroyOnLoad: 0
+  client_overrideLimboMode: 0
+  client_limboMode: 2
   IsPositionSyncd: 1
   IsRotationSyncd: 1
+  wasInstantiatedForce: 0
 --- !u!114 &1420838009900293922
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -381,6 +385,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isTickReceiver: 0
   speed: 7
+  movementDirection: {x: 0, y: 0, z: 0}
 --- !u!1 &2320780467005423178
 GameObject:
   m_ObjectHideFlags: 0
