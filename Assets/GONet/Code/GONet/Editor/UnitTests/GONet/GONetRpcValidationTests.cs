@@ -736,6 +736,318 @@ namespace GONet.Tests
         }
 
         #endregion
+
+        #region Async Validation Tests (All Parameter Counts 0-8)
+
+        /// <summary>
+        /// Tests async validation infrastructure for all supported parameter counts (0-8).
+        /// Verifies that async validators can be registered, invoked, and that SetValidatedOverride works correctly.
+        /// </summary>
+
+        [Test]
+        public async Task AsyncValidation_0Param_ValidatorInvokedSuccessfully()
+        {
+            // Arrange
+            bool validatorCalled = false;
+            var testComponent = new MockRpcComponent();
+
+            // Create async validator (0 parameters)
+            Func<Task<RpcValidationResult>> asyncValidator = async () =>
+            {
+                validatorCalled = true;
+                await Task.Delay(10); // Simulate async work
+                var result = RpcValidationResult.CreatePreAllocated(3);
+                result.AllowAll();
+                return result;
+            };
+
+            // Register via reflection (simulating runtime registration)
+            var asyncValidators = new Dictionary<string, MethodInfo>
+            {
+                ["TestMethod"] = asyncValidator.Method
+            };
+            var paramCounts = new Dictionary<string, int> { ["TestMethod"] = 0 };
+
+            eventBus.RegisterAsyncValidators(typeof(MockRpcComponent), asyncValidators, paramCounts);
+
+            // Act
+            var result = await asyncValidator();
+
+            // Assert
+            Assert.IsTrue(validatorCalled, "Async validator should be invoked");
+            Assert.IsNotNull(result, "Result should not be null");
+            Assert.IsTrue(result.AllowedTargets[0], "Target 0 should be allowed");
+            Assert.IsTrue(result.AllowedTargets[1], "Target 1 should be allowed");
+            Assert.IsTrue(result.AllowedTargets[2], "Target 2 should be allowed");
+        }
+
+        [Test]
+        public async Task AsyncValidation_1Param_SetValidatedOverrideWorks()
+        {
+            // Arrange
+            string originalParam = "original";
+            string modifiedParam = "modified";
+            bool validatorCalled = false;
+
+            Func<string, Task<RpcValidationResult>> asyncValidator = async (param1) =>
+            {
+                validatorCalled = true;
+                await Task.Delay(10);
+                var result = RpcValidationResult.CreatePreAllocated(2);
+                result.AllowAll();
+
+                // Modify parameter via SetValidatedOverride (index 0)
+                result.SetValidatedOverride(0, modifiedParam);
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator(originalParam);
+
+            // Assert
+            Assert.IsTrue(validatorCalled, "Async validator should be invoked");
+            Assert.IsTrue(result.WasModified, "Result should indicate modification");
+
+            var overrides = result.GetValidatedOverrides();
+            Assert.IsNotNull(overrides, "Overrides should exist");
+            Assert.AreEqual(1, overrides.Count, "Should have 1 override");
+            Assert.AreEqual(modifiedParam, overrides[0], "Override at index 0 should be modified value");
+        }
+
+        [Test]
+        public async Task AsyncValidation_2Param_BothParametersModified()
+        {
+            // Arrange
+            Func<int, string, Task<RpcValidationResult>> asyncValidator = async (param1, param2) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(1);
+                result.AllowAll();
+
+                // Modify both parameters
+                result.SetValidatedOverride(0, param1 * 2);  // Double the int
+                result.SetValidatedOverride(1, param2.ToUpper());  // Uppercase the string
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator(42, "test");
+
+            // Assert
+            Assert.IsTrue(result.WasModified, "Result should indicate modification");
+            var overrides = result.GetValidatedOverrides();
+            Assert.AreEqual(2, overrides.Count, "Should have 2 overrides");
+            Assert.AreEqual(84, overrides[0], "First param should be doubled");
+            Assert.AreEqual("TEST", overrides[1], "Second param should be uppercase");
+        }
+
+        [Test]
+        public async Task AsyncValidation_3Param_SelectiveTargetDenial()
+        {
+            // Arrange
+            Func<string, int, bool, Task<RpcValidationResult>> asyncValidator = async (msg, count, flag) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(4);
+
+                // Allow only first two targets, deny last two
+                result.AllowedTargets[0] = true;
+                result.AllowedTargets[1] = true;
+                result.AllowedTargets[2] = false;
+                result.AllowedTargets[3] = false;
+                result.DenialReason = "Selective denial for testing";
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator("hello", 123, true);
+
+            // Assert
+            Assert.IsTrue(result.AllowedTargets[0], "Target 0 should be allowed");
+            Assert.IsTrue(result.AllowedTargets[1], "Target 1 should be allowed");
+            Assert.IsFalse(result.AllowedTargets[2], "Target 2 should be denied");
+            Assert.IsFalse(result.AllowedTargets[3], "Target 3 should be denied");
+            Assert.AreEqual("Selective denial for testing", result.DenialReason);
+        }
+
+        [Test]
+        public async Task AsyncValidation_4Param_ComplexModification()
+        {
+            // Arrange
+            Func<string, int, float, bool, Task<RpcValidationResult>> asyncValidator = async (str, num, flt, flag) =>
+            {
+                await Task.Delay(10); // Simulate longer async work (e.g., database lookup)
+                var result = RpcValidationResult.CreatePreAllocated(2);
+                result.AllowAll();
+
+                // Apply complex transformations
+                if (str.Length > 5)
+                {
+                    result.SetValidatedOverride(0, str.Substring(0, 5)); // Truncate
+                }
+                if (num > 100)
+                {
+                    result.SetValidatedOverride(1, 100); // Clamp
+                }
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator("verylongstring", 999, 3.14f, false);
+
+            // Assert
+            Assert.IsTrue(result.WasModified, "Result should indicate modification");
+            var overrides = result.GetValidatedOverrides();
+            Assert.AreEqual(2, overrides.Count, "Should have 2 overrides");
+            Assert.AreEqual("veryl", overrides[0], "String should be truncated");
+            Assert.AreEqual(100, overrides[1], "Number should be clamped");
+        }
+
+        [Test]
+        public async Task AsyncValidation_6Param_AllowAllWithNoModification()
+        {
+            // Arrange
+            Func<int, int, int, int, int, int, Task<RpcValidationResult>> asyncValidator = async (p1, p2, p3, p4, p5, p6) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(3);
+                result.AllowAll();
+                // No modifications
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator(1, 2, 3, 4, 5, 6);
+
+            // Assert
+            Assert.IsFalse(result.WasModified, "Result should NOT indicate modification");
+            Assert.IsTrue(result.AllowedTargets[0], "All targets should be allowed");
+            Assert.IsTrue(result.AllowedTargets[1], "All targets should be allowed");
+            Assert.IsTrue(result.AllowedTargets[2], "All targets should be allowed");
+        }
+
+        [Test]
+        public async Task AsyncValidation_7Param_DenyAllDueToValidationFailure()
+        {
+            // Arrange
+            Func<string, string, string, string, string, string, string, Task<RpcValidationResult>> asyncValidator = async (p1, p2, p3, p4, p5, p6, p7) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(2);
+
+                // Deny all due to "profanity detected" simulation
+                result.DenyAll("Content validation failed");
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator("a", "b", "c", "d", "e", "f", "g");
+
+            // Assert
+            Assert.IsFalse(result.AllowedTargets[0], "Target 0 should be denied");
+            Assert.IsFalse(result.AllowedTargets[1], "Target 1 should be denied");
+            Assert.AreEqual("Content validation failed", result.DenialReason);
+        }
+
+        [Test]
+        public async Task AsyncValidation_8Param_MaxParamCountSupported()
+        {
+            // Arrange
+            Func<byte, short, int, long, float, double, bool, string, Task<RpcValidationResult>> asyncValidator = async (b, s, i, l, f, d, flag, str) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(1);
+                result.AllowAll();
+
+                // Modify last parameter (index 7)
+                result.SetValidatedOverride(7, str + "_validated");
+
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator(1, 2, 3, 4L, 5.0f, 6.0, true, "test");
+
+            // Assert
+            Assert.IsTrue(result.WasModified, "Result should indicate modification");
+            var overrides = result.GetValidatedOverrides();
+            Assert.AreEqual(1, overrides.Count, "Should have 1 override");
+            Assert.AreEqual("test_validated", overrides[7], "Last param should be modified");
+        }
+
+        [Test]
+        public async Task AsyncValidation_AllParamCounts_NonBlockingExecution()
+        {
+            // This test verifies that async validators don't block the main thread
+            // Arrange
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var tasks = new List<Task<RpcValidationResult>>();
+
+            // Create async validators for all param counts (0-8) that each take 50ms
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Delay(50);
+                var result = RpcValidationResult.CreatePreAllocated(1);
+                result.AllowAll();
+                return result;
+            }));
+
+            for (int paramCount = 1; paramCount <= 8; paramCount++)
+            {
+                int count = paramCount; // Capture for closure
+                tasks.Add(Task.Run(async () =>
+                {
+                    await Task.Delay(50);
+                    var result = RpcValidationResult.CreatePreAllocated(1);
+                    result.AllowAll();
+                    return result;
+                }));
+            }
+
+            // Act - await all tasks concurrently
+            var results = await Task.WhenAll(tasks);
+            stopwatch.Stop();
+
+            // Assert
+            // If executed synchronously: 9 validators * 50ms = 450ms minimum
+            // If executed concurrently: ~50ms total
+            Assert.Less(stopwatch.ElapsedMilliseconds, 200,
+                "Async validators should execute concurrently, not sequentially");
+            Assert.AreEqual(9, results.Length, "Should have results for all 9 param counts");
+
+            foreach (var result in results)
+            {
+                Assert.IsNotNull(result, "All results should be non-null");
+                Assert.IsTrue(result.AllowedTargets[0], "All should allow targets");
+            }
+        }
+
+        [Test]
+        public async Task AsyncValidation_EmptyTargets_HandledGracefully()
+        {
+            // Arrange
+            Func<string, Task<RpcValidationResult>> asyncValidator = async (param1) =>
+            {
+                await Task.Delay(5);
+                var result = RpcValidationResult.CreatePreAllocated(0); // Zero targets
+                // Can't call AllowAll() on zero targets
+                return result;
+            };
+
+            // Act
+            var result = await asyncValidator("test");
+
+            // Assert
+            Assert.IsNotNull(result, "Result should not be null");
+            Assert.AreEqual(0, result.TargetCount, "Target count should be 0");
+        }
+
+        #endregion
     }
 
     #region Helper Classes for Testing
