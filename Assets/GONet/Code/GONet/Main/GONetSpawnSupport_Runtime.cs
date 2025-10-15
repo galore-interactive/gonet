@@ -413,6 +413,142 @@ namespace GONet
                 loadingAddressableKeys.Remove(addressableKey);
             }
         }
+
+        /// <summary>
+        /// Attempts to get a cached addressable prefab without loading it.
+        /// Use this to check if a prefab is already loaded before calling LoadGONetPrefabAsync_Cached().
+        ///
+        /// Example usage:
+        /// <code>
+        /// if (GONetSpawnSupport_Runtime.TryGetCachedAddressablePrefab("BulletPrefab", out GONetParticipant prefab))
+        /// {
+        ///     // Cache hit - instant access!
+        ///     Instantiate(prefab, position, rotation);
+        /// }
+        /// else
+        /// {
+        ///     // Cache miss - need to load
+        ///     var loaded = await GONetAddressablesHelper.LoadGONetPrefabAsync_Cached("BulletPrefab");
+        /// }
+        /// </code>
+        /// </summary>
+        public static bool TryGetCachedAddressablePrefab(string addressableKey, out GONetParticipant prefab)
+        {
+            // Validate key - null/empty keys are invalid
+            if (string.IsNullOrWhiteSpace(addressableKey))
+            {
+                prefab = null;
+                return false;
+            }
+
+            return addressablePrefabCache.TryGetValue(addressableKey, out prefab);
+        }
+
+        /// <summary>
+        /// Manually caches an addressable prefab for fast access.
+        /// Typically you don't need to call this - use PreloadGONetAddressablePrefabs() or LoadGONetPrefabAsync_Cached() instead.
+        ///
+        /// Advanced use case: If you already have a prefab reference and want to register it with GONet's cache:
+        /// <code>
+        /// GONetParticipant myPrefab = ...; // Already loaded somehow
+        /// GONetSpawnSupport_Runtime.CacheAddressablePrefab("MyPrefabKey", myPrefab);
+        /// </code>
+        /// </summary>
+        public static void CacheAddressablePrefab(string addressableKey, GONetParticipant prefab)
+        {
+            if (string.IsNullOrWhiteSpace(addressableKey))
+            {
+                GONetLog.Warning("Cannot cache addressable prefab with null/empty key");
+                return;
+            }
+
+            if (prefab == null)
+            {
+                GONetLog.Warning($"Cannot cache null prefab for key '{addressableKey}'");
+                return;
+            }
+
+            if (!addressablePrefabCache.ContainsKey(addressableKey))
+            {
+                addressablePrefabCache[addressableKey] = prefab;
+                GONetLog.Debug($"Manually cached addressable prefab: {addressableKey}");
+            }
+            else
+            {
+                // Already cached - warn if trying to cache a different prefab instance
+                if (addressablePrefabCache[addressableKey] != prefab)
+                {
+                    GONetLog.Warning($"Addressable key '{addressableKey}' already cached with different prefab. Ignoring new prefab.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes a specific prefab from the addressables cache to free memory.
+        ///
+        /// Use case: One-off spawns where you don't want the prefab to stay in RAM.
+        /// <code>
+        /// // Load and spawn a boss (one-time event)
+        /// var bossPrefab = await GONetAddressablesHelper.LoadGONetPrefabAsync_Cached("BossPrefab");
+        /// Instantiate(bossPrefab, ...);
+        ///
+        /// // Boss defeated - free memory immediately
+        /// GONetSpawnSupport_Runtime.RemoveCachedAddressablePrefab("BossPrefab");
+        /// </code>
+        /// </summary>
+        /// <param name="addressableKey">The addressable key to remove from cache</param>
+        /// <returns>True if removed, false if not found in cache</returns>
+        public static bool RemoveCachedAddressablePrefab(string addressableKey)
+        {
+            if (string.IsNullOrWhiteSpace(addressableKey))
+            {
+                return false;
+            }
+
+            bool removed = addressablePrefabCache.Remove(addressableKey);
+            if (removed)
+            {
+                GONetLog.Debug($"Removed addressable prefab from cache: {addressableKey}");
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// Clears ALL cached addressable prefabs to free memory.
+        ///
+        /// Use cases:
+        /// - Transitioning between game modes (clear menu prefabs before gameplay)
+        /// - Level completion (clear level-specific prefabs)
+        /// - Memory pressure situations (force cleanup)
+        ///
+        /// <code>
+        /// // Example: Clear cache when transitioning from menu to gameplay
+        /// void OnStartGame()
+        /// {
+        ///     GONetSpawnSupport_Runtime.ClearAddressablePrefabCache();
+        ///     // Now load gameplay prefabs fresh
+        ///     await GONetAddressablesHelper.PreloadGONetAddressablePrefabs(gameplayPrefabs);
+        /// }
+        /// </code>
+        ///
+        /// WARNING: This does NOT unload assets from Unity's Addressables system - it only removes
+        /// GONet's references. To fully unload assets from memory, use Unity's Addressables.Release().
+        /// </summary>
+        public static void ClearAddressablePrefabCache()
+        {
+            int count = addressablePrefabCache.Count;
+            addressablePrefabCache.Clear();
+            GONetLog.Info($"Cleared addressable prefab cache - removed {count} prefabs");
+        }
+
+        /// <summary>
+        /// Returns the number of prefabs currently cached.
+        /// Useful for debugging/monitoring memory usage.
+        /// </summary>
+        public static int GetCachedAddressablePrefabCount()
+        {
+            return addressablePrefabCache.Count;
+        }
 #endif
 
         public static GONetParticipant LookupTemplateFromDesignTimeMetadata(DesignTimeMetadata designTimeMetadata)
