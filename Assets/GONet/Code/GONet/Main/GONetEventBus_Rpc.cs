@@ -7179,9 +7179,95 @@ namespace GONet
         }
 
         /// <summary>
-        /// Processes validation result and sends RPC to allowed targets with delivery reporting.
+        /// Processes async-validated TargetRPC targets and applies parameter modifications before routing.
+        /// This method is called ONLY when an async validator has completed validation.
         /// Handles parameter modification by async validators via SetValidatedOverride API.
         /// </summary>
+        /// <remarks>
+        /// ASYNC VALIDATION FLOW:
+        /// 1. Client calls TargetRPC with 5 parameters
+        /// 2. Server invokes async validator (non-blocking: ValidateMessageAsync)
+        /// 3. Validator returns RpcValidationResult with:
+        ///    - AllowedTargets[] (bool array, one per target)
+        ///    - SetValidatedOverride() calls (if parameters were modified)
+        ///    - DenialReason (if any targets were denied)
+        /// 4. THIS METHOD applies validation results:
+        ///    - Builds allowed/denied lists from bool array
+        ///    - Applies parameter overrides (e.g., profanity filter modified "content" param)
+        ///    - Serializes (possibly modified) parameters
+        ///    - Routes to allowed targets
+        ///    - Returns delivery report with success/failure details
+        ///
+        /// KEY DIFFERENCE FROM SYNC VALIDATION:
+        /// - Sync: Serialize first → Validate with byte[] → Route
+        /// - Async: Validate with object[] → Apply modifications → Serialize → Route
+        ///
+        /// This async-first approach enables:
+        /// - Non-blocking I/O (web APIs, database lookups)
+        /// - Parameter modification via SetValidatedOverride (can't use 'ref' with async)
+        /// - Smooth gameplay during validation (no frame stutter)
+        ///
+        /// PERFORMANCE CHARACTERISTICS:
+        /// - Async overhead: ~0.1-0.5ms (Task creation, await, state machine)
+        /// - Web API latency: 50-500ms (doesn't block Unity main thread!)
+        /// - Serialization: ~0.05-0.2ms (same as sync path)
+        /// - Network send: ~0.1-1ms (same as sync path)
+        ///
+        /// EXAMPLE (from GONetSampleChatSystem):
+        /// <code>
+        /// [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true,
+        ///            validationMethod: nameof(ValidateMessageAsync))]
+        /// async Task&lt;RpcDeliveryReport&gt; SendMessage(string content, string channel, ChatType type, ushort from, ushort[] recipients)
+        ///
+        /// async Task&lt;RpcValidationResult&gt; ValidateMessageAsync(string content, ...)
+        /// {
+        ///     // Non-blocking profanity filter
+        ///     string filtered = await CallProfanityApiAsync(content);
+        ///
+        ///     var result = validationContext.GetValidationResult();
+        ///     result.AllowAll(); // Or selective denial
+        ///
+        ///     if (filtered != content)
+        ///         result.SetValidatedOverride(0, filtered); // Param index 0 = content
+        ///
+        ///     return result;
+        /// }
+        /// </code>
+        ///
+        /// MEMORY SAFETY:
+        /// - byte[] returned to SerializationUtils pool in finally block
+        /// - bool[] returned to RpcValidationArrayPool in finally block
+        /// - RpcEvent instances returned to object pool after send
+        ///
+        /// VARIANTS:
+        /// - 9 overloads exist for 0-8 parameters (this is the 5-param version)
+        /// - All follow identical pattern: validate → modify → serialize → route
+        /// - See <see cref="HandleTargetRpcWithDeliveryReportAsync{TResult,T1,T2,T3,T4,T5}"/> for invocation
+        /// </remarks>
+        /// <typeparam name="T1">Type of first RPC parameter</typeparam>
+        /// <typeparam name="T2">Type of second RPC parameter</typeparam>
+        /// <typeparam name="T3">Type of third RPC parameter</typeparam>
+        /// <typeparam name="T4">Type of fourth RPC parameter</typeparam>
+        /// <typeparam name="T5">Type of fifth RPC parameter</typeparam>
+        /// <param name="instance">Component instance to invoke RPC on</param>
+        /// <param name="methodName">Name of the RPC method</param>
+        /// <param name="metadata">RPC metadata (reliability, persistence, etc.)</param>
+        /// <param name="targetBuffer">Array of target authority IDs (pre-allocated from pool)</param>
+        /// <param name="targetCount">Number of valid targets in targetBuffer</param>
+        /// <param name="validationResult">Result from async validator (contains allowed/denied/modified data)</param>
+        /// <param name="arg1">First RPC parameter (may be overridden by validator)</param>
+        /// <param name="arg2">Second RPC parameter (may be overridden by validator)</param>
+        /// <param name="arg3">Third RPC parameter (may be overridden by validator)</param>
+        /// <param name="arg4">Fourth RPC parameter (may be overridden by validator)</param>
+        /// <param name="arg5">Fifth RPC parameter (may be overridden by validator)</param>
+        /// <returns>
+        /// Delivery report containing:
+        /// - DeliveredTo: Array of authority IDs that received the RPC
+        /// - FailedDelivery: Array of authority IDs that were denied
+        /// - FailureReason: Human-readable reason for denials (e.g., "Profanity detected")
+        /// - WasModified: True if validator modified parameters via SetValidatedOverride
+        /// - ValidationReportId: Unique ID for retrieving full validation details
+        /// </returns>
         private async Task<RpcDeliveryReport> Server_ProcessValidatedTargetsWithDataDoReportingAsync<T1, T2, T3, T4, T5>(
             GONetParticipantCompanionBehaviour instance, string methodName, RpcMetadata metadata,
             ushort[] targetBuffer, int targetCount, RpcValidationResult validationResult,
