@@ -113,6 +113,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetSpawnPropagationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcDeliveryTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Utils\AnimationEditorUtils.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\SecretaryOfTemporalAffairs_FixedUpdateTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\UnreliableChannelTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcDeferredProcessingTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetAddressablesCacheTests.cs" />

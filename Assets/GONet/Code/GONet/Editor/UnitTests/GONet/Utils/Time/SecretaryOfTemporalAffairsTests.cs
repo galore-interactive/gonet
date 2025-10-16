@@ -25,8 +25,9 @@ namespace GONet.Tests.Time
         [SetUp]
         public void Setup()
         {
-            // Reset any static state that might interfere
-            HighPerfTimeSync.ResetForTesting(); // If you added this method
+            // CRITICAL: Reset all static state to ensure clean starting point
+            HighPerfTimeSync.ResetForTesting();
+            SecretaryOfTemporalAffairs.ResetStaticsForTesting();
 
             // Create a fresh instance for each test
             timeKeeper = new SecretaryOfTemporalAffairs();

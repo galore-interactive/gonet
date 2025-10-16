@@ -185,6 +185,7 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ArrayPool.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Tests\UnityTimeTest.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\MiscUtils.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleSpawner.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\Defines.cs" />

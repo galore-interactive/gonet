@@ -121,6 +121,9 @@ namespace GONet.Tests.Time
             lastSyncTimeField?.SetValue(null, 0L);
 
             HighPerfTimeSync.ResetForTesting();
+
+            // CRITICAL: Reset SecretaryOfTemporalAffairs statics to prevent stale time baselines
+            SecretaryOfTemporalAffairs.ResetStaticsForTesting();
         }
 
         /// <summary>
