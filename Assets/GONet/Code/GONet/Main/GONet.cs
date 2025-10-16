@@ -3428,6 +3428,12 @@ namespace GONet
         /// </summary>
         internal static void FixedUpdate_AfterGONetReady()
         {
+            // Refresh physics time counter (mirrors Unity's Time.fixedTime behavior)
+            if (Time != null)
+            {
+                Time.FixedUpdate();
+            }
+
             // SAFE ITERATION: Using enumerator with dispose pattern (HashSet-safe)
             using (var enumerator = allGONetBehaviours.GetEnumerator())
             {
@@ -4105,6 +4111,14 @@ namespace GONet
                 public double CachedElapsedSeconds;
                 public float LastDeltaTime;
                 public int IsInitialized;
+
+                // Physics time tracking (mirrors Unity's Time.fixedTime behavior)
+                public long PhysicsElapsedTicks;          // Physics time counter (manually incremented)
+                // PhysicsInitialized moved to AlignedTimeState for direct mutation
+                public long CachedFixedElapsedTicks;      // Cached for fast access
+                public long LastFixedUpdateFrame;         // Frame number for cache validation
+                public double CachedFixedElapsedSeconds;  // Cached seconds version
+                public float LastFixedDeltaTime;          // Delta between FixedUpdate calls
             }
 
             // Separate structure for interpolation state
@@ -4121,7 +4135,7 @@ namespace GONet
             }
 
             // 128-byte aligned structure to prevent false sharing
-            [StructLayout(LayoutKind.Explicit, Size = 192)]
+            [StructLayout(LayoutKind.Explicit, Size = 216)]
             private struct AlignedTimeState
             {
                 [FieldOffset(0)] public TimeState State;
@@ -4129,6 +4143,10 @@ namespace GONet
                 [FieldOffset(128)] public long InitialStopwatchTicks;
                 [FieldOffset(136)] public int UpdateCount;
                 [FieldOffset(140)] public long InitialDateTimeTicks;
+                [FieldOffset(148)] public int FixedUpdateCount; // Physics frame counter
+                [FieldOffset(152)] public int PhysicsInitialized; // MOVED OUT: Direct access needed for mutation
+                [FieldOffset(156)] public float UnityFixedTimeAtInit; // Unity's fixedTime when we initialized (for validation)
+                [FieldOffset(160)] public long PhysicsTimeAtInit; // Initial physics time value (for validation)
             }
             private AlignedTimeState alignedState;
 
@@ -4142,6 +4160,11 @@ namespace GONet
             [ThreadStatic] private static double tlsCachedSeconds;
             [ThreadStatic] private static int tlsLastFrame;
             [ThreadStatic] private static bool tlsInitialized;
+
+            // Thread-local cache for FixedUpdate (physics time)
+            [ThreadStatic] private static long tlsCachedFixedTicks;
+            [ThreadStatic] private static double tlsCachedFixedSeconds;
+            [ThreadStatic] private static int tlsLastFixedFrame;
 
             // Static fields for Unity Editor play mode handling
             private static long editorPlayModeStartStopwatchTicks = 0;
@@ -4160,6 +4183,10 @@ namespace GONet
                 tlsCachedSeconds = 0;
                 tlsLastFrame = -1;
                 tlsInitialized = false;
+                // Clear fixed time thread-local storage
+                tlsCachedFixedTicks = 0;
+                tlsCachedFixedSeconds = 0;
+                tlsLastFixedFrame = -1;
             }
 #endif
 
@@ -4210,6 +4237,49 @@ namespace GONet
 
             public int FrameCount { get; private set; }
 
+            /// <summary>
+            /// Synchronized elapsed time in ticks, cached once per FixedUpdate cycle.
+            /// Use this for physics state collection to ensure consistent timestamps
+            /// throughout the entire physics tick.
+            /// DESIGN: Physics ONLY runs on server - clients receive synced position/rotation.
+            /// </summary>
+            public long FixedElapsedTicks
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => GetFixedElapsedTicksFast();
+            }
+
+            /// <summary>
+            /// Synchronized elapsed time in seconds, cached once per FixedUpdate cycle.
+            /// Use this for physics state collection to ensure consistent timestamps
+            /// throughout the entire physics tick.
+            /// DESIGN: Physics ONLY runs on server - clients receive synced position/rotation.
+            /// </summary>
+            public double FixedElapsedSeconds
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => GetFixedElapsedSecondsFast();
+            }
+
+            /// <summary>
+            /// Time delta between FixedUpdate cycles (physics delta time).
+            /// Mirrors Unity's Time.fixedDeltaTime progression.
+            /// </summary>
+            public float FixedDeltaTime
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => Volatile.Read(ref alignedState.State.LastFixedDeltaTime);
+            }
+
+            /// <summary>
+            /// Physics frame counter (increments once per FixedUpdate).
+            /// </summary>
+            public int FixedUpdateCount
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => Volatile.Read(ref alignedState.FixedUpdateCount);
+            }
+
             private readonly double valueBlendingBufferLeadSeconds = 0.1; // Example value, adjust as needed
 
             public SecretaryOfTemporalAffairs()
@@ -4243,6 +4313,14 @@ namespace GONet
                 alignedState.Interpolation.DilationStartTimeTicks = 0;
                 alignedState.Interpolation.DilationDurationTicks = 0;
                 alignedState.UpdateCount = 0;
+                // Initialize physics time state
+                alignedState.State.PhysicsElapsedTicks = 0;
+                alignedState.PhysicsInitialized = 0; // Not initialized until first FixedUpdate
+                alignedState.State.CachedFixedElapsedTicks = 0;
+                alignedState.State.LastFixedUpdateFrame = -1;
+                alignedState.State.CachedFixedElapsedSeconds = 0.0;
+                alignedState.State.LastFixedDeltaTime = 0f;
+                alignedState.FixedUpdateCount = 0;
                 Thread.MemoryBarrier();
             }
 
@@ -4328,6 +4406,71 @@ namespace GONet
                     return cachedSeconds;
                 }
 
+                long ticks = CalculateElapsedTicks();
+                return Math.Max(0.0, ticks * TICKS_TO_SECONDS);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private long GetFixedElapsedTicksFast()
+            {
+                if (Volatile.Read(ref alignedState.State.IsInitialized) == 0)
+                    return 0;
+
+                if (!tlsInitialized)
+                {
+                    tlsLastFixedFrame = -1;
+                    tlsCachedFixedTicks = 0;
+                    tlsCachedFixedSeconds = 0.0;
+                    tlsInitialized = true;
+                }
+
+                int currentFixedFrame = Volatile.Read(ref alignedState.FixedUpdateCount);
+                if (tlsLastFixedFrame == currentFixedFrame && tlsCachedFixedTicks >= 0)
+                    return tlsCachedFixedTicks;
+
+                long lastFixedUpdateFrame = Volatile.Read(ref alignedState.State.LastFixedUpdateFrame);
+                if (lastFixedUpdateFrame == currentFixedFrame && lastFixedUpdateFrame >= 0)
+                {
+                    long cachedFixedTicks = Volatile.Read(ref alignedState.State.CachedFixedElapsedTicks);
+                    tlsLastFixedFrame = currentFixedFrame;
+                    tlsCachedFixedTicks = cachedFixedTicks;
+                    tlsCachedFixedSeconds = alignedState.State.CachedFixedElapsedSeconds;
+                    return cachedFixedTicks;
+                }
+
+                // Fallback: physics not initialized yet, return network time
+                return CalculateElapsedTicks();
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private double GetFixedElapsedSecondsFast()
+            {
+                if (Volatile.Read(ref alignedState.State.IsInitialized) == 0)
+                    return 0.0;
+
+                if (!tlsInitialized)
+                {
+                    tlsLastFixedFrame = -1;
+                    tlsCachedFixedTicks = 0;
+                    tlsCachedFixedSeconds = 0.0;
+                    tlsInitialized = true;
+                }
+
+                int currentFixedFrame = Volatile.Read(ref alignedState.FixedUpdateCount);
+                if (tlsLastFixedFrame == currentFixedFrame && tlsCachedFixedSeconds >= 0)
+                    return tlsCachedFixedSeconds;
+
+                long lastFixedUpdateFrame = Volatile.Read(ref alignedState.State.LastFixedUpdateFrame);
+                if (lastFixedUpdateFrame == currentFixedFrame && lastFixedUpdateFrame >= 0)
+                {
+                    double cachedFixedSeconds = alignedState.State.CachedFixedElapsedSeconds;
+                    tlsLastFixedFrame = currentFixedFrame;
+                    tlsCachedFixedSeconds = cachedFixedSeconds;
+                    tlsCachedFixedTicks = Volatile.Read(ref alignedState.State.CachedFixedElapsedTicks);
+                    return cachedFixedSeconds;
+                }
+
+                // Fallback: physics not initialized yet, return network time
                 long ticks = CalculateElapsedTicks();
                 return Math.Max(0.0, ticks * TICKS_TO_SECONDS);
             }
@@ -4526,6 +4669,81 @@ namespace GONet
                 {
                     FrameCount = UnityEngine.Time.frameCount;
                 }
+            }
+
+            /// <summary>
+            /// Called once per physics tick to refresh the physics time counter.
+            /// Mirrors Unity's Time.fixedTime behavior by incrementing by exactly Time.fixedDeltaTime each call.
+            /// DESIGN: Physics ONLY runs on server - clients receive synced position/rotation.
+            /// </summary>
+            internal void FixedUpdate()
+            {
+                int newFixedUpdateCount = Interlocked.Increment(ref alignedState.FixedUpdateCount);
+
+                // Refresh physics time cache from network-synchronized time
+                // DESIGN: Same as Update(), just called from FixedUpdate instead
+                long newFixedElapsedTicks = CalculateElapsedTicks(); // Network-synchronized time (includes adjustments)
+                double newFixedElapsedSecondsDouble = newFixedElapsedTicks * TICKS_TO_SECONDS;
+
+                double oldFixedElapsedSeconds = alignedState.State.CachedFixedElapsedSeconds;
+                alignedState.State.CachedFixedElapsedSeconds = newFixedElapsedSecondsDouble;
+
+                float fixedDeltaTime = 0f;
+                if (oldFixedElapsedSeconds >= 0 && newFixedElapsedSecondsDouble > oldFixedElapsedSeconds)
+                {
+                    fixedDeltaTime = (float)(newFixedElapsedSecondsDouble - oldFixedElapsedSeconds);
+                    // Physics delta should be stable, clamp extreme values
+                    fixedDeltaTime = Math.Clamp(fixedDeltaTime, 0.0f, 0.1f);
+                }
+
+                alignedState.State.CachedFixedElapsedTicks = newFixedElapsedTicks;
+                alignedState.State.LastFixedDeltaTime = fixedDeltaTime;
+                alignedState.State.LastFixedUpdateFrame = newFixedUpdateCount;
+
+                // First FixedUpdate? Log initialization
+                if (alignedState.PhysicsInitialized == 0)
+                {
+                    alignedState.PhysicsInitialized = 1;
+                    float unityFixedTime = UnityEngine.Time.fixedTime;
+                    alignedState.UnityFixedTimeAtInit = unityFixedTime;
+
+                    GONetLog.Debug($"[PhysicsTime] Initialized at {newFixedElapsedTicks * TICKS_TO_SECONDS:F6}s " +
+                                  $"(network time, Unity.Time.fixedTime={unityFixedTime:F6}s), " +
+                                  $"FixedUpdateCount={newFixedUpdateCount}");
+                }
+
+                // DIAGNOSTIC LOGGING: Compare all time values (every 50 physics frames)
+                if (IsUnityMainThread && newFixedUpdateCount % 50 == 0)
+                {
+                    GONetLog.Info($"[PhysicsTime] " +
+                                 $"Unity.Time.time={UnityEngine.Time.time:F6}s | " +
+                                 $"Unity.Time.fixedTime={UnityEngine.Time.fixedTime:F6}s | " +
+                                 $"Unity.Time.deltaTime={UnityEngine.Time.deltaTime:F6}s | " +
+                                 $"GONet.Time.ElapsedSeconds={ElapsedSeconds:F6}s | " +
+                                 $"GONet.Time.DeltaTime={DeltaTime:F6}s | " +
+                                 $"GONet.Time.FixedElapsedSeconds={newFixedElapsedSecondsDouble:F6}s | " +
+                                 $"GONet.Time.FixedDeltaTime={fixedDeltaTime:F6}s");
+                }
+
+                Thread.MemoryBarrier();
+            }
+
+            /// <summary>
+            /// Resets physics time counter to current network-synchronized time.
+            /// Called automatically by GONetSceneManager after scene loads to prevent accumulated drift.
+            /// Can also be called manually if needed.
+            /// </summary>
+            public void ResetPhysicsTime()
+            {
+                long anchorTicks = CalculateElapsedTicks();
+
+                // Reset initialization flag so next FixedUpdate re-initializes
+                alignedState.PhysicsInitialized = 0;
+                alignedState.State.PhysicsElapsedTicks = anchorTicks;
+                alignedState.State.CachedFixedElapsedTicks = anchorTicks;
+                alignedState.State.CachedFixedElapsedSeconds = anchorTicks * TICKS_TO_SECONDS;
+
+                GONetLog.Info($"[PhysicsTime] Reset to network time: {anchorTicks * TICKS_TO_SECONDS:F6}s");
             }
 
             public string DebugState()
