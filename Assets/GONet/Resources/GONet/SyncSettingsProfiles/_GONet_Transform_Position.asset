@@ -23,6 +23,7 @@ MonoBehaviour:
   QuantizationResultingPrecision: 0.0009536743 (i.e., 0.954 millimeters)
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
+  PhysicsUpdateInterval: 1
   SyncValueTypeSerializerOverrides:
   - ValueType: 12
     CustomSerializerType:

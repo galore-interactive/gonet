@@ -2953,6 +2953,8 @@ namespace GONet
         /// <summary>
         /// Physics sync grouping - Used for server-authoritative Rigidbody synchronization.
         /// Runs via WaitForFixedUpdate coroutine AFTER all physics processing (simulation + collision/trigger callbacks).
+        /// TEMPORARILY DISABLED: Using END_OF_FRAME (0f) so it doesn't match any members (effectively disabling physics sync).
+        /// Regular sync at 24Hz will handle all position/rotation for now.
         /// Uses FixedElapsedTicks timestamps and unreliable channel for frequent physics updates.
         /// </summary>
         internal static readonly SyncBundleUniqueGrouping grouping_physics_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Unreliable, true);
