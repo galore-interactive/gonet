@@ -943,9 +943,11 @@ namespace GONet
                     myRigidBody.isKinematic = true;
                     myRigidBody.useGravity = false;
 
-                    // Enable Unity's Rigidbody interpolation for smooth rendering on non-authority clients
-                    // This works with GONet's value blending to provide smooth motion between network updates
-                    myRigidBody.interpolation = RigidbodyInterpolation.Interpolate;
+                    // DISABLE Unity's Rigidbody interpolation on clients (GONet's value blending handles smoothing)
+                    // Using Unity's interpolation creates double interpolation conflict with GONet's value blending,
+                    // causing stuttering/jittery motion. GONet's value blending already provides smooth interpolation
+                    // between network updates (50Hz), so Unity's interpolation is redundant and conflicts.
+                    myRigidBody.interpolation = RigidbodyInterpolation.None;
 
                     // Clear constraints when becoming kinematic on non-authority clients
                     // Rationale: Constraints are for physics simulation only. Since kinematic rigidbodies
@@ -977,8 +979,11 @@ namespace GONet
                         myRigidBody2D.isKinematic = true;
                         myRigidBody2D.simulated = false;
 
-                        // Enable Unity's Rigidbody2D interpolation for smooth rendering on non-authority clients
-                        myRigidBody2D.interpolation = RigidbodyInterpolation2D.Interpolate;
+                        // DISABLE Unity's Rigidbody2D interpolation on clients (GONet's value blending handles smoothing)
+                        // Using Unity's interpolation creates double interpolation conflict with GONet's value blending,
+                        // causing stuttering/jittery motion. GONet's value blending already provides smooth interpolation
+                        // between network updates (50Hz), so Unity's interpolation is redundant and conflicts.
+                        myRigidBody2D.interpolation = RigidbodyInterpolation2D.None;
                     }
                 }
             }
