@@ -118,6 +118,29 @@ namespace GONet
         [Tooltip("GONet optimizes processing by using multiple threads (as possible) when processing value sync'ing.\nSome things just cannot be done outside the main Unity thread.\nTherefore, if you know for certain that the value to sync being decorated with this attribute cannot run outside unity main thread, set this to true and GONet will ensure it is so.")]
         public bool MustRunOnUnityMainThread = false;
 
+        /// <summary>
+        /// SERVER PHYSICS SYNC ONLY: How often to sync physics state (position/rotation from Rigidbody) for objects using this profile.
+        /// Only applies to GONetParticipants with Rigidbody components and IsRigidBodyOwnerOnlyControlled enabled.
+        ///
+        /// Value of 1 = sync every FixedUpdate (60 Hz at 0.0167s timestep)
+        /// Value of 2 = sync every 2nd FixedUpdate (30 Hz)
+        /// Value of 3 = sync every 3rd FixedUpdate (20 Hz)
+        /// Value of 4 = sync every 4th FixedUpdate (15 Hz)
+        ///
+        /// PERFORMANCE: Higher values reduce bandwidth and CPU overhead but increase interpolation lag on clients.
+        /// RECOMMENDED: 1 for fast-moving objects (projectiles), 2-3 for normal physics objects, 4 for slow/static objects.
+        /// </summary>
+        [Space(10)]
+        [Tooltip("SERVER PHYSICS SYNC: How often to sync physics state for Rigidbody objects using this profile.\n\n" +
+                 "1 = Every FixedUpdate (60 Hz) - Best for projectiles/fast objects\n" +
+                 "2 = Every 2nd FixedUpdate (30 Hz) - Good for normal physics\n" +
+                 "3 = Every 3rd FixedUpdate (20 Hz) - Balanced performance\n" +
+                 "4 = Every 4th FixedUpdate (15 Hz) - Best for slow/static objects\n\n" +
+                 "Only applies to GONetParticipants with IsRigidBodyOwnerOnlyControlled enabled.\n" +
+                 "Higher values reduce bandwidth but increase interpolation lag.")]
+        [Range(1, 4)]
+        public int PhysicsUpdateInterval = 1;
+
         [Space(10)]
         [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to be public and implement GONet.IGONetAutoMagicalSync_CustomSerializer.\n*WARNING: Do NOT have multiple entries for the same GONet Value Type or else GONet will get confused.")]
         public SyncType_CustomSerializer_Pair[] SyncValueTypeSerializerOverrides;

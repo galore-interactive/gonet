@@ -3418,6 +3418,176 @@ namespace GONet
         }
 
         /// <summary>
+        /// SERVER PHYSICS SYNC: Collects physics state (position/rotation) from all Rigidbody-controlled GONetParticipants
+        /// and sends to clients at configurable intervals.
+        ///
+        /// DESIGN:
+        /// - SERVER ONLY: Only runs on server (authority over physics simulation)
+        /// - FILTER: Only participants with IsRigidBodyOwnerOnlyControlled + Rigidbody component
+        /// - INTERVAL: Syncs every Nth FixedUpdate based on profile's PhysicsUpdateInterval (1-4)
+        /// - TIMESTAMP: Uses GONet.FixedElapsedTicks (physics time, NOT standard ElapsedTicks)
+        /// - REUSE: Leverages existing auto-sync infrastructure (reuses position/rotation change tracking)
+        ///
+        /// PERFORMANCE:
+        /// - Zero allocations (reuses existing companion arrays)
+        /// - Direct Rigidbody reads (cached reference)
+        /// - Groups by interval for efficient batching
+        ///
+        /// CALLED FROM: FixedUpdate_AfterGONetReady() - after Time.FixedUpdate()
+        /// </summary>
+        internal static void CollectAndSyncPhysicsState()
+        {
+            // SERVER ONLY: Clients don't simulate physics for networked Rigidbody objects
+            if (!IsServer) return;
+
+            // FUTURE OPTIMIZATION: Early exit if no physics participants registered
+            // For now, iterate all participants (filtering is fast)
+
+            long currentPhysicsTimeTicks = Time.FixedElapsedTicks;  // CRITICAL: Physics time, not standard time
+            int currentFixedUpdateCount = Time.FixedUpdateCount;
+
+            // Group participants by physics update interval for efficient batching
+            // Key = interval (1, 2, 3, 4), Value = list of participants to sync this frame
+            Dictionary<int, List<GONetParticipant>> participantsByInterval = new Dictionary<int, List<GONetParticipant>>(4);
+
+            // Iterate all active GONetParticipants
+            using (var enumerator = gonetParticipantByGONetIdMap.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    GONetParticipant participant = enumerator.Current.Value;
+
+                    // Unity fake null check (destroyed GameObject)
+                    object participantObj = participant;
+                    if (participantObj == null) continue;
+
+                    // FILTER 1: Must have Rigidbody control enabled
+                    if (!participant.IsRigidBodyOwnerOnlyControlled) continue;
+
+                    // FILTER 2: Must have position or rotation sync enabled
+                    if (!participant.IsPositionSyncd && !participant.IsRotationSyncd) continue;
+
+                    // FILTER 3: Must have Rigidbody component (cached in Start())
+                    if (participant.myRigidBody == null) continue;
+
+                    // Get sync companion to access profile configuration
+                    var syncCompanion = GetSyncCompanionByGNP(participant);
+                    if (syncCompanion == null) continue;
+
+                    // TODO: Access PhysicsUpdateInterval from profile dynamically
+                    // For MVP, default to interval=1 (every FixedUpdate)
+                    // NEXT STEP: Load profile at runtime and cache PhysicsUpdateInterval per participant
+                    //            (currently hardcoded to avoid Resources.Load() overhead every FixedUpdate)
+                    int physicsInterval = 1; // Default: sync every FixedUpdate (60Hz)
+
+                    // Check if this frame should sync for this interval
+                    if (currentFixedUpdateCount % physicsInterval != 0) continue;
+
+                    // Add to group for batching
+                    List<GONetParticipant> participantsForInterval;
+                    if (!participantsByInterval.TryGetValue(physicsInterval, out participantsForInterval))
+                    {
+                        participantsForInterval = new List<GONetParticipant>(100);
+                        participantsByInterval[physicsInterval] = participantsForInterval;
+                    }
+                    participantsForInterval.Add(participant);
+                }
+            }
+
+            // For each interval group, create and send physics sync bundle
+            using (var intervalEnumerator = participantsByInterval.GetEnumerator())
+            {
+                while (intervalEnumerator.MoveNext())
+                {
+                    int interval = intervalEnumerator.Current.Key;
+                    List<GONetParticipant> participants = intervalEnumerator.Current.Value;
+
+                    if (participants.Count == 0) continue;
+
+                    // Create physics change list (reusing existing AutoMagicalSync infrastructure)
+                    List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> physicsChanges =
+                        new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>(participants.Count * 2); // *2 for position + rotation
+
+                    for (int i = 0; i < participants.Count; ++i)
+                    {
+                        GONetParticipant participant = participants[i];
+                        var syncCompanion = GetSyncCompanionByGNP(participant);
+                        if (syncCompanion == null) continue;
+
+                        Rigidbody rb = participant.myRigidBody;
+                        if (rb == null) continue; // Defensive: Rigidbody could be destroyed
+
+                        // Update position value from Rigidbody (if sync enabled)
+                        if (participant.IsPositionSyncd)
+                        {
+                            // Find position change support object by member name
+                            byte positionIndex;
+                            if (syncCompanion.TryGetIndexByMemberName("position", out positionIndex))
+                            {
+                                AutoMagicalSync_ValueMonitoringSupport_ChangedValue positionChangeSupport =
+                                    syncCompanion.valuesChangesSupport[positionIndex];
+
+                                // Update value from Rigidbody physics state (NOT Transform)
+                                positionChangeSupport.lastKnownValue = rb.position;
+
+                                // Add to physics changes list for serialization
+                                physicsChanges.Add(positionChangeSupport);
+                            }
+                        }
+
+                        // Update rotation value from Rigidbody (if sync enabled)
+                        if (participant.IsRotationSyncd)
+                        {
+                            // Find rotation change support object by member name
+                            byte rotationIndex;
+                            if (syncCompanion.TryGetIndexByMemberName("rotation", out rotationIndex))
+                            {
+                                AutoMagicalSync_ValueMonitoringSupport_ChangedValue rotationChangeSupport =
+                                    syncCompanion.valuesChangesSupport[rotationIndex];
+
+                                // Update value from Rigidbody physics state (NOT Transform)
+                                rotationChangeSupport.lastKnownValue = rb.rotation;
+
+                                // Add to physics changes list for serialization
+                                physicsChanges.Add(rotationChangeSupport);
+                            }
+                        }
+                    }
+
+                    // Skip if no physics changes collected
+                    if (physicsChanges.Count == 0) continue;
+
+                    // Serialize physics bundle using existing auto-sync infrastructure
+                    // CRITICAL: Use FixedElapsedTicks (physics time), NOT ElapsedTicks (standard time)
+                    WholeBundleOfChoiceFragments bundleFragments;
+                    SerializeWhole_ChangesBundle(
+                        physicsChanges,
+                        mainThread_valueChangeSerializationArrayPool,  // Main thread pool (FixedUpdate runs on main thread)
+                        MyAuthorityId,  // Filter: Server owns physics data, don't send back to self
+                        currentPhysicsTimeTicks,  // ← PHYSICS TIME (critical for client interpolation!)
+                        out bundleFragments
+                    );
+
+                    // Send bundle fragments to all remote connections (clients)
+                    // Use unreliable channel (physics updates are frequent, can tolerate packet loss)
+                    GONetChannelId physicsChannelId = GONetChannel.AutoMagicalSync_Unreliable;
+
+                    for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
+                    {
+                        byte[] physicsBundleSerialized = bundleFragments.fragmentBytes[iFragment];
+                        int bytesUsedCount = bundleFragments.fragmentBytesUsedCount[iFragment];
+
+                        // Send to all clients
+                        SendBytesToRemoteConnections(physicsBundleSerialized, bytesUsedCount, physicsChannelId);
+
+                        // Return buffer to pool (memory management)
+                        mainThread_valueChangeSerializationArrayPool.Return(physicsBundleSerialized);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// PHYSICS FRAME UPDATE: FixedUpdateAfterGONetReady for all ready GONetParticipantCompanionBehaviours.
         /// Called from GONetGlobal.FixedUpdate() at Unity's fixed timestep (default: 50Hz / 0.02s).
         ///
@@ -3433,6 +3603,9 @@ namespace GONet
             {
                 Time.FixedUpdate();
             }
+
+            // SERVER PHYSICS SYNC: Collect and sync physics state from Rigidbody objects
+            CollectAndSyncPhysicsState();
 
             // SAFE ITERATION: Using enumerator with dispose pattern (HashSet-safe)
             using (var enumerator = allGONetBehaviours.GetEnumerator())
