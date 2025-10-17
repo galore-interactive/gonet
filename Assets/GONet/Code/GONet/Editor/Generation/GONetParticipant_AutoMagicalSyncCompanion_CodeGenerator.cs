@@ -200,7 +200,21 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_SyncChangesEverySeconds = ").Append(singleMember.attribute.SyncChangesEverySeconds).AppendLine("f;");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_Reliability = AutoMagicalSyncReliability.").Append(singleMember.attribute.Reliability).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_ShouldBlendBetweenValuesReceived = ").Append(singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false").AppendLine(";");
-                    sb.Append("\t\t\tGONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue((").Append(uniqueEntry.codeGenerationId).Append(", ").Append(iOverall).Append("), out support").Append(iOverall).AppendLine(".syncAttribute_ShouldSkipSync);");
+
+                    // Check if this is Transform.position or Transform.rotation - needs special ShouldSkipSync handling
+                    bool isTransformPosition = single.componentTypeFullName == "UnityEngine.Transform" && singleMember.memberName == "position";
+                    bool isTransformRotation = single.componentTypeFullName == "UnityEngine.Transform" && singleMember.memberName == "rotation";
+
+                    if (isTransformRotation)
+                    {
+                        sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".syncAttribute_ShouldSkipSync = GONetMain.IsRotationNotSyncd;");
+                    }
+                    else if (isTransformPosition)
+                    {
+                        sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".syncAttribute_ShouldSkipSync = GONetMain.IsPositionNotSyncd;");
+                    }
+
+                    sb.Append("\t\t\t// TODO have to revisit this at some point to get animator parameters working: GONet.GONetAutoMagicalSyncAttribute.ShouldSkipSyncByRegistrationIdMap.TryGetValue((").Append(uniqueEntry.codeGenerationId).Append(", ").Append(iOverall).Append("), out support").Append(iOverall).AppendLine(".syncAttribute_ShouldSkipSync);");
 
                     string lowerBound = singleMember.attribute.QuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
                     string upperBound = singleMember.attribute.QuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
@@ -210,6 +224,7 @@ namespace GONet.Editor.Generation
                     if (singleMember.attribute.CustomSerialize_Instance != null)
                     {
                         sb.Append("\t\t\tcachedCustomSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
+                        sb.AppendLine();
                     }
                     if (singleMember.attribute.CustomValueBlending_Instance != null)
                     {
@@ -603,28 +618,25 @@ namespace GONet.Editor.Generation
                 {
                     GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 
-                    sb.Append("\t\t\t\tcase ").Append(iOverall).AppendLine(":");
-                    sb.Append("\t\t\t\t{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
+                    // Compact single-line format to match T4 template
+                    sb.Append("\t\t\t\tcase ").Append(iOverall).Append(":\t\t\t\t\t");
 
                     // Apply value based on blend settings
                     if (singleMember.attribute.ShouldBlendBetweenValuesReceived && (singleMember.animatorControllerParameterId == 0 || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName))
                     {
-                        sb.Append("\t\t\t\t\tvaluesChangesSupport[").Append(iOverall).AppendLine("].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); // NOTE: this queue will be used each frame to blend between this value and others added there");
+                        sb.Append("valuesChangesSupport[").Append(iOverall).Append("].AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, value); break; // NOTE: this queue will be used each frame to blend between this value and others added there");
                     }
                     else
                     {
                         if (singleMember.animatorControllerParameterId == 0)
                         {
-                            sb.Append("\t\t\t\t\t").Append(single.componentTypeName).Append(".").Append(singleMember.memberName).Append(" = value.").Append(singleMember.memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                            sb.Append(single.componentTypeName).Append(".").Append(singleMember.memberName).Append(" = value.").Append(singleMember.memberTypeFullName.Replace(".", "_")).Append("; break;");
                         }
                         else
                         {
-                            sb.Append("\t\t\t\t\t").Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).Append(", (").Append(singleMember.animatorControllerParameterTypeFullName).Append(")value.").Append(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")).AppendLine(");");
+                            sb.Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).Append(", (").Append(singleMember.animatorControllerParameterTypeFullName).Append(")value.").Append(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")).Append("); break;");
                         }
                     }
-
-                    sb.AppendLine("\t\t\t\t}");
-                    sb.AppendLine("\t\t\t\tbreak;");
                     sb.AppendLine();
 
                     ++iOverall;
@@ -669,7 +681,6 @@ namespace GONet.Editor.Generation
                     WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t", false, readOnly);
                     sb.AppendLine("\t\t\t\t\treturn value;");
                     sb.AppendLine("\t\t\t\t}");
-                    sb.AppendLine();
 
                     ++iOverall;
                 }
@@ -700,9 +711,13 @@ namespace GONet.Editor.Generation
                         sb.Append(indent).Append("\t").Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).AppendLine(", value);");
                     }
                 }
-                else if (readOnly) // ReadOnlyNotApply - return GONetSyncableValue directly
+                else if (readOnly) // ReadOnlyNotApply - extract specific type from GONetSyncableValue
                 {
-                    sb.Append(indent).AppendLine("\tGONet.GONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);");
+                    sb.Append(indent).Append("\tvar value = customSerializer.Deserialize(bitStream_readFrom).").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+                        sb.Append(indent).Append("\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    }
                 }
             }
             else if (memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -884,9 +899,13 @@ namespace GONet.Editor.Generation
                         sb.Append(indent).Append("\t").Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).Append(", value);");
                     }
                 }
-                else if (readOnly) // ReadOnlyNotApply - return GONetSyncableValue directly
+                else if (readOnly) // ReadOnlyNotApply - extract specific type from GONetSyncableValue
                 {
-                    sb.Append(indent).AppendLine("\tGONet.GONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);");
+                    sb.Append(indent).Append("\tvar value = customSerializer.Deserialize(bitStream_readFrom).").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+                        sb.Append(indent).Append("\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    }
                 }
             }
         }
