@@ -15,6 +15,7 @@
 
 using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
+using GONet.Editor.Generation;
 using GONet.Generation;
 using GONet.PluginAPI;
 using GONet.Utils;
@@ -1683,14 +1684,15 @@ namespace GONet.Generation
 
         private static void GenerateClass(GONetParticipant_ComponentsWithAutoSyncMembers uniqueEntry)
         {
-            var t4Template = new GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate(uniqueEntry);
-            string generatedClassText = t4Template.TransformText();
+            // NEW: Use pure C# code generator instead of T4 template
+            var codeGenerator = new GONetParticipant_AutoMagicalSyncCompanion_CodeGenerator(uniqueEntry);
+            string generatedClassText = codeGenerator.Generate();
 
             if (!Directory.Exists(GENERATED_FILE_PATH))
             {
                 Directory.CreateDirectory(GENERATED_FILE_PATH);
             }
-            string writeToPath = string.Concat(GENERATED_FILE_PATH, t4Template.ClassName, C_SHARP_FILE_SUFFIX);
+            string writeToPath = string.Concat(GENERATED_FILE_PATH, codeGenerator.ClassName, C_SHARP_FILE_SUFFIX);
             File.WriteAllText(writeToPath, generatedClassText);
         }
 

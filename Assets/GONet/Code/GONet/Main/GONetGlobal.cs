@@ -405,9 +405,39 @@ namespace GONet
             // Create persistent status UI
             CreateStatusUI();
 
+            // Start physics sync coroutine (server-only, runs after all physics processing)
+            StartCoroutine(PhysicsSync_WaitForFixedUpdate());
+
             if (shouldAttemptAutoStartAsClient)
             {
                 Editor_AttemptStartAsClientIfAppropriate(ServerIPAddress_Actual, ServerPort_Actual);
+            }
+        }
+
+        /// <summary>
+        /// Physics sync coroutine - Runs AFTER all FixedUpdate() calls AND physics processing.
+        /// This is the correct timing to capture final Rigidbody state for synchronization.
+        ///
+        /// Unity execution order per physics frame:
+        /// 1. FixedUpdate() on all scripts (including companion FixedUpdateAfterGONetReady)
+        /// 2. Internal physics simulation (forces, velocities, positions)
+        /// 3. OnCollisionEnter/Stay/Exit callbacks
+        /// 4. OnTriggerEnter/Stay/Exit callbacks
+        /// 5. WaitForFixedUpdate resumes ← WE CAPTURE PHYSICS STATE HERE!
+        ///
+        /// This timing ensures we sync the FINAL physics state after ALL physics processing,
+        /// not intermediate state before collisions/triggers have been handled.
+        /// </summary>
+        private System.Collections.IEnumerator PhysicsSync_WaitForFixedUpdate()
+        {
+            while (true)
+            {
+                // Wait for all physics processing to complete
+                // This includes: FixedUpdate calls, physics simulation, collision/trigger callbacks
+                yield return new WaitForFixedUpdate();
+
+                // NOW capture and sync final physics state (server-only check inside method)
+                GONetMain.PhysicsSync_ProcessASAP();
             }
         }
 

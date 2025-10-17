@@ -79,6 +79,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetRpcValidationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ArrayPoolTests.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_CodeGenerator.cs" />
     <Compile Include="Assets\GONet\Sample\Editor\SceneBuildSettingsHelper.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\NetworkUtilsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\ValueBlendUtilsTests.cs" />
@@ -134,7 +135,6 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\TimeSyncTestHelpers.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetEditorWindow.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetAdaptivePoolScalerTests.cs" />
-    <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\GoNetParticipant_AutoMagicalSyncCompanion_GeneratedTemplate_Code.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncTests.cs" />

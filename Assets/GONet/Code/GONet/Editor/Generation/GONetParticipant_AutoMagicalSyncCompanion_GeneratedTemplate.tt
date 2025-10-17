@@ -1103,20 +1103,39 @@ namespace GONet.Generation
 		for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
         {
 			GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+
+			// Check if this is a Rigidbody-aware member (position or rotation from Transform component)
+			bool isTransformComponent = single.componentTypeFullName == "UnityEngine.Transform";
+			bool isPositionMember = singleMember.memberName == "position";
+			bool isRotationMember = singleMember.memberName == "rotation";
+			bool isRigidbodyAwareMember = isTransformComponent && (isPositionMember || isRotationMember);
 #>
 				var valuesChangesSupport<#=iOverall#> = valuesChangesSupport[<#=iOverall#>];
 				if (DoesMatchUniqueGrouping(valuesChangesSupport<#=iOverall#>, onlyMatchIfUniqueGroupingMatches) &&
 					!ShouldSkipSync(valuesChangesSupport<#=iOverall#>, <#=iOverall#>)) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...
 				{
 					valuesChangesSupport<#=iOverall#>.lastKnownValue_previous = valuesChangesSupport<#=iOverall#>.lastKnownValue;
-				<# if (singleMember.animatorControllerParameterId == 0) { #>
+<#			if (isRigidbodyAwareMember) { #>
+					// PHYSICS SYNC: Source position/rotation from Rigidbody when appropriate
+					bool shouldSourceFromRigidbody = gonetParticipant.IsRigidBodyOwnerOnlyControlled && gonetParticipant.myRigidBody != null;
+					if (shouldSourceFromRigidbody)
+					{
+						// Source from Rigidbody (physics simulation)
+						valuesChangesSupport<#=iOverall#>.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = gonetParticipant.myRigidBody.<#=singleMember.memberName#>;
+					}
+					else
+					{
+						// Source from Transform (regular sync)
+						valuesChangesSupport<#=iOverall#>.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
+					}
+<#			} else if (singleMember.animatorControllerParameterId == 0) { #>
 					valuesChangesSupport<#=iOverall#>.lastKnownValue.<#=singleMember.memberTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.<#=singleMember.memberName#>;
-				<# } else { #>
+<#			} else { #>
 					valuesChangesSupport<#=iOverall#>.lastKnownValue.<#=singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")#> = <#=single.componentTypeName#>.Get<#=singleMember.animatorControllerParameterMethodSuffix#>(<#=singleMember.animatorControllerParameterId.ToString()#>);
-				<# } #>
+<#			} #>
 				}
 
-<#		
+<#
 			iOverall++;
 		}
 	}
