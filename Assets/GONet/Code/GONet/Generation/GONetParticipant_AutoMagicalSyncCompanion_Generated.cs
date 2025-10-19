@@ -407,7 +407,21 @@ namespace GONet.Generation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool DoesMatchUniqueGrouping(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetMain.SyncBundleUniqueGrouping onlyMatchIfUniqueGroupingMatches)
         {
-            return 
+            // PHYSICS SYNC SPECIAL CASE: Physics sync grouping (mustRunOnUnityMainThread=true, END_OF_FRAME frequency)
+            // bypasses frequency matching and processes ALL members. This is because:
+            // 1. Physics objects are filtered at participant level (IsRigidBodyOwnerOnlyControlled check in Process() loop)
+            // 2. Physics sync runs at 50Hz (via WaitForFixedUpdate), not based on member frequency
+            // 3. Member frequencies (like 24Hz for Transform.position/rotation) don't apply to physics pipeline
+            bool isPhysicsSyncGrouping = onlyMatchIfUniqueGroupingMatches.mustRunOnUnityMainThread &&
+                                         onlyMatchIfUniqueGroupingMatches.scheduleFrequency == AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS;
+            if (isPhysicsSyncGrouping)
+            {
+                // Physics sync: Process all members (frequency check bypassed)
+                return onlyMatchIfUniqueGroupingMatches.reliability == valueChangeSupport.syncAttribute_Reliability;
+            }
+
+            // Regular sync: Match both frequency and reliability
+            return
                 onlyMatchIfUniqueGroupingMatches.scheduleFrequency == valueChangeSupport.syncAttribute_SyncChangesEverySeconds &&
                 onlyMatchIfUniqueGroupingMatches.reliability == valueChangeSupport.syncAttribute_Reliability;
         }

@@ -937,10 +937,27 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\t\t\t!ShouldSkipSync(valuesChangesSupport").Append(iOverall).Append(", ").Append(iOverall).AppendLine(")) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...");
                     sb.AppendLine("\t\t\t\t{");
 
-                    // Standard value update (same as before physics sync work)
+                    // Standard value update - always update tracking values first
                     sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue_previous = valuesChangesSupport").Append(iOverall).AppendLine(".lastKnownValue;");
 
-                    if (singleMember.animatorControllerParameterId == 0)
+                    if (isRigidbodyAwareMember && singleMember.animatorControllerParameterId == 0)
+                    {
+                        // PHYSICS SYNC: For Transform.position/rotation, source from Rigidbody when appropriate (IsRigidBodyOwnerOnlyControlled).
+                        // This is filtered at call site (AutoMagicalSyncProcessing.Process()) - physics pipeline only calls this for physics objects.
+                        // So we check here to determine SOURCE (Rigidbody vs Transform), not to skip processing (that's done at call site).
+                        sb.AppendLine("\t\t\t\t\tbool shouldSourceFromRigidbody = gonetParticipant.IsRigidBodyOwnerOnlyControlled && gonetParticipant.myRigidBody != null;");
+                        sb.AppendLine("\t\t\t\t\tif (shouldSourceFromRigidbody)");
+                        sb.AppendLine("\t\t\t\t\t{");
+                        sb.AppendLine("\t\t\t\t\t\t// Source from Rigidbody (physics simulation)");
+                        sb.Append("\t\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue.").Append(singleMember.memberTypeFullName.Replace(".", "_")).Append(" = gonetParticipant.myRigidBody.").Append(singleMember.memberName).AppendLine(";");
+                        sb.AppendLine("\t\t\t\t\t}");
+                        sb.AppendLine("\t\t\t\t\telse");
+                        sb.AppendLine("\t\t\t\t\t{");
+                        sb.AppendLine("\t\t\t\t\t\t// Source from Transform (regular sync)");
+                        sb.Append("\t\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue.").Append(singleMember.memberTypeFullName.Replace(".", "_")).Append(" = ").Append(single.componentTypeName).Append(".").Append(singleMember.memberName).AppendLine(";");
+                        sb.AppendLine("\t\t\t\t\t}");
+                    }
+                    else if (singleMember.animatorControllerParameterId == 0)
                     {
                         sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue.").Append(singleMember.memberTypeFullName.Replace(".", "_")).Append(" = ").Append(single.componentTypeName).Append(".").Append(singleMember.memberName).AppendLine(";");
                     }

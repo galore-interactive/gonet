@@ -2953,9 +2953,9 @@ namespace GONet
         /// <summary>
         /// Physics sync grouping - Used for server-authoritative Rigidbody synchronization.
         /// Runs via WaitForFixedUpdate coroutine AFTER all physics processing (simulation + collision/trigger callbacks).
-        /// TEMPORARILY DISABLED: Using END_OF_FRAME (0f) so it doesn't match any members (effectively disabling physics sync).
-        /// Regular sync at 24Hz will handle all position/rotation for now.
-        /// Uses FixedElapsedTicks timestamps and unreliable channel for frequent physics updates.
+        /// Uses END_OF_FRAME frequency (0f) so ProcessASAP() executes EVERY FixedUpdate without frequency throttling.
+        /// Physics objects are filtered at call site in AutoMagicalSyncProcessing.Process() using IsRigidBodyOwnerOnlyControlled flag.
+        /// Uses FixedElapsedTicks timestamps and unreliable channel for frequent physics updates (actual rate: 50Hz via FixedUpdate).
         /// </summary>
         internal static readonly SyncBundleUniqueGrouping grouping_physics_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Unreliable, true);
 
@@ -3523,17 +3523,23 @@ namespace GONet
         /// </summary>
         internal static void PhysicsSync_ProcessASAP()
         {
+            GONetLog.Debug("=== PHYSICS SYNC ENTRY POINT === (if you see this, new code is running)");
+
             // SERVER ONLY: Physics sync only runs on server (authority over physics simulation)
             if (!IsServer)
             {
+                GONetLog.Debug($"[Physics Sync] Skipping - not server (IsServer={IsServer})");
                 return;
             }
+
+            GONetLog.Debug($"[Physics Sync] PhysicsSync_ProcessASAP() called - IsServer={IsServer}");
 
             // Ensure physics sync processing support exists
             // This is created dynamically when first companion with physics sync needs it,
             // but we ensure it exists here for robustness
             if (!autoSyncProcessingSupportByFrequencyMap.ContainsKey(grouping_physics_unreliable))
             {
+                GONetLog.Debug("[Physics Sync] Creating physics sync processing support (first time)");
                 var physicsAutoSyncProcessingSupport =
                     new AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable(
                         grouping_physics_unreliable,
@@ -3547,7 +3553,12 @@ namespace GONet
             AutoMagicalSyncProcessing_SingleGrouping_SeparateThreadCapable physicsSync;
             if (autoSyncProcessingSupportByFrequencyMap.TryGetValue(grouping_physics_unreliable, out physicsSync))
             {
+                GONetLog.Debug("[Physics Sync] Calling physicsSync.ProcessASAP()");
                 physicsSync.ProcessASAP();
+            }
+            else
+            {
+                GONetLog.Warning("[Physics Sync] Could not find physics sync processing support!");
             }
         }
 
@@ -8964,11 +8975,23 @@ namespace GONet
                     syncValuesToSend.Clear();
                     valuesNowAtRestToBroadcast.Clear();
 
+                    bool isPhysicsGrouping = uniqueGrouping.Equals(grouping_physics_unreliable); // FIXED: struct comparison
+                    if (isPhysicsGrouping)
+                    {
+                        GONetLog.Debug($"[Physics Sync Loop] everythingMap has {everythingMap_evenStuffNotOnThisScheduleFrequency.Count} code generation ID entries");
+                    }
+
                     using (var enumeratorOuter = everythingMap_evenStuffNotOnThisScheduleFrequency.GetEnumerator())
                     {
+                        int outerIterations = 0;
                         while (enumeratorOuter.MoveNext())
                         {
+                            outerIterations++;
                             Dictionary<GONetParticipant, GONetParticipant_AutoMagicalSyncCompanion_Generated> currentMap = enumeratorOuter.Current.Value;
+                            if (isPhysicsGrouping && outerIterations <= 3)
+                            {
+                                GONetLog.Debug($"[Physics Sync Loop] Outer iteration {outerIterations}, currentMap has {(currentMap != null ? currentMap.Count : 0)} participants");
+                            }
                             if (currentMap == null)
                             {
                                 GONetLog.Error("currentMap == null");
@@ -9002,6 +9025,37 @@ namespace GONet
                                         !gonetParticipantByGONetIdMap.ContainsKey(participant.GONetId))  // Participant despawned but still in everythingMap
                                     {
                                         continue; // Skip this participant - it's destroyed or despawned
+                                    }
+
+                                    // PHYSICS SYNC SEPARATION: Skip physics objects in non-physics pipeline, skip non-physics objects in physics pipeline
+                                    // This prevents double-syncing position/rotation (once from regular 24Hz pipeline, once from physics 50Hz pipeline).
+                                    // Physics pipeline (grouping_physics_unreliable): ONLY process physics objects owned by this authority
+                                    // All other pipelines: ONLY process non-physics objects OR objects not owned by this authority
+                                    bool isPhysicsSyncGrouping = uniqueGrouping.Equals(grouping_physics_unreliable); // FIXED: struct comparison
+                                    bool isPhysicsObject = participant.IsRigidBodyOwnerOnlyControlled && participant.myRigidBody != null;
+                                    bool shouldProcessInPhysicsPipeline = isPhysicsObject && participant.IsMine; // Only send physics updates if I own the object
+
+                                    if (isPhysicsSyncGrouping)
+                                    {
+                                        // In physics sync grouping: ONLY process objects I own that are physics objects
+                                        if (!shouldProcessInPhysicsPipeline)
+                                        {
+                                            GONetLog.Debug($"[Physics Filter] SKIP in physics grouping: GONetId={participant.GONetId}, IsMine={participant.IsMine}, IsRigidBodyOwnerOnlyControlled={participant.IsRigidBodyOwnerOnlyControlled}, hasRigidbody={participant.myRigidBody != null}");
+                                            continue; // Skip: not my physics object
+                                        }
+                                        else
+                                        {
+                                            GONetLog.Debug($"[Physics Filter] PROCESS in physics grouping: GONetId={participant.GONetId}, IsMine={participant.IsMine}, IsRigidBodyOwnerOnlyControlled={participant.IsRigidBodyOwnerOnlyControlled}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // In regular sync grouping: SKIP physics objects I own (those are handled by physics pipeline)
+                                        if (shouldProcessInPhysicsPipeline)
+                                        {
+                                            GONetLog.Debug($"[Physics Filter] SKIP in regular grouping: GONetId={participant.GONetId}, IsMine={participant.IsMine}, IsRigidBodyOwnerOnlyControlled={participant.IsRigidBodyOwnerOnlyControlled}");
+                                            continue; // Skip: my physics object (handled by physics pipeline)
+                                        }
                                     }
 
                                     if (signalNeedToResetAtRest_untilBetterWayToDealWithThisSituation)
@@ -9218,18 +9272,29 @@ namespace GONet
             /// </summary>
             internal void ProcessASAP()
             {
+                const int FORCE_RECOMPILE_MARKER = 45; // Changed to 45 - FIXED: Use Equals() not ReferenceEquals() for struct!
+                bool isPhysicsGrouping = uniqueGrouping.Equals(grouping_physics_unreliable); // FIXED: struct comparison
+                // ALWAYS log to verify new code is running, regardless of grouping type
+                GONetLog.Debug($"[ProcessASAP UNCONDITIONAL] marker={FORCE_RECOMPILE_MARKER}, isPhysics={isPhysicsGrouping}, thread={isSetupToRunInSeparateThread}, hashcode={uniqueGrouping.GetHashCode()}");
+
                 if (isSetupToRunInSeparateThread)
                 {
+                    if (isPhysicsGrouping) GONetLog.Debug("[Physics Sync ProcessASAP] Taking separate thread path (shouldProcessInSeparateThreadASAP=true)");
                     shouldProcessInSeparateThreadASAP = true;
                 }
                 else if (!IsNotSafeToProcess())
                 {
+                    if (isPhysicsGrouping) GONetLog.Debug($"[Physics Sync ProcessASAP] scheduleFrequencyTicks={scheduleFrequencyTicks}, END_OF_FRAME={END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS}");
+
                     if (scheduleFrequencyTicks == END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_TICKS)
                     {
+                        if (isPhysicsGrouping) GONetLog.Debug("[Physics Sync ProcessASAP] Calling Process() (END_OF_FRAME path)");
                         Process();
                     }
                     else
                     {
+                        if (isPhysicsGrouping) GONetLog.Debug("[Physics Sync ProcessASAP] Taking frequency throttling path");
+
                         long nowTicks = HighResolutionTimeUtils.UtcNowTicks;
 
                         bool isFirstTimeThrough = lastScheduledProcessAtTicks == 0;
@@ -9241,10 +9306,19 @@ namespace GONet
                         bool isASAPNow = (nowTicks - lastScheduledProcessAtTicks) > scheduleFrequencyTicks;
                         if (isASAPNow)
                         {
+                            if (isPhysicsGrouping) GONetLog.Debug("[Physics Sync ProcessASAP] Frequency throttle check passed, calling Process()");
                             Process();
                             lastScheduledProcessAtTicks += scheduleFrequencyTicks;
                         }
+                        else
+                        {
+                            if (isPhysicsGrouping) GONetLog.Debug($"[Physics Sync ProcessASAP] Frequency throttle check FAILED (not enough time elapsed): nowTicks={nowTicks}, lastScheduledProcessAtTicks={lastScheduledProcessAtTicks}, scheduleFrequencyTicks={scheduleFrequencyTicks}");
+                        }
                     }
+                }
+                else
+                {
+                    if (isPhysicsGrouping) GONetLog.Debug($"[Physics Sync ProcessASAP] IsNotSafeToProcess()=true (MyAuthorityId={MyAuthorityId}, IsClientVsServerStatusKnown={IsClientVsServerStatusKnown}, IsClient={IsClient})");
                 }
             }
 
