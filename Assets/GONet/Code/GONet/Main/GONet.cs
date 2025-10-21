@@ -2250,12 +2250,64 @@ namespace GONet
 
         internal static bool IsRotationNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
         {
-            return !monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd;
+            // Check if rotation sync is disabled
+            if (!monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd)
+            {
+                return true; // Skip: rotation sync disabled
+            }
+
+            // PHYSICS SYNC FREQUENCY GATING: Check if this is a physics object and if so, gate by PhysicsUpdateInterval
+            GONetParticipant participant = monitoringSupport.syncCompanion.gonetParticipant;
+            bool isPhysicsObject = participant.IsRigidBodyOwnerOnlyControlled && participant.myRigidBody != null && participant.IsMine;
+
+            if (isPhysicsObject)
+            {
+                // Get the physics update interval from this specific value's sync profile
+                int physicsUpdateInterval = monitoringSupport.syncAttribute_PhysicsUpdateInterval;
+
+                // Skip this physics frame if counter doesn't match interval
+                // physicsUpdateInterval=1: sync frames 0,1,2,3 (always)
+                // physicsUpdateInterval=2: sync frames 0,2 (every 2nd)
+                // physicsUpdateInterval=3: sync frames 0,3 (every 3rd)
+                // physicsUpdateInterval=4: sync frame 0 (every 4th)
+                if (physicsFrameCounter % physicsUpdateInterval != 0)
+                {
+                    return true; // Skip: not the right physics frame for this interval
+                }
+            }
+
+            return false; // Don't skip: should sync
         }
 
         internal static bool IsPositionNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
         {
-            return !monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd;
+            // Check if position sync is disabled
+            if (!monitoringSupport.syncCompanion.gonetParticipant.IsPositionSyncd)
+            {
+                return true; // Skip: position sync disabled
+            }
+
+            // PHYSICS SYNC FREQUENCY GATING: Check if this is a physics object and if so, gate by PhysicsUpdateInterval
+            GONetParticipant participant = monitoringSupport.syncCompanion.gonetParticipant;
+            bool isPhysicsObject = participant.IsRigidBodyOwnerOnlyControlled && participant.myRigidBody != null && participant.IsMine;
+
+            if (isPhysicsObject)
+            {
+                // Get the physics update interval from this specific value's sync profile
+                int physicsUpdateInterval = monitoringSupport.syncAttribute_PhysicsUpdateInterval;
+
+                // Skip this physics frame if counter doesn't match interval
+                // physicsUpdateInterval=1: sync frames 0,1,2,3 (always)
+                // physicsUpdateInterval=2: sync frames 0,2 (every 2nd)
+                // physicsUpdateInterval=3: sync frames 0,3 (every 3rd)
+                // physicsUpdateInterval=4: sync frame 0 (every 4th)
+                if (physicsFrameCounter % physicsUpdateInterval != 0)
+                {
+                    return true; // Skip: not the right physics frame for this interval
+                }
+            }
+
+            return false; // Don't skip: should sync
         }
 
         static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
@@ -2959,6 +3011,13 @@ namespace GONet
         /// </summary>
         internal static readonly SyncBundleUniqueGrouping grouping_physics_unreliable = new SyncBundleUniqueGrouping(AutoMagicalSyncFrequencies.END_OF_FRAME_IN_WHICH_CHANGE_OCCURS_SECONDS, AutoMagicalSyncReliability.Unreliable, true);
 
+        /// <summary>
+        /// Physics frame counter for physics sync frequency gating.
+        /// Incremented every FixedUpdate to track which physics frame we're on.
+        /// Used with PhysicsUpdateInterval (1-4) to determine if this frame should sync physics state.
+        /// </summary>
+        private static int physicsFrameCounter = 0;
+
         static Thread endOfLineSendAndSaveThread;
 
         /// <summary>
@@ -3523,6 +3582,9 @@ namespace GONet
         /// </summary>
         internal static void PhysicsSync_ProcessASAP()
         {
+            // Increment physics frame counter (wraps around to prevent overflow)
+            physicsFrameCounter = (physicsFrameCounter + 1) % 4;
+
             // SERVER ONLY: Physics sync only runs on server (authority over physics simulation)
             if (!IsServer)
             {
@@ -7455,6 +7517,12 @@ namespace GONet
             ///     <see cref="GONetAutoMagicalSyncAttribute.QuantizeUpperBound"/>
             /// </summary>
             internal QuantizerSettingsGroup syncAttribute_QuantizerSettingsGroup;
+            /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.PhysicsUpdateInterval"/>
+            /// Physics sync frequency: 1=every FixedUpdate, 2=every 2nd, 3=every 3rd, 4=every 4th.
+            /// Only used for physics sync (Rigidbody position/rotation when IsRigidBodyOwnerOnlyControlled=true).
+            /// </summary>
+            internal int syncAttribute_PhysicsUpdateInterval;
             #endregion
 
             /// <summary>
@@ -9202,6 +9270,8 @@ namespace GONet
                                         {
                                             continue; // Skip: not my physics object
                                         }
+                                        // PHYSICS SYNC FREQUENCY GATING: Now handled per-value in IsPositionNotSyncd/IsRotationNotSyncd
+                                        // This allows position and rotation to have independent PhysicsUpdateInterval settings
                                     }
                                     else
                                     {

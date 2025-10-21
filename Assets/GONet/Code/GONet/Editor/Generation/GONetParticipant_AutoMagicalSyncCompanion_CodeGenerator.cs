@@ -200,6 +200,7 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_SyncChangesEverySeconds = ").Append(singleMember.attribute.SyncChangesEverySeconds).AppendLine("f;");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_Reliability = AutoMagicalSyncReliability.").Append(singleMember.attribute.Reliability).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_ShouldBlendBetweenValuesReceived = ").Append(singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false").AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_PhysicsUpdateInterval = ").Append(singleMember.attribute.PhysicsUpdateInterval).AppendLine(";");
 
                     // Check if this is Transform.position or Transform.rotation - needs special ShouldSkipSync handling
                     bool isTransformPosition = single.componentTypeFullName == "UnityEngine.Transform" && singleMember.memberName == "position";

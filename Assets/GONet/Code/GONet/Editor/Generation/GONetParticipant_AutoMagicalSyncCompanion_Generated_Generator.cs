@@ -3753,6 +3753,7 @@ namespace GONet.Generation
                 attribute.Reliability = profile.SendViaReliability;
                 attribute.ShouldBlendBetweenValuesReceived = profile.ShouldBlendBetweenValuesReceived;
                 attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
+                attribute.PhysicsUpdateInterval = profile.PhysicsUpdateInterval;
 
                 float syncEverySeconds = 0;
                 if (profile.SyncChangesFrequencyOccurrences > 0)

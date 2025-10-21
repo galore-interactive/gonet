@@ -145,11 +145,25 @@ namespace GONet
         /// Only used/applied when <see cref="QuantizeDownToBitCount"/> greater than 0.
         ///
         /// This is the known/expected lowest value possible.
-        /// IMPORTANT: 
+        /// IMPORTANT:
         /// PRE: Must be less than <see cref="QuantizeUpperBound"/>.
         /// </summary>
         public float QuantizeLowerBound = float.MinValue / 2f;
         public float QuantizeUpperBound = float.MaxValue / 2f;
+
+        /// <summary>
+        /// SERVER PHYSICS SYNC ONLY: How often to sync physics state (position/rotation from Rigidbody) for objects using this profile.
+        /// Only applies to GONetParticipants with Rigidbody components and IsRigidBodyOwnerOnlyControlled enabled.
+        ///
+        /// Value of 1 = sync every FixedUpdate (60 Hz at 0.0167s timestep)
+        /// Value of 2 = sync every 2nd FixedUpdate (30 Hz)
+        /// Value of 3 = sync every 3rd FixedUpdate (20 Hz)
+        /// Value of 4 = sync every 4th FixedUpdate (15 Hz)
+        ///
+        /// PERFORMANCE: Higher values reduce bandwidth and CPU overhead but increase interpolation lag on clients.
+        /// RECOMMENDED: 1 for fast-moving objects (projectiles), 2-3 for normal physics objects, 4 for slow/static objects.
+        /// </summary>
+        public int PhysicsUpdateInterval = 1;
 
         #region GONet internal only
 
