@@ -58,6 +58,10 @@ namespace GONet.Generation
             CompilationPipeline.compilationFinished += CompilationPipelineOnCompilationFinished;
 
             GONetLog.Debug($"~~~~~~~~~~~~GEEPs start  BUILD did this!");
+
+            // CRITICAL: Validate ALL [GONetAutoMagicalSync] fields/properties in project BEFORE code generation
+            GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ValidateAllAutoMagicalSyncFieldsInProject();
+
             GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.UpdateAllUniqueSnaps();
             GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.GenerateFiles();
             FileUtils.CopyFile(
@@ -187,6 +191,124 @@ namespace GONet.Generation
         {
             GONetParticipant.ResetCalled += GONetParticipant_EditorOnlyReset;
             EditorApplication.quitting += OnEditorApplicationQuitting;
+        }
+
+        /// <summary>
+        /// Scans ALL MonoBehaviour types in the project for [GONetAutoMagicalSync] attributes and validates them.
+        /// This runs BEFORE code generation to catch unsupported types even if they're not on discovered prefabs.
+        /// </summary>
+        /// <exception cref="NotSupportedException">Thrown when any unsupported type is found</exception>
+        internal static void ValidateAllAutoMagicalSyncFieldsInProject()
+        {
+            const string GONET_AUTO_MAGICAL_SYNC_ATTRIBUTE_NAME = "GONetAutoMagicalSyncAttribute";
+
+            GONetLog.Debug("Validating all [GONetAutoMagicalSync] fields/properties in project...");
+
+            // Get all types in all assemblies (including user scripts)
+            var allTypes = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(assembly =>
+                {
+                    try { return assembly.GetTypes(); }
+                    catch { return System.Linq.Enumerable.Empty<Type>(); } // Skip assemblies that can't be loaded
+                });
+
+            int validatedCount = 0;
+            foreach (Type type in allTypes)
+            {
+                // Only check MonoBehaviour-derived types (where [GONetAutoMagicalSync] is used)
+                if (!typeof(MonoBehaviour).IsAssignableFrom(type))
+                {
+                    continue;
+                }
+
+                // Get all public instance fields and properties
+                MemberInfo[] members = type.GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(member => member.MemberType == MemberTypes.Field || member.MemberType == MemberTypes.Property)
+                    .ToArray();
+
+                foreach (MemberInfo member in members)
+                {
+                    // Check if this member has [GONetAutoMagicalSync] attribute
+                    object attribute = member.GetCustomAttribute(typeof(GONetAutoMagicalSyncAttribute), true);
+                    if (attribute == null)
+                    {
+                        continue;
+                    }
+
+                    // Extract member type
+                    Type memberType = member.MemberType == MemberTypes.Property
+                        ? ((PropertyInfo)member).PropertyType
+                        : ((FieldInfo)member).FieldType;
+
+                    // Validate the type
+                    ValidateAutoMagicalSyncMemberType(memberType, member.Name, type);
+                    validatedCount++;
+                }
+            }
+
+            GONetLog.Debug($"Validated {validatedCount} [GONetAutoMagicalSync] fields/properties - all supported types!");
+        }
+
+        /// <summary>
+        /// Validates that a member type marked with [GONetAutoMagicalSync] is supported by GONet.
+        /// Throws an exception with clear error message if unsupported, halting code generation.
+        /// </summary>
+        /// <param name="memberType">The Type of the field/property marked with [GONetAutoMagicalSync]</param>
+        /// <param name="memberName">Name of the field/property for error messages</param>
+        /// <param name="componentType">Type of the component owning the member for error messages</param>
+        /// <exception cref="NotSupportedException">Thrown when type is not supported for sync</exception>
+        internal static void ValidateAutoMagicalSyncMemberType(Type memberType, string memberName, Type componentType)
+        {
+            const string DOUBLE_TYPE_FULL_NAME = "System.Double";
+            const string STRING_TYPE_FULL_NAME = "System.String";
+
+            // Check for explicitly unsupported types
+            if (memberType.FullName == DOUBLE_TYPE_FULL_NAME)
+            {
+                const string ERROR_MESSAGE_TEMPLATE =
+                    "[GONet Build Error] The field/property '{0}' in component '{1}' is marked with [GONetAutoMagicalSync], " +
+                    "but type 'double' is NOT supported for automatic value blending (interpolation/extrapolation).\n\n" +
+                    "Why: GONet's value blending system (NumericValueChangeSnapshot) only supports types that are commonly interpolated " +
+                    "in game synchronization: float, Vector2, Vector3, Vector4, and Quaternion. Double precision is typically used for " +
+                    "non-interpolated values like timestamps or IDs.\n\n" +
+                    "Solutions:\n" +
+                    "1. Change '{0}' to 'float' if you need value blending\n" +
+                    "2. Remove [GONetAutoMagicalSync] if this value doesn't need automatic sync\n" +
+                    "3. Use a custom serializer via CustomSerializerClass parameter if you need double precision without blending\n\n" +
+                    "Supported types: bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, Vector2, Vector3, Vector4, Quaternion\n" +
+                    "Unsupported types: double, string (reference types not yet supported)";
+
+                string errorMessage = string.Format(ERROR_MESSAGE_TEMPLATE, memberName, componentType.FullName);
+
+                // Log to Unity console AND GONet log
+                Debug.LogError(errorMessage);
+                GONetLog.Error(errorMessage);
+
+                throw new NotSupportedException(errorMessage);
+            }
+
+            if (memberType.FullName == STRING_TYPE_FULL_NAME)
+            {
+                const string ERROR_MESSAGE_TEMPLATE =
+                    "[GONet Build Error] The field/property '{0}' in component '{1}' is marked with [GONetAutoMagicalSync], " +
+                    "but type 'string' is NOT supported for automatic sync.\n\n" +
+                    "Why: Reference types are not yet supported by GONet's AutoMagicalSync system.\n\n" +
+                    "Solutions:\n" +
+                    "1. Remove [GONetAutoMagicalSync] from '{0}'\n" +
+                    "2. Use RPCs ([ServerRpc]/[ClientRpc]) to send string values instead\n" +
+                    "3. Convert to a supported value type if possible (e.g., int for IDs)\n\n" +
+                    "Supported types: bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, Vector2, Vector3, Vector4, Quaternion";
+
+                string errorMessage = string.Format(ERROR_MESSAGE_TEMPLATE, memberName, componentType.FullName);
+
+                // Log to Unity console AND GONet log
+                Debug.LogError(errorMessage);
+                GONetLog.Error(errorMessage);
+
+                throw new NotSupportedException(errorMessage);
+            }
+
+            // Additional validation can be added here for other unsupported types
         }
 
         internal static void DeleteGeneratedFiles()
@@ -3876,6 +3998,14 @@ namespace GONet.Generation
                     for (int iSyncMember = 0; iSyncMember < syncMemberCount; ++iSyncMember)
                     {
                         MemberInfo syncMember = syncMembers.ElementAt(iSyncMember);
+
+                        // VALIDATION: Check if the member type is supported for automatic sync
+                        Type syncMemberType = syncMember.MemberType == MemberTypes.Property
+                            ? ((PropertyInfo)syncMember).PropertyType
+                            : ((FieldInfo)syncMember).FieldType;
+
+                        GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.ValidateAutoMagicalSyncMemberType(syncMemberType, syncMember.Name, component.GetType());
+
                         var singleMember = new GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember(syncMember);
                         componentAutoSyncMembers.AddLast(singleMember);
 

@@ -249,9 +249,9 @@ GameObject:
   - component: {fileID: 1420838009900293919}
   - component: {fileID: 1420838009900293918}
   - component: {fileID: 1420838009900293917}
-  - component: {fileID: 6470844790599893267}
+  - component: {fileID: -543266588607919463}
   m_Layer: 0
-  m_Name: CannonBall
+  m_Name: CannonBall_ZeroSync
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -358,7 +358,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  UnityGuid: cd34a05f71977084dad77778edeb26a3
+  UnityGuid: 296a736c5d07aac40bac772034430131
   animatorSyncSupport:
     keys: []
     values: []
@@ -368,12 +368,12 @@ MonoBehaviour:
   AutoDontDestroyOnLoad: 0
   client_overrideLimboMode: 0
   client_limboMode: 2
-  IsPositionSyncd: 1
-  IsRotationSyncd: 1
+  IsPositionSyncd: 0
+  IsRotationSyncd: 0
   wasInstantiatedForce: 0
   myRigidBody: {fileID: 0}
   myRigidBody2D: {fileID: 0}
---- !u!114 &6470844790599893267
+--- !u!114 &-543266588607919463
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -382,12 +382,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 1420838009900293916}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2a50299b7cc8dbf48bd5d1c1c62a6eff, type: 3}
+  m_Script: {fileID: 11500000, guid: 1d7e913d93c6fcc4bad59397c21e624b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   isTickReceiver: 0
   speed: 7
+  speedDecayRate: 1
+  spawnTime: 0
+  spawnPosition: {x: 0, y: 0, z: 0}
   movementDirection: {x: 0, y: 0, z: 0}
+  initialSpeed: 0
+  syncedDecayRate: 0
 --- !u!1 &2320780467005423178
 GameObject:
   m_ObjectHideFlags: 0

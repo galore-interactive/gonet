@@ -563,6 +563,13 @@ namespace GONet
         /// </summary>
         public string SceneIdentifier;
 
+        /// <summary>
+        /// Custom initialization data serialized from <see cref="IGONetSyncdBehaviourInitializer.Spawner_SerializeSpawnData"/>.
+        /// <para>This data is sent ONCE at spawn time and deserialized on receivers before Awake() completes.</para>
+        /// <para>Null if no <see cref="IGONetSyncdBehaviourInitializer"/> components are present on the spawned object.</para>
+        /// </summary>
+        public byte[] CustomSpawnData;
+
         internal static InstantiateGONetParticipantEvent Create(GONetParticipant gonetParticipant)
         {
             InstantiateGONetParticipantEvent @event = new InstantiateGONetParticipantEvent();
@@ -593,6 +600,9 @@ namespace GONet
 
             @event.OccurredAtElapsedTicks = default;
 
+            // Serialize custom spawn data from IGONetSpawnDataProvider components
+            @event.CustomSpawnData = SerializeCustomSpawnData(gonetParticipant);
+
             return @event;
         }
 
@@ -619,6 +629,9 @@ namespace GONet
                 : GONetSceneManager.GetSceneIdentifier(gonetParticipant.gameObject);
 
             @event.OccurredAtElapsedTicks = default;
+
+            // Serialize custom spawn data from IGONetSpawnDataProvider components
+            @event.CustomSpawnData = SerializeCustomSpawnData(gonetParticipant);
 
             return @event;
         }
@@ -652,7 +665,44 @@ namespace GONet
 
             @event.OccurredAtElapsedTicks = default;
 
+            // Serialize custom spawn data from IGONetSpawnDataProvider components
+            @event.CustomSpawnData = SerializeCustomSpawnData(gonetParticipant);
+
             return @event;
+        }
+
+        /// <summary>
+        /// Serializes custom initialization data from all <see cref="IGONetSyncdBehaviourInitializer"/> components on the given GONetParticipant.
+        /// </summary>
+        /// <param name="gonetParticipant">The participant being initialized</param>
+        /// <returns>Serialized initialization data byte array, or null if no initializers found</returns>
+        private static byte[] SerializeCustomSpawnData(GONetParticipant gonetParticipant)
+        {
+            // Find all IGONetSyncdBehaviourInitializer components on the same GameObject
+            IGONetSyncdBehaviourInitializer[] providers = gonetParticipant.GetComponents<IGONetSyncdBehaviourInitializer>();
+
+            if (providers == null || providers.Length == 0)
+            {
+                return null; // No spawn data providers
+            }
+
+            // Create builder for serialization
+            Utils.BitByBitByteArrayBuilder builder = Utils.BitByBitByteArrayBuilder.GetBuilder();
+
+            // Write provider count (for deserialization validation)
+            builder.WriteUInt((uint)providers.Length, 8); // Max 255 providers (overkill, but safe)
+
+            // Call each provider's serialization method
+            foreach (IGONetSyncdBehaviourInitializer provider in providers)
+            {
+                provider.Spawner_SerializeSpawnData(builder);
+            }
+
+            // Return serialized byte array (copy only the written bytes, not the full buffer)
+            int bytesWritten = builder.Length_WrittenBytes;
+            byte[] result = new byte[bytesWritten];
+            Array.Copy(builder.GetBuffer(), 0, result, 0, bytesWritten);
+            return result;
         }
     }
 

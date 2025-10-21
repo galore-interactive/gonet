@@ -607,8 +607,9 @@ namespace GONet
                 {
                     GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
 
-                    // IMPORTANT: If this is the server and there are connected clients, sync scene-defined object GONetIds
-                    if (GONetMain.IsServer && GONetMain.gonetServer != null && GONetMain.gonetServer.numConnections > 0)
+                    // IMPORTANT: If this is the server, initialize scene-defined objects with IGONetSyncdBehaviourInitializer
+                    // This must happen EVEN IF no clients are connected (server needs to initialize its own objects)
+                    if (GONetMain.IsServer)
                     {
                         StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
                     }
@@ -643,31 +644,109 @@ namespace GONet
             GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
         }
 
+        /// <summary>
+        /// Cache of serialized scene object initialization data, keyed by "sceneName|designTimeLocation".
+        /// This ensures server sends IDENTICAL data to all clients (avoiding re-randomization).
+        /// Populated during initial scene load, reused for late-joiners.
+        /// </summary>
+        private static readonly Dictionary<string, byte[]> sceneObjectInitDataCache = new Dictionary<string, byte[]>();
+
+        /// <summary>
+        /// Retrieves cached scene object initialization data for late-joiners.
+        /// Returns null if not cached (object has no IGONetSyncdBehaviourInitializer or cache miss).
+        /// </summary>
+        internal static byte[] GetCachedSceneObjectInitData(string sceneName, string designTimeLocation)
+        {
+            string cacheKey = $"{sceneName}|{designTimeLocation}";
+            bool found = sceneObjectInitDataCache.TryGetValue(cacheKey, out byte[] cachedData);
+
+            if (found && cachedData != null)
+            {
+                GONetLog.Info($"[CACHE-HIT] Found cached init data for '{designTimeLocation}' in scene '{sceneName}' - {cachedData.Length} bytes");
+            }
+            else
+            {
+                GONetLog.Warning($"[CACHE-MISS] No cached init data for '{designTimeLocation}' in scene '{sceneName}' (total cache entries: {sceneObjectInitDataCache.Count})");
+            }
+
+            return cachedData; // null if not found
+        }
+
         private IEnumerator SyncSceneDefinedObjectIds_WhenReady(string sceneName, List<GONetParticipant> sceneParticipants)
         {
-            // Wait a frame to ensure all GONetIds have been assigned
-            yield return null;
-
-            // Collect design-time locations and GONetIds for all scene-defined objects
+            // CRITICAL: Initialize server's OWN scene objects IMMEDIATELY (before first Update() runs)
+            // Otherwise objects with IGONetSyncdBehaviourInitializer will have isInitialized=false on first Update()
+            //
+            // This happens SYNCHRONOUSLY (not after yield) because:
+            // 1. Update() runs every frame starting immediately after scene load
+            // 2. Spawner_SerializeSpawnData() sets isInitialized=true and randomizes values
+            // 3. Server needs initialization even if no clients are connected
+            //
+            // We cache the serialized data to avoid calling Spawner_SerializeSpawnData() twice
+            // (which would generate different random values!)
             List<string> designTimeLocations = new List<string>();
             List<uint> gonetIds = new List<uint>();
+            List<byte[]> customInitDataList = new List<byte[]>();
 
             foreach (var participant in sceneParticipants)
             {
                 if (participant != null &&
                     participant.IsDesignTimeMetadataInitd &&
-                    participant.GONetId != 0 &&
                     !string.IsNullOrEmpty(participant.DesignTimeLocation))
                 {
-                    designTimeLocations.Add(participant.DesignTimeLocation);
-                    gonetIds.Add(participant.GONetId);
+                    // Serialize initialization data - this ALSO initializes the server's own instance!
+                    // Spawner_SerializeSpawnData() sets fields and isInitialized=true
+                    byte[] initData = GONetMain.SerializeSceneObjectInitData(participant);
+
+                    // Cache for late-joiners (avoids re-randomization on second serialization call)
+                    // Key format: sceneName|designTimeLocation to handle same prefab in different scenes
+                    if (initData != null)
+                    {
+                        string cacheKey = $"{sceneName}|{participant.DesignTimeLocation}";
+                        sceneObjectInitDataCache[cacheKey] = initData;
+                        GONetLog.Info($"[CACHE-ADD] Cached init data for '{participant.DesignTimeLocation}' in scene '{sceneName}' - {initData.Length} bytes (total cache entries: {sceneObjectInitDataCache.Count})");
+
+                        // Store participant reference for later (after GONetId assignment)
+                        designTimeLocations.Add(participant.DesignTimeLocation);
+                        customInitDataList.Add(initData);
+                    }
+                    else
+                    {
+                        GONetLog.Debug($"[CACHE-SKIP] No init data to cache for '{participant.DesignTimeLocation}' (no IGONetSyncdBehaviourInitializer)");
+                    }
                 }
             }
 
-            if (designTimeLocations.Count > 0)
+            // Wait a frame to ensure all GONetIds have been assigned
+            yield return null;
+
+            // Now collect GONetIds (which are guaranteed to be assigned after the yield)
+            for (int i = 0; i < designTimeLocations.Count; i++)
+            {
+                string location = designTimeLocations[i];
+
+                // Find participant by location (linear search - could be optimized with dictionary)
+                GONetParticipant participant = sceneParticipants.Find(p =>
+                    p != null &&
+                    p.IsDesignTimeMetadataInitd &&
+                    p.DesignTimeLocation == location);
+
+                if (participant != null && participant.GONetId != 0)
+                {
+                    gonetIds.Add(participant.GONetId);
+                }
+                else
+                {
+                    GONetLog.Warning($"[GONetGlobal] Could not find GONetId for participant at location '{location}'");
+                    gonetIds.Add(0); // Placeholder to maintain array alignment
+                }
+            }
+
+            // Only send RPC if there are connected clients
+            if (designTimeLocations.Count > 0 && GONetMain.gonetServer != null && GONetMain.gonetServer.numConnections > 0)
             {
                 GONetLog.Info($"[GONetGlobal] Syncing {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to all clients");
-                SendSceneDefinedObjectIdSync(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray());
+                SendSceneDefinedObjectIdSync(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), customInitDataList.ToArray());
             }
         }
 
@@ -1046,7 +1125,7 @@ namespace GONet
         /// Called after client initialization is complete, so all scene objects should be ready.
         /// </summary>
         [TargetRpc]
-        internal void RPC_SyncSceneDefinedObjectIds(ushort targetClientId, string sceneName, string[] designTimeLocations, uint[] gonetIds)
+        internal void RPC_SyncSceneDefinedObjectIds(ushort targetClientId, string sceneName, string[] designTimeLocations, uint[] gonetIds, byte[][] customInitData)
         {
             // Only process on clients
             if (GONetMain.IsServer)
@@ -1056,12 +1135,14 @@ namespace GONet
 
             int assignedCount = 0;
             int notFoundCount = 0;
+            int initDataCount = 0;
 
             // Match each design-time location to a GONetParticipant and assign its GONetId
             for (int i = 0; i < designTimeLocations.Length; i++)
             {
                 string location = designTimeLocations[i];
                 uint gonetId = gonetIds[i];
+                byte[] initData = (customInitData != null && i < customInitData.Length) ? customInitData[i] : null;
 
                 // Find the GONetParticipant with this design-time location
                 GONetParticipant participant = GONetMain.FindParticipantByDesignTimeLocation(location, sceneName);
@@ -1069,7 +1150,21 @@ namespace GONet
                 {
                     // Assign the GONetId to match the server's assignment
                     GONetMain.AssignGONetIdRaw_Direct(participant, gonetId);
-                    GONetLog.Debug($"[GONetGlobal] Assigned GONetId {gonetId} to scene object '{participant.gameObject.name}' at location '{location}'");
+
+                    // Deserialize custom initialization data if present
+                    if (initData != null && initData.Length > 0)
+                    {
+                        GONetLog.Info($"[GONetGlobal] ABOUT TO DESERIALIZE init data for '{participant.gameObject.name}' - {initData.Length} bytes");
+                        GONetMain.DeserializeSceneObjectInitData(participant, initData);
+                        GONetLog.Info($"[GONetGlobal] FINISHED DESERIALIZE for '{participant.gameObject.name}'");
+                        initDataCount++;
+                    }
+                    else
+                    {
+                        GONetLog.Warning($"[GONetGlobal] NO INIT DATA for '{participant.gameObject.name}' at location '{location}'");
+                    }
+
+                    GONetLog.Debug($"[GONetGlobal] Assigned GONetId {gonetId} to scene object '{participant.gameObject.name}' at location '{location}'{(initData != null ? $" with {initData.Length} bytes init data" : "")}");
                     assignedCount++;
                 }
                 else
@@ -1081,11 +1176,11 @@ namespace GONet
 
             if (notFoundCount > 0)
             {
-                GONetLog.Warning($"[GONetGlobal] Assigned {assignedCount} of {designTimeLocations.Length} scene-defined object GONetIds for scene '{sceneName}' ({notFoundCount} not found)");
+                GONetLog.Warning($"[GONetGlobal] Assigned {assignedCount} of {designTimeLocations.Length} scene-defined object GONetIds for scene '{sceneName}' ({notFoundCount} not found, {initDataCount} with init data)");
             }
             else
             {
-                GONetLog.Info($"[GONetGlobal] Successfully assigned all {assignedCount} scene-defined object GONetIds for scene '{sceneName}'");
+                GONetLog.Info($"[GONetGlobal] Successfully assigned all {assignedCount} scene-defined object GONetIds for scene '{sceneName}' ({initDataCount} with initialization data)");
             }
 
             // IMPORTANT: Mark that scene-defined object IDs are ready and process any queued messages
@@ -1100,18 +1195,18 @@ namespace GONet
         /// INTERNAL: Sends scene-defined object GONetId assignments to all clients.
         /// Called by server after loading a scene with scene-defined objects.
         /// </summary>
-        internal void SendSceneDefinedObjectIdSync(string sceneName, string[] designTimeLocations, uint[] gonetIds)
+        internal void SendSceneDefinedObjectIdSync(string sceneName, string[] designTimeLocations, uint[] gonetIds, byte[][] customInitData)
         {
-            CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), GONetMain.OwnerAuthorityId_Unset, sceneName, designTimeLocations, gonetIds);
+            CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), GONetMain.OwnerAuthorityId_Unset, sceneName, designTimeLocations, gonetIds, customInitData);
         }
 
         /// <summary>
         /// INTERNAL: Sends scene-defined object GONetId assignments to a specific client.
         /// Called by server when a late-joining client connects.
         /// </summary>
-        internal void SendSceneDefinedObjectIdSync_ToSpecificClient(string sceneName, string[] designTimeLocations, uint[] gonetIds, ushort targetClientAuthorityId)
+        internal void SendSceneDefinedObjectIdSync_ToSpecificClient(string sceneName, string[] designTimeLocations, uint[] gonetIds, byte[][] customInitData, ushort targetClientAuthorityId)
         {
-            CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds);
+            CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), targetClientAuthorityId, sceneName, designTimeLocations, gonetIds, customInitData);
         }
 
         /// <summary>

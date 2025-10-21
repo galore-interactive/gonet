@@ -5120,11 +5120,13 @@ namespace GONet
                     FrameCount = UnityEngine.Time.frameCount;
                 }
 
+                /*
                 // DEBUG: Log every Update to track standard time progression (server only)
                 if (IsUnityMainThread && IsServer)
                 {
                     GONetLog.Debug($"[PhysicsTime] Update, gonet.std:{newElapsedSecondsDouble:F7}  unity.std:{UnityEngine.Time.time:F7}  unity.realtimeSinceStartup:{UnityEngine.Time.realtimeSinceStartup:F7}");
                 }
+                */
             }
 
             /// <summary>
@@ -5196,12 +5198,13 @@ namespace GONet
                 alignedState.State.LastFixedDeltaTime = fixedDeltaTime;
                 alignedState.State.LastFixedUpdateFrame = newFixedUpdateCount;
 
+                /*
                 // DEBUG: Log every FixedUpdate to track fixed time progression (server only)
                 if (IsUnityMainThread && IsServer)
                 {
                     GONetLog.Debug($"[PhysicsTime] FixedUpdate, gonet.fixed:{newFixedElapsedSecondsDouble:F7}  gonet.std:{currentStandardTimeSeconds:F7}  unity.fixed:{UnityEngine.Time.fixedTime:F7}  unity.std:{UnityEngine.Time.time:F7}  unity.realtimeSinceStartup:{UnityEngine.Time.realtimeSinceStartup:F7}");
                 }
-
+                
                 // DIAGNOSTIC LOGGING: Compare all time values (every 50 physics frames)
                 if (IsUnityMainThread && newFixedUpdateCount % 50 == 0)
                 {
@@ -5214,6 +5217,7 @@ namespace GONet
                                  $"GONet.Time.FixedElapsedSeconds={newFixedElapsedSecondsDouble:F6}s | " +
                                  $"GONet.Time.FixedDeltaTime={fixedDeltaTime:F6}s");
                 }
+                */
 
                 Thread.MemoryBarrier();
 
@@ -6020,6 +6024,9 @@ namespace GONet
                     : UnityEngine.Object.Instantiate(template, instantiateEvent.Position, instantiateEvent.Rotation, HierarchyUtils.FindByFullUniquePath(instantiateEvent.ParentFullUniquePath).transform);
             template.wasInstantiatedForce = false; // be safe and set back to false
 
+            // Deserialize custom spawn data from IGONetSyncdBehaviourInitializer components
+            DeserializeCustomSpawnData(instance, instantiateEvent.CustomSpawnData);
+
             // The instance should have inherited the metadata from the template during Instantiate()
             // But we still need to mark it as initialized to be safe
             if (templateMetadata != null && !string.IsNullOrWhiteSpace(templateMetadata.Location))
@@ -6078,6 +6085,153 @@ namespace GONet
             isCurrentlyProcessingInstantiateGNPEvent = false;
 
             return instance;
+        }
+
+        /// <summary>
+        /// Serializes initialization data from all <see cref="IGONetSyncdBehaviourInitializer"/> components on the given GONetParticipant.
+        /// Used for both runtime spawns and scene-defined object synchronization.
+        /// </summary>
+        /// <param name="gonetParticipant">The participant to serialize initialization data from</param>
+        /// <returns>Serialized initialization data byte array, or null if no initializers found</returns>
+        internal static byte[] SerializeSceneObjectInitData(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant == null)
+            {
+                return null;
+            }
+
+            // Find all IGONetSyncdBehaviourInitializer components on the same GameObject
+            IGONetSyncdBehaviourInitializer[] providers = gonetParticipant.GetComponents<IGONetSyncdBehaviourInitializer>();
+
+            if (providers == null || providers.Length == 0)
+            {
+                return null; // No initialization data providers
+            }
+
+            // Create builder for serialization
+            Utils.BitByBitByteArrayBuilder builder = Utils.BitByBitByteArrayBuilder.GetBuilder();
+
+            // Write provider count (for deserialization validation)
+            builder.WriteUInt((uint)providers.Length, 8); // Max 255 providers
+
+            // Call each provider's serialization method
+            foreach (IGONetSyncdBehaviourInitializer provider in providers)
+            {
+                provider.Spawner_SerializeSpawnData(builder);
+            }
+
+            // CRITICAL: Flush any remaining bits from scratch buffer to memory!
+            // Without this, the last byte(s) of data remain in BitWriter's scratch buffer
+            // and never get copied to the result array, causing deserialization to read garbage (zeros).
+            // This happens because WriteFloat() writes 32 bits at a time, and when combined with
+            // the 8-bit provider count, the last 8 bits of the 4th float stay in scratch.
+            builder.WriteCurrentPartialByte();
+
+            // Return serialized byte array (copy only the written bytes, not the full buffer)
+            int bytesWritten = builder.Length_WrittenBytes;
+            byte[] result = new byte[bytesWritten];
+            Array.Copy(builder.GetBuffer(), 0, result, 0, bytesWritten);
+
+            // HEX DUMP: Log raw bytes for debugging serialization issue
+            string hexDump = System.BitConverter.ToString(result).Replace("-", " ");
+            GONetLog.Debug($"[SceneInitData] Serialized initialization data for '{gonetParticipant.gameObject.name}' ({providers.Length} providers, {bytesWritten} bytes) - RAW BYTES: {hexDump}");
+
+            return result;
+        }
+
+        /// <summary>
+        /// Deserializes initialization data and calls <see cref="IGONetSyncdBehaviourInitializer.Receiver_DeserializeSpawnData"/> on all providers.
+        /// Used for scene-defined object synchronization.
+        /// </summary>
+        /// <param name="participant">The scene-defined GONetParticipant</param>
+        /// <param name="initData">Serialized initialization data from the RPC (or null if no providers)</param>
+        internal static void DeserializeSceneObjectInitData(GONetParticipant participant, byte[] initData)
+        {
+            if (initData == null || initData.Length == 0)
+            {
+                return; // No initialization data to deserialize
+            }
+
+            if (participant == null)
+            {
+                GONetLog.Error($"[SceneInitData] Cannot deserialize init data - participant is null");
+                return;
+            }
+
+            // Find all IGONetSyncdBehaviourInitializer components on the same GameObject
+            IGONetSyncdBehaviourInitializer[] providers = participant.GetComponents<IGONetSyncdBehaviourInitializer>();
+
+            if (providers == null || providers.Length == 0)
+            {
+                GONetLog.Warning($"[SceneInitData] Received initialization data ({initData.Length} bytes) but no IGONetSyncdBehaviourInitializer components found on '{participant.gameObject.name}' (GONetId: {participant.GONetId})");
+                return;
+            }
+
+            // HEX DUMP: Log raw bytes for debugging serialization issue
+            string hexDump = System.BitConverter.ToString(initData).Replace("-", " ");
+            GONetLog.Debug($"[SceneInitData] RAW BYTES for '{participant.gameObject.name}': {hexDump}");
+
+            // Create builder for deserialization
+            Utils.BitByBitByteArrayBuilder builder = Utils.BitByBitByteArrayBuilder.GetBuilder_WithNewData(initData, initData.Length);
+
+            // Read provider count (for validation)
+            uint providerCount;
+            builder.ReadUInt(out providerCount, 8);
+
+            if (providerCount != providers.Length)
+            {
+                GONetLog.Error($"[SceneInitData] Provider count mismatch on '{participant.gameObject.name}': Expected {providerCount} providers (from init data), found {providers.Length} components. Deserialization may fail!");
+            }
+
+            // Call each provider's deserialization method
+            foreach (IGONetSyncdBehaviourInitializer provider in providers)
+            {
+                provider.Receiver_DeserializeSpawnData(builder);
+            }
+
+            GONetLog.Debug($"[SceneInitData] Deserialized initialization data for '{participant.gameObject.name}' ({providers.Length} providers, {initData.Length} bytes)");
+        }
+
+        /// <summary>
+        /// Deserializes custom spawn data and calls <see cref="IGONetSyncdBehaviourInitializer.Receiver_DeserializeSpawnData"/> on all providers.
+        /// </summary>
+        /// <param name="instance">The instantiated GONetParticipant</param>
+        /// <param name="customSpawnData">Serialized spawn data from the spawn event (or null if no providers)</param>
+        private static void DeserializeCustomSpawnData(GONetParticipant instance, byte[] customSpawnData)
+        {
+            if (customSpawnData == null || customSpawnData.Length == 0)
+            {
+                return; // No spawn data to deserialize
+            }
+
+            // Find all IGONetSyncdBehaviourInitializer components on the same GameObject
+            IGONetSyncdBehaviourInitializer[] providers = instance.GetComponents<IGONetSyncdBehaviourInitializer>();
+
+            if (providers == null || providers.Length == 0)
+            {
+                GONetLog.Warning($"[SpawnData] Received custom spawn data ({customSpawnData.Length} bytes) but no IGONetSyncdBehaviourInitializer components found on '{instance.gameObject.name}' (GONetId: {instance.GONetId})");
+                return;
+            }
+
+            // Create builder for deserialization
+            Utils.BitByBitByteArrayBuilder builder = Utils.BitByBitByteArrayBuilder.GetBuilder_WithNewData(customSpawnData, customSpawnData.Length);
+
+            // Read provider count (for validation)
+            uint providerCount;
+            builder.ReadUInt(out providerCount, 8);
+
+            if (providerCount != providers.Length)
+            {
+                GONetLog.Error($"[SpawnData] Provider count mismatch on '{instance.gameObject.name}': Expected {providerCount} providers (from spawn data), found {providers.Length} components. Deserialization may fail!");
+            }
+
+            // Call each provider's deserialization method
+            foreach (IGONetSyncdBehaviourInitializer provider in providers)
+            {
+                provider.Receiver_DeserializeSpawnData(builder);
+            }
+
+            GONetLog.Debug($"[SpawnData] Deserialized spawn data for '{instance.gameObject.name}' ({providers.Length} providers, {customSpawnData.Length} bytes)");
         }
 
         private static void Server_OnClientConnected_SendClientCurrentState(GONetConnection_ServerToClient connectionToClient)
@@ -6142,6 +6296,7 @@ namespace GONet
                 //GONetLog.Warning($"[SCENE_SYNC] Processing scene '{sceneName}' for scene-defined objects...");
                 List<string> designTimeLocations = new List<string>();
                 List<uint> gonetIds = new List<uint>();
+                List<byte[]> customInitDataList = new List<byte[]>();
 
                 int matchedInstanceIds = 0;
                 int foundParticipants = 0;
@@ -6167,6 +6322,12 @@ namespace GONet
                                 foundParticipants++;
                                 designTimeLocations.Add(participant.DesignTimeLocation);
                                 gonetIds.Add(participant.GONetId);
+
+                                // Get initialization data from cache (populated during initial scene load)
+                                // This ensures late-joiners receive IDENTICAL data to early joiners (no re-randomization!)
+                                byte[] initData = GONetGlobal.GetCachedSceneObjectInitData(sceneName, participant.DesignTimeLocation);
+                                customInitDataList.Add(initData); // Can be null if no IGONetSyncdBehaviourInitializer components
+
                                 //GONetLog.Debug($"[SCENE_SYNC] Found scene-defined participant: GONetId {participant.GONetId}, Location: {participant.DesignTimeLocation}, Scene: {sceneName}");
                                 break;
                             }
@@ -6179,7 +6340,7 @@ namespace GONet
                 if (designTimeLocations.Count > 0)
                 {
                     //GONetLog.Info($"[INIT] Sending {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to newly connected client AuthorityId: {gonetConnection_ServerToClient.OwnerAuthorityId}");
-                    Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), gonetConnection_ServerToClient.OwnerAuthorityId);
+                    Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), customInitDataList.ToArray(), gonetConnection_ServerToClient.OwnerAuthorityId);
                 }
             }
 
@@ -6197,6 +6358,7 @@ namespace GONet
 
             List<string> designTimeLocations = new List<string>();
             List<uint> gonetIds = new List<uint>();
+            List<byte[]> customInitDataList = new List<byte[]>();
 
             // Find all GONetParticipants that were defined in this specific scene
             foreach (int instanceId in definedInSceneParticipantInstanceIDs)
@@ -6216,6 +6378,12 @@ namespace GONet
                         {
                             designTimeLocations.Add(participant.DesignTimeLocation);
                             gonetIds.Add(participant.GONetId);
+
+                            // Get initialization data from cache (populated during initial scene load)
+                            // This ensures late-joiners receive IDENTICAL data to early joiners (no re-randomization!)
+                            byte[] initData = GONetGlobal.GetCachedSceneObjectInitData(sceneName, participant.DesignTimeLocation);
+                            customInitDataList.Add(initData); // Can be null if no IGONetSyncdBehaviourInitializer components
+
                             //GONetLog.Debug($"[SCENE_SYNC] Found scene-defined participant for '{sceneName}': GONetId {participant.GONetId}, Location: {participant.DesignTimeLocation}");
                             break;
                         }
@@ -6226,7 +6394,7 @@ namespace GONet
             if (designTimeLocations.Count > 0)
             {
                 //GONetLog.Info($"[SCENE_SYNC] Sending {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to client AuthorityId: {clientAuthorityId}");
-                Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), clientAuthorityId);
+                Global.SendSceneDefinedObjectIdSync_ToSpecificClient(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), customInitDataList.ToArray(), clientAuthorityId);
             }
             else
             {

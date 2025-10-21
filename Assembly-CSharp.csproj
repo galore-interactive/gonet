@@ -122,6 +122,7 @@
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeConstraintAttribute.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe32.Dirty.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe64.Dirty.cs" />
+    <Compile Include="Assets\GONet\Sample\Projectile\Projectile_ZeroSync.cs" />
     <Compile Include="Assets\GONet\Sample\SceneSelectionUI.cs" />
     <Compile Include="Assets\GONet\Sample\TestSelectionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAddressablesHelper.cs" />
@@ -134,6 +135,7 @@
     <Compile Include="Assets\GONet\Sample\GONetSampleInputSync.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\Compression.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\Defines.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\IGONetSyncdBehaviourInitializer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetConnections.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\TieredArrayPool.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableEndpoint.cs" />
@@ -176,6 +178,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAutoMagicalSyncSettings_ProfileTemplate.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ValueBlendUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Analysis\Vector3BlendingQualityAnalyzer.cs" />
+    <Compile Include="Assets\GONet\Sample\CircularMotion_ZeroSync.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\DateTimeEx.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\IGONetAutoMagicalSync_CustomSerializer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetGlobal.cs" />

@@ -17,6 +17,11 @@
         },
         {
             "location": "resources://Assets/GONet/Sample/Projectile/Resources/CannonBall.prefab",
+            "unityGuid": "cd34a05f71977084dad77778edeb26a3",
+            "codeGenerationId": 1
+        },
+        {
+            "location": "resources://Assets/GONet/Sample/Projectile/Resources/CannonBall_ZeroSync.prefab",
             "unityGuid": "296a736c5d07aac40bac772034430131",
             "codeGenerationId": 1
         },
@@ -24,6 +29,21 @@
             "location": "resources://Assets/GONet/Sample/Projectile/Resources/SpawnTestBeacon.prefab",
             "unityGuid": "ed363b3c8191b064fa74c62efdad0f4c",
             "codeGenerationId": 1
+        },
+        {
+            "location": "resources://Assets/GONet/Sample/Resources/AutoRotatingOrbitor.prefab",
+            "unityGuid": "d06b4174f9cd9ea45a8e7a16669f297b",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "resources://Assets/GONet/Sample/Resources/AutoRotatingOrbitor_ZeroSync.prefab",
+            "unityGuid": "4fcc3b4cd3b61664fb145e4efc1158a4",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "resources://Assets/GONet/Sample/Resources/Follower.prefab",
+            "unityGuid": "ff0647f685f02be429db5526fe0c7067",
+            "codeGenerationId": 2
         },
         {
             "location": "scene://GONetSample/GONet_GlobalContext",
@@ -41,52 +61,52 @@
             "codeGenerationId": 1
         },
         {
-            "location": "scene://RpcPlayground/AutoRotaters/GameObject",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/GameObject (1)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/GameObject (2)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/GameObject (4)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/GameObject (5)",
-            "unityGuid": "",
-            "codeGenerationId": 3
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower",
+            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor",
             "unityGuid": "",
             "codeGenerationId": 2
         },
         {
-            "location": "scene://RpcPlayground/Followers/Follower (1)",
+            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (1)",
             "unityGuid": "",
             "codeGenerationId": 2
         },
         {
-            "location": "scene://RpcPlayground/Followers/Follower (2)",
+            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (2)",
             "unityGuid": "",
             "codeGenerationId": 2
         },
         {
-            "location": "scene://RpcPlayground/Followers/Follower (4)",
+            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (3)",
             "unityGuid": "",
             "codeGenerationId": 2
         },
         {
-            "location": "scene://RpcPlayground/Followers/Follower (5)",
+            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (4)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower ",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower_+30N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower_+31N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower_+32N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Followers/Follower_+33N06",
             "unityGuid": "",
             "codeGenerationId": 2
         },
