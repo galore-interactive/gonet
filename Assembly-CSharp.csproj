@@ -169,6 +169,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetSessionContext.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Server.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GUID.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\Utils\SubQuantizationDiagnostics.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\PacketIO.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\NetworkUtils.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeReference.cs" />

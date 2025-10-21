@@ -31,10 +31,48 @@ namespace GONet.PluginAPI
         [FieldOffset(8)]
         internal GONetSyncableValue numericValue;
 
+        /// <summary>
+        /// Velocity data when this snapshot came from a velocity packet.
+        /// Null (GONetSyncType = None) when snapshot came from a position packet.
+        /// Used by velocity-augmented sync system for sub-quantization handling.
+        /// </summary>
+        [FieldOffset(28)]
+        internal GONetSyncableValue velocity;
+
+        /// <summary>
+        /// True if numericValue was synthesized from velocity data (not received directly).
+        /// False if numericValue came from a position packet.
+        /// Used to detect sub-quantization oscillation during extrapolation.
+        /// </summary>
+        [FieldOffset(48)]
+        internal bool wasSynthesizedFromVelocity;
+
         NumericValueChangeSnapshot(long elapsedTicksAtChange, GONetSyncableValue value) : this()
         {
             this.elapsedTicksAtChange = elapsedTicksAtChange;
             numericValue = value;
+        }
+
+        /// <summary>
+        /// Creates snapshot from a position packet (real value).
+        /// </summary>
+        NumericValueChangeSnapshot(long elapsedTicksAtChange, GONetSyncableValue value, bool wasSynthesized) : this()
+        {
+            this.elapsedTicksAtChange = elapsedTicksAtChange;
+            numericValue = value;
+            wasSynthesizedFromVelocity = wasSynthesized;
+            // velocity remains default (GONetSyncType = None)
+        }
+
+        /// <summary>
+        /// Creates snapshot from a velocity packet (synthesized value with velocity).
+        /// </summary>
+        NumericValueChangeSnapshot(long elapsedTicksAtChange, GONetSyncableValue synthesizedValue, GONetSyncableValue velocityValue) : this()
+        {
+            this.elapsedTicksAtChange = elapsedTicksAtChange;
+            numericValue = synthesizedValue;
+            velocity = velocityValue;
+            wasSynthesizedFromVelocity = true;
         }
 
         internal static NumericValueChangeSnapshot Create(long elapsedTicksAtChange, GONetSyncableValue value)
@@ -51,6 +89,46 @@ namespace GONet.PluginAPI
             throw new ArgumentException("Type not supported.", nameof(value.GONetSyncType));
         }
 
+        /// <summary>
+        /// Creates snapshot from a position packet (explicitly marking synthesis state).
+        /// </summary>
+        internal static NumericValueChangeSnapshot CreateFromPositionPacket(long elapsedTicksAtChange, GONetSyncableValue value, bool wasSynthesized = false)
+        {
+            if (value.GONetSyncType == GONetSyncableValueTypes.System_Single ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2 ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4 ||
+                value.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+            {
+                return new NumericValueChangeSnapshot(elapsedTicksAtChange, value, wasSynthesized);
+            }
+
+            throw new ArgumentException("Type not supported.", nameof(value.GONetSyncType));
+        }
+
+        /// <summary>
+        /// Creates snapshot from a velocity packet (synthesized position with velocity data).
+        /// </summary>
+        internal static NumericValueChangeSnapshot CreateFromVelocityPacket(long elapsedTicksAtChange, GONetSyncableValue synthesizedValue, GONetSyncableValue velocityValue)
+        {
+            if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.System_Single ||
+                synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3 ||
+                synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2 ||
+                synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4 ||
+                synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+            {
+                // Validate velocity type matches position type
+                if (velocityValue.GONetSyncType != synthesizedValue.GONetSyncType)
+                {
+                    throw new ArgumentException($"Velocity type ({velocityValue.GONetSyncType}) must match position type ({synthesizedValue.GONetSyncType})");
+                }
+
+                return new NumericValueChangeSnapshot(elapsedTicksAtChange, synthesizedValue, velocityValue);
+            }
+
+            throw new ArgumentException("Type not supported.", nameof(synthesizedValue.GONetSyncType));
+        }
+
         public override bool Equals(object obj)
         {
             if (!(obj is NumericValueChangeSnapshot))
@@ -60,7 +138,9 @@ namespace GONet.PluginAPI
 
             var snapshot = (NumericValueChangeSnapshot)obj;
             return elapsedTicksAtChange == snapshot.elapsedTicksAtChange &&
-                   EqualityComparer<GONetSyncableValue>.Default.Equals(numericValue, snapshot.numericValue);
+                   EqualityComparer<GONetSyncableValue>.Default.Equals(numericValue, snapshot.numericValue) &&
+                   EqualityComparer<GONetSyncableValue>.Default.Equals(velocity, snapshot.velocity) &&
+                   wasSynthesizedFromVelocity == snapshot.wasSynthesizedFromVelocity;
         }
 
         public override int GetHashCode()
@@ -68,6 +148,8 @@ namespace GONet.PluginAPI
             var hashCode = -1529925349;
             hashCode = hashCode * -1521134295 + elapsedTicksAtChange.GetHashCode();
             hashCode = hashCode * -1521134295 + EqualityComparer<GONetSyncableValue>.Default.GetHashCode(numericValue);
+            hashCode = hashCode * -1521134295 + EqualityComparer<GONetSyncableValue>.Default.GetHashCode(velocity);
+            hashCode = hashCode * -1521134295 + wasSynthesizedFromVelocity.GetHashCode();
             return hashCode;
         }
     }

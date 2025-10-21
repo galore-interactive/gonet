@@ -79,7 +79,18 @@ namespace GONet.Generation
             new ArrayPool<IGONetAutoMagicalSync_CustomValueBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
         protected IGONetAutoMagicalSync_CustomValueBlending[] cachedCustomValueBlendings;
 
+        protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomVelocityBlending> cachedCustomVelocityBlendingsArrayPool =
+            new ArrayPool<IGONetAutoMagicalSync_CustomVelocityBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        protected IGONetAutoMagicalSync_CustomVelocityBlending[] cachedCustomVelocityBlendings;
+
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
+
+        /// <summary>
+        /// Tracks whether next sync bundle should be a VELOCITY packet (true) or VALUE packet (false).
+        /// Alternates on each sync to enable velocity-augmented sync for sub-quantization handling.
+        /// Only used when velocity blending is enabled for at least one value.
+        /// </summary>
+        protected bool nextBundleIsVelocity = false;
 
         internal abstract byte CodeGenerationId { get; }
 
@@ -97,6 +108,7 @@ namespace GONet.Generation
             doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
             cachedCustomValueBlendingsArrayPool.Return(cachedCustomValueBlendings);
+            cachedCustomVelocityBlendingsArrayPool.Return(cachedCustomVelocityBlendings);
 
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -253,6 +265,18 @@ namespace GONet.Generation
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
+
+            // SUB-QUANTIZATION DIAGNOSTIC: Check delta-from-baseline before quantizing
+            float currentValue = value.System_Single;
+            float baselineValue = valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
+            float deltaFromBaseline = currentValue - baselineValue;
+            Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(
+                gonetParticipant.GONetId,
+                valueChangeSupport.memberName,
+                deltaFromBaseline,
+                quantizeSettings,
+                null); // No custom serializer for plain float quantization
+
             uint valueQuantized = QuantizeSingle(singleIndex, value);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
         }
@@ -264,6 +288,94 @@ namespace GONet.Generation
             bitStream_readFrom.ReadUInt(out valueQuantized, quantizeSettings.quantizeToBitCount);
             float valueUnquantized = Quantizer.LookupQuantizer(quantizeSettings).Unquantize(valueQuantized);
             return valueUnquantized + valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
+        }
+
+        /// <summary>
+        /// Calculates velocity (delta/time) for a value based on previous snapshot.
+        /// Used when serializing velocity packets in alternating value/velocity system.
+        /// </summary>
+        protected GONetSyncableValue CalculateVelocity(byte singleIndex, GONetSyncableValue currentValue, long currentElapsedTicks)
+        {
+            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
+
+            // Get previous snapshot
+            int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_capacitySize - 1;
+            if (mostRecentChangesIndex < 0 || valueChangeSupport.mostRecentChanges_capacityUsed == 0)
+            {
+                // No previous value, velocity is zero
+                if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
+                    return 0f;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
+                    return UnityEngine.Vector2.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                    return UnityEngine.Vector3.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
+                    return UnityEngine.Vector4.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+                    return UnityEngine.Quaternion.identity; // Angular velocity handling will be added later
+
+                return currentValue; // Fallback
+            }
+
+            PluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];
+            long deltaTimeTicks = currentElapsedTicks - previousSnapshot.elapsedTicksAtChange;
+
+            if (deltaTimeTicks <= 0)
+            {
+                // No time elapsed, cannot calculate velocity
+                if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
+                    return 0f;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
+                    return UnityEngine.Vector2.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                    return UnityEngine.Vector3.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
+                    return UnityEngine.Vector4.zero;
+                else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+                    return UnityEngine.Quaternion.identity;
+
+                return currentValue;
+            }
+
+            float deltaTimeSeconds = (float)deltaTimeTicks / System.Diagnostics.Stopwatch.Frequency;
+
+            // Calculate velocity based on type
+            if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
+            {
+                float delta = currentValue.System_Single - previousSnapshot.numericValue.System_Single;
+                return delta / deltaTimeSeconds;
+            }
+            else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
+            {
+                UnityEngine.Vector2 delta = currentValue.UnityEngine_Vector2 - previousSnapshot.numericValue.UnityEngine_Vector2;
+                return delta / deltaTimeSeconds;
+            }
+            else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+            {
+                UnityEngine.Vector3 delta = currentValue.UnityEngine_Vector3 - previousSnapshot.numericValue.UnityEngine_Vector3;
+                return delta / deltaTimeSeconds;
+            }
+            else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
+            {
+                UnityEngine.Vector4 delta = currentValue.UnityEngine_Vector4 - previousSnapshot.numericValue.UnityEngine_Vector4;
+                return delta / deltaTimeSeconds;
+            }
+            else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+            {
+                // TODO: Calculate angular velocity (omega) - will be implemented in separate task
+                return UnityEngine.Quaternion.identity;
+            }
+
+            return currentValue; // Fallback
+        }
+
+        /// <summary>
+        /// Toggles bundle type and returns whether next bundle should be velocity (true) or position (false).
+        /// Called after each serialization to alternate between value/velocity packets.
+        /// </summary>
+        protected void ToggleBundleType()
+        {
+            nextBundleIsVelocity = !nextBundleIsVelocity;
         }
 
         internal abstract void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value);

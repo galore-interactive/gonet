@@ -98,6 +98,64 @@ namespace GONet
         [Tooltip("This is a very helpful READONLY readout of what the above quantization settings will yield for the resulting precision.\nThis value is the same unit of measure of whatever the source value being quantized represents.\nFor example: a component of a position would be meters, which is common and that's why we put the more useful millimeters conversion in parenthesis for convenience (in which case sub-millimeter precision is great).\n\nIMPORTANT: If there is a custom serializer associated with certain Value Type(s), it is possible these quantization settings are ignored (see 'Sync Value Type Serializer Overrides' section).")]
         public string QuantizationResultingPrecision;
 
+        #region Velocity Quantization Settings (NEW - Velocity Augmented Sync System)
+
+        /// <summary>
+        /// Velocity/delta quantization lower bound. Used when alternating value/velocity packets enabled.
+        /// Represents expected minimum rate of change (units per second).
+        ///
+        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        ///
+        /// RECOMMENDED: Set to negative of expected maximum velocity (e.g., -20 for objects moving up to 20 units/sec)
+        /// </summary>
+        [Space(10)]
+        [Header("Velocity Quantization (Alternating Value/Velocity Packets)")]
+        [Tooltip("Lower bound for velocity/delta quantization when alternating value/velocity packets enabled.\n" +
+                 "Represents expected minimum rate of change (units per second).\n\n" +
+                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "RECOMMENDED: Set to negative of expected maximum velocity\n" +
+                 "Example: -20 for objects moving up to 20 units/sec")]
+        public float VelocityQuantizeLowerBound = -20f;
+
+        /// <summary>
+        /// Velocity/delta quantization upper bound. Used when alternating value/velocity packets enabled.
+        /// Represents expected maximum rate of change (units per second).
+        ///
+        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        ///
+        /// RECOMMENDED: Set to expected maximum velocity (e.g., 20 for objects moving up to 20 units/sec)
+        /// </summary>
+        [Tooltip("Upper bound for velocity/delta quantization when alternating value/velocity packets enabled.\n" +
+                 "Represents expected maximum rate of change (units per second).\n\n" +
+                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "RECOMMENDED: Set to expected maximum velocity\n" +
+                 "Example: 20 for objects moving up to 20 units/sec")]
+        public float VelocityQuantizeUpperBound = 20f;
+
+        /// <summary>
+        /// Bit count for velocity quantization. Can often be lower than position bit count since velocity
+        /// range is typically smaller and more predictable than position range.
+        ///
+        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        ///
+        /// RECOMMENDED: 8-10 bits for most use cases (provides 0.039-0.156 units/sec resolution for ±20 units/sec range)
+        /// </summary>
+        [Tooltip("Bit count for velocity quantization. Can be lower than position bits since velocity range is typically smaller.\n\n" +
+                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "RECOMMENDED: 8-10 bits for most use cases\n" +
+                 "8 bits = 0.156 units/sec resolution (256 values)\n" +
+                 "10 bits = 0.039 units/sec resolution (1024 values)")]
+        [Range(4, 16)]
+        public byte VelocityQuantizeDownToBitCount = 10;
+
+        /// <summary>
+        /// READONLY: Velocity quantization resulting precision (calculated from above settings)
+        /// </summary>
+        [Tooltip("READONLY: Velocity quantization precision (calculated from above settings)")]
+        public string VelocityQuantizationResultingPrecision;
+
+        #endregion
+
         /// <summary>
         /// Helps identify the order in which this single value change will be processed in a group of auto-magical value changes.
         /// Leave this alone for normal priority.
@@ -168,6 +226,7 @@ namespace GONet
 
         private void UpdateResultingPrecision()
         {
+            // Position quantization precision
             if (QuantizeDownToBitCount == 0)
             {
                 QuantizationResultingPrecision = "<full precision - no quantization will occur>";
@@ -177,6 +236,18 @@ namespace GONet
                 float range = QuantizeUpperBound - QuantizeLowerBound;
                 float precision = range / (float)Math.Pow(2.0, QuantizeDownToBitCount);
                 QuantizationResultingPrecision = string.Concat(precision.ToString(), " (i.e., ", string.Format("{0:##,##0.###}", precision * 1000f), " millimeters)");
+            }
+
+            // Velocity quantization precision
+            if (VelocityQuantizeDownToBitCount == 0)
+            {
+                VelocityQuantizationResultingPrecision = "<full precision - no quantization will occur>";
+            }
+            else
+            {
+                float velocityRange = VelocityQuantizeUpperBound - VelocityQuantizeLowerBound;
+                float velocityPrecision = velocityRange / (float)Math.Pow(2.0, VelocityQuantizeDownToBitCount);
+                VelocityQuantizationResultingPrecision = string.Concat(velocityPrecision.ToString("F6"), " units/sec");
             }
         }
     }
