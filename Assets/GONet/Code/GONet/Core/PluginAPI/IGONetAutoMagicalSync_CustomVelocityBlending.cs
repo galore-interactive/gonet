@@ -53,7 +53,7 @@ namespace GONet.PluginAPI
         /// <param name="gonetParticipant">The GONetParticipant this value belongs to</param>
         /// <returns>Extrapolated value at target time</returns>
         GONetSyncableValue ExtrapolateWithVelocityContext(
-            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.NumericValueChangeSnapshot[] valueBuffer,
+            NumericValueChangeSnapshot[] valueBuffer,
             int valueCount,
             long atElapsedTicks,
             GONetParticipant gonetParticipant);

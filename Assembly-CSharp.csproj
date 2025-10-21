@@ -163,6 +163,7 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeLogLevel.cs" />
     <Compile Include="Assets\GONet\Sample\ClaimableObjectViaRpcs.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetClient.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\IGONetAutoMagicalSync_CustomVelocityBlending.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\PacketHeader.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\ConnectTokenData.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\Quantizer.cs" />
