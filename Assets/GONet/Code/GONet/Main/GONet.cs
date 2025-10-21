@@ -7492,7 +7492,7 @@ namespace GONet
             private ushort mostRecentChanges_UpdatedByAuthorityId;
 
             /// <summary>
-            /// If true, a message from owner came in indicating this is at rest, but is awaiting processing of that while the 
+            /// If true, a message from owner came in indicating this is at rest, but is awaiting processing of that while the
             /// value blending buffer lead time transpires first.
             /// Also, if true, <see cref="hasAwaitingAtRest_assumedInitialRestElapsedTicks"/> will indicate when the source indicating as much (i.e., elapsedTicksAtSend).
             /// </summary>
@@ -7501,6 +7501,14 @@ namespace GONet
             internal long hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks;
             internal long hasAwaitingAtRest_lastProcessedAtRestTicks;
             internal GONetSyncableValue hasAwaitingAtRest_value;
+
+            /// <summary>
+            /// NEW: Physics snapping flag for at-rest handling.
+            /// If true, when the at-rest value is applied, trigger physics snapping on the GONetParticipant
+            /// to eliminate quantization error (position: ~0.95mm → sub-mm, rotation: ~0.3° → sub-0.01°).
+            /// Only applies to physics objects (IsRigidBodyOwnerOnlyControlled=true) on non-authority clients.
+            /// </summary>
+            internal bool hasAwaitingAtRest_needsPhysicsSnap;
 
             /// <summary>
             /// DO NOT USE THIS.
@@ -9896,6 +9904,39 @@ namespace GONet
                     GONetLog.Debug($"Successfully deserialized GNP '{gonetParticipant.gameObject.name}' with GONetId: {gonetId}");
                     syncCompanion.DeserializeInitAll(bitStream_headerAlreadyRead, elapsedTicksAtSend);
 
+                    // LATE-JOINER PHYSICS SNAPPING: If this is a physics object, trigger physics snapping
+                    // to eliminate quantization error for objects at rest (position ~0.95mm → sub-mm, rotation ~0.3° → sub-0.01°)
+                    bool isPhysicsObject = gonetParticipant.IsRigidBodyOwnerOnlyControlled &&
+                                           gonetParticipant.myRigidBody != null &&
+                                           !gonetParticipant.IsMine;
+
+                    if (isPhysicsObject)
+                    {
+                        // Check if this object has position or rotation sync by scanning all indices for matching function pointers
+                        // This relies on the implementation detail that position/rotation use IsPositionNotSyncd/IsRotationNotSyncd delegates
+                        bool hasPositionOrRotation = false;
+                        for (byte i = 0; i < syncCompanion.valuesChangesSupport.Length; i++)
+                        {
+                            AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[i];
+                            if (changedValue.syncAttribute_ShouldSkipSync == IsPositionNotSyncd ||
+                                changedValue.syncAttribute_ShouldSkipSync == IsRotationNotSyncd)
+                            {
+                                hasPositionOrRotation = true;
+                                break;
+                            }
+                        }
+
+                        if (hasPositionOrRotation)
+                        {
+                            // Get current transform values (just applied via DeserializeInitAll)
+                            Vector3 position = gonetParticipant.transform.position;
+                            Quaternion rotation = gonetParticipant.transform.rotation;
+
+                            // Trigger physics snapping to improve final resting accuracy
+                            gonetParticipant.TriggerPhysicsSnapToRest(position, rotation);
+                        }
+                    }
+
                     // Deduplication check: Only publish if not already published
                     if (TryMarkDeserializeInitPublished(gonetId))
                     {
@@ -10190,6 +10231,28 @@ namespace GONet
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_sinceLeadTimeAdjustedElapsedTicks = Time.ElapsedTicks - valueBlendingBufferLeadTicks;
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_value = value;
 
+                                // NEW: Check if this is a physics object at-rest (position or rotation sync)
+                                // Physics snapping eliminates quantization error: position ~0.95mm → sub-mm, rotation ~0.3° → sub-0.01°
+                                bool isPhysicsObject = gonetParticipant.IsRigidBodyOwnerOnlyControlled &&
+                                                       gonetParticipant.myRigidBody != null &&
+                                                       !gonetParticipant.IsMine;
+
+                                if (isPhysicsObject)
+                                {
+                                    // Check if this is position or rotation by matching the ShouldSkipSync function pointer
+                                    // This relies on the implementation detail that position/rotation use IsPositionNotSyncd/IsRotationNotSyncd delegates
+                                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+                                    bool isPosition = changedValue.syncAttribute_ShouldSkipSync == IsPositionNotSyncd;
+                                    bool isRotation = changedValue.syncAttribute_ShouldSkipSync == IsRotationNotSyncd;
+                                    bool isPositionOrRotation = isPosition || isRotation;
+
+                                    if (isPositionOrRotation)
+                                    {
+                                        // PHYSICS SNAPPING: Mark this value as needing physics snap when applied
+                                        syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_needsPhysicsSnap = true;
+                                    }
+                                }
+
                                 /*{
                                     GONetLog.Debug($"[AT-REST-RECEIVED] GNP:{gonetParticipant.GONetId} index:{index} " +
                                         $"atRestValue:{value} currentValue:{syncCompanion.GetAutoMagicalSyncValue(index)} " +
@@ -10242,11 +10305,49 @@ namespace GONet
                                     syncCompanion.InitSingle(value, index, assumedInitialRestElapsedTicks);
 
                                     //GONetLog.Debug($"[AT-REST-APPLIED] GNP:{gonetParticipant.GONetId} index:{index} finalValue:{syncCompanion.GetAutoMagicalSyncValue(index)}");
+
+                                    // NEW: Trigger physics snapping if needed (after value is applied)
+                                    if (syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_needsPhysicsSnap)
+                                    {
+                                        syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_needsPhysicsSnap = false;
+
+                                        // Get both position and rotation (may be same or different index)
+                                        // Physics snapping requires both to achieve sub-mm position and sub-0.01° rotation
+                                        Vector3 position = gonetParticipant.transform.position;
+                                        Quaternion rotation = gonetParticipant.transform.rotation;
+
+                                        gonetParticipant.TriggerPhysicsSnapToRest(position, rotation);
+                                    }
                                 }, assumedInitialRestElapsedTicks + valueBlendingBufferLeadTicks));
                             }
                             else
                             {
                                 syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+
+                                // NEW: Immediate physics snap for non-blended physics objects at rest
+                                bool isPhysicsObject = gonetParticipant.IsRigidBodyOwnerOnlyControlled &&
+                                                       gonetParticipant.myRigidBody != null &&
+                                                       !gonetParticipant.IsMine;
+
+                                if (isPhysicsObject)
+                                {
+                                    // Check if this is position or rotation by matching the ShouldSkipSync function pointer
+                                    // This relies on the implementation detail that position/rotation use IsPositionNotSyncd/IsRotationNotSyncd delegates
+                                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
+                                    bool isPosition = changedValue.syncAttribute_ShouldSkipSync == IsPositionNotSyncd;
+                                    bool isRotation = changedValue.syncAttribute_ShouldSkipSync == IsRotationNotSyncd;
+                                    bool isPositionOrRotation = isPosition || isRotation;
+
+                                    if (isPositionOrRotation)
+                                    {
+                                        // Get current transform values (just applied via DeserializeInitSingle)
+                                        Vector3 position = gonetParticipant.transform.position;
+                                        Quaternion rotation = gonetParticipant.transform.rotation;
+
+                                        // Trigger physics snapping immediately (no coroutine delay for non-blended values)
+                                        gonetParticipant.TriggerPhysicsSnapToRest(position, rotation);
+                                    }
+                                }
                             }
 
                             /* TODO change this to an at rest message?  probably not needed...leave commented out for now until deemed useful

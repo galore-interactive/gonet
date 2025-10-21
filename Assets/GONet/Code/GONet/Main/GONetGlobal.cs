@@ -776,6 +776,65 @@ namespace GONet
 
             // GONetId Reuse Prevention: Periodic cleanup of expired despawned GONetIds
             GONetMain.CleanupExpiredDespawnedGONetIds();
+
+            // DEBUG: Ctrl+Alt+K to toggle kinematic state for all physics objects (DEVELOPMENT ONLY)
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.K))
+            {
+                DebugToggleAllPhysicsObjectsKinematic();
+            }
+        }
+
+        /// <summary>
+        /// DEBUG ONLY: Toggle kinematic state for all physics objects and log the results.
+        /// Triggered by Ctrl+Alt+K key combination.
+        /// This is for development/testing purposes to verify physics snapping behavior.
+        /// </summary>
+        private void DebugToggleAllPhysicsObjectsKinematic()
+        {
+            GONetParticipant[] allParticipants = UnityEngine.Object.FindObjectsOfType<GONetParticipant>();
+
+            int physicsObjectCount = 0;
+            int toggledCount = 0;
+            bool? newKinematicState = null; // Will be set based on first object found
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(2048);
+            sb.AppendLine("========================================");
+            sb.AppendLine("[DEBUG-KINEMATIC] Ctrl+Alt+K pressed - Toggling physics objects");
+            sb.AppendLine("========================================");
+
+            foreach (var participant in allParticipants)
+            {
+                if (participant.IsRigidBodyOwnerOnlyControlled && participant.myRigidBody != null)
+                {
+                    physicsObjectCount++;
+
+                    // Determine toggle state based on first object (all will match)
+                    if (!newKinematicState.HasValue)
+                    {
+                        newKinematicState = !participant.myRigidBody.isKinematic;
+                    }
+
+                    bool oldKinematic = participant.myRigidBody.isKinematic;
+                    participant.myRigidBody.isKinematic = newKinematicState.Value;
+                    toggledCount++;
+
+                    sb.AppendLine($"[{participant.gameObject.name}] GONetId:{participant.GONetId} IsMine:{participant.IsMine}");
+                    sb.AppendLine($"  BEFORE: isKinematic={oldKinematic}");
+                    sb.AppendLine($"  AFTER:  isKinematic={participant.myRigidBody.isKinematic}");
+                    sb.AppendLine($"  Position: {participant.transform.position}");
+                    sb.AppendLine($"  Rotation: {participant.transform.rotation.eulerAngles}");
+                    sb.AppendLine();
+                }
+            }
+
+            sb.AppendLine("========================================");
+            sb.AppendLine($"[DEBUG-KINEMATIC] Total GONetParticipants: {allParticipants.Length}");
+            sb.AppendLine($"[DEBUG-KINEMATIC] Physics objects found: {physicsObjectCount}");
+            sb.AppendLine($"[DEBUG-KINEMATIC] Objects toggled: {toggledCount}");
+            sb.AppendLine($"[DEBUG-KINEMATIC] New kinematic state: {(newKinematicState.HasValue ? newKinematicState.Value.ToString() : "N/A - no physics objects found")}");
+            sb.AppendLine("========================================");
+
+            GONetLog.Warning(sb.ToString()); // Use Warning level so it's always visible
         }
 
         /// <summary>
