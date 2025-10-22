@@ -165,6 +165,38 @@ namespace GONet
         /// </summary>
         public int PhysicsUpdateInterval = 1;
 
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Indicates if this value is eligible for velocity-augmented synchronization.
+        /// Automatically set to true for Vector3 and Quaternion types when velocity quantization is configured.
+        /// When true, system alternates between sending VALUE (position) and VELOCITY (rate of change) bundles
+        /// to eliminate sub-quantization jitter on receivers through position synthesis.
+        /// </summary>
+        public bool IsVelocityEligible = false;
+
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Lower bound for velocity quantization.
+        /// Only used when QuantizeDownToBitCount > 0 and IsVelocityEligible = true.
+        /// Values outside [VelocityQuantizeLowerBound, VelocityQuantizeUpperBound] will fall back to VALUE bundles.
+        /// Default: -20 (units/second for Vector3, radians/second for Quaternion)
+        /// </summary>
+        public float VelocityQuantizeLowerBound = -20f;
+
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Upper bound for velocity quantization.
+        /// Only used when QuantizeDownToBitCount > 0 and IsVelocityEligible = true.
+        /// Values outside [VelocityQuantizeLowerBound, VelocityQuantizeUpperBound] will fall back to VALUE bundles.
+        /// Default: 20 (units/second for Vector3, radians/second for Quaternion)
+        /// </summary>
+        public float VelocityQuantizeUpperBound = 20f;
+
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Bit count for velocity quantization (separate from position quantization).
+        /// Only used when IsVelocityEligible = true.
+        /// Higher values = better precision but more bandwidth.
+        /// Default: 10 bits (1024 discrete values across velocity range)
+        /// </summary>
+        public byte VelocityQuantizeDownToBitCount = 10;
+
         #region GONet internal only
 
         /// <summary>
