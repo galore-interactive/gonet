@@ -9712,6 +9712,9 @@ namespace GONet
                 List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> withinRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
                 List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> outOfRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
 
+                int velocityEligibleCount = 0;
+                int nonVelocityEligibleCount = 0;
+
                 // Partition changes based on velocity eligibility and range
                 for (int i = 0; i < countTotal; ++i)
                 {
@@ -9726,15 +9729,16 @@ namespace GONet
 
                     if (isVelocityEligible)
                     {
+                        velocityEligibleCount++;
                         // Check if velocity fits in quantization range
                         bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
 
-                        // DIAGNOSTIC: Log when velocity is out of range (limit to first 3 per frame)
-                        if (!velocityWithinRange && (withinRangeChanges.Count + outOfRangeChanges.Count) < 3)
+                        // DIAGNOSTIC: Log first velocity-eligible value per frame to debug range check
+                        if (velocityEligibleCount == 1)
                         {
                             var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
                             GONetLog.Debug($"[VelocitySync][PARTITION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                          $"velocity OUT OF RANGE - snapshotCount:{changesSupport.mostRecentChanges_usedSize}, " +
+                                          $"velocityWithinRange:{velocityWithinRange}, snapshotCount:{changesSupport.mostRecentChanges_usedSize}, " +
                                           $"range:[{changesSupport.syncAttribute_VelocityQuantizeLowerBound}, {changesSupport.syncAttribute_VelocityQuantizeUpperBound}]");
                         }
 
@@ -9749,12 +9753,13 @@ namespace GONet
                     }
                     else
                     {
+                        nonVelocityEligibleCount++;
                         // Non-velocity-eligible values always go in VALUE bundle
                         outOfRangeChanges.Add(change);
                     }
                 }
                 // DIAGNOSTIC: Log partition results
-                GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total)");
+                GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total, {velocityEligibleCount} velEligible, {nonVelocityEligibleCount} nonEligible)");
 
 
                 // Send VELOCITY bundle for values within range
