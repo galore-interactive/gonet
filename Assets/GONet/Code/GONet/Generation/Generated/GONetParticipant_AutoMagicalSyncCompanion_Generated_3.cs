@@ -462,18 +462,8 @@ namespace GONet.Generation
 				}
 			}
 			{ // Transform.rotation
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[8];
-				customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 			}
 			{ // Transform.position
-				    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[9];
-				{ // SUB-QUANTIZATION DIAGNOSTIC for position
-					var currentValue = Transform.position;
-					var baselineValue = valuesChangesSupport[9].baselineValue_current.UnityEngine_Vector3;
-					var deltaFromBaseline = currentValue - baselineValue;
-					GONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, "position", deltaFromBaseline, valuesChangesSupport[9].syncAttribute_QuantizerSettingsGroup, customSerializer);
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline);
-				}
 			}
 
             // Velocity-augmented sync: Toggle ONLY if velocity-synced values were actually serialized
@@ -572,21 +562,11 @@ namespace GONet.Generation
 
 				case 8:
 				{ // Transform.rotation
-					    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[8];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
 				}
 				break;
 
 				case 9:
 				{ // Transform.position
-					    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[9];
-					{ // SUB-QUANTIZATION DIAGNOSTIC for position
-						var currentValue = Transform.position;
-						var baselineValue = valuesChangesSupport[9].baselineValue_current.UnityEngine_Vector3;
-						var deltaFromBaseline = currentValue - baselineValue;
-						GONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, "position", deltaFromBaseline, valuesChangesSupport[9].syncAttribute_QuantizerSettingsGroup, customSerializer);
-						customSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline);
-					}
 				}
 				break;
 

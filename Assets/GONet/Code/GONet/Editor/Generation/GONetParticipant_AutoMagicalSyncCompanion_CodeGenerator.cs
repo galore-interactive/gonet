@@ -500,11 +500,12 @@ namespace GONet.Editor.Generation
             // Check if velocity-augmented sync applies to this member
             bool usesVelocitySync = IsVelocityCapableType(memberTypeFullName) && singleMember.attribute.ShouldBlendBetweenValuesReceived;
 
-            if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName || memberTypeFullName == typeof(UnityEngine.Vector3).FullName || memberTypeFullName == typeof(UnityEngine.Vector4).FullName || memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-            {
-                // Velocity-capable types - skip to Vector handling at line 590
-            }
-            else if (singleMember.attribute.CustomSerialize_Instance != null)
+            // Check CustomSerialize, but EXCLUDE Vector types (they're handled separately below)
+            if (singleMember.attribute.CustomSerialize_Instance != null &&
+                memberTypeFullName != typeof(UnityEngine.Vector2).FullName &&
+                memberTypeFullName != typeof(UnityEngine.Vector3).FullName &&
+                memberTypeFullName != typeof(UnityEngine.Vector4).FullName &&
+                memberTypeFullName != typeof(UnityEngine.Quaternion).FullName)
             {
                 sb.Append(indent).AppendLine("\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
                 if (singleMember.attribute.QuantizeDownToBitCount > 0)
@@ -591,7 +592,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\tbitStream_appendTo.WriteByte(bytes[i]);");
                 sb.Append(indent).AppendLine("\t}");
             }
-            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName || memberTypeFullName == typeof(UnityEngine.Vector3).FullName || memberTypeFullName == typeof(UnityEngine.Vector4).FullName || memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName || memberTypeFullName == typeof(UnityEngine.Vector3).FullName || memberTypeFullName == typeof(UnityEngine.Vector4).FullName || memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
                 sb.Append(indent).AppendLine("\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
 
