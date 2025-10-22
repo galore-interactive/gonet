@@ -810,19 +810,24 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 velocity;");
-                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector2(out velocity);");
+                // Vector2 uses custom serializer
+                sb.Append(indent).AppendLine($"\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[{iOverall}];");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 velocity = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector2;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 velocity;");
-                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector3(out velocity);");
+                // Vector3 uses custom serializer
+                sb.Append(indent).AppendLine($"\t\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[{iOverall}];");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 velocity = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                // Angular velocity stored as Vector3 (axis × speed)
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity;");
-                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector3(out angularVelocity);");
+                // Angular velocity stored as Vector3 (uses Vector3 serializer)
+                // For Quaternion rotation, angular velocity is Vector3, so we need Vector3 serializer
+                sb.Append(indent).AppendLine($"\t\t// Angular velocity uses Vector3 serializer (not Quaternion)");
+                sb.Append(indent).AppendLine($"\t\t// Create temporary Vector3 serializer for angular velocity");
+                sb.Append(indent).AppendLine($"\t\tvar vector3Serializer = new GONet.Utils.Vector3Serializer(GONet.Utils.QuantizerSettingsGroup.Default_Vector3);");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = vector3Serializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
             }
 
             sb.AppendLine();
@@ -895,24 +900,29 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("#endif");
             sb.AppendLine();
 
-            // Create snapshot with velocity data and add to queue
-            sb.Append(indent).AppendLine("\t\t// Create snapshot with velocity data (wasSynthesizedFromVelocity=true)");
+            // For velocity packets, we need to manually add the snapshot with velocity data
+            // (AddToMostRecentChangeQueue_IfAppropriate would create a snapshot without velocity)
+            sb.Append(indent).AppendLine("\t\t// Create and manually insert snapshot with velocity data (wasSynthesizedFromVelocity=true)");
+            sb.Append(indent).AppendLine($"\t\tGONetSyncableValue synthesizedValueWrapped = synthesizedValue;");
             if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                // For Quaternion: velocity is Vector3 (angular velocity), but CreateFromVelocityPacket expects matching types
-                // We need to pass Quaternion for both value and "velocity" (store angular velocity separately)
-                sb.Append(indent).AppendLine($"\t\t// NOTE: For Quaternion, velocity is stored as Vector3 angular velocity in snapshot.velocity");
-                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue synthesizedValueWrapped = synthesizedValue;");
                 sb.Append(indent).AppendLine($"\t\tGONetSyncableValue angularVelocityWrapped = angularVelocity;");
-                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, angularVelocityWrapped);");
+                sb.Append(indent).AppendLine($"\t\tvar velocitySnapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, angularVelocityWrapped);");
             }
             else
             {
-                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue synthesizedValueWrapped = synthesizedValue;");
                 sb.Append(indent).AppendLine($"\t\tGONetSyncableValue velocityWrapped = velocity;");
-                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, velocityWrapped);");
+                sb.Append(indent).AppendLine($"\t\tvar velocitySnapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, velocityWrapped);");
             }
-            sb.Append(indent).AppendLine($"\t\tvalueChangeSupport.AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, snapshot);");
+
+            // Manually add to mostRecentChanges array (similar to AddToMostRecentChangeQueue_IfAppropriate but keeps velocity snapshot)
+            sb.Append(indent).AppendLine("\t\t// Add velocity snapshot to mostRecentChanges buffer");
+            sb.Append(indent).AppendLine($"\t\tif (valueChangeSupport.mostRecentChanges_usedSize < valueChangeSupport.mostRecentChanges_capacitySize)");
+            sb.Append(indent).AppendLine("\t\t{");
+            sb.Append(indent).AppendLine($"\t\t\tint insertIndex = valueChangeSupport.mostRecentChanges_usedSize;");
+            sb.Append(indent).AppendLine($"\t\t\tvalueChangeSupport.mostRecentChanges[insertIndex] = velocitySnapshot;");
+            sb.Append(indent).AppendLine($"\t\t\t++valueChangeSupport.mostRecentChanges_usedSize;");
+            sb.Append(indent).AppendLine("\t\t}");
             sb.AppendLine();
 
             // Apply synthesized value to component
