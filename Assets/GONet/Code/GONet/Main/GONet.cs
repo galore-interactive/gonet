@@ -5743,7 +5743,7 @@ namespace GONet
                         if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
                             messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
                         {
-                            isVelocityBundle = bitStream.ReadBit();
+                            bitStream.ReadBit(out isVelocityBundle);
                         }
 
                         // DEBUG: Log position after reading header for OwnerAuthorityIdAssignmentEvent
