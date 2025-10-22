@@ -1022,38 +1022,10 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\t\tcase ").Append(iOverall).AppendLine(":");
                     sb.Append("\t\t\t\t{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
 
-                    // Check if this value uses velocity sync
-                    bool usesVelocitySync = singleMember.attribute.ShouldBlendBetweenValuesReceived &&
-                                           IsVelocityCapableType(singleMember.memberTypeFullName);
-
-                    if (usesVelocitySync && !readOnly)
-                    {
-                        // Per-value velocity: Read velocity bit and branch
-                        sb.AppendLine("\t\t\t\t\t// Per-value velocity: Read velocity bit (0 = VALUE, 1 = VELOCITY)");
-                        sb.AppendLine("\t\t\t\t\tbool isVelocityValue;");
-                        sb.AppendLine("\t\t\t\t\tbitStream_readFrom.ReadBit(out isVelocityValue);");
-                        sb.AppendLine();
-                        sb.AppendLine("\t\t\t\t\tif (isVelocityValue)");
-                        sb.AppendLine("\t\t\t\t\t{");
-
-                        // Generate velocity deserialization logic
-                        WriteVelocityDeserializationLogic(iOverall, single, singleMember, "\t\t\t\t\t");
-
-                        sb.AppendLine("\t\t\t\t\t\treturn value;");
-                        sb.AppendLine("\t\t\t\t\t}");
-                        sb.AppendLine("\t\t\t\t\telse");
-                        sb.AppendLine("\t\t\t\t\t{");
-                        sb.AppendLine("\t\t\t\t\t\t// VALUE packet: Deserialize normally");
-                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t\t\t", false, readOnly);
-                        sb.AppendLine("\t\t\t\t\t\treturn value;");
-                        sb.AppendLine("\t\t\t\t\t}");
-                    }
-                    else
-                    {
-                        // Non-velocity or read-only: Deserialize normally
-                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t", false, readOnly);
-                        sb.AppendLine("\t\t\t\t\treturn value;");
-                    }
+                    // NOTE: Velocity bit reading/processing happens in GONet.cs event processing layer, not here
+                    // This method only deserializes the VALUE data (not velocity)
+                    WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t", false, readOnly);
+                    sb.AppendLine("\t\t\t\t\treturn value;");
 
                     sb.AppendLine("\t\t\t\t}");
 
