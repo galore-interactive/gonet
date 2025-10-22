@@ -454,9 +454,10 @@ namespace GONet.Editor.Generation
         /// Writes end of velocity-aware serialization wrapper (if needed).
         /// Toggles per-value velocity state after serialization.
         /// </summary>
-        private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync, int iOverall, bool isSerializeAll)
+        private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync, int iOverall, bool isSerializeAll, bool wroteVelocityHeader)
         {
-            if (usesVelocitySync && !isSerializeAll)
+            // Only write footer if header was actually written
+            if (wroteVelocityHeader && usesVelocitySync && !isSerializeAll)
             {
                 sb.Append(indent).AppendLine("\t}");
                 sb.Append(indent).AppendLine();
@@ -536,7 +537,7 @@ namespace GONet.Editor.Generation
                     sb.Append(valueIndent).Append("bitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
                 }
 
-                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll);
+                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll, wroteVelocityHeader);
             }
             else if (memberTypeFullName == typeof(long).FullName)
             {
@@ -615,7 +616,7 @@ namespace GONet.Editor.Generation
                     sb.Append(valueIndent).Append("customSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
                 }
 
-                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll);
+                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll, wroteVelocityHeader);
             }
         }
 
