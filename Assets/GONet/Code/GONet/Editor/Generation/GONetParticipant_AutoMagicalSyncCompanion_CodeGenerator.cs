@@ -349,6 +349,10 @@ namespace GONet.Editor.Generation
             sb.AppendLine("            // Velocity-augmented sync: Write bundle type bit (0 = VALUE, 1 = VELOCITY)");
             sb.AppendLine("            bitStream_appendTo.WriteBit(nextBundleIsVelocity);");
             sb.AppendLine();
+            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: bundleType={(nextBundleIsVelocity ? \\\"VELOCITY\\\" : \\\"VALUE\\\")}\");");
+            sb.AppendLine("#endif");
+            sb.AppendLine();
 
             WriteSerializationBody(true);
 
@@ -357,8 +361,17 @@ namespace GONet.Editor.Generation
             sb.AppendLine("            // CRITICAL: Prevents empty VELOCITY packets when PhysicsUpdateInterval > 1 gates physics values");
             sb.AppendLine("            if (didSerializeAnyVelocitySyncedValuesThisBundle)");
             sb.AppendLine("            {");
+            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: Toggling (had velocity-synced values) {(nextBundleIsVelocity ? \\\"VELOCITY\\\" : \\\"VALUE\\\")} → {(!nextBundleIsVelocity ? \\\"VELOCITY\\\" : \\\"VALUE\\\")}\");");
+            sb.AppendLine("#endif");
             sb.AppendLine("                ToggleBundleType();");
             sb.AppendLine("            }");
+            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.AppendLine("            else");
+            sb.AppendLine("            {");
+            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: NOT toggling (no velocity-synced values serialized), keeping {(nextBundleIsVelocity ? \\\"VELOCITY\\\" : \\\"VALUE\\\")}\");");
+            sb.AppendLine("            }");
+            sb.AppendLine("#endif");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -443,6 +456,9 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized velocity data");
                 sb.Append(indent).AppendLine($"\t\tvar currentValue = {valueExpression};");
                 sb.Append(indent).AppendLine($"\t\tvar velocity = CalculateVelocity({iOverall}, currentValue, GONetMain.Time.ElapsedTicks);");
+                sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] VELOCITY packet: value[{iOverall}]={{currentValue}}, velocity={{velocity}}\");");
+                sb.Append(indent).AppendLine("#endif");
                 return true;
             }
             return false;
@@ -458,6 +474,9 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\t{");
             sb.Append(indent).AppendLine("\t\t// VALUE packet: Serialize position normally");
             sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized position data");
+            sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.Append(indent).AppendLine("\t\tGONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] VALUE packet: serializing position data\");");
+            sb.Append(indent).AppendLine("#endif");
         }
 
         /// <summary>

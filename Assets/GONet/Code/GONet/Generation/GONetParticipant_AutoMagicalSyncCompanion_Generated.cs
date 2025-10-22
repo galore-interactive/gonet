@@ -310,6 +310,9 @@ namespace GONet.Generation
             int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_usedSize - 1;
             if (mostRecentChangesIndex < 0 || valueChangeSupport.mostRecentChanges_usedSize == 0)
             {
+#if GONET_VELOCITY_SYNC_DEBUG
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity: No previous snapshot, returning zero velocity");
+#endif
                 // No previous value, velocity is zero
                 if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
                     return 0f;
@@ -351,17 +354,29 @@ namespace GONet.Generation
             if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
             {
                 float delta = currentValue.System_Single - previousSnapshot.numericValue.System_Single;
-                return delta / deltaTimeSeconds;
+                float velocity = delta / deltaTimeSeconds;
+#if GONET_VELOCITY_SYNC_DEBUG
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Float current={currentValue.System_Single}, prev={previousSnapshot.numericValue.System_Single}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
+#endif
+                return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
             {
                 UnityEngine.Vector2 delta = currentValue.UnityEngine_Vector2 - previousSnapshot.numericValue.UnityEngine_Vector2;
-                return delta / deltaTimeSeconds;
+                UnityEngine.Vector2 velocity = delta / deltaTimeSeconds;
+#if GONET_VELOCITY_SYNC_DEBUG
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector2 delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
+#endif
+                return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
             {
                 UnityEngine.Vector3 delta = currentValue.UnityEngine_Vector3 - previousSnapshot.numericValue.UnityEngine_Vector3;
-                return delta / deltaTimeSeconds;
+                UnityEngine.Vector3 velocity = delta / deltaTimeSeconds;
+#if GONET_VELOCITY_SYNC_DEBUG
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector3 current={currentValue.UnityEngine_Vector3}, prev={previousSnapshot.numericValue.UnityEngine_Vector3}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
+#endif
+                return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
             {
@@ -639,6 +654,9 @@ namespace GONet.Generation
                                   (mostRecent.velocity.GONetSyncType == mostRecent.numericValue.GONetSyncType) ||
                                   (mostRecent.numericValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion &&
                                    mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3); // Angular velocity stored as Vector3
+#if GONET_VELOCITY_SYNC_DEBUG
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: hasVelocityData={hasVelocityData}, wasSynthesized={mostRecent.wasSynthesizedFromVelocity}, velocityType={mostRecent.velocity.GONetSyncType}, valueType={mostRecent.numericValue.GONetSyncType}");
+#endif
             }
 
             // Use velocity blending if available and velocity data exists
@@ -647,6 +665,9 @@ namespace GONet.Generation
                 IGONetAutoMagicalSync_CustomVelocityBlending customVelocityBlending = cachedCustomVelocityBlendings[index];
                 if (customVelocityBlending != null)
                 {
+#if GONET_VELOCITY_SYNC_DEBUG
+                    GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: Using velocity-aware extrapolation with {customVelocityBlending.GetType().Name}");
+#endif
                     // Use velocity-aware extrapolation
                     blendedValue = customVelocityBlending.ExtrapolateWithVelocityContext(
                         valueBuffer,
@@ -654,10 +675,19 @@ namespace GONet.Generation
                         atElapsedTicks,
                         gonetParticipant);
 
+#if GONET_VELOCITY_SYNC_DEBUG
+                    GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: Extrapolated value={blendedValue}");
+#endif
                     // Velocity extrapolation always extrapolates (uses velocity data)
                     didExtrapolatePastMostRecentChanges = true;
                     return true;
                 }
+#if GONET_VELOCITY_SYNC_DEBUG
+                else
+                {
+                    GONetLog.Warning($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: hasVelocityData=true but customVelocityBlending is NULL! Falling back to standard blending.");
+                }
+#endif
             }
 
             // Fall back to standard value blending
