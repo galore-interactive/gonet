@@ -513,7 +513,7 @@ namespace GONet.Generation
 			#endif
 					// Angular velocity uses Vector3 serializer (not Quaternion)
 					// Create temporary Vector3 serializer for angular velocity
-					var vector3Serializer = new PluginAPI.Vector3Serializer();
+					var vector3Serializer = new GONet.Vector3Serializer();
 					UnityEngine.Vector3 angularVelocity = vector3Serializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 
 					// Get previous value to synthesize from

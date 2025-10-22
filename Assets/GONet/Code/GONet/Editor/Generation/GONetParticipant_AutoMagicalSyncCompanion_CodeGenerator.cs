@@ -500,7 +500,11 @@ namespace GONet.Editor.Generation
             // Check if velocity-augmented sync applies to this member
             bool usesVelocitySync = IsVelocityCapableType(memberTypeFullName) && singleMember.attribute.ShouldBlendBetweenValuesReceived;
 
-            if (singleMember.attribute.CustomSerialize_Instance != null)
+            if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName || memberTypeFullName == typeof(UnityEngine.Vector3).FullName || memberTypeFullName == typeof(UnityEngine.Vector4).FullName || memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                // Velocity-capable types - skip to Vector handling at line 590
+            }
+            else if (singleMember.attribute.CustomSerialize_Instance != null)
             {
                 sb.Append(indent).AppendLine("\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
                 if (singleMember.attribute.QuantizeDownToBitCount > 0)
