@@ -9658,6 +9658,9 @@ namespace GONet
             // Alternate between VALUE (even) and VELOCITY (odd) bundles
             bool isVelocityBundle = (System.Threading.Interlocked.Increment(ref velocityBundleCounter) % 2 == 0);
 
+            // DIAGNOSTIC: Log bundle type
+            GONetLog.Debug($"[VelocitySync] Sending {(isVelocityBundle ? "VELOCITY" : "VALUE")} bundle (counter: {velocityBundleCounter}, {countFiltered} changes)");
+
             while (individualChangesCountRemaining > 0)
             {
                 using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
@@ -10320,11 +10323,23 @@ namespace GONet
                                     // Calculate deltaTime from last snapshot to this bundle's send time
                                     float deltaTime = (elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
 
+                                    // DIAGNOSTIC: Log velocity and synthesis details
+                                    if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                                    {
+                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VELOCITY bundle - velocity: {velocityValue.UnityEngine_Vector3}, lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, deltaTime: {deltaTime:F4}s");
+                                    }
+
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
                                         lastSnapshot.numericValue,
                                         velocityValue,
                                         deltaTime);
+
+                                    // DIAGNOSTIC: Log synthesized position
+                                    if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                                    {
+                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] Synthesized position: {synthesizedValue.UnityEngine_Vector3}");
+                                    }
 
                                     // Store synthesized position as snapshot
                                     syncCompanion.InitSingle(synthesizedValue, index, elapsedTicksAtSend);
@@ -10340,6 +10355,7 @@ namespace GONet
                             else
                             {
                                 // VALUE BUNDLE: Deserialize and apply normally
+                                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - deserializing position directly");
                                 syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
                             }
 
