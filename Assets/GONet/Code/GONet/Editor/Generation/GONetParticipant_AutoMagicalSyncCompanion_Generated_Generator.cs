@@ -3755,6 +3755,12 @@ namespace GONet.Generation
                 attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
                 attribute.PhysicsUpdateInterval = profile.PhysicsUpdateInterval;
 
+                // VELOCITY-AUGMENTED SYNC: Copy velocity quantization settings from profile to attribute
+                attribute.IsVelocityEligible = profile.IsVelocityEligible;
+                attribute.VelocityQuantizeLowerBound = profile.VelocityQuantizeLowerBound;
+                attribute.VelocityQuantizeUpperBound = profile.VelocityQuantizeUpperBound;
+                attribute.VelocityQuantizeDownToBitCount = profile.VelocityQuantizeDownToBitCount;
+
                 float syncEverySeconds = 0;
                 if (profile.SyncChangesFrequencyOccurrences > 0)
                 {

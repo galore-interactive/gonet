@@ -101,18 +101,34 @@ namespace GONet
         #region Velocity Quantization Settings (NEW - Velocity Augmented Sync System)
 
         /// <summary>
+        /// Enable velocity-augmented sync for this value. When enabled, GONet will alternate between sending
+        /// VALUE packets (quantized positions) and VELOCITY packets (rates of change) to eliminate sub-quantization jitter.
+        ///
+        /// IMPORTANT: Only enable for values that change smoothly and predictably (positions, rotations).
+        /// DO NOT enable for discrete/step-change values (health, ammo count, etc.).
+        ///
+        /// RECOMMENDED: Enable for Transform.position/rotation on moving objects for smoother interpolation.
+        /// </summary>
+        [Space(10)]
+        [Header("Velocity-Augmented Sync (Eliminates Sub-Quantization Jitter)")]
+        [Tooltip("Enable velocity-augmented sync to eliminate sub-quantization jitter on moving objects.\n\n" +
+                 "When enabled, GONet alternates between VALUE packets (positions) and VELOCITY packets (rates of change).\n\n" +
+                 "IMPORTANT: Only enable for smooth/predictable values (positions, rotations).\n" +
+                 "DO NOT enable for discrete values (health, ammo, etc.).\n\n" +
+                 "RECOMMENDED: Enable for Transform.position/rotation on moving objects.")]
+        public bool IsVelocityEligible = false;
+
+        /// <summary>
         /// Velocity/delta quantization lower bound. Used when alternating value/velocity packets enabled.
         /// Represents expected minimum rate of change (units per second).
         ///
-        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        /// Only applies when <see cref="IsVelocityEligible"/> is true.
         ///
         /// RECOMMENDED: Set to negative of expected maximum velocity (e.g., -20 for objects moving up to 20 units/sec)
         /// </summary>
-        [Space(10)]
-        [Header("Velocity Quantization (Alternating Value/Velocity Packets)")]
         [Tooltip("Lower bound for velocity/delta quantization when alternating value/velocity packets enabled.\n" +
                  "Represents expected minimum rate of change (units per second).\n\n" +
-                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "Only applies when 'Is Velocity Eligible' is enabled.\n\n" +
                  "RECOMMENDED: Set to negative of expected maximum velocity\n" +
                  "Example: -20 for objects moving up to 20 units/sec")]
         public float VelocityQuantizeLowerBound = -20f;
@@ -121,13 +137,13 @@ namespace GONet
         /// Velocity/delta quantization upper bound. Used when alternating value/velocity packets enabled.
         /// Represents expected maximum rate of change (units per second).
         ///
-        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        /// Only applies when <see cref="IsVelocityEligible"/> is true.
         ///
         /// RECOMMENDED: Set to expected maximum velocity (e.g., 20 for objects moving up to 20 units/sec)
         /// </summary>
         [Tooltip("Upper bound for velocity/delta quantization when alternating value/velocity packets enabled.\n" +
                  "Represents expected maximum rate of change (units per second).\n\n" +
-                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "Only applies when 'Is Velocity Eligible' is enabled.\n\n" +
                  "RECOMMENDED: Set to expected maximum velocity\n" +
                  "Example: 20 for objects moving up to 20 units/sec")]
         public float VelocityQuantizeUpperBound = 20f;
@@ -136,12 +152,12 @@ namespace GONet
         /// Bit count for velocity quantization. Can often be lower than position bit count since velocity
         /// range is typically smaller and more predictable than position range.
         ///
-        /// Only applies when <see cref="ShouldBlendBetweenValuesReceived"/> is true.
+        /// Only applies when <see cref="IsVelocityEligible"/> is true.
         ///
         /// RECOMMENDED: 8-10 bits for most use cases (provides 0.039-0.156 units/sec resolution for ±20 units/sec range)
         /// </summary>
         [Tooltip("Bit count for velocity quantization. Can be lower than position bits since velocity range is typically smaller.\n\n" +
-                 "Only applies when 'Should Blend Between Values Received' is enabled.\n\n" +
+                 "Only applies when 'Is Velocity Eligible' is enabled.\n\n" +
                  "RECOMMENDED: 8-10 bits for most use cases\n" +
                  "8 bits = 0.156 units/sec resolution (256 values)\n" +
                  "10 bits = 0.039 units/sec resolution (1024 values)")]
