@@ -350,7 +350,7 @@ namespace GONet.Editor.Generation
             sb.AppendLine("            bitStream_appendTo.WriteBit(nextBundleIsVelocity);");
             sb.AppendLine();
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine(@"            GONetLog.Debug($""[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: bundleType={(nextBundleIsVelocity ? \""VELOCITY\"" : \""VALUE\"")}"");");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: bundleType={(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
             sb.AppendLine("#endif");
             sb.AppendLine();
 
@@ -362,14 +362,14 @@ namespace GONet.Editor.Generation
             sb.AppendLine("            if (didSerializeAnyVelocitySyncedValuesThisBundle)");
             sb.AppendLine("            {");
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine(@"                GONetLog.Debug($""[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: Toggling (had velocity-synced values) {(nextBundleIsVelocity ? \""VELOCITY\"" : \""VALUE\"")} → {(!nextBundleIsVelocity ? \""VELOCITY\"" : \""VALUE\"")}"");");
+            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: Toggling (had velocity-synced values) {(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")} → {(!nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
             sb.AppendLine("#endif");
             sb.AppendLine("                ToggleBundleType();");
             sb.AppendLine("            }");
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
             sb.AppendLine("            else");
             sb.AppendLine("            {");
-            sb.AppendLine(@"                GONetLog.Debug($""[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: NOT toggling (no velocity-synced values serialized), keeping {(nextBundleIsVelocity ? \""VELOCITY\"" : \""VALUE\"")}"");");
+            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: NOT toggling (no velocity-synced values serialized), keeping {(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
             sb.AppendLine("            }");
             sb.AppendLine("#endif");
             sb.AppendLine("        }");
@@ -738,7 +738,7 @@ namespace GONet.Editor.Generation
             sb.AppendLine("            bitStream_readFrom.ReadBit(out isVelocityBundle);");
             sb.AppendLine();
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine(@"            GONetLog.Debug($""[VelocitySync][{gonetParticipant.GONetId}] DeserializeInitAll: Received bundleType={(isVelocityBundle ? \""VELOCITY\"" : \""VALUE\"")}"");");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] DeserializeInitAll: Received bundleType={(isVelocityBundle ? \"VELOCITY\" : \"VALUE\")}\");");
             sb.AppendLine("#endif");
             sb.AppendLine();
 
