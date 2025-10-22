@@ -10619,8 +10619,17 @@ namespace GONet
                                     // Velocity expired or not eligible - use received VALUE directly
                                     if (changesSupport.isVelocityEligible)
                                     {
-                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - velocity EXPIRED " +
-                                                      $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms), using received VALUE");
+                                        // DIAGNOSTIC: Distinguish between "expired" vs "waiting for first VELOCITY"
+                                        if (changesSupport.lastVelocityTimestamp > 0 && velocityAgeTicks > velocityValidDurationTicks)
+                                        {
+                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - velocity EXPIRED " +
+                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms), using received VALUE");
+                                        }
+                                        else
+                                        {
+                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - waiting for first VELOCITY " +
+                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms < {VELOCITY_VALID_DURATION_MS}ms), using received VALUE");
+                                        }
                                     }
                                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
                                 }
