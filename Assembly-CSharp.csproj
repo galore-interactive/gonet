@@ -99,6 +99,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GCLessAlgorithms.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\GONetLog.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Client_GONetIdBatchLimboMode.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\DefaultVelocityBlending_Vector3.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FunctionalComparer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\FileBackedDictionary.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAdaptivePoolScaler.cs" />
@@ -131,6 +132,7 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\SequenceBuffer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetRpcs.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliablePacketController.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\DefaultVelocityBlending_Quaternion.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\TypeUtils.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleInputSync.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\Compression.cs" />
@@ -159,6 +161,7 @@
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableEndpointTelemetry.cs" />
     <Compile Include="Assets\GONet\Sample\GONetStatusUI.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\DefaultVelocityBlending_Float.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CastToObjectEqualityOperatorComparer.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeLogLevel.cs" />
     <Compile Include="Assets\GONet\Sample\ClaimableObjectViaRpcs.cs" />

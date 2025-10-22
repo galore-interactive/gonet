@@ -299,8 +299,8 @@ namespace GONet.Generation
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
 
             // Get previous snapshot
-            int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_capacitySize - 1;
-            if (mostRecentChangesIndex < 0 || valueChangeSupport.mostRecentChanges_capacityUsed == 0)
+            int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_usedSize - 1;
+            if (mostRecentChangesIndex < 0 || valueChangeSupport.mostRecentChanges_usedSize == 0)
             {
                 // No previous value, velocity is zero
                 if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
@@ -626,8 +626,11 @@ namespace GONet.Generation
             {
                 // Check most recent snapshot for velocity data
                 NumericValueChangeSnapshot mostRecent = valueBuffer[valueCount - 1];
+                // Velocity data exists if: flagged as synthesized OR velocity type matches value type
                 hasVelocityData = mostRecent.wasSynthesizedFromVelocity ||
-                                  mostRecent.velocity.GONetSyncType != GONetSyncableValueTypes.None;
+                                  (mostRecent.velocity.GONetSyncType == mostRecent.numericValue.GONetSyncType) ||
+                                  (mostRecent.numericValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion &&
+                                   mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3); // Angular velocity stored as Vector3
             }
 
             // Use velocity blending if available and velocity data exists
