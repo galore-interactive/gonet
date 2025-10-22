@@ -10628,7 +10628,7 @@ namespace GONet
                                         else
                                         {
                                             GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - waiting for first VELOCITY " +
-                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms < {VELOCITY_VALID_DURATION_MS}ms), using received VALUE");
+                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms < {AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS}ms), using received VALUE");
                                         }
                                     }
                                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
