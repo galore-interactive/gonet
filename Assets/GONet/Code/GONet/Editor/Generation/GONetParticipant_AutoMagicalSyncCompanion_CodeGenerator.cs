@@ -440,7 +440,7 @@ namespace GONet.Editor.Generation
         /// Generates velocity calculation code for a given type.
         /// Returns the velocity calculation as a GONetSyncableValue.
         /// </summary>
-        private void WriteVelocityCalculation(int iOverall, string memberTypeFullName, string indent)
+        private void WriteVelocityCalculation(int iOverall, string memberTypeFullName, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent)
         {
             sb.Append(indent).AppendLine("// VELOCITY BUNDLE: Calculate velocity from last two snapshots");
             sb.Append(indent).AppendLine($"var changesSupport = valuesChangesSupport[{iOverall}];");
@@ -451,7 +451,24 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("{");
             sb.Append(indent).AppendLine("\tvar current = changesSupport.mostRecentChanges[0];");
             sb.Append(indent).AppendLine("\tvar previous = changesSupport.mostRecentChanges[1];");
-            sb.Append(indent).AppendLine("\tfloat deltaTime = (current.elapsedTicksAtChange - previous.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;");
+
+            // Calculate DETERMINISTIC deltaTime based on sync settings (not snapshot timestamps!)
+            // This ensures both server and client use IDENTICAL deltaTime for velocity calculations
+            if (singleMember.attribute.PhysicsUpdateInterval > 0)
+            {
+                // FIXEDUPDATE path: deltaTime = Time.fixedDeltaTime × PhysicsUpdateInterval
+                int physicsInterval = singleMember.attribute.PhysicsUpdateInterval;
+                sb.Append(indent).AppendLine($"\t// DETERMINISTIC deltaTime for FixedUpdate path: Time.fixedDeltaTime × {physicsInterval}");
+                sb.Append(indent).AppendLine($"\tfloat deltaTime = UnityEngine.Time.fixedDeltaTime * {physicsInterval}f;");
+            }
+            else
+            {
+                // UPDATE path: deltaTime = SyncChangesEverySeconds
+                float deltaTime = singleMember.attribute.SyncChangesEverySeconds;
+                sb.Append(indent).AppendLine($"\t// DETERMINISTIC deltaTime for Update path: {deltaTime:F6}s (from SyncChangesEverySeconds)");
+                sb.Append(indent).AppendLine($"\tfloat deltaTime = {deltaTime.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}f;");
+            }
+
             sb.Append(indent).AppendLine();
             sb.Append(indent).AppendLine("\tif (deltaTime > 0.0001f)");
             sb.Append(indent).AppendLine("\t{");
@@ -475,8 +492,14 @@ namespace GONet.Editor.Generation
             {
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 currentValue = current.numericValue.UnityEngine_Vector3;");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 previousValue = previous.numericValue.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log snapshot values and velocity calculation");
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue}}, previous={{previousValue}}, deltaTime={{deltaTime:F4}}s\");");
+                sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = (currentValue - previousValue) / deltaTime;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated velocity={{velocityValue.UnityEngine_Vector3}}\");");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
             {
@@ -501,12 +524,14 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
             sb.Append(indent).AppendLine("\t\t// Delta time too small, use zero velocity");
+            sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] DeltaTime too small: {{deltaTime:F6}}s\");");
             sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
             sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine("else");
             sb.Append(indent).AppendLine("{");
             sb.Append(indent).AppendLine("\t// Not enough snapshots, use zero velocity");
+            sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] Not enough snapshots: recentChangesCount={{recentChangesCount}}\");");
             sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine();
@@ -559,7 +584,7 @@ namespace GONet.Editor.Generation
                     sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
                     sb.Append(indent).AppendLine("\t{");
 
-                    WriteVelocityCalculation(iOverall, memberTypeFullName, indent + "\t\t");
+                    WriteVelocityCalculation(iOverall, memberTypeFullName, singleMember, indent + "\t\t");
 
                     sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
                     sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
@@ -631,7 +656,7 @@ namespace GONet.Editor.Generation
                     sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
                     sb.Append(indent).AppendLine("\t{");
 
-                    WriteVelocityCalculation(iOverall, memberTypeFullName, indent + "\t\t");
+                    WriteVelocityCalculation(iOverall, memberTypeFullName, singleMember, indent + "\t\t");
 
                     sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
                     sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
@@ -658,6 +683,14 @@ namespace GONet.Editor.Generation
                         // (like Quaternion rotation which uses Smallest3 encoding with quantization handled inside the serializer)
                         sb.Append(indent).Append("\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
                     }
+
+                    // CRITICAL: Store this VALUE as a snapshot for future velocity calculations
+                    sb.Append(indent).AppendLine();
+                    sb.Append(indent).AppendLine($"\t\t// Store snapshot for velocity calculation on next VELOCITY bundle");
+                    sb.Append(indent).AppendLine($"\t\tvar snapshotValue = new GONetSyncableValue();");
+                    string snapshotFieldName = memberTypeFullName.Replace(".", "_");
+                    sb.Append(indent).AppendLine($"\t\tsnapshotValue.{snapshotFieldName} = {valueExpression};");
+                    sb.Append(indent).AppendLine($"\t\tvaluesChangesSupport[{iOverall}].AddToMostRecentChangeQueue_IfAppropriate(GONet.GONetMain.Time.ElapsedTicks, snapshotValue);");
 
                     sb.Append(indent).AppendLine("\t}");
                 }
@@ -1106,6 +1139,8 @@ namespace GONet.Editor.Generation
                 if (isDeserializeAll)
                 {
                     sb.Append(indent).Append("\tvar value = customSerializer.Deserialize(bitStream_readFrom).").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    // NOTE: DeserializeAll is ONLY used for INIT sync (always VALUE bundles, never VELOCITY bundles)
+                    // So baseline addition is always correct here (no useVelocitySerializer check needed)
                     if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
                         sb.Append(indent).Append("\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
@@ -1123,9 +1158,14 @@ namespace GONet.Editor.Generation
                 else if (readOnly) // ReadOnlyNotApply - extract specific type from GONetSyncableValue
                 {
                     sb.Append(indent).Append("\tvar value = customSerializer.Deserialize(bitStream_readFrom).").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    // VELOCITY-AUGMENTED SYNC FIX: Only add baseline for VALUE bundles, NOT VELOCITY bundles
+                    // When useVelocitySerializer=true, we're deserializing velocity (not delta-from-baseline)
                     if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
-                        sb.Append(indent).Append("\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                        sb.Append(indent).AppendLine("\tif (!useVelocitySerializer)");
+                        sb.Append(indent).AppendLine("\t{");
+                        sb.Append(indent).Append("\t\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                        sb.Append(indent).AppendLine("\t}");
                     }
                 }
             }
@@ -1504,3 +1544,4 @@ namespace GONet.Editor.Generation
         }
     }
 }
+ 

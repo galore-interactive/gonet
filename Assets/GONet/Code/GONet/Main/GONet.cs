@@ -9625,7 +9625,7 @@ namespace GONet
         /// Velocity-augmented sync: Tracks bundle alternation between VALUE (even) and VELOCITY (odd).
         /// Thread-safe via Interlocked.Increment.
         /// </summary>
-        private static int velocityBundleCounter = 0;
+        // NOTE: Removed velocityBundleCounter - using time-based alternation instead (see SerializeWhole_BundleOfChoice)
 
         /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
         private static void SerializeWhole_BundleOfChoice(
@@ -9655,11 +9655,13 @@ namespace GONet
             int lastIndexUsed = 0;
 
             // VELOCITY-AUGMENTED SYNC: Decide if this bundle sends velocities or values
-            // Alternate between VALUE (even) and VELOCITY (odd) bundles
-            bool isVelocityBundle = (System.Threading.Interlocked.Increment(ref velocityBundleCounter) % 2 == 0);
+            // Use time-based alternation: all bundles in same ~16ms window use same mode
+            // This ensures consistent VALUE/VELOCITY mode across all bundles sent in a frame
+            long currentTimeMs = elapsedTicksAtCapture / System.TimeSpan.TicksPerMillisecond;
+            bool isVelocityBundle = ((currentTimeMs / 16) % 2 == 0);
 
             // DIAGNOSTIC: Log bundle type
-            GONetLog.Debug($"[VelocitySync] Sending {(isVelocityBundle ? "VELOCITY" : "VALUE")} bundle (counter: {velocityBundleCounter}, {countFiltered} changes)");
+            GONetLog.Debug($"[VelocitySync] Sending {(isVelocityBundle ? "VELOCITY" : "VALUE")} bundle (time: {currentTimeMs}ms, {countFiltered} changes)");
 
             while (individualChangesCountRemaining > 0)
             {
@@ -10320,8 +10322,19 @@ namespace GONet
                                     // Get last known position
                                     var lastSnapshot = changesSupport.mostRecentChanges[0];
 
-                                    // Calculate deltaTime from last snapshot to this bundle's send time
-                                    float deltaTime = (elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
+                                    // Calculate DETERMINISTIC deltaTime based on sync settings (matching server calculation)
+                                    // This ensures client uses IDENTICAL deltaTime that server used for velocity calculation
+                                    float deltaTime;
+                                    if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
+                                    {
+                                        // FIXEDUPDATE path: deltaTime = Time.fixedDeltaTime × PhysicsUpdateInterval
+                                        deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
+                                    }
+                                    else
+                                    {
+                                        // UPDATE path: deltaTime = syncChangesEverySeconds
+                                        deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
+                                    }
 
                                     // DIAGNOSTIC: Log velocity and synthesis details
                                     if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
