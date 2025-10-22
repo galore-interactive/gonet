@@ -73,7 +73,23 @@ namespace GONet.Generation
 
         protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomSerializer> cachedCustomSerializersArrayPool =
             new ArrayPool<IGONetAutoMagicalSync_CustomSerializer>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        /// <summary>
+        /// DEPRECATED: Use cachedValueSerializers instead. This field exists for backward compatibility only.
+        /// Will be removed when all generated code is migrated to two-serializer architecture.
+        /// </summary>
         protected IGONetAutoMagicalSync_CustomSerializer[] cachedCustomSerializers;
+
+        /// <summary>
+        /// Velocity-augmented sync: Serializers initialized with VALUE quantization settings.
+        /// Used when sending/receiving VALUE packets (actual position/rotation data).
+        /// </summary>
+        protected IGONetAutoMagicalSync_CustomSerializer[] cachedValueSerializers;
+
+        /// <summary>
+        /// Velocity-augmented sync: Serializers initialized with VELOCITY quantization settings.
+        /// Used when sending/receiving VELOCITY packets (velocity/angular velocity data).
+        /// </summary>
+        protected IGONetAutoMagicalSync_CustomSerializer[] cachedVelocitySerializers;
 
         protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomValueBlending> cachedCustomValueBlendingsArrayPool =
             new ArrayPool<IGONetAutoMagicalSync_CustomValueBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
@@ -86,14 +102,15 @@ namespace GONet.Generation
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
         /// <summary>
-        /// Per-value velocity tracking: Tracks whether next sync for EACH value should be VELOCITY (true) or VALUE (false).
-        /// Alternates PER-VALUE on each sync to enable velocity-augmented sync for sub-quantization handling.
+        /// Velocity-augmented sync: Tracks sync count PER-VALUE for velocity frequency logic.
+        /// Used with VelocityFrequency to determine when to send VELOCITY vs VALUE packets.
+        /// Example: syncCounter[i] % VelocityFrequency == 0 means send VELOCITY this tick.
         /// Array indexed by singleIndex (same as valuesChangesSupport indices).
         /// </summary>
-        protected bool[] nextValueIsVelocity;
+        protected int[] syncCounter;
 
-        protected static readonly ArrayPool<bool> nextValueIsVelocityArrayPool =
-            new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
+        protected static readonly ArrayPool<int> syncCounterArrayPool =
+            new ArrayPool<int>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
         internal abstract byte CodeGenerationId { get; }
 
@@ -110,9 +127,11 @@ namespace GONet.Generation
 
             doesBaselineValueNeedAdjustingArrayPool.Return(doesBaselineValueNeedAdjusting);
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
+            cachedCustomSerializersArrayPool.Return(cachedValueSerializers);
+            cachedCustomSerializersArrayPool.Return(cachedVelocitySerializers);
             cachedCustomValueBlendingsArrayPool.Return(cachedCustomValueBlendings);
             cachedCustomVelocityBlendingsArrayPool.Return(cachedCustomVelocityBlendings);
-            nextValueIsVelocityArrayPool.Return(nextValueIsVelocity);
+            syncCounterArrayPool.Return(syncCounter);
 
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -442,16 +461,6 @@ namespace GONet.Generation
             return omega;
         }
 
-        /// <summary>
-        /// Toggles velocity state for a specific value index (VALUE → VELOCITY or VELOCITY → VALUE).
-        /// Called after serializing a velocity-capable value to alternate between value/velocity packets.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void ToggleValueVelocityState(byte singleIndex)
-        {
-            nextValueIsVelocity[singleIndex] = !nextValueIsVelocity[singleIndex];
-        }
-
         internal abstract void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value);
 
         internal abstract GONetSyncableValue GetAutoMagicalSyncValue(byte index);
@@ -491,9 +500,13 @@ namespace GONet.Generation
         }
 
         /// <summary>
-        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet
+        /// NOTE: This is only virtual to avoid upgrading customers prior to this being added having compilation issues when upgrading from a previous version of GONet.
         /// </summary>
-        internal virtual GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        /// <param name="bitStream_readFrom">The bit stream to deserialize from</param>
+        /// <param name="singleIndex">The index of the value to deserialize</param>
+        /// <param name="useVelocitySerializer">Velocity-augmented sync: If true, uses cachedVelocitySerializers; if false, uses cachedValueSerializers. Default false for backward compatibility.</param>
+        /// <returns>The deserialized value (either VALUE or VELOCITY depending on useVelocitySerializer parameter)</returns>
+        internal virtual GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, bool useVelocitySerializer = false)
         {
             // NOTE: this return here is dummy and overrides in child classes will NOT call base.DeserializeInitSingle_ReadOnlyNotApply()
             return default;

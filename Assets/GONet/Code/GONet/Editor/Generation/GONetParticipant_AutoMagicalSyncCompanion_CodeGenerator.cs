@@ -142,12 +142,14 @@ namespace GONet.Editor.Generation
             sb.Append("\t\t\tvaluesCount = ").Append(overallCount).AppendLine(";");
             sb.AppendLine("\t\t\t");
             sb.AppendLine("\t\t\tcachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine("\t\t\tcachedValueSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine("\t\t\tcachedVelocitySerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tcachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tcachedCustomVelocityBlendings = cachedCustomVelocityBlendingsArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine();
-            sb.AppendLine("\t\t\t// Per-value velocity tracking: Allocate array for velocity state per sync value");
-            sb.AppendLine("\t\t\tnextValueIsVelocity = nextValueIsVelocityArrayPool.Borrow((int)valuesCount);");
-            sb.AppendLine("\t\t\tArray.Clear(nextValueIsVelocity, 0, nextValueIsVelocity.Length); // Start with VALUE packets for all values");
+            sb.AppendLine("\t\t\t// Velocity-augmented sync: Allocate syncCounter for per-value velocity frequency tracking");
+            sb.AppendLine("\t\t\tsyncCounter = syncCounterArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine("\t\t\tArray.Clear(syncCounter, 0, syncCounter.Length); // Start at 0 for all values");
             sb.AppendLine("\t\t    ");
             sb.AppendLine("\t\t\tlastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tArray.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);");
@@ -229,7 +231,16 @@ namespace GONet.Editor.Generation
 
                     if (singleMember.attribute.CustomSerialize_Instance != null)
                     {
+                        // Initialize legacy cachedCustomSerializers for backward compatibility
                         sb.Append("\t\t\tcachedCustomSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
+
+                        // Velocity-augmented sync: Initialize VALUE serializer (same quantization as legacy for now)
+                        sb.Append("\t\t\tcachedValueSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
+
+                        // Velocity-augmented sync: Initialize VELOCITY serializer
+                        // TODO: Add separate VelocityQuantizeDownToBitCount, VelocityQuantizeLowerBound, VelocityQuantizeUpperBound to GONetAutoMagicalSyncAttribute
+                        // For now, use same quantization as VALUE (sufficient for initial implementation)
+                        sb.Append("\t\t\tcachedVelocitySerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
                         sb.AppendLine();
                     }
                     if (singleMember.attribute.CustomValueBlending_Instance != null)
@@ -452,7 +463,7 @@ namespace GONet.Editor.Generation
 
         /// <summary>
         /// Writes end of velocity-aware serialization wrapper (if needed).
-        /// Toggles per-value velocity state after serialization.
+        /// Increments syncCounter for velocity frequency tracking.
         /// </summary>
         private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync, int iOverall, bool isSerializeAll, bool wroteVelocityHeader)
         {
@@ -461,8 +472,8 @@ namespace GONet.Editor.Generation
             {
                 sb.Append(indent).AppendLine("\t}");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine("\t// Per-value velocity: Toggle state for next sync");
-                sb.Append(indent).AppendLine($"\tToggleValueVelocityState({iOverall});");
+                sb.Append(indent).AppendLine("\t// Velocity-augmented sync: Increment sync counter for frequency tracking");
+                sb.Append(indent).AppendLine($"\tsyncCounter[{iOverall}]++;");
             }
         }
 
@@ -973,8 +984,13 @@ namespace GONet.Editor.Generation
             sb.AppendLine();
             sb.AppendLine("        /// <summary>");
             sb.AppendLine("        /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).");
+            sb.AppendLine("        /// Velocity-augmented sync: Supports deserializing either VALUE or VELOCITY data based on useVelocitySerializer parameter.");
             sb.AppendLine("        /// </summary>");
-            sb.AppendLine("        internal override GONet.GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)");
+            sb.AppendLine("        /// <param name=\"bitStream_readFrom\">The bit stream to deserialize from</param>");
+            sb.AppendLine("        /// <param name=\"singleIndex\">The index of the value to deserialize</param>");
+            sb.AppendLine("        /// <param name=\"useVelocitySerializer\">If true, uses cachedVelocitySerializers; if false, uses cachedValueSerializers. Default false.</param>");
+            sb.AppendLine("        /// <returns>The deserialized value (either VALUE or VELOCITY depending on useVelocitySerializer)</returns>");
+            sb.AppendLine("        internal override GONet.GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, bool useVelocitySerializer = false)");
             sb.AppendLine("        {");
             sb.AppendLine("\t\t\tswitch (singleIndex)");
             sb.AppendLine("\t\t\t{");
@@ -1021,7 +1037,17 @@ namespace GONet.Editor.Generation
 
             if (singleMember.attribute.CustomSerialize_Instance != null)
             {
-                sb.Append(indent).AppendLine("\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
+                // Velocity-augmented sync: Use appropriate serializer array based on useVelocitySerializer parameter
+                // For backward compatibility, cachedCustomSerializers is used when not in ReadOnlyNotApply mode
+                if (readOnly)
+                {
+                    sb.Append(indent).AppendLine("\t// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)");
+                    sb.Append(indent).AppendLine("\tIGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[" + iOverall + "] : cachedValueSerializers[" + iOverall + "];");
+                }
+                else
+                {
+                    sb.Append(indent).AppendLine("\tIGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
+                }
                 if (isDeserializeAll)
                 {
                     sb.Append(indent).Append("\tvar value = customSerializer.Deserialize(bitStream_readFrom).").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");

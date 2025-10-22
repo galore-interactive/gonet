@@ -10845,6 +10845,105 @@ namespace GONet
             // (They might have been waiting for THIS participant specifically)
             ProcessDeferredSyncBundlesWaitingForGONetReady();
         }
+
+        #region Velocity-Augmented Sync Helper Methods
+
+        /// <summary>
+        /// Velocity-augmented sync: Synthesizes a new value from a previous value and velocity over deltaTime.
+        /// Used to generate intermediate positions/rotations from received velocity packets.
+        /// </summary>
+        /// <param name="lastValue">The last received VALUE (e.g., position, rotation)</param>
+        /// <param name="velocity">The received VELOCITY (e.g., linear velocity for Vector3, angular velocity as Vector3 for Quaternion)</param>
+        /// <param name="deltaTime">Time elapsed since lastValue was received (in seconds)</param>
+        /// <returns>Synthesized value: lastValue + velocity * deltaTime (appropriate for the type)</returns>
+        private static GONetSyncableValue SynthesizeValueFromVelocity(
+            GONetSyncableValue lastValue,
+            GONetSyncableValue velocity,
+            float deltaTime)
+        {
+            GONetSyncableValue result = new GONetSyncableValue();
+
+            switch (lastValue.GONetSyncType)
+            {
+                case GONetSyncableValueTypes.System_Single: // float
+                {
+                    result.System_Single = lastValue.System_Single + velocity.System_Single * deltaTime;
+                    return result;
+                }
+
+                case GONetSyncableValueTypes.UnityEngine_Vector2:
+                {
+                    result.UnityEngine_Vector2 = lastValue.UnityEngine_Vector2 + velocity.UnityEngine_Vector2 * deltaTime;
+                    return result;
+                }
+
+                case GONetSyncableValueTypes.UnityEngine_Vector3:
+                {
+                    result.UnityEngine_Vector3 = lastValue.UnityEngine_Vector3 + velocity.UnityEngine_Vector3 * deltaTime;
+                    return result;
+                }
+
+                case GONetSyncableValueTypes.UnityEngine_Vector4:
+                {
+                    result.UnityEngine_Vector4 = lastValue.UnityEngine_Vector4 + velocity.UnityEngine_Vector4 * deltaTime;
+                    return result;
+                }
+
+                case GONetSyncableValueTypes.UnityEngine_Quaternion:
+                {
+                    // Angular velocity is stored as Vector3 (axis × radians/sec)
+                    if (velocity.GONetSyncType != GONetSyncableValueTypes.UnityEngine_Vector3)
+                    {
+                        GONetLog.Error($"[VelocitySync] Quaternion synthesis requires Vector3 angular velocity, but received {velocity.GONetSyncType}");
+                        return lastValue; // Return unchanged
+                    }
+
+                    result.UnityEngine_Quaternion = RotateQuaternionByAngularVelocity(
+                        lastValue.UnityEngine_Quaternion,
+                        velocity.UnityEngine_Vector3, // Angular velocity as Vector3
+                        deltaTime);
+                    return result;
+                }
+
+                default:
+                    GONetLog.Warning($"[VelocitySync] Velocity synthesis not implemented for type {lastValue.GONetSyncType}. Returning lastValue unchanged.");
+                    return lastValue;
+            }
+        }
+
+        /// <summary>
+        /// Velocity-augmented sync: Rotates a quaternion by angular velocity over deltaTime.
+        /// Angular velocity is represented as Vector3: axis (normalized direction) × magnitude (radians/sec).
+        /// </summary>
+        /// <param name="current">Current rotation</param>
+        /// <param name="angularVelocity">Angular velocity as Vector3 (axis × radians/sec)</param>
+        /// <param name="deltaTime">Time elapsed (in seconds)</param>
+        /// <returns>New rotation after applying angular velocity</returns>
+        private static UnityEngine.Quaternion RotateQuaternionByAngularVelocity(
+            UnityEngine.Quaternion current,
+            UnityEngine.Vector3 angularVelocity,
+            float deltaTime)
+        {
+            // Calculate total rotation angle in radians
+            float angle = angularVelocity.magnitude * deltaTime;
+
+            // Early exit if rotation is negligible (avoid division by zero on normalize)
+            if (angle < 0.0001f)
+            {
+                return current;
+            }
+
+            // Extract rotation axis
+            UnityEngine.Vector3 axis = angularVelocity.normalized;
+
+            // Create delta rotation quaternion (Unity's AngleAxis expects degrees)
+            UnityEngine.Quaternion deltaRot = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);
+
+            // Apply delta rotation: deltaRot * current (order matters for quaternions!)
+            return (deltaRot * current).normalized;
+        }
+
+        #endregion
     }
 
     [Serializable]
