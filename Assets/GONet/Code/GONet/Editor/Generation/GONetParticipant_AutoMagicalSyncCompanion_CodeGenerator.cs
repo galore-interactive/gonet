@@ -465,7 +465,6 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
             sb.Append(indent).AppendLine("\t\t// VALUE packet: Serialize position normally");
-            sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized position data");
             sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
             sb.Append(indent).AppendLine("\t\tGONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] VALUE packet: serializing position data\");");
             sb.Append(indent).AppendLine("#endif");
