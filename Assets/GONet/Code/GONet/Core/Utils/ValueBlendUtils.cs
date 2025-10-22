@@ -150,6 +150,17 @@ namespace GONet.Utils
             { GONetSyncableValueTypes.UnityEngine_Vector3, new DefaultVelocityBlending_Vector3() }
         };
 
+        /// <summary>
+        /// Gets the default velocity blending implementation for the specified GONetSyncableValueTypes.
+        /// Returns null if no default velocity blending exists for this type.
+        /// </summary>
+        public static IGONetAutoMagicalSync_CustomVelocityBlending GetDefaultVelocityBlending(GONetSyncableValueTypes valueType)
+        {
+            IGONetAutoMagicalSync_CustomVelocityBlending blending;
+            defaultVelocityBlendings_byValueType.TryGetValue(valueType, out blending);
+            return blending; // Returns null if not found
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static float GetQuadraticBezierValue(float p0, float p1, float p2, float t)
         {

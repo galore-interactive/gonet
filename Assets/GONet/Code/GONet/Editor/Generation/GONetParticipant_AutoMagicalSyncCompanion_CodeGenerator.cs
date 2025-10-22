@@ -143,6 +143,7 @@ namespace GONet.Editor.Generation
             sb.AppendLine("\t\t\t");
             sb.AppendLine("\t\t\tcachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tcachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine("\t\t\tcachedCustomVelocityBlendings = cachedCustomVelocityBlendingsArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t    ");
             sb.AppendLine("\t\t\tlastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tArray.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);");
@@ -231,6 +232,14 @@ namespace GONet.Editor.Generation
                     {
                         sb.Append("\t\t\tcachedCustomValueBlendings[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<").Append(singleMember.attribute.CustomValueBlending_Instance.GetType().FullName.Replace("+", ".")).AppendLine(">();");
                     }
+
+                    // Velocity blending: Populate with default implementations from ValueBlendUtils
+                    // Only for velocity-capable types (float, Vector2/3/4, Quaternion) that use value blending
+                    if (singleMember.attribute.ShouldBlendBetweenValuesReceived && IsVelocityCapableType(singleMember.memberTypeFullName))
+                    {
+                        sb.Append("\t\t\tcachedCustomVelocityBlendings[").Append(iOverall).AppendLine("] = GONet.Utils.ValueBlendUtils.GetDefaultVelocityBlending(support" + iOverall + ".GONetSyncType);");
+                    }
+
                     if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
                     {
                         sb.Append("            int support").Append(iOverall).Append("_mostRecentChanges_calcdSize = support").Append(iOverall).Append(".syncAttribute_SyncChangesEverySeconds != 0 ? (int)((GONetMain.valueBlendingBufferLeadSeconds / support").Append(iOverall).AppendLine(".syncAttribute_SyncChangesEverySeconds) * 2.5f) : 0;");
