@@ -92,6 +92,14 @@ namespace GONet.Generation
         /// </summary>
         protected bool nextBundleIsVelocity = false;
 
+        /// <summary>
+        /// Tracks whether any velocity-synced values were actually serialized in the current bundle.
+        /// Used to determine if bundle type toggle should occur.
+        /// CRITICAL: Must only toggle when values are actually serialized, otherwise physics sync frequency
+        /// gating (PhysicsUpdateInterval) causes empty VELOCITY packets to be sent.
+        /// </summary>
+        protected bool didSerializeAnyVelocitySyncedValuesThisBundle = false;
+
         internal abstract byte CodeGenerationId { get; }
 
         internal GONetParticipant_AutoMagicalSyncCompanion_Generated(GONetParticipant gonetParticipant)

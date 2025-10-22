@@ -334,6 +334,9 @@ namespace GONet.Editor.Generation
             sb.AppendLine("        /// </summary>");
             sb.AppendLine("        internal override void SerializeAll(Utils.BitByBitByteArrayBuilder bitStream_appendTo)");
             sb.AppendLine("        {");
+            sb.AppendLine("            // Velocity-augmented sync: Reset flag for this bundle");
+            sb.AppendLine("            didSerializeAnyVelocitySyncedValuesThisBundle = false;");
+            sb.AppendLine();
             sb.AppendLine("            // Velocity-augmented sync: Write bundle type bit (0 = VALUE, 1 = VELOCITY)");
             sb.AppendLine("            bitStream_appendTo.WriteBit(nextBundleIsVelocity);");
             sb.AppendLine();
@@ -341,8 +344,12 @@ namespace GONet.Editor.Generation
             WriteSerializationBody(true);
 
             sb.AppendLine();
-            sb.AppendLine("            // Velocity-augmented sync: Toggle for next bundle");
-            sb.AppendLine("            ToggleBundleType();");
+            sb.AppendLine("            // Velocity-augmented sync: Toggle ONLY if velocity-synced values were actually serialized");
+            sb.AppendLine("            // CRITICAL: Prevents empty VELOCITY packets when PhysicsUpdateInterval > 1 gates physics values");
+            sb.AppendLine("            if (didSerializeAnyVelocitySyncedValuesThisBundle)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                ToggleBundleType();");
+            sb.AppendLine("            }");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -424,6 +431,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\tif (nextBundleIsVelocity)");
                 sb.Append(indent).AppendLine("\t{");
                 sb.Append(indent).AppendLine("\t\t// VELOCITY packet: Calculate and serialize velocity");
+                sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized velocity data");
                 sb.Append(indent).AppendLine($"\t\tvar currentValue = {valueExpression};");
                 sb.Append(indent).AppendLine($"\t\tvar velocity = CalculateVelocity({iOverall}, currentValue, GONetMain.Time.ElapsedTicks);");
                 return true;
@@ -440,6 +448,7 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
             sb.Append(indent).AppendLine("\t\t// VALUE packet: Serialize position normally");
+            sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized position data");
         }
 
         /// <summary>
