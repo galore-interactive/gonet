@@ -733,6 +733,15 @@ namespace GONet.Editor.Generation
 
         private void WriteDeserializeAllBody()
         {
+            // Velocity-augmented sync: Read bundle type bit (0 = VALUE, 1 = VELOCITY)
+            sb.AppendLine("            bool isVelocityBundle;");
+            sb.AppendLine("            bitStream_readFrom.ReadBit(out isVelocityBundle);");
+            sb.AppendLine();
+            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] DeserializeInitAll: Received bundleType={(isVelocityBundle ? \\\"VELOCITY\\\" : \\\"VALUE\\\")}\");");
+            sb.AppendLine("#endif");
+            sb.AppendLine();
+
             int iOverall = 0;
             int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
             for (int iSingle = 0; iSingle < singleCount; ++iSingle)
@@ -752,12 +761,176 @@ namespace GONet.Editor.Generation
                     GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
 
                     sb.Append("\t\t\t{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
-                    WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t", true);
+
+                    // Check if this value uses velocity sync
+                    bool usesVelocitySync = singleMember.attribute.ShouldBlendBetweenValuesReceived &&
+                                           IsVelocityCapableType(singleMember.memberTypeFullName);
+
+                    if (usesVelocitySync)
+                    {
+                        // Velocity-augmented sync: Branch on bundle type
+                        WriteVelocityDeserializationLogic(iOverall, single, singleMember, "\t\t\t");
+                    }
+                    else
+                    {
+                        // Non-velocity values: Deserialize normally
+                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t", true);
+                    }
+
                     sb.AppendLine("\t\t\t}");
 
                     ++iOverall;
                 }
             }
+        }
+
+        /// <summary>
+        /// Generates velocity-aware deserialization logic for a single value.
+        /// Branches on isVelocityBundle:
+        /// - VELOCITY: Deserialize velocity, synthesize position from velocity
+        /// - VALUE: Deserialize position normally
+        /// </summary>
+        private void WriteVelocityDeserializationLogic(int iOverall, GONetParticipant_ComponentsWithAutoSyncMembers_Single single, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent)
+        {
+            string memberTypeFullName = singleMember.memberTypeFullName;
+            string memberTypeReplaced = memberTypeFullName.Replace(".", "_");
+
+            sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
+            sb.Append(indent).AppendLine("\t{");
+            sb.Append(indent).AppendLine("\t\t// VELOCITY packet: Deserialize velocity and synthesize position");
+            sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] DeserializeInitAll[{iOverall}]: Deserializing VELOCITY data\");");
+            sb.Append(indent).AppendLine("#endif");
+
+            // Deserialize velocity
+            if (memberTypeFullName == typeof(float).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tfloat velocity;");
+                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadFloat(out velocity);");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 velocity;");
+                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector2(out velocity);");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 velocity;");
+                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector3(out velocity);");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                // Angular velocity stored as Vector3 (axis × speed)
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity;");
+                sb.Append(indent).AppendLine("\t\tbitStream_readFrom.ReadVector3(out angularVelocity);");
+            }
+
+            sb.AppendLine();
+
+            // Get previous value and synthesize new position from velocity
+            sb.Append(indent).AppendLine($"\t\t// Get previous value to synthesize from");
+            sb.Append(indent).AppendLine($"\t\tGONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[{iOverall}];");
+            sb.Append(indent).AppendLine($"\t\tint mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_usedSize - 1;");
+            sb.AppendLine();
+
+            if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                // Quaternion: Synthesize using angular velocity integration
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion synthesizedValue;");
+                sb.Append(indent).AppendLine("\t\tif (mostRecentChangesIndex >= 0 && valueChangeSupport.mostRecentChanges_usedSize > 0)");
+                sb.Append(indent).AppendLine("\t\t{");
+                sb.Append(indent).AppendLine("\t\t\tPluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
+                sb.Append(indent).AppendLine("\t\t\tlong deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
+                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                sb.AppendLine();
+                sb.Append(indent).AppendLine("\t\t\t// Integrate angular velocity: q_new = q_old * exp(omega * dt / 2)");
+                sb.Append(indent).AppendLine("\t\t\tfloat angle = angularVelocity.magnitude * deltaTimeSeconds;");
+                sb.Append(indent).AppendLine("\t\t\tif (angle > 1e-6f)");
+                sb.Append(indent).AppendLine("\t\t\t{");
+                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Vector3 axis = angularVelocity.normalized;");
+                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Quaternion deltaRotation = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);");
+                sb.Append(indent).AppendLine("\t\t\t\tsynthesizedValue = previousSnapshot.numericValue.UnityEngine_Quaternion * deltaRotation;");
+                sb.Append(indent).AppendLine("\t\t\t}");
+                sb.Append(indent).AppendLine("\t\t\telse");
+                sb.Append(indent).AppendLine("\t\t\t{");
+                sb.Append(indent).AppendLine("\t\t\t\tsynthesizedValue = previousSnapshot.numericValue.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t\t\t}");
+                sb.Append(indent).AppendLine("\t\t}");
+                sb.Append(indent).AppendLine("\t\telse");
+                sb.Append(indent).AppendLine("\t\t{");
+                sb.Append(indent).AppendLine("\t\t\t// No previous value, use current as-is");
+                sb.Append(indent).AppendLine($"\t\t\tsynthesizedValue = {single.componentTypeName}.{singleMember.memberName};");
+                sb.Append(indent).AppendLine("\t\t}");
+            }
+            else
+            {
+                // Scalar/Vector types: synthesizedValue = previousValue + velocity × deltaTime
+                sb.Append(indent).AppendLine($"\t\t{memberTypeFullName} synthesizedValue;");
+                sb.Append(indent).AppendLine("\t\tif (mostRecentChangesIndex >= 0 && valueChangeSupport.mostRecentChanges_usedSize > 0)");
+                sb.Append(indent).AppendLine("\t\t{");
+                sb.Append(indent).AppendLine("\t\t\tPluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
+                sb.Append(indent).AppendLine("\t\t\tlong deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
+                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                sb.AppendLine();
+                sb.Append(indent).AppendLine($"\t\t\t// Synthesize: position = previousPosition + velocity × deltaTime");
+                sb.Append(indent).AppendLine($"\t\t\tsynthesizedValue = previousSnapshot.numericValue.{memberTypeReplaced} + velocity * deltaTimeSeconds;");
+                sb.Append(indent).AppendLine("\t\t}");
+                sb.Append(indent).AppendLine("\t\telse");
+                sb.Append(indent).AppendLine("\t\t{");
+                sb.Append(indent).AppendLine("\t\t\t// No previous value, use current as-is (first packet)");
+                sb.Append(indent).AppendLine($"\t\t\tsynthesizedValue = {single.componentTypeName}.{singleMember.memberName};");
+                sb.Append(indent).AppendLine("\t\t}");
+            }
+
+            sb.AppendLine();
+            sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] DeserializeInitAll[{iOverall}]: angularVelocity={{angularVelocity}}, synthesizedRotation={{synthesizedValue}}\");");
+            }
+            else
+            {
+                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] DeserializeInitAll[{iOverall}]: velocity={{velocity}}, synthesizedValue={{synthesizedValue}}\");");
+            }
+            sb.Append(indent).AppendLine("#endif");
+            sb.AppendLine();
+
+            // Create snapshot with velocity data and add to queue
+            sb.Append(indent).AppendLine("\t\t// Create snapshot with velocity data (wasSynthesizedFromVelocity=true)");
+            if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValue, angularVelocity);");
+            }
+            else
+            {
+                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValue, velocity);");
+            }
+            sb.Append(indent).AppendLine($"\t\tvalueChangeSupport.AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, snapshot);");
+            sb.AppendLine();
+
+            // Apply synthesized value to component
+            sb.Append(indent).AppendLine("\t\t// Apply synthesized value to component");
+            if (singleMember.animatorControllerParameterId == 0)
+            {
+                sb.Append(indent).Append("\t\t").Append(single.componentTypeName).Append(".").Append(singleMember.memberName).AppendLine(" = synthesizedValue;");
+            }
+            else
+            {
+                sb.Append(indent).Append("\t\t").Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).AppendLine(", synthesizedValue);");
+            }
+
+            sb.Append(indent).AppendLine("\t}");
+            sb.Append(indent).AppendLine("\telse");
+            sb.Append(indent).AppendLine("\t{");
+            sb.Append(indent).AppendLine("\t\t// VALUE packet: Deserialize position normally");
+            sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
+            sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] DeserializeInitAll[{iOverall}]: Deserializing VALUE data (normal position)\");");
+            sb.Append(indent).AppendLine("#endif");
+
+            // VALUE packet: Normal deserialization
+            WriteDeserializeSingle(iOverall, single, singleMember, indent + "\t", true);
+
+            sb.Append(indent).AppendLine("\t}");
         }
 
         private void WriteInitSingle()
