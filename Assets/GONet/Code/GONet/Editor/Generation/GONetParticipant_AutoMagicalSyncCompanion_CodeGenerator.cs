@@ -237,7 +237,7 @@ namespace GONet.Editor.Generation
                     // Only for velocity-capable types (float, Vector2/3/4, Quaternion) that use value blending
                     if (singleMember.attribute.ShouldBlendBetweenValuesReceived && IsVelocityCapableType(singleMember.memberTypeFullName))
                     {
-                        sb.Append("\t\t\tcachedCustomVelocityBlendings[").Append(iOverall).AppendLine("] = GONet.Utils.ValueBlendUtils.GetDefaultVelocityBlending(support" + iOverall + ".GONetSyncType);");
+                        sb.Append("\t\t\tcachedCustomVelocityBlendings[").Append(iOverall).AppendLine("] = GONet.Utils.ValueBlendUtils.GetDefaultVelocityBlending(support" + iOverall + ".lastKnownValue.GONetSyncType);");
                     }
 
                     if (singleMember.attribute.ShouldBlendBetweenValuesReceived)
