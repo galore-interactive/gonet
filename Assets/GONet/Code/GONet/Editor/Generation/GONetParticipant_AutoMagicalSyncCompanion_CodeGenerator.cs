@@ -250,10 +250,12 @@ namespace GONet.Editor.Generation
                         // Velocity-augmented sync: Initialize VALUE serializer (same quantization as legacy for now)
                         sb.Append("\t\t\tcachedValueSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
 
-                        // Velocity-augmented sync: Initialize VELOCITY serializer
-                        // TODO: Add separate VelocityQuantizeDownToBitCount, VelocityQuantizeLowerBound, VelocityQuantizeUpperBound to GONetAutoMagicalSyncAttribute
-                        // For now, use same quantization as VALUE (sufficient for initial implementation)
-                        sb.Append("\t\t\tcachedVelocitySerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
+                        // Velocity-augmented sync: Initialize VELOCITY serializer with velocity-specific quantization settings
+                        // Use VelocityQuantize* fields instead of regular Quantize* fields
+                        string velBitCount = singleMember.attribute.VelocityQuantizeDownToBitCount.ToString();
+                        string velLowerBound = singleMember.attribute.VelocityQuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
+                        string velUpperBound = singleMember.attribute.VelocityQuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
+                        sb.Append("\t\t\tcachedVelocitySerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(velBitCount).Append(", ").Append(velLowerBound).Append(", ").Append(velUpperBound).AppendLine(");");
                         sb.AppendLine();
                     }
                     if (singleMember.attribute.CustomValueBlending_Instance != null)
