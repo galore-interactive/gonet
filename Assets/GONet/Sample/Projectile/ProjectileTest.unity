@@ -464,7 +464,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isTickReceiver: 0
-  projectilPrefab: {fileID: 1420838009900293917, guid: 296a736c5d07aac40bac772034430131,
+  projectilPrefab_zeroSync: {fileID: 1420838009900293917, guid: 296a736c5d07aac40bac772034430131,
+    type: 3}
+  projectilPrefab: {fileID: 1420838009900293917, guid: cd34a05f71977084dad77778edeb26a3,
     type: 3}
 --- !u!1 &800405512
 GameObject:

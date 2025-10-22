@@ -600,7 +600,7 @@ namespace GONet.Editor.Generation
                     {
                         sb.Append(indent).AppendLine("\t\t// Angular velocity (omega) serialization for Quaternion");
                         sb.Append(indent).AppendLine("\t\t// velocity is Vector3 (axis * radians/sec), serialize using Vector3Serializer");
-                        sb.Append(indent).AppendLine("\t\tvar vector3Serializer = new GONet.Vector3Serializer();");
+                        sb.Append(indent).AppendLine("\t\tvar vector3Serializer = new PluginAPI.Vector3Serializer();");
                         sb.Append(indent).AppendLine("\t\t// TODO: Use velocity quantization settings instead of position settings");
                         sb.Append(indent).AppendLine("\t\tvector3Serializer.Serialize(bitStream_appendTo, gonetParticipant, velocity.UnityEngine_Vector3);");
                     }
@@ -826,7 +826,7 @@ namespace GONet.Editor.Generation
                 // For Quaternion rotation, angular velocity is Vector3, so we need Vector3 serializer
                 sb.Append(indent).AppendLine($"\t\t// Angular velocity uses Vector3 serializer (not Quaternion)");
                 sb.Append(indent).AppendLine($"\t\t// Create temporary Vector3 serializer for angular velocity");
-                sb.Append(indent).AppendLine($"\t\tvar vector3Serializer = new GONet.Utils.Vector3Serializer(GONet.Utils.QuantizerSettingsGroup.Default_Vector3);");
+                sb.Append(indent).AppendLine($"\t\tvar vector3Serializer = new PluginAPI.Vector3Serializer();");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = vector3Serializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
             }
 

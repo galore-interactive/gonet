@@ -21,7 +21,9 @@ using UnityEngine;
 
 public class ProjectileSpawner : GONetBehaviour
 {
-    public GONetParticipant projectilPrefab;
+    [SerializeField] private GONetParticipant projectilPrefab_zeroSync;
+    [SerializeField] private GONetParticipant projectilPrefab;
+
     private readonly List<Projectile> projectiles = new(100);
     private readonly List<GONetParticipant> addressableParticipants = new(100); // For Physics Cube Projectiles (no Projectile component)
     private float lastCheckTime = 0f;
@@ -49,8 +51,10 @@ public class ProjectileSpawner : GONetBehaviour
     /// PERFORMANCE OPTIMIZATION: Initialize centralized event subscription on first projectile spawn.
     /// This replaces per-projectile subscriptions (N subscriptions) with a single subscription + dispatch pattern.
     /// </summary>
-    private void Start()
+    protected override void Start()
     {
+        base.Start();
+
         // Subscribe once to ALL transform position sync events
         // Filter: Only process events from local authority (not remote) for ANY projectile
         centralizedTransformSubscription = GONetMain.EventBus.Subscribe(
@@ -60,8 +64,10 @@ public class ProjectileSpawner : GONetBehaviour
         );
     }
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
+     
         // Clean up centralized subscription
         centralizedTransformSubscription?.Dispose();
     }
@@ -157,7 +163,7 @@ public class ProjectileSpawner : GONetBehaviour
     private void Update()
     {
         // INPUT HANDLING: Doesn't depend on GONet initialization, safe to run in Update()
-        if (GONetMain.IsClient && projectilPrefab != null)
+        if (GONetMain.IsClient && projectilPrefab_zeroSync != null)
         {
             #region check keys and touches states
             bool shouldInstantiateBasedOnInput = Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.B);
@@ -203,14 +209,15 @@ public class ProjectileSpawner : GONetBehaviour
 
                     GONetParticipant gnp = default;
                     bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 0.5f;
+                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.5f;
                     if (shouldClientOwn)
                     {
-                        gnp = Instantiate(projectilPrefab, transform.position, spreadRotation);
+                        gnp = Instantiate(shouldBeZeroSync ? projectilPrefab_zeroSync : projectilPrefab, transform.position, spreadRotation);
                     }
                     else
                     {
                         // Spawn using batch-aware API (now delegates internally to Try version with limbo fallback)
-                        gnp = GONetMain.Client_InstantiateToBeRemotelyControlledByMe(projectilPrefab, transform.position, spreadRotation);
+                        gnp = GONetMain.Client_InstantiateToBeRemotelyControlledByMe(shouldBeZeroSync ? projectilPrefab_zeroSync : projectilPrefab, transform.position, spreadRotation);
                     }
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
                 }
