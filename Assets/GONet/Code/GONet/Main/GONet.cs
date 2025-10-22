@@ -9770,6 +9770,19 @@ namespace GONet
                 if (withinRangeChanges.Count > 0)
                 {
                     GONetLog.Debug($"[VelocitySync] Sending VELOCITY bundle ({withinRangeChanges.Count} values, time: {currentTimeMs}ms)");
+
+                    // QUANTITATIVE DIAGNOSTIC: Log exact position and velocity being sent
+                    foreach (var change in withinRangeChanges)
+                    {
+                        if (change.lastKnownValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                        {
+                            GONetLog.Debug($"[VelocitySync][SERVER-SEND][{change.syncCompanion.gonetParticipant.GONetId}][idx:{change.index}] " +
+                                          $"currentPosition: {change.lastKnownValue.UnityEngine_Vector3}, " +
+                                          $"velocity: {(change.lastKnownValue.UnityEngine_Vector3 - change.lastKnownValue_previous.UnityEngine_Vector3) / ((elapsedTicksAtCapture - change.mostRecentChanges[0].elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond)}, " +
+                                          $"time: {currentTimeMs}ms");
+                        }
+                    }
+
                     SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
                 }
 
@@ -10524,22 +10537,23 @@ namespace GONet
                                         deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
                                     }
 
-                                    // DIAGNOSTIC: Log velocity and synthesis details
-                                    if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
-                                    {
-                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VELOCITY bundle - velocity: {velocityValue.UnityEngine_Vector3}, lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, deltaTime: {deltaTime:F4}s");
-                                    }
-
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
                                         lastSnapshot.numericValue,
                                         velocityValue,
                                         deltaTime);
 
-                                    // DIAGNOSTIC: Log synthesized position
-                                    if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                                    // QUANTITATIVE DIAGNOSTIC: Log received velocity, synthesis formula, and result
+                                    if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
                                     {
-                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] Synthesized position: {synthesizedValue.UnityEngine_Vector3}");
+                                        Vector3 expected = lastSnapshot.numericValue.UnityEngine_Vector3 + velocityValue.UnityEngine_Vector3 * deltaTime;
+                                        GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VEL][{gonetParticipant.GONetId}][idx:{index}] " +
+                                                      $"receivedVelocity: {velocityValue.UnityEngine_Vector3}, " +
+                                                      $"lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, " +
+                                                      $"deltaTime: {deltaTime:F4}s, " +
+                                                      $"synthesized: {synthesizedValue.UnityEngine_Vector3}, " +
+                                                      $"expected: {expected}, " +
+                                                      $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                     }
 
                                     // Store synthesized position as snapshot
@@ -10596,12 +10610,17 @@ namespace GONet
                                             changesSupport.lastReceivedVelocity,
                                             deltaTime);
 
-                                        // DIAGNOSTIC: Log that we're synthesizing instead of using received VALUE
+                                        // QUANTITATIVE DIAGNOSTIC: Compare received VALUE vs synthesized (anti-jitter)
                                         if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
                                         {
-                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - SYNTHESIZING from velocity " +
-                                                          $"(received: {receivedValue.UnityEngine_Vector3}, synthesized: {synthesizedValue.UnityEngine_Vector3}, " +
-                                                          $"velocity age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms)");
+                                            Vector3 diff = synthesizedValue.UnityEngine_Vector3 - receivedValue.UnityEngine_Vector3;
+                                            float diffMag = diff.magnitude;
+                                            GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VAL][{gonetParticipant.GONetId}][idx:{index}] " +
+                                                          $"receivedVALUE: {receivedValue.UnityEngine_Vector3}, " +
+                                                          $"synthesizedFromVelocity: {synthesizedValue.UnityEngine_Vector3}, " +
+                                                          $"diff: {diff}, diffMag: {diffMag:F4}, " +
+                                                          $"velocityAge: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms, " +
+                                                          $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                         }
 
                                         // Apply synthesized value instead of received VALUE
