@@ -139,6 +139,17 @@ namespace GONet.Utils
             { GONetSyncableValueTypes.UnityEngine_Vector3, new GONetDefaultValueBlending_Vector3() }
         };
 
+        /// <summary>
+        /// Default velocity-aware value blending implementations.
+        /// Used when velocity data is detected in value buffer (alternating value/velocity packets).
+        /// </summary>
+        static readonly Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomVelocityBlending> defaultVelocityBlendings_byValueType = new Dictionary<GONetSyncableValueTypes, IGONetAutoMagicalSync_CustomVelocityBlending>(8)
+        {
+            { GONetSyncableValueTypes.System_Single, new DefaultVelocityBlending_Float() },
+            { GONetSyncableValueTypes.UnityEngine_Quaternion, new DefaultVelocityBlending_Quaternion() },
+            { GONetSyncableValueTypes.UnityEngine_Vector3, new DefaultVelocityBlending_Vector3() }
+        };
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static float GetQuadraticBezierValue(float p0, float p1, float p2, float t)
         {

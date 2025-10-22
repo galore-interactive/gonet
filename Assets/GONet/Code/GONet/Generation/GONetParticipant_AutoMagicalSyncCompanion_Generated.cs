@@ -613,13 +613,43 @@ namespace GONet.Generation
         }
 
         internal bool TryGetBlendedValue(
-            byte index, 
-            NumericValueChangeSnapshot[] valueBuffer, 
-            int valueCount, 
-            long atElapsedTicks, 
+            byte index,
+            NumericValueChangeSnapshot[] valueBuffer,
+            int valueCount,
+            long atElapsedTicks,
             out GONetSyncableValue blendedValue,
             out bool didExtrapolatePastMostRecentChanges)
         {
+            // Check if velocity-aware blending should be used
+            bool hasVelocityData = false;
+            if (valueCount > 0)
+            {
+                // Check most recent snapshot for velocity data
+                NumericValueChangeSnapshot mostRecent = valueBuffer[valueCount - 1];
+                hasVelocityData = mostRecent.wasSynthesizedFromVelocity ||
+                                  mostRecent.velocity.GONetSyncType != GONetSyncableValueTypes.None;
+            }
+
+            // Use velocity blending if available and velocity data exists
+            if (hasVelocityData)
+            {
+                IGONetAutoMagicalSync_CustomVelocityBlending customVelocityBlending = cachedCustomVelocityBlendings[index];
+                if (customVelocityBlending != null)
+                {
+                    // Use velocity-aware extrapolation
+                    blendedValue = customVelocityBlending.ExtrapolateWithVelocityContext(
+                        valueBuffer,
+                        valueCount,
+                        atElapsedTicks,
+                        gonetParticipant);
+
+                    // Velocity extrapolation always extrapolates (uses velocity data)
+                    didExtrapolatePastMostRecentChanges = true;
+                    return true;
+                }
+            }
+
+            // Fall back to standard value blending
             IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
             //GONetLog.Debug($"grease null blender? {(customValueBlending == null)} @ index: {index}");
             if (customValueBlending != null)
