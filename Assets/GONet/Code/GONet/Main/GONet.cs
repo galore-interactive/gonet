@@ -10947,31 +10947,31 @@ namespace GONet
             GONetSyncableValue velocity,
             float deltaTime)
         {
-            GONetSyncableValue result = new GONetSyncableValue();
+            GONetSyncableValue result;
 
             switch (lastValue.GONetSyncType)
             {
                 case GONetSyncableValueTypes.System_Single: // float
                 {
-                    result.System_Single = lastValue.System_Single + velocity.System_Single * deltaTime;
+                    result = new GONetSyncableValue { System_Single = lastValue.System_Single + velocity.System_Single * deltaTime };
                     return result;
                 }
 
                 case GONetSyncableValueTypes.UnityEngine_Vector2:
                 {
-                    result.UnityEngine_Vector2 = lastValue.UnityEngine_Vector2 + velocity.UnityEngine_Vector2 * deltaTime;
+                    result = new GONetSyncableValue { UnityEngine_Vector2 = lastValue.UnityEngine_Vector2 + velocity.UnityEngine_Vector2 * deltaTime };
                     return result;
                 }
 
                 case GONetSyncableValueTypes.UnityEngine_Vector3:
                 {
-                    result.UnityEngine_Vector3 = lastValue.UnityEngine_Vector3 + velocity.UnityEngine_Vector3 * deltaTime;
+                    result = new GONetSyncableValue { UnityEngine_Vector3 = lastValue.UnityEngine_Vector3 + velocity.UnityEngine_Vector3 * deltaTime };
                     return result;
                 }
 
                 case GONetSyncableValueTypes.UnityEngine_Vector4:
                 {
-                    result.UnityEngine_Vector4 = lastValue.UnityEngine_Vector4 + velocity.UnityEngine_Vector4 * deltaTime;
+                    result = new GONetSyncableValue { UnityEngine_Vector4 = lastValue.UnityEngine_Vector4 + velocity.UnityEngine_Vector4 * deltaTime };
                     return result;
                 }
 
@@ -10984,10 +10984,13 @@ namespace GONet
                         return lastValue; // Return unchanged
                     }
 
-                    result.UnityEngine_Quaternion = RotateQuaternionByAngularVelocity(
-                        lastValue.UnityEngine_Quaternion,
-                        velocity.UnityEngine_Vector3, // Angular velocity as Vector3
-                        deltaTime);
+                    result = new GONetSyncableValue
+                    {
+                        UnityEngine_Quaternion = RotateQuaternionByAngularVelocity(
+                            lastValue.UnityEngine_Quaternion,
+                            velocity.UnityEngine_Vector3, // Angular velocity as Vector3
+                            deltaTime)
+                    };
                     return result;
                 }
 
