@@ -209,6 +209,16 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_ShouldBlendBetweenValuesReceived = ").Append(singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false").AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_PhysicsUpdateInterval = ").Append(singleMember.attribute.PhysicsUpdateInterval).AppendLine(";");
 
+                    // VELOCITY-AUGMENTED SYNC: Initialize velocity tracking fields
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".isVelocityEligible = ").Append(singleMember.attribute.IsVelocityEligible ? "true" : "false").AppendLine(";");
+                    string velocityLowerBound = singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
+                    string velocityUpperBound = singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBound).AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBound).AppendLine(";");
+                    // Store member type as enum for velocity calculations
+                    string memberTypeEnum = singleMember.memberTypeFullName.Replace(".", "_");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".codeGenerationMemberType = GONetSyncableValueTypes.").Append(memberTypeEnum).AppendLine(";");
+
                     // Check if this is Transform.position or Transform.rotation - needs special ShouldSkipSync handling
                     bool isTransformPosition = single.componentTypeFullName == "UnityEngine.Transform" && singleMember.memberName == "position";
                     bool isTransformRotation = single.componentTypeFullName == "UnityEngine.Transform" && singleMember.memberName == "rotation";

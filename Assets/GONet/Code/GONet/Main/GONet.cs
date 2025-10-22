@@ -7533,6 +7533,11 @@ namespace GONet
             /// Only used for physics sync (Rigidbody position/rotation when IsRigidBodyOwnerOnlyControlled=true).
             /// </summary>
             internal int syncAttribute_PhysicsUpdateInterval;
+            /// <summary>
+            /// Type of this syncable value (Vector3, Quaternion, float, etc.).
+            /// Used for type-specific velocity calculations and range checking.
+            /// </summary>
+            internal GONetSyncableValueTypes codeGenerationMemberType;
             #endregion
 
             /// <summary>
@@ -7587,6 +7592,45 @@ namespace GONet
             /// Only applies to physics objects (IsRigidBodyOwnerOnlyControlled=true) on non-authority clients.
             /// </summary>
             internal bool hasAwaitingAtRest_needsPhysicsSnap;
+
+            #region VELOCITY-AUGMENTED SYNC: Velocity tracking and expiration
+            /// <summary>
+            /// True if this value is eligible for velocity-augmented sync (Vector3, Quaternion, etc.).
+            /// Set during initialization based on sync attribute configuration.
+            /// </summary>
+            internal bool isVelocityEligible;
+
+            /// <summary>
+            /// Velocity quantization lower bound from sync attribute.
+            /// Used for range checking before sending VELOCITY bundles.
+            /// </summary>
+            internal float syncAttribute_VelocityQuantizeLowerBound;
+
+            /// <summary>
+            /// Velocity quantization upper bound from sync attribute.
+            /// Used for range checking before sending VELOCITY bundles.
+            /// </summary>
+            internal float syncAttribute_VelocityQuantizeUpperBound;
+
+            /// <summary>
+            /// Last received velocity value from VELOCITY bundle.
+            /// Used for synthesis when VALUE bundles arrive.
+            /// </summary>
+            internal GONetSyncableValue lastReceivedVelocity;
+
+            /// <summary>
+            /// Timestamp when last velocity was received (in ticks).
+            /// Used for time-based expiration.
+            /// </summary>
+            internal long lastVelocityTimestamp;
+
+            /// <summary>
+            /// Velocity expiration duration in milliseconds.
+            /// After this duration without VELOCITY bundle, stop synthesizing and use VALUE directly.
+            /// Default: 100ms (~6 frames at 60fps)
+            /// </summary>
+            internal const long VELOCITY_VALID_DURATION_MS = 100;
+            #endregion
 
             /// <summary>
             /// DO NOT USE THIS.
@@ -9654,14 +9698,73 @@ namespace GONet
 
             int lastIndexUsed = 0;
 
-            // VELOCITY-AUGMENTED SYNC: Decide if this bundle sends velocities or values
-            // Use time-based alternation: all bundles in same ~16ms window use same mode
-            // This ensures consistent VALUE/VELOCITY mode across all bundles sent in a frame
+            // VELOCITY-AUGMENTED SYNC: Decide if this is a VELOCITY frame (time-based alternation)
             long currentTimeMs = elapsedTicksAtCapture / System.TimeSpan.TicksPerMillisecond;
-            bool isVelocityBundle = ((currentTimeMs / 16) % 2 == 0);
+            bool isVelocityFrame = ((currentTimeMs / 16) % 2 == 0);
 
-            // DIAGNOSTIC: Log bundle type
-            GONetLog.Debug($"[VelocitySync] Sending {(isVelocityBundle ? "VELOCITY" : "VALUE")} bundle (time: {currentTimeMs}ms, {countFiltered} changes)");
+            if (isVelocityFrame)
+            {
+                // VELOCITY FRAME: Partition changes by velocity magnitude
+                // - Values within range → VELOCITY bundle (jitter elimination)
+                // - Values exceeding range → VALUE bundle (fallback)
+                // Result: Send up to TWO bundles this frame
+
+                List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> withinRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
+                List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> outOfRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
+
+                // Partition changes based on velocity eligibility and range
+                for (int i = 0; i < countTotal; ++i)
+                {
+                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
+                    if (!ShouldSendChange(change, filterUsingOwnerAuthorityId))
+                    {
+                        continue; // Skip filtered changes
+                    }
+
+                    // Check if this value is velocity-eligible
+                    bool isVelocityEligible = change.syncCompanion.valuesChangesSupport[change.index].isVelocityEligible;
+
+                    if (isVelocityEligible)
+                    {
+                        // Check if velocity fits in quantization range
+                        bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
+
+                        if (velocityWithinRange)
+                        {
+                            withinRangeChanges.Add(change);
+                        }
+                        else
+                        {
+                            outOfRangeChanges.Add(change);
+                        }
+                    }
+                    else
+                    {
+                        // Non-velocity-eligible values always go in VALUE bundle
+                        outOfRangeChanges.Add(change);
+                    }
+                }
+
+                // Send VELOCITY bundle for values within range
+                if (withinRangeChanges.Count > 0)
+                {
+                    GONetLog.Debug($"[VelocitySync] Sending VELOCITY bundle ({withinRangeChanges.Count} values, time: {currentTimeMs}ms)");
+                    SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
+                }
+
+                // Send VALUE bundle for values out of range (and non-velocity-eligible)
+                if (outOfRangeChanges.Count > 0)
+                {
+                    GONetLog.Debug($"[VelocitySync] Sending VALUE bundle ({outOfRangeChanges.Count} values, time: {currentTimeMs}ms)");
+                    SerializeWhole_BundleOfChoice_Internal(outOfRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
+                }
+
+                return; // Done with VELOCITY frame
+            }
+
+            // VALUE FRAME: Send all changes as VALUE bundle (normal alternation)
+            GONetLog.Debug($"[VelocitySync] Sending VALUE bundle (VALUE frame, {countFiltered} changes, time: {currentTimeMs}ms)");
+            bool isVelocityBundle = false;
 
             while (individualChangesCountRemaining > 0)
             {
@@ -9680,6 +9783,65 @@ namespace GONet
                     // body
                     int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed, isVelocityBundle);
                     
+                    if (changesInBundleCount > 0)
+                    {
+                        bitStream.WriteCurrentPartialByte();
+
+                        var byteCount = bitStream.Length_WrittenBytes;
+                        bundleFragments.fragmentBytesUsedCount[bundleFragments.fragmentCount] = byteCount;
+                        byte[] bytes = byteArrayPool.Borrow(byteCount);
+                        Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, byteCount);
+                        bundleFragments.fragmentBytes[bundleFragments.fragmentCount] = bytes;
+
+                        individualChangesCountRemaining -= changesInBundleCount;
+                        bundleFragments.fragmentCount++;
+                    }
+                    else
+                    {
+                        if (individualChangesCountRemaining > 0)
+                        {
+                            GONetLog.Warning("Why mismatch in remaining expected versus actual.  This could be serious!");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Internal helper for serializing a bundle with specified changes and velocity mode.
+        /// Used by SerializeWhole_BundleOfChoice to send separate VELOCITY and VALUE bundles on VELOCITY frames.
+        /// </summary>
+        private static void SerializeWhole_BundleOfChoice_Internal(
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes,
+            ArrayPool<byte> byteArrayPool,
+            ushort filterUsingOwnerAuthorityId,
+            long elapsedTicksAtCapture,
+            Type chosenBundleType,
+            bool isVelocityBundle,
+            ref WholeBundleOfChoiceFragments bundleFragments)
+        {
+            int countTotal = changes.Count;
+            int individualChangesCountRemaining = countTotal;
+            int lastIndexUsed = 0;
+
+            while (individualChangesCountRemaining > 0)
+            {
+                using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
+                {
+                    { // header...just message type/id...well, and now time...and velocity flag
+                        uint messageID = messageTypeToMessageIDMap[chosenBundleType];
+                        bitStream.WriteUInt(messageID);
+
+                        bitStream.WriteLong(elapsedTicksAtCapture);
+
+                        // VELOCITY-AUGMENTED SYNC: Write velocity bit (ONE bit for entire bundle)
+                        bitStream.WriteBit(isVelocityBundle);
+                    }
+
+                    // body
+                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed, isVelocityBundle);
+
                     if (changesInBundleCount > 0)
                     {
                         bitStream.WriteCurrentPartialByte();

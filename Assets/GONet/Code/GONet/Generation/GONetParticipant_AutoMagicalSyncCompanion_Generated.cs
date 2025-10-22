@@ -482,6 +482,80 @@ namespace GONet.Generation
         }
 
         /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Checks if the calculated velocity for a value fits within its quantization range.
+        /// Used to decide if value should be sent in VELOCITY bundle or fallback to VALUE bundle.
+        /// </summary>
+        internal bool IsVelocityWithinQuantizationRange(byte valueIndex)
+        {
+            var changesSupport = valuesChangesSupport[valueIndex];
+
+            // Non-velocity-eligible values always return false
+            if (!changesSupport.isVelocityEligible)
+            {
+                return false;
+            }
+
+            // Check if we have enough snapshots to calculate velocity
+            if (changesSupport.mostRecentChangesCount < 2)
+            {
+                return false; // Not enough data yet
+            }
+
+            // Get velocity quantization bounds from sync attribute
+            float lowerBound = changesSupport.syncAttribute_VelocityQuantizeLowerBound;
+            float upperBound = changesSupport.syncAttribute_VelocityQuantizeUpperBound;
+
+            // Calculate velocity from last two snapshots
+            var current = changesSupport.mostRecentChanges[0].numericValue;
+            var previous = changesSupport.mostRecentChanges[1].numericValue;
+
+            // Get deterministic deltaTime (matches code generator calculation)
+            float deltaTime;
+            if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
+            {
+                deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
+            }
+            else
+            {
+                deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
+            }
+
+            if (deltaTime <= 0.0001f)
+            {
+                return false; // Avoid division by zero
+            }
+
+            // Calculate velocity based on value type
+            switch (changesSupport.codeGenerationMemberType)
+            {
+                case GONetSyncableValueTypes.UnityEngine_Vector3:
+                    {
+                        var velocity = (current.UnityEngine_Vector3 - previous.UnityEngine_Vector3) / deltaTime;
+                        // Check each component
+                        return velocity.x >= lowerBound && velocity.x <= upperBound &&
+                               velocity.y >= lowerBound && velocity.y <= upperBound &&
+                               velocity.z >= lowerBound && velocity.z <= upperBound;
+                    }
+
+                case GONetSyncableValueTypes.UnityEngine_Quaternion:
+                    {
+                        // For quaternions, check angular velocity magnitude
+                        // TODO: Implement proper angular velocity check if needed
+                        return true; // For now, assume quaternions always fit (rotation is typically slow)
+                    }
+
+                case GONetSyncableValueTypes.System_Single:
+                    {
+                        var velocity = (current.System_Single - previous.System_Single) / deltaTime;
+                        return velocity >= lowerBound && velocity <= upperBound;
+                    }
+
+                default:
+                    return false; // Unknown type, use VALUE bundle
+            }
+        }
+
+        /// <summary>
         /// Deserializes all values from <paramref name="bitStream_readFrom"/> and uses them to modify appropriate member variables internally.
         /// Oops.  Just kidding....it's ALMOST all values.  The exception being <see cref="GONetParticipant.GONetId"/> because that has to be processed first separately in order
         /// to know which <see cref="GONetParticipant"/> we are working with in order to call this method.
