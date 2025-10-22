@@ -86,19 +86,14 @@ namespace GONet.Generation
         protected static readonly ConcurrentDictionary<Thread, byte[]> valueDeserializeByteArrayByThreadMap = new ConcurrentDictionary<Thread, byte[]>(5, 5);
 
         /// <summary>
-        /// Tracks whether next sync bundle should be a VELOCITY packet (true) or VALUE packet (false).
-        /// Alternates on each sync to enable velocity-augmented sync for sub-quantization handling.
-        /// Only used when velocity blending is enabled for at least one value.
+        /// Per-value velocity tracking: Tracks whether next sync for EACH value should be VELOCITY (true) or VALUE (false).
+        /// Alternates PER-VALUE on each sync to enable velocity-augmented sync for sub-quantization handling.
+        /// Array indexed by singleIndex (same as valuesChangesSupport indices).
         /// </summary>
-        protected bool nextBundleIsVelocity = false;
+        protected bool[] nextValueIsVelocity;
 
-        /// <summary>
-        /// Tracks whether any velocity-synced values were actually serialized in the current bundle.
-        /// Used to determine if bundle type toggle should occur.
-        /// CRITICAL: Must only toggle when values are actually serialized, otherwise physics sync frequency
-        /// gating (PhysicsUpdateInterval) causes empty VELOCITY packets to be sent.
-        /// </summary>
-        protected bool didSerializeAnyVelocitySyncedValuesThisBundle = false;
+        protected static readonly ArrayPool<bool> nextValueIsVelocityArrayPool =
+            new ArrayPool<bool>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);
 
         internal abstract byte CodeGenerationId { get; }
 
@@ -117,6 +112,7 @@ namespace GONet.Generation
             cachedCustomSerializersArrayPool.Return(cachedCustomSerializers);
             cachedCustomValueBlendingsArrayPool.Return(cachedCustomValueBlendings);
             cachedCustomVelocityBlendingsArrayPool.Return(cachedCustomVelocityBlendings);
+            nextValueIsVelocityArrayPool.Return(nextValueIsVelocity);
 
             for (int i = 0; i < valuesCount; ++i)
             {
@@ -447,12 +443,13 @@ namespace GONet.Generation
         }
 
         /// <summary>
-        /// Toggles bundle type and returns whether next bundle should be velocity (true) or position (false).
-        /// Called after each serialization to alternate between value/velocity packets.
+        /// Toggles velocity state for a specific value index (VALUE → VELOCITY or VELOCITY → VALUE).
+        /// Called after serializing a velocity-capable value to alternate between value/velocity packets.
         /// </summary>
-        protected void ToggleBundleType()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void ToggleValueVelocityState(byte singleIndex)
         {
-            nextBundleIsVelocity = !nextBundleIsVelocity;
+            nextValueIsVelocity[singleIndex] = !nextValueIsVelocity[singleIndex];
         }
 
         internal abstract void SetAutoMagicalSyncValue(byte index, GONetSyncableValue value);

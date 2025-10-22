@@ -144,6 +144,10 @@ namespace GONet.Editor.Generation
             sb.AppendLine("\t\t\tcachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tcachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tcachedCustomVelocityBlendings = cachedCustomVelocityBlendingsArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine();
+            sb.AppendLine("\t\t\t// Per-value velocity tracking: Allocate array for velocity state per sync value");
+            sb.AppendLine("\t\t\tnextValueIsVelocity = nextValueIsVelocityArrayPool.Borrow((int)valuesCount);");
+            sb.AppendLine("\t\t\tArray.Clear(nextValueIsVelocity, 0, nextValueIsVelocity.Length); // Start with VALUE packets for all values");
             sb.AppendLine("\t\t    ");
             sb.AppendLine("\t\t\tlastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);");
             sb.AppendLine("\t\t\tArray.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);");
@@ -343,35 +347,14 @@ namespace GONet.Editor.Generation
             sb.AppendLine("        /// </summary>");
             sb.AppendLine("        internal override void SerializeAll(Utils.BitByBitByteArrayBuilder bitStream_appendTo)");
             sb.AppendLine("        {");
-            sb.AppendLine("            // Velocity-augmented sync: Reset flag for this bundle");
-            sb.AppendLine("            didSerializeAnyVelocitySyncedValuesThisBundle = false;");
-            sb.AppendLine();
-            sb.AppendLine("            // Velocity-augmented sync: Write bundle type bit (0 = VALUE, 1 = VELOCITY)");
-            sb.AppendLine("            bitStream_appendTo.WriteBit(nextBundleIsVelocity);");
-            sb.AppendLine();
+            sb.AppendLine("            // SerializeAll is INIT ONLY - always send VALUES (no velocity data during initial sync)");
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: bundleType={(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: INIT sync (always VALUE packets)\");");
             sb.AppendLine("#endif");
             sb.AppendLine();
 
             WriteSerializationBody(true);
 
-            sb.AppendLine();
-            sb.AppendLine("            // Velocity-augmented sync: Toggle ONLY if velocity-synced values were actually serialized");
-            sb.AppendLine("            // CRITICAL: Prevents empty VELOCITY packets when PhysicsUpdateInterval > 1 gates physics values");
-            sb.AppendLine("            if (didSerializeAnyVelocitySyncedValuesThisBundle)");
-            sb.AppendLine("            {");
-            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: Toggling (had velocity-synced values) {(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")} → {(!nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
-            sb.AppendLine("#endif");
-            sb.AppendLine("                ToggleBundleType();");
-            sb.AppendLine("            }");
-            sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine("            else");
-            sb.AppendLine("            {");
-            sb.AppendLine("                GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] SerializeAll: NOT toggling (no velocity-synced values serialized), keeping {(nextBundleIsVelocity ? \"VELOCITY\" : \"VALUE\")}\");");
-            sb.AppendLine("            }");
-            sb.AppendLine("#endif");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -416,7 +399,7 @@ namespace GONet.Editor.Generation
                     }
 
                     sb.Append(isSerializeAll ? "\t\t\t" : "\t\t\t\t").Append("{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
-                    WriteSingleSerialization(iOverall, single, singleMember, isSerializeAll ? "\t\t\t" : "\t\t\t\t");
+                    WriteSingleSerialization(iOverall, single, singleMember, isSerializeAll ? "\t\t\t" : "\t\t\t\t", isSerializeAll);
                     sb.Append(isSerializeAll ? "\t\t\t" : "\t\t\t\t").AppendLine("}");
 
                     if (!isSerializeAll)
@@ -446,18 +429,27 @@ namespace GONet.Editor.Generation
         /// Writes beginning of velocity-aware serialization wrapper (if needed).
         /// Returns true if wrapper was written (velocity sync enabled), false otherwise.
         /// </summary>
-        private bool WriteVelocitySerializationHeader(int iOverall, string indent, bool usesVelocitySync, string valueExpression)
+        private bool WriteVelocitySerializationHeader(int iOverall, string indent, bool usesVelocitySync, string valueExpression, bool isSerializeAll)
         {
             if (usesVelocitySync)
             {
-                sb.Append(indent).AppendLine("\tif (nextBundleIsVelocity)");
+                if (isSerializeAll)
+                {
+                    // SerializeAll: NO velocity logic (always VALUE packets during INIT)
+                    return false;
+                }
+
+                // SerializeSingle: Write per-value velocity bit and check state
+                sb.Append(indent).AppendLine("\t// Per-value velocity: Write velocity bit (0 = VALUE, 1 = VELOCITY)");
+                sb.Append(indent).AppendLine($"\tbitStream_appendTo.WriteBit(nextValueIsVelocity[{iOverall}]);");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\tif (nextValueIsVelocity[{iOverall}])");
                 sb.Append(indent).AppendLine("\t{");
                 sb.Append(indent).AppendLine("\t\t// VELOCITY packet: Calculate and serialize velocity");
-                sb.Append(indent).AppendLine("\t\tdidSerializeAnyVelocitySyncedValuesThisBundle = true; // Track that we serialized velocity data");
                 sb.Append(indent).AppendLine($"\t\tvar currentValue = {valueExpression};");
                 sb.Append(indent).AppendLine($"\t\tvar velocity = CalculateVelocity({iOverall}, currentValue, GONetMain.Time.ElapsedTicks);");
                 sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] VELOCITY packet: value[{iOverall}]={{currentValue}}, velocity={{velocity}}\");");
+                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] VELOCITY packet[{iOverall}]: value={{currentValue}}, velocity={{velocity}}\");");
                 sb.Append(indent).AppendLine("#endif");
                 return true;
             }
@@ -481,16 +473,20 @@ namespace GONet.Editor.Generation
 
         /// <summary>
         /// Writes end of velocity-aware serialization wrapper (if needed).
+        /// Toggles per-value velocity state after serialization.
         /// </summary>
-        private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync)
+        private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync, int iOverall, bool isSerializeAll)
         {
-            if (usesVelocitySync)
+            if (usesVelocitySync && !isSerializeAll)
             {
                 sb.Append(indent).AppendLine("\t}");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine("\t// Per-value velocity: Toggle state for next sync");
+                sb.Append(indent).AppendLine($"\tToggleValueVelocityState({iOverall});");
             }
         }
 
-        private void WriteSingleSerialization(int iOverall, GONetParticipant_ComponentsWithAutoSyncMembers_Single single, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent)
+        private void WriteSingleSerialization(int iOverall, GONetParticipant_ComponentsWithAutoSyncMembers_Single single, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent, bool isSerializeAll)
         {
             string memberTypeFullName = singleMember.memberTypeFullName;
             string valueExpression = singleMember.animatorControllerParameterId == 0
@@ -531,7 +527,7 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
             {
-                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression);
+                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression, isSerializeAll);
 
                 if (wroteVelocityHeader)
                 {
@@ -561,7 +557,7 @@ namespace GONet.Editor.Generation
                     sb.Append(valueIndent).Append("bitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
                 }
 
-                WriteVelocitySerializationFooter(indent, usesVelocitySync);
+                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll);
             }
             else if (memberTypeFullName == typeof(long).FullName)
             {
@@ -596,7 +592,7 @@ namespace GONet.Editor.Generation
             {
                 sb.Append(indent).AppendLine("\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
 
-                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression);
+                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression, isSerializeAll);
 
                 if (wroteVelocityHeader)
                 {
@@ -640,7 +636,7 @@ namespace GONet.Editor.Generation
                     sb.Append(valueIndent).Append("customSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
                 }
 
-                WriteVelocitySerializationFooter(indent, usesVelocitySync);
+                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll);
             }
         }
 
@@ -738,12 +734,9 @@ namespace GONet.Editor.Generation
 
         private void WriteDeserializeAllBody()
         {
-            // Velocity-augmented sync: Read bundle type bit (0 = VALUE, 1 = VELOCITY)
-            sb.AppendLine("            bool isVelocityBundle;");
-            sb.AppendLine("            bitStream_readFrom.ReadBit(out isVelocityBundle);");
-            sb.AppendLine();
+            // DeserializeInitAll: INIT sync - always receives VALUE packets (no velocity data)
             sb.AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] DeserializeInitAll: Received bundleType={(isVelocityBundle ? \"VELOCITY\" : \"VALUE\")}\");");
+            sb.AppendLine("            GONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] DeserializeInitAll: INIT sync (always VALUE packets)\");");
             sb.AppendLine("#endif");
             sb.AppendLine();
 
@@ -767,20 +760,8 @@ namespace GONet.Editor.Generation
 
                     sb.Append("\t\t\t{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
 
-                    // Check if this value uses velocity sync
-                    bool usesVelocitySync = singleMember.attribute.ShouldBlendBetweenValuesReceived &&
-                                           IsVelocityCapableType(singleMember.memberTypeFullName);
-
-                    if (usesVelocitySync)
-                    {
-                        // Velocity-augmented sync: Branch on bundle type
-                        WriteVelocityDeserializationLogic(iOverall, single, singleMember, "\t\t\t");
-                    }
-                    else
-                    {
-                        // Non-velocity values: Deserialize normally
-                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t", true);
-                    }
+                    // DeserializeInitAll: Always deserialize VALUES (no velocity during INIT sync)
+                    WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t", true);
 
                     sb.AppendLine("\t\t\t}");
 
@@ -1041,8 +1022,40 @@ namespace GONet.Editor.Generation
 
                     sb.Append("\t\t\t\tcase ").Append(iOverall).AppendLine(":");
                     sb.Append("\t\t\t\t{ // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
-                    WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t", false, readOnly);
-                    sb.AppendLine("\t\t\t\t\treturn value;");
+
+                    // Check if this value uses velocity sync
+                    bool usesVelocitySync = singleMember.attribute.ShouldBlendBetweenValuesReceived &&
+                                           IsVelocityCapableType(singleMember.memberTypeFullName);
+
+                    if (usesVelocitySync && !readOnly)
+                    {
+                        // Per-value velocity: Read velocity bit and branch
+                        sb.AppendLine("\t\t\t\t\t// Per-value velocity: Read velocity bit (0 = VALUE, 1 = VELOCITY)");
+                        sb.AppendLine("\t\t\t\t\tbool isVelocityValue;");
+                        sb.AppendLine("\t\t\t\t\tbitStream_readFrom.ReadBit(out isVelocityValue);");
+                        sb.AppendLine();
+                        sb.AppendLine("\t\t\t\t\tif (isVelocityValue)");
+                        sb.AppendLine("\t\t\t\t\t{");
+
+                        // Generate velocity deserialization logic
+                        WriteVelocityDeserializationLogic(iOverall, single, singleMember, "\t\t\t\t\t");
+
+                        sb.AppendLine("\t\t\t\t\t\treturn value;");
+                        sb.AppendLine("\t\t\t\t\t}");
+                        sb.AppendLine("\t\t\t\t\telse");
+                        sb.AppendLine("\t\t\t\t\t{");
+                        sb.AppendLine("\t\t\t\t\t\t// VALUE packet: Deserialize normally");
+                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t\t\t", false, readOnly);
+                        sb.AppendLine("\t\t\t\t\t\treturn value;");
+                        sb.AppendLine("\t\t\t\t\t}");
+                    }
+                    else
+                    {
+                        // Non-velocity or read-only: Deserialize normally
+                        WriteDeserializeSingle(iOverall, single, singleMember, "\t\t\t\t", false, readOnly);
+                        sb.AppendLine("\t\t\t\t\treturn value;");
+                    }
+
                     sb.AppendLine("\t\t\t\t}");
 
                     ++iOverall;
