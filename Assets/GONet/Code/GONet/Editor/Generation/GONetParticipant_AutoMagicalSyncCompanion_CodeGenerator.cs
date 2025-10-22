@@ -899,11 +899,18 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\t\t// Create snapshot with velocity data (wasSynthesizedFromVelocity=true)");
             if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValue, angularVelocity);");
+                // For Quaternion: velocity is Vector3 (angular velocity), but CreateFromVelocityPacket expects matching types
+                // We need to pass Quaternion for both value and "velocity" (store angular velocity separately)
+                sb.Append(indent).AppendLine($"\t\t// NOTE: For Quaternion, velocity is stored as Vector3 angular velocity in snapshot.velocity");
+                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue synthesizedValueWrapped = synthesizedValue;");
+                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue angularVelocityWrapped = angularVelocity;");
+                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, angularVelocityWrapped);");
             }
             else
             {
-                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValue, velocity);");
+                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue synthesizedValueWrapped = synthesizedValue;");
+                sb.Append(indent).AppendLine($"\t\tGONetSyncableValue velocityWrapped = velocity;");
+                sb.Append(indent).AppendLine($"\t\tvar snapshot = PluginAPI.NumericValueChangeSnapshot.CreateFromVelocityPacket(assumedElapsedTicksAtChange, synthesizedValueWrapped, velocityWrapped);");
             }
             sb.Append(indent).AppendLine($"\t\tvalueChangeSupport.AddToMostRecentChangeQueue_IfAppropriate(assumedElapsedTicksAtChange, snapshot);");
             sb.AppendLine();

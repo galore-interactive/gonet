@@ -118,7 +118,12 @@ namespace GONet.PluginAPI
                 synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
             {
                 // Validate velocity type matches position type
-                if (velocityValue.GONetSyncType != synthesizedValue.GONetSyncType)
+                // EXCEPTION: Quaternion uses Vector3 for angular velocity (axis × speed)
+                bool isValidVelocityType = velocityValue.GONetSyncType == synthesizedValue.GONetSyncType ||
+                                          (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion &&
+                                           velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3);
+
+                if (!isValidVelocityType)
                 {
                     throw new ArgumentException($"Velocity type ({velocityValue.GONetSyncType}) must match position type ({synthesizedValue.GONetSyncType})");
                 }
