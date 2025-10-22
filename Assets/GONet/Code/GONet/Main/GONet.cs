@@ -9729,8 +9729,8 @@ namespace GONet
                         // Check if velocity fits in quantization range
                         bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
 
-                        // DIAGNOSTIC: Log first few failures to understand WHY velocity doesn't fit
-                        if (!velocityWithinRange && withinRangeChanges.Count + outOfRangeChanges.Count < 5)
+                        // DIAGNOSTIC: Log when velocity is out of range (limit to first 3 per frame)
+                        if (!velocityWithinRange && (withinRangeChanges.Count + outOfRangeChanges.Count) < 3)
                         {
                             var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
                             GONetLog.Debug($"[VelocitySync][PARTITION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
@@ -9753,6 +9753,9 @@ namespace GONet
                         outOfRangeChanges.Add(change);
                     }
                 }
+                // DIAGNOSTIC: Log partition results
+                GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total)");
+
 
                 // Send VELOCITY bundle for values within range
                 if (withinRangeChanges.Count > 0)
