@@ -209,7 +209,7 @@ public class ProjectileSpawner : GONetBehaviour
 
                     GONetParticipant gnp = default;
                     bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 0.5f;
-                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.5f;
+                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.0f;
                     if (shouldClientOwn)
                     {
                         gnp = Instantiate(shouldBeZeroSync ? projectilPrefab_zeroSync : projectilPrefab, transform.position, spreadRotation);

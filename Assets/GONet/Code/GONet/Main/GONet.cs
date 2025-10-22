@@ -7627,9 +7627,13 @@ namespace GONet
             /// <summary>
             /// Velocity expiration duration in milliseconds.
             /// After this duration without VELOCITY bundle, stop synthesizing and use VALUE directly.
-            /// Default: 100ms (~6 frames at 60fps)
+            /// Increased from 100ms → 200ms to tolerate:
+            /// - Server snapshot accumulation delay (~80-120ms for 2+ snapshots at 24Hz)
+            /// - Network jitter and packet loss
+            /// - Late-joiner synchronization delays
+            /// Default: 200ms (~12 frames at 60fps)
             /// </summary>
-            internal const long VELOCITY_VALID_DURATION_MS = 100;
+            internal const long VELOCITY_VALID_DURATION_MS = 200;
             #endregion
 
             /// <summary>

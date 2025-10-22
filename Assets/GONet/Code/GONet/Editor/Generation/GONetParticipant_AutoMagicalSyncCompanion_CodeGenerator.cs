@@ -215,6 +215,9 @@ namespace GONet.Editor.Generation
                     string velocityUpperBound = singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBound).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBound).AppendLine(";");
+                    // Initialize lastVelocityTimestamp to current time to prevent false "EXPIRED" on first VALUE bundle
+                    // (uninitialized = 0 → age = currentTime - 0 = HUGE → immediate expiration)
+                    sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastVelocityTimestamp = GONet.GONetMain.Time.ElapsedTicks;");
                     // Store member type as enum for velocity calculations
                     string memberTypeEnum = singleMember.memberTypeFullName.Replace(".", "_");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".codeGenerationMemberType = GONetSyncableValueTypes.").Append(memberTypeEnum).AppendLine(";");
