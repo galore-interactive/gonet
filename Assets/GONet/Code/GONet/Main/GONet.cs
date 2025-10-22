@@ -10477,6 +10477,11 @@ namespace GONet
                                 GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
 
                                 var changesSupport = syncCompanion.valuesChangesSupport[index];
+
+                                // CRITICAL: Store velocity and timestamp for future VALUE bundle synthesis
+                                changesSupport.lastReceivedVelocity = velocityValue;
+                                changesSupport.lastVelocityTimestamp = Time.ElapsedTicks;
+
                                 int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
 
                                 if (recentChangesCount >= 1)
@@ -10529,9 +10534,75 @@ namespace GONet
                             }
                             else
                             {
-                                // VALUE BUNDLE: Deserialize and apply normally
-                                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - deserializing position directly");
-                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
+                                // VALUE BUNDLE: Check if we should synthesize from velocity or use received VALUE
+                                var changesSupport = syncCompanion.valuesChangesSupport[index];
+
+                                // Check if velocity is still valid (time-based expiration)
+                                long currentTicks = Time.ElapsedTicks;
+                                long velocityAgeTicks = currentTicks - changesSupport.lastVelocityTimestamp;
+                                long velocityValidDurationTicks = AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS * TimeSpan.TicksPerMillisecond;
+                                bool hasRecentVelocity = (velocityAgeTicks < velocityValidDurationTicks) && changesSupport.isVelocityEligible;
+
+                                if (hasRecentVelocity)
+                                {
+                                    // SYNTHESIZE from last received velocity to avoid ping-ponging with quantized VALUE
+                                    // This is the key to eliminating jitter: we ignore the quantized VALUE and keep
+                                    // synthesizing smooth positions from velocity until velocity expires
+
+                                    // Read VALUE from bitstream but DON'T apply it (keep bitstream in sync)
+                                    GONetSyncableValue receivedValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, false);
+
+                                    int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
+                                    if (recentChangesCount >= 1)
+                                    {
+                                        // Get last known position
+                                        var lastSnapshot = changesSupport.mostRecentChanges[0];
+
+                                        // Calculate DETERMINISTIC deltaTime (matching server and VELOCITY bundle path)
+                                        float deltaTime;
+                                        if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
+                                        {
+                                            deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
+                                        }
+                                        else
+                                        {
+                                            deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
+                                        }
+
+                                        // Synthesize position from last received velocity (ignore received VALUE)
+                                        GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
+                                            lastSnapshot.numericValue,
+                                            changesSupport.lastReceivedVelocity,
+                                            deltaTime);
+
+                                        // DIAGNOSTIC: Log that we're synthesizing instead of using received VALUE
+                                        if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
+                                        {
+                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - SYNTHESIZING from velocity " +
+                                                          $"(received: {receivedValue.UnityEngine_Vector3}, synthesized: {synthesizedValue.UnityEngine_Vector3}, " +
+                                                          $"velocity age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms)");
+                                        }
+
+                                        // Apply synthesized value instead of received VALUE
+                                        syncCompanion.InitSingle(synthesizedValue, index, elapsedTicksAtSend);
+                                    }
+                                    else
+                                    {
+                                        // No previous snapshot - use received VALUE as fallback
+                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - no snapshot, using received VALUE");
+                                        syncCompanion.InitSingle(receivedValue, index, elapsedTicksAtSend);
+                                    }
+                                }
+                                else
+                                {
+                                    // Velocity expired or not eligible - use received VALUE directly
+                                    if (changesSupport.isVelocityEligible)
+                                    {
+                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - velocity EXPIRED " +
+                                                      $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms), using received VALUE");
+                                    }
+                                    syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
+                                }
                             }
 
                             AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
