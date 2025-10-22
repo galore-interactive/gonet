@@ -28,6 +28,7 @@ MonoBehaviour:
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   PhysicsUpdateInterval: 3
+  IsVelocityEligible: 1
   SyncValueTypeSerializerOverrides:
   - ValueType: 12
     CustomSerializerType:
