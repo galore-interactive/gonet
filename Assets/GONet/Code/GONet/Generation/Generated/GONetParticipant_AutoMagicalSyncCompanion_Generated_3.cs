@@ -83,12 +83,14 @@ namespace GONet.Generation
 			valuesCount = 10;
 			
 			cachedCustomSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedValueSerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
+			cachedVelocitySerializers = cachedCustomSerializersArrayPool.Borrow((int)valuesCount);
 			cachedCustomValueBlendings = cachedCustomValueBlendingsArrayPool.Borrow((int)valuesCount);
 			cachedCustomVelocityBlendings = cachedCustomVelocityBlendingsArrayPool.Borrow((int)valuesCount);
 
-			// Per-value velocity tracking: Allocate array for velocity state per sync value
-			nextValueIsVelocity = nextValueIsVelocityArrayPool.Borrow((int)valuesCount);
-			Array.Clear(nextValueIsVelocity, 0, nextValueIsVelocity.Length); // Start with VALUE packets for all values
+			// Velocity-augmented sync: Allocate syncCounter for per-value velocity frequency tracking
+			syncCounter = syncCounterArrayPool.Borrow((int)valuesCount);
+			Array.Clear(syncCounter, 0, syncCounter.Length); // Start at 0 for all values
 		    
 			lastKnownValueChangesSinceLastCheck = lastKnownValuesChangedArrayPool.Borrow((int)valuesCount);
 			Array.Clear(lastKnownValueChangesSinceLastCheck, 0, lastKnownValueChangesSinceLastCheck.Length);
@@ -126,6 +128,8 @@ namespace GONet.Generation
 			support0.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
 			cachedCustomSerializers[0] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedValueSerializers[0] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedVelocitySerializers[0] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.GONetParticipant.GONetId_InitialAssignment_CustomSerializer>(0, -1.701412E+38f, 1.701412E+38f);
 
 
 			var support1 = valuesChangesSupport[1] = valueChangeSupportArrayPool.Borrow();
@@ -300,6 +304,8 @@ namespace GONet.Generation
 			support8.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-1.701412E+38f, 1.701412E+38f, 0, true);
 
 			cachedCustomSerializers[8] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedValueSerializers[8] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
+			cachedVelocitySerializers[8] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.QuaternionSerializer>(0, -1.701412E+38f, 1.701412E+38f);
 
 			cachedCustomValueBlendings[8] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetValueBlending_Quaternion_ExtrapolateWithLowPassSmoothingFilter>();
 			cachedCustomVelocityBlendings[8] = GONet.Utils.ValueBlendUtils.GetDefaultVelocityBlending(support8.lastKnownValue.GONetSyncType);
@@ -328,6 +334,8 @@ namespace GONet.Generation
 			support9.syncAttribute_QuantizerSettingsGroup = new GONet.Utils.QuantizerSettingsGroup(-125f, 125f, 18, true);
 
 			cachedCustomSerializers[9] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedValueSerializers[9] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
+			cachedVelocitySerializers[9] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<GONet.Vector3Serializer>(18, -125f, 125f);
 
 			cachedCustomValueBlendings[9] = GONetAutoMagicalSyncAttribute.GetCustomValueBlending<GONet.PluginAPI.GONetValueBlending_Vector3_HermiteSpline>();
 			cachedCustomVelocityBlendings[9] = GONet.Utils.ValueBlendUtils.GetDefaultVelocityBlending(support9.lastKnownValue.GONetSyncType);
@@ -457,7 +465,7 @@ namespace GONet.Generation
 			}
         }
 
-        internal override void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex)
+        internal override void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, bool isVelocityBundle = false)
         {
 			switch (singleIndex)
 			{
@@ -511,39 +519,148 @@ namespace GONet.Generation
 
 				case 7:
 				{ // CircularMotion.NettyWorkedFloat
-					bitStream_appendTo.WriteFloat(CircularMotion.NettyWorkedFloat);
+					if (isVelocityBundle)
+					{
+						// VELOCITY BUNDLE: Calculate velocity from last two snapshots
+						var changesSupport = valuesChangesSupport[7];
+						int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
+						GONetSyncableValue velocityValue;
+						
+						if (recentChangesCount >= 2)
+						{
+							var current = changesSupport.mostRecentChanges[0];
+							var previous = changesSupport.mostRecentChanges[1];
+							float deltaTime = (current.elapsedTicksAtChange - previous.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
+						
+							if (deltaTime > 0.0001f)
+							{
+								float currentValue = current.numericValue.System_Single;
+								float previousValue = previous.numericValue.System_Single;
+								velocityValue = new GONetSyncableValue();
+								velocityValue.System_Single = (currentValue - previousValue) / deltaTime;
+							}
+							else
+							{
+								// Delta time too small, use zero velocity
+								velocityValue = new GONetSyncableValue();
+							}
+						}
+						else
+						{
+							// Not enough snapshots, use zero velocity
+							velocityValue = new GONetSyncableValue();
+						}
+						
+						// Serialize velocity using velocity serializer
+						cachedVelocitySerializers[7].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);
 					}
-				
-					// Per-value velocity: Toggle state for next sync
-					ToggleValueVelocityState(7);
+					else
+					{
+						// VALUE BUNDLE: Serialize position normally
+						bitStream_appendTo.WriteFloat(CircularMotion.NettyWorkedFloat);
+					}
 				}
 				break;
 
 				case 8:
 				{ // Transform.rotation
 					    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[8];
-					customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
+					if (isVelocityBundle)
+					{
+						// VELOCITY BUNDLE: Calculate velocity from last two snapshots
+						var changesSupport = valuesChangesSupport[8];
+						int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
+						GONetSyncableValue velocityValue;
+						
+						if (recentChangesCount >= 2)
+						{
+							var current = changesSupport.mostRecentChanges[0];
+							var previous = changesSupport.mostRecentChanges[1];
+							float deltaTime = (current.elapsedTicksAtChange - previous.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
+						
+							if (deltaTime > 0.0001f)
+							{
+								// Angular velocity for Quaternion (stored as Vector3)
+								UnityEngine.Quaternion currentValue = current.numericValue.UnityEngine_Quaternion;
+								UnityEngine.Quaternion previousValue = previous.numericValue.UnityEngine_Quaternion;
+								UnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);
+								deltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);
+								UnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;
+								velocityValue = new GONetSyncableValue();
+								velocityValue.UnityEngine_Vector3 = angularVelocity;
+							}
+							else
+							{
+								// Delta time too small, use zero velocity
+								velocityValue = new GONetSyncableValue();
+							}
+						}
+						else
+						{
+							// Not enough snapshots, use zero velocity
+							velocityValue = new GONetSyncableValue();
+						}
+						
+						// Serialize velocity using velocity serializer
+						cachedVelocitySerializers[8].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);
 					}
-				
-					// Per-value velocity: Toggle state for next sync
-					ToggleValueVelocityState(8);
+					else
+					{
+						// VALUE BUNDLE: Serialize position normally
+						customSerializer.Serialize(bitStream_appendTo, gonetParticipant, Transform.rotation);
+					}
 				}
 				break;
 
 				case 9:
 				{ // Transform.position
 					    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[9];
-					{ // SUB-QUANTIZATION DIAGNOSTIC for position
-						var currentValue = Transform.position;
-						var baselineValue = valuesChangesSupport[9].baselineValue_current.UnityEngine_Vector3;
-						var deltaFromBaseline = currentValue - baselineValue;
-						GONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, "position", deltaFromBaseline, valuesChangesSupport[9].syncAttribute_QuantizerSettingsGroup, customSerializer);
-						customSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline);
+					if (isVelocityBundle)
+					{
+						// VELOCITY BUNDLE: Calculate velocity from last two snapshots
+						var changesSupport = valuesChangesSupport[9];
+						int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
+						GONetSyncableValue velocityValue;
+						
+						if (recentChangesCount >= 2)
+						{
+							var current = changesSupport.mostRecentChanges[0];
+							var previous = changesSupport.mostRecentChanges[1];
+							float deltaTime = (current.elapsedTicksAtChange - previous.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
+						
+							if (deltaTime > 0.0001f)
+							{
+								UnityEngine.Vector3 currentValue = current.numericValue.UnityEngine_Vector3;
+								UnityEngine.Vector3 previousValue = previous.numericValue.UnityEngine_Vector3;
+								velocityValue = new GONetSyncableValue();
+								velocityValue.UnityEngine_Vector3 = (currentValue - previousValue) / deltaTime;
+							}
+							else
+							{
+								// Delta time too small, use zero velocity
+								velocityValue = new GONetSyncableValue();
+							}
+						}
+						else
+						{
+							// Not enough snapshots, use zero velocity
+							velocityValue = new GONetSyncableValue();
+						}
+						
+						// Serialize velocity using velocity serializer
+						cachedVelocitySerializers[9].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);
 					}
+					else
+					{
+						// VALUE BUNDLE: Serialize position normally
+						{ // SUB-QUANTIZATION DIAGNOSTIC for position
+							var currentValue = Transform.position;
+							var baselineValue = valuesChangesSupport[9].baselineValue_current.UnityEngine_Vector3;
+							var deltaFromBaseline = currentValue - baselineValue;
+							GONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, "position", deltaFromBaseline, valuesChangesSupport[9].syncAttribute_QuantizerSettingsGroup, customSerializer);
+							customSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline);
+						}
 					}
-				
-					// Per-value velocity: Toggle state for next sync
-					ToggleValueVelocityState(9);
 				}
 				break;
 
@@ -692,14 +809,20 @@ namespace GONet.Generation
 
         /// <summary>
         /// Simply deserializes in order to move along the bit stream counter, but does NOT apply the values (i.e, does NOT init).
+        /// Velocity-augmented sync: Supports deserializing either VALUE or VELOCITY data based on useVelocitySerializer parameter.
         /// </summary>
-        internal override GONet.GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex)
+        /// <param name="bitStream_readFrom">The bit stream to deserialize from</param>
+        /// <param name="singleIndex">The index of the value to deserialize</param>
+        /// <param name="useVelocitySerializer">If true, uses cachedVelocitySerializers; if false, uses cachedValueSerializers. Default false.</param>
+        /// <returns>The deserialized value (either VALUE or VELOCITY depending on useVelocitySerializer)</returns>
+        internal override GONet.GONetSyncableValue DeserializeInitSingle_ReadOnlyNotApply(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, bool useVelocitySerializer = false)
         {
 			switch (singleIndex)
 			{
 				case 0:
 				{ // GONetParticipant.GONetId
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[0];
+					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[0] : cachedValueSerializers[0];
 					var value = customSerializer.Deserialize(bitStream_readFrom).System_UInt32;
 					return value;
 				}
@@ -753,13 +876,15 @@ namespace GONet.Generation
 				}
 				case 8:
 				{ // Transform.rotation
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[8];
+					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[8] : cachedValueSerializers[8];
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
 					return value;
 				}
 				case 9:
 				{ // Transform.position
-					IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[9];
+					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
+					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[9] : cachedValueSerializers[9];
 					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
 					value += valuesChangesSupport[9].baselineValue_current.UnityEngine_Vector3;
 					return value;

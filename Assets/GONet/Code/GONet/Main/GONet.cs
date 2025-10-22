@@ -5736,6 +5736,16 @@ namespace GONet
 
                         bitStream.ReadLong(out elapsedTicksAtSend);
 
+                        // VELOCITY-AUGMENTED SYNC: Read velocity bit for VALUE/VELOCITY bundle type
+                        // This bit determines whether all values in this bundle are serialized as velocities or values
+                        // CRITICAL: Must be read BEFORE DeserializeBody_BundleOfChoice to stay in sync with serialization
+                        bool isVelocityBundle = false;
+                        if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
+                            messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
+                        {
+                            isVelocityBundle = bitStream.ReadBit();
+                        }
+
                         // DEBUG: Log position after reading header for OwnerAuthorityIdAssignmentEvent
                         //if (messageType == typeof(OwnerAuthorityIdAssignmentEvent))
                         //{
@@ -5750,14 +5760,14 @@ namespace GONet
                         //}
 
                         //GONetLog.Debug($"received something....networkData.bytesUsedCount: {networkData.bytesUsedCount}, messageType: {messageType.Name}, IsServer? {IsServer} (isServerOverride: {isServerOverride}, MyAuthorityId: {MyAuthorityId}/Server: {OwnerAuthorityId_Server}), IsClient? {IsClient}");
-                        
+
                         {  // body:
                             if (messageType == typeof(AutoMagicalSync_ValueChanges_Message) ||
                                 messageType == typeof(AutoMagicalSync_ValuesNowAtRest_Message))
                             {
                                 try
                                 {
-                                    DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType);
+                                    DeserializeBody_BundleOfChoice(bitStream, networkData.relatedConnection, networkData.channelId, elapsedTicksAtSend, messageType, isVelocityBundle);
                                     if (IsServer)
                                     {
                                         /*
@@ -9611,6 +9621,12 @@ namespace GONet
 
         static readonly ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments> wholeBundleOfChoiceBuffersByThread = new ConcurrentDictionary<Thread, WholeBundleOfChoiceFragments>(4, 4);
 
+        /// <summary>
+        /// Velocity-augmented sync: Tracks bundle alternation between VALUE (even) and VELOCITY (odd).
+        /// Thread-safe via Interlocked.Increment.
+        /// </summary>
+        private static int velocityBundleCounter = 0;
+
         /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
         private static void SerializeWhole_BundleOfChoice(
             List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, 
@@ -9638,19 +9654,26 @@ namespace GONet
 
             int lastIndexUsed = 0;
 
+            // VELOCITY-AUGMENTED SYNC: Decide if this bundle sends velocities or values
+            // Alternate between VALUE (even) and VELOCITY (odd) bundles
+            bool isVelocityBundle = (System.Threading.Interlocked.Increment(ref velocityBundleCounter) % 2 == 0);
+
             while (individualChangesCountRemaining > 0)
             {
                 using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
                 {
-                    { // header...just message type/id...well, and now time 
+                    { // header...just message type/id...well, and now time...and velocity flag
                         uint messageID = messageTypeToMessageIDMap[chosenBundleType];
                         bitStream.WriteUInt(messageID);
 
                         bitStream.WriteLong(elapsedTicksAtCapture);
+
+                        // VELOCITY-AUGMENTED SYNC: Write velocity bit (ONE bit for entire bundle)
+                        bitStream.WriteBit(isVelocityBundle);
                     }
 
                     // body
-                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed);
+                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed, isVelocityBundle);
                     
                     if (changesInBundleCount > 0)
                     {
@@ -9816,7 +9839,8 @@ namespace GONet
         /// Returns the number of changes actually included in/added to the <paramref name="bitStream_headerAlreadyWritten"/> AFTER any filtering this method does (e.g., checking <paramref name="filterUsingOwnerAuthorityId"/>).
         /// </summary>
         /// <param name="filterUsingOwnerAuthorityId">NOTE: pass in <see cref="OwnerAuthorityId_Unset"/> to NOT filter</param>
-        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId, ref int lastIndexUsed)
+        /// <param name="isVelocityBundle">TRUE if this bundle contains velocity data, FALSE for value data</param>
+        private static int SerializeBody_ChangesBundle(List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> changes, Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyWritten, ushort filterUsingOwnerAuthorityId, ref int lastIndexUsed, bool isVelocityBundle)
         {
             //GONetLog.Debug("mikkyu magoo");
 
@@ -9890,7 +9914,7 @@ namespace GONet
 
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 //GONetLog.AppendLine($"serialize change index: {change.index}");
-                change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index);
+                change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index, isVelocityBundle);
             }
             //GONetLog.Append_FlushDebug();
 
@@ -10038,7 +10062,7 @@ namespace GONet
         /// </summary>
         static readonly List<GONetParticipant> gnpsAwaitingCompanion = new List<GONetParticipant>(1000);
 
-        private static void DeserializeBody_BundleOfChoice(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend, Type chosenBundleType)
+        private static void DeserializeBody_BundleOfChoice(Utils.BitByBitByteArrayBuilder bitStream_headerAlreadyRead, GONetConnection sourceOfChangeConnection, GONetChannelId channelId, long elapsedTicksAtSend, Type chosenBundleType, bool isVelocityBundle = false)
         {
             //if (chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message)) GONetLog.Debug($"remote source sent us at rest bundle.");
 
@@ -10253,7 +10277,9 @@ namespace GONet
 
                     if (gonetParticipant.IsMine) // with recent changes, bundles all all the same for all clients, which means you will receive your own stuff too...essentially want to skip, but have to move the bit reader forward!
                     {
-                        syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index);
+                        // VELOCITY-AUGMENTED SYNC: Always pass isVelocityBundle to keep bitstream in sync
+                        // (even when skipping, we must read the same number of bits)
+                        syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, isVelocityBundle);
 
                         // IMPORTANT: Log when Client:2 skips its own values
                         if (IsClient)
@@ -10276,7 +10302,46 @@ namespace GONet
                                 //uint logId = (gonetParticipant != null) ? gonetParticipant.GONetId : GONetParticipant.GONetId_Unset;
                                 //GONetLog.Info($"[SYNC-APPLY] Client applying value change - GONetId: {logId}, GameObject: '{logName}', index: {index}");
                             //}
-                            syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+
+                            // VELOCITY-AUGMENTED SYNC: Handle VELOCITY vs VALUE bundles
+                            if (isVelocityBundle)
+                            {
+                                // VELOCITY BUNDLE: Deserialize velocity, synthesize position
+                                GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
+
+                                var changesSupport = syncCompanion.valuesChangesSupport[index];
+                                int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
+
+                                if (recentChangesCount >= 1)
+                                {
+                                    // Get last known position
+                                    var lastSnapshot = changesSupport.mostRecentChanges[0];
+
+                                    // Calculate deltaTime from last snapshot to this bundle's send time
+                                    float deltaTime = (elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;
+
+                                    // Synthesize new position from velocity
+                                    GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
+                                        lastSnapshot.numericValue,
+                                        velocityValue,
+                                        deltaTime);
+
+                                    // Store synthesized position as snapshot
+                                    syncCompanion.InitSingle(synthesizedValue, index, elapsedTicksAtSend);
+                                }
+                                else
+                                {
+                                    // No previous snapshot - treat velocity as initial value (shouldn't happen in practice)
+                                    GONetLog.Warning($"[VelocitySync] VELOCITY bundle received but no previous snapshot for GONetId {gonetParticipant.GONetId}, index {index}. Cannot synthesize.");
+                                    // Still initialize with velocity data to keep bitstream in sync
+                                    syncCompanion.InitSingle(velocityValue, index, elapsedTicksAtSend);
+                                }
+                            }
+                            else
+                            {
+                                // VALUE BUNDLE: Deserialize and apply normally
+                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
+                            }
 
                             AutoMagicalSync_ValueMonitoringSupport_ChangedValue changedValue = syncCompanion.valuesChangesSupport[index];
 
@@ -10294,7 +10359,10 @@ namespace GONet
                                 // Deserializing from the bit stream has to happen now before waiting in coroutine becuase the rest of the bit stream processing happens immediately hereafter!
                                 // We don't want it applied immediately, so we have to setup a coroutine to
                                 // apply the value AFTER we ensure the value blending buffer time has elapsed to avoid applying too soon!
-                                GONetSyncableValue value = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index);
+
+                                // VELOCITY-AUGMENTED SYNC: For ValuesNowAtRest, isVelocityBundle should typically be false
+                                // (resting values don't have velocity), but pass it for bitstream consistency
+                                GONetSyncableValue value = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, isVelocityBundle);
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = true;
                                 long assumedInitialRestElapsedTicks = elapsedTicksAtSend - TimeSpan.FromSeconds(syncCompanion.valuesChangesSupport[index].syncAttribute_SyncChangesEverySeconds).Ticks; // need to subtract the sync rate off of this to know when the value actually first arrived at rest value
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_assumedInitialRestElapsedTicks = assumedInitialRestElapsedTicks;
@@ -10392,7 +10460,9 @@ namespace GONet
                             }
                             else
                             {
-                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend);
+                                // VELOCITY-AUGMENTED SYNC: For ValuesNowAtRest (no blending), pass isVelocityBundle
+                                // Should typically be false since resting values don't have velocity
+                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, isVelocityBundle);
 
                                 // NEW: Immediate physics snap for non-blended physics objects at rest
                                 bool isPhysicsObject = gonetParticipant.IsRigidBodyOwnerOnlyControlled &&

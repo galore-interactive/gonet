@@ -372,7 +372,7 @@ namespace GONet.Editor.Generation
 
         private void WriteSerializeSingle()
         {
-            sb.AppendLine("        internal override void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex)");
+            sb.AppendLine("        internal override void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, bool isVelocityBundle = false)");
             sb.AppendLine("        {");
             sb.AppendLine("\t\t\tswitch (singleIndex)");
             sb.AppendLine("\t\t\t{");
@@ -437,44 +437,79 @@ namespace GONet.Editor.Generation
         }
 
         /// <summary>
-        /// Writes beginning of velocity-aware serialization wrapper (if needed).
-        /// Returns true if wrapper was written (velocity sync enabled), false otherwise.
+        /// Generates velocity calculation code for a given type.
+        /// Returns the velocity calculation as a GONetSyncableValue.
         /// </summary>
-        private bool WriteVelocitySerializationHeader(int iOverall, string indent, bool usesVelocitySync, string valueExpression, bool isSerializeAll)
+        private void WriteVelocityCalculation(int iOverall, string memberTypeFullName, string indent)
         {
-            // Velocity sync disabled for now - needs GONet.cs integration
-            // TODO: Implement per-value velocity sync in GONet.cs event processing layer
-            return false;
-        }
+            sb.Append(indent).AppendLine("// VELOCITY BUNDLE: Calculate velocity from last two snapshots");
+            sb.Append(indent).AppendLine($"var changesSupport = valuesChangesSupport[{iOverall}];");
+            sb.Append(indent).AppendLine("int recentChangesCount = changesSupport.mostRecentChanges_usedSize;");
+            sb.Append(indent).AppendLine("GONetSyncableValue velocityValue;");
+            sb.Append(indent).AppendLine();
+            sb.Append(indent).AppendLine("if (recentChangesCount >= 2)");
+            sb.Append(indent).AppendLine("{");
+            sb.Append(indent).AppendLine("\tvar current = changesSupport.mostRecentChanges[0];");
+            sb.Append(indent).AppendLine("\tvar previous = changesSupport.mostRecentChanges[1];");
+            sb.Append(indent).AppendLine("\tfloat deltaTime = (current.elapsedTicksAtChange - previous.elapsedTicksAtChange) / (float)System.TimeSpan.TicksPerSecond;");
+            sb.Append(indent).AppendLine();
+            sb.Append(indent).AppendLine("\tif (deltaTime > 0.0001f)");
+            sb.Append(indent).AppendLine("\t{");
 
-        /// <summary>
-        /// Writes middle section of velocity-aware serialization (between velocity and value blocks).
-        /// </summary>
-        private void WriteVelocitySerializationMiddle(string indent)
-        {
+            // Type-specific velocity calculation
+            if (memberTypeFullName == typeof(float).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tfloat currentValue = current.numericValue.System_Single;");
+                sb.Append(indent).AppendLine("\t\tfloat previousValue = previous.numericValue.System_Single;");
+                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\t\tvelocityValue.System_Single = (currentValue - previousValue) / deltaTime;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 currentValue = current.numericValue.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 previousValue = previous.numericValue.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector2 = (currentValue - previousValue) / deltaTime;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 currentValue = current.numericValue.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 previousValue = previous.numericValue.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = (currentValue - previousValue) / deltaTime;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 currentValue = current.numericValue.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 previousValue = previous.numericValue.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector4 = (currentValue - previousValue) / deltaTime;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\t// Angular velocity for Quaternion (stored as Vector3)");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion currentValue = current.numericValue.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion previousValue = previous.numericValue.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);");
+                sb.Append(indent).AppendLine("\t\tdeltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;");
+                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
+            }
+
             sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
-            sb.Append(indent).AppendLine("\t\t// VALUE packet: Serialize position normally");
-            sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-            sb.Append(indent).AppendLine("\t\tGONetLog.Debug($\"[VelocitySync][{gonetParticipant.GONetId}] VALUE packet: serializing position data\");");
-            sb.Append(indent).AppendLine("#endif");
-        }
-
-        /// <summary>
-        /// Writes end of velocity-aware serialization wrapper (if needed).
-        /// Increments syncCounter for velocity frequency tracking.
-        /// </summary>
-        private void WriteVelocitySerializationFooter(string indent, bool usesVelocitySync, int iOverall, bool isSerializeAll, bool wroteVelocityHeader)
-        {
-            // Only write footer if header was actually written
-            if (wroteVelocityHeader && usesVelocitySync && !isSerializeAll)
-            {
-                sb.Append(indent).AppendLine("\t}");
-                sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine("\t// Velocity-augmented sync: Increment sync counter for frequency tracking");
-                sb.Append(indent).AppendLine($"\tsyncCounter[{iOverall}]++;");
-            }
+            sb.Append(indent).AppendLine("\t\t// Delta time too small, use zero velocity");
+            sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+            sb.Append(indent).AppendLine("\t}");
+            sb.Append(indent).AppendLine("}");
+            sb.Append(indent).AppendLine("else");
+            sb.Append(indent).AppendLine("{");
+            sb.Append(indent).AppendLine("\t// Not enough snapshots, use zero velocity");
+            sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+            sb.Append(indent).AppendLine("}");
+            sb.Append(indent).AppendLine();
         }
 
         private void WriteSingleSerialization(int iOverall, GONetParticipant_ComponentsWithAutoSyncMembers_Single single, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent, bool isSerializeAll)
@@ -518,37 +553,44 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(float).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName)
             {
-                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression, isSerializeAll);
-
-                if (wroteVelocityHeader)
+                if (usesVelocitySync && !isSerializeAll)
                 {
-                    // VELOCITY branch: Serialize velocity
+                    // VELOCITY-CAPABLE: Branch on bundle type
+                    sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
+                    sb.Append(indent).AppendLine("\t{");
+
+                    WriteVelocityCalculation(iOverall, memberTypeFullName, indent + "\t\t");
+
+                    sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
+                    sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
+                    sb.Append(indent).AppendLine("\t}");
+                    sb.Append(indent).AppendLine("\telse");
+                    sb.Append(indent).AppendLine("\t{");
+                    sb.Append(indent).AppendLine("\t\t// VALUE BUNDLE: Serialize position normally");
+
                     if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
-                        sb.Append(indent).AppendLine("\t\t// Serialize velocity (quantized using velocity quantization settings)");
-                        sb.Append(indent).AppendLine("\t\t// TODO: Use velocity quantization settings from profile");
-                        sb.Append(indent).Append("\t\tSerializeSingleQuantized(bitStream_appendTo, ").Append(iOverall).Append(", velocity").AppendLine(");");
+                        sb.Append(indent).Append("\t\tSerializeSingleQuantized(bitStream_appendTo, ").Append(iOverall).Append(", ").Append(valueExpression).AppendLine(");");
                     }
                     else
                     {
-                        sb.Append(indent).AppendLine("\t\tbitStream_appendTo.WriteFloat(velocity.System_Single);");
+                        sb.Append(indent).Append("\t\tbitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
                     }
 
-                    WriteVelocitySerializationMiddle(indent);
-                }
-
-                // VALUE branch (or non-velocity path)
-                string valueIndent = wroteVelocityHeader ? indent + "\t\t" : indent + "\t";
-                if (singleMember.attribute.QuantizeDownToBitCount > 0)
-                {
-                    sb.Append(valueIndent).Append("SerializeSingleQuantized(bitStream_appendTo, ").Append(iOverall).Append(", ").Append(valueExpression).AppendLine(");");
+                    sb.Append(indent).AppendLine("\t}");
                 }
                 else
                 {
-                    sb.Append(valueIndent).Append("bitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
+                    // NO VELOCITY: Serialize normally
+                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+                        sb.Append(indent).Append("\tSerializeSingleQuantized(bitStream_appendTo, ").Append(iOverall).Append(", ").Append(valueExpression).AppendLine(");");
+                    }
+                    else
+                    {
+                        sb.Append(indent).Append("\tbitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
+                    }
                 }
-
-                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll, wroteVelocityHeader);
             }
             else if (memberTypeFullName == typeof(long).FullName)
             {
@@ -583,51 +625,64 @@ namespace GONet.Editor.Generation
             {
                 sb.Append(indent).AppendLine("\t    IGONetAutoMagicalSync_CustomSerializer customSerializer = cachedCustomSerializers[" + iOverall + "];");
 
-                bool wroteVelocityHeader = WriteVelocitySerializationHeader(iOverall, indent, usesVelocitySync, valueExpression, isSerializeAll);
-
-                if (wroteVelocityHeader)
+                if (usesVelocitySync && !isSerializeAll)
                 {
-                    // VELOCITY branch: Serialize velocity (linear or angular)
-                    if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+                    // VELOCITY-CAPABLE: Branch on bundle type
+                    sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
+                    sb.Append(indent).AppendLine("\t{");
+
+                    WriteVelocityCalculation(iOverall, memberTypeFullName, indent + "\t\t");
+
+                    sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
+                    sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
+                    sb.Append(indent).AppendLine("\t}");
+                    sb.Append(indent).AppendLine("\telse");
+                    sb.Append(indent).AppendLine("\t{");
+                    sb.Append(indent).AppendLine("\t\t// VALUE BUNDLE: Serialize position normally");
+
+                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
-                        sb.Append(indent).AppendLine("\t\t// Angular velocity (omega) serialization for Quaternion");
-                        sb.Append(indent).AppendLine("\t\t// velocity is Vector3 (axis * radians/sec), serialize using Vector3Serializer");
-                        sb.Append(indent).AppendLine("\t\tvar vector3Serializer = new GONet.Vector3Serializer();");
-                        sb.Append(indent).AppendLine("\t\t// TODO: Use velocity quantization settings instead of position settings");
-                        sb.Append(indent).AppendLine("\t\tvector3Serializer.Serialize(bitStream_appendTo, gonetParticipant, velocity.UnityEngine_Vector3);");
+                        // SUB-QUANTIZATION DIAGNOSTIC: Log delta-from-baseline that's actually being serialized
+                        string deltaFieldName = memberTypeFullName.Replace(".", "_");
+                        sb.Append(indent).AppendLine($"\t\t{{ // SUB-QUANTIZATION DIAGNOSTIC for {singleMember.memberName}");
+                        sb.Append(indent).AppendLine($"\t\t\tvar currentValue = {valueExpression};");
+                        sb.Append(indent).AppendLine($"\t\t\tvar baselineValue = valuesChangesSupport[{iOverall}].baselineValue_current.{deltaFieldName};");
+                        sb.Append(indent).AppendLine($"\t\t\tvar deltaFromBaseline = currentValue - baselineValue;");
+                        sb.Append(indent).AppendLine($"\t\t\tGONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, \"{singleMember.memberName}\", deltaFromBaseline, valuesChangesSupport[{iOverall}].syncAttribute_QuantizerSettingsGroup, customSerializer);");
+                        sb.Append(indent).Append("\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline").AppendLine(");");
+                        sb.Append(indent).AppendLine("\t\t}");
                     }
                     else
                     {
-                        // Vector2/3/4: Serialize velocity
-                        sb.Append(indent).AppendLine("\t\t// Serialize velocity (TODO: use velocity quantization settings)");
-                        sb.Append(indent).AppendLine("\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, velocity);");
+                        // NOTE: No sub-quantization diagnostic here because this path is for values WITHOUT baseline subtraction
+                        // (like Quaternion rotation which uses Smallest3 encoding with quantization handled inside the serializer)
+                        sb.Append(indent).Append("\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
                     }
 
-                    WriteVelocitySerializationMiddle(indent);
-                }
-
-                // VALUE branch (or non-velocity path)
-                string valueIndent = wroteVelocityHeader ? indent + "\t\t" : indent + "\t";
-                if (singleMember.attribute.QuantizeDownToBitCount > 0)
-                {
-                    // SUB-QUANTIZATION DIAGNOSTIC: Log delta-from-baseline that's actually being serialized
-                    string deltaFieldName = memberTypeFullName.Replace(".", "_");
-                    sb.Append(valueIndent).AppendLine($"{{ // SUB-QUANTIZATION DIAGNOSTIC for {singleMember.memberName}");
-                    sb.Append(valueIndent).AppendLine($"\tvar currentValue = {valueExpression};");
-                    sb.Append(valueIndent).AppendLine($"\tvar baselineValue = valuesChangesSupport[{iOverall}].baselineValue_current.{deltaFieldName};");
-                    sb.Append(valueIndent).AppendLine($"\tvar deltaFromBaseline = currentValue - baselineValue;");
-                    sb.Append(valueIndent).AppendLine($"\tGONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, \"{singleMember.memberName}\", deltaFromBaseline, valuesChangesSupport[{iOverall}].syncAttribute_QuantizerSettingsGroup, customSerializer);");
-                    sb.Append(valueIndent).Append("\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline").AppendLine(");");
-                    sb.Append(valueIndent).AppendLine("}");
+                    sb.Append(indent).AppendLine("\t}");
                 }
                 else
                 {
-                    // NOTE: No sub-quantization diagnostic here because this path is for values WITHOUT baseline subtraction
-                    // (like Quaternion rotation which uses Smallest3 encoding with quantization handled inside the serializer)
-                    sb.Append(valueIndent).Append("customSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
+                    // NO VELOCITY: Serialize normally
+                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                    {
+                        // SUB-QUANTIZATION DIAGNOSTIC: Log delta-from-baseline that's actually being serialized
+                        string deltaFieldName = memberTypeFullName.Replace(".", "_");
+                        sb.Append(indent).AppendLine($"\t{{ // SUB-QUANTIZATION DIAGNOSTIC for {singleMember.memberName}");
+                        sb.Append(indent).AppendLine($"\t\tvar currentValue = {valueExpression};");
+                        sb.Append(indent).AppendLine($"\t\tvar baselineValue = valuesChangesSupport[{iOverall}].baselineValue_current.{deltaFieldName};");
+                        sb.Append(indent).AppendLine($"\t\tvar deltaFromBaseline = currentValue - baselineValue;");
+                        sb.Append(indent).AppendLine($"\t\tGONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, \"{singleMember.memberName}\", deltaFromBaseline, valuesChangesSupport[{iOverall}].syncAttribute_QuantizerSettingsGroup, customSerializer);");
+                        sb.Append(indent).Append("\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline").AppendLine(");");
+                        sb.Append(indent).AppendLine("\t}");
+                    }
+                    else
+                    {
+                        // NOTE: No sub-quantization diagnostic here because this path is for values WITHOUT baseline subtraction
+                        // (like Quaternion rotation which uses Smallest3 encoding with quantization handled inside the serializer)
+                        sb.Append(indent).Append("\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, ").Append(valueExpression).AppendLine(");");
+                    }
                 }
-
-                WriteVelocitySerializationFooter(indent, usesVelocitySync, iOverall, isSerializeAll, wroteVelocityHeader);
             }
         }
 
