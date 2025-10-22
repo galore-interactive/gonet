@@ -496,7 +496,7 @@ namespace GONet.Generation
             }
 
             // Check if we have enough snapshots to calculate velocity
-            if (changesSupport.mostRecentChangesCount < 2)
+            if (changesSupport.mostRecentChanges_usedSize < 2)
             {
                 return false; // Not enough data yet
             }
