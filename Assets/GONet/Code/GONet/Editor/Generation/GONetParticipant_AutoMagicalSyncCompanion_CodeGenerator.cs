@@ -431,28 +431,8 @@ namespace GONet.Editor.Generation
         /// </summary>
         private bool WriteVelocitySerializationHeader(int iOverall, string indent, bool usesVelocitySync, string valueExpression, bool isSerializeAll)
         {
-            if (usesVelocitySync)
-            {
-                if (isSerializeAll)
-                {
-                    // SerializeAll: NO velocity logic (always VALUE packets during INIT)
-                    return false;
-                }
-
-                // SerializeSingle: Write per-value velocity bit and check state
-                sb.Append(indent).AppendLine("\t// Per-value velocity: Write velocity bit (0 = VALUE, 1 = VELOCITY)");
-                sb.Append(indent).AppendLine($"\tbitStream_appendTo.WriteBit(nextValueIsVelocity[{iOverall}]);");
-                sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine($"\tif (nextValueIsVelocity[{iOverall}])");
-                sb.Append(indent).AppendLine("\t{");
-                sb.Append(indent).AppendLine("\t\t// VELOCITY packet: Calculate and serialize velocity");
-                sb.Append(indent).AppendLine($"\t\tvar currentValue = {valueExpression};");
-                sb.Append(indent).AppendLine($"\t\tvar velocity = CalculateVelocity({iOverall}, currentValue, GONetMain.Time.ElapsedTicks);");
-                sb.Append(indent).AppendLine("#if GONET_VELOCITY_SYNC_DEBUG");
-                sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VelocitySync][{{gonetParticipant.GONetId}}] VELOCITY packet[{iOverall}]: value={{currentValue}}, velocity={{velocity}}\");");
-                sb.Append(indent).AppendLine("#endif");
-                return true;
-            }
+            // Velocity sync disabled for now - needs GONet.cs integration
+            // TODO: Implement per-value velocity sync in GONet.cs event processing layer
             return false;
         }
 
