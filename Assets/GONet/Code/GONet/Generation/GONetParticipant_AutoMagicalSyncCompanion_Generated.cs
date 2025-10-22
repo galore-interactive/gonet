@@ -362,11 +362,65 @@ namespace GONet.Generation
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
             {
-                // TODO: Calculate angular velocity (omega) - will be implemented in separate task
-                return UnityEngine.Quaternion.identity;
+                // Calculate angular velocity (omega) from quaternion delta
+                UnityEngine.Quaternion q0 = previousSnapshot.numericValue.UnityEngine_Quaternion;
+                UnityEngine.Quaternion q1 = currentValue.UnityEngine_Quaternion;
+                UnityEngine.Vector3 omega = CalculateAngularVelocity(q0, q1, deltaTimeSeconds);
+                return omega; // Store as Vector3 (axis * radians/sec)
             }
 
             return currentValue; // Fallback
+        }
+
+        /// <summary>
+        /// Calculates angular velocity (omega) from two quaternions.
+        /// Returns a Vector3 representing the axis of rotation scaled by angular speed (radians/second).
+        /// Formula: omega = 2 * axis * angle / deltaTime
+        /// where (axis, angle) = ToAxisAngle(q1 * q0^-1)
+        /// </summary>
+        protected UnityEngine.Vector3 CalculateAngularVelocity(UnityEngine.Quaternion q0, UnityEngine.Quaternion q1, float deltaTime)
+        {
+            if (deltaTime <= 0f)
+                return UnityEngine.Vector3.zero;
+
+            // Calculate relative rotation: q_delta = q1 * q0^-1
+            UnityEngine.Quaternion q0Inverse = UnityEngine.Quaternion.Inverse(q0);
+            UnityEngine.Quaternion qDelta = q1 * q0Inverse;
+
+            // Ensure shortest path (quaternion double-cover: q and -q represent same rotation)
+            if (qDelta.w < 0f)
+            {
+                qDelta.x = -qDelta.x;
+                qDelta.y = -qDelta.y;
+                qDelta.z = -qDelta.z;
+                qDelta.w = -qDelta.w;
+            }
+
+            // Extract axis-angle representation
+            // For quaternion q = (cos(angle/2), sin(angle/2) * axis)
+            // angle = 2 * acos(w)
+            // axis = (x, y, z) / sin(angle/2)
+
+            float angle = 2f * UnityEngine.Mathf.Acos(UnityEngine.Mathf.Clamp(qDelta.w, -1f, 1f));
+
+            // Handle near-zero rotation (avoid division by zero)
+            float sinHalfAngle = UnityEngine.Mathf.Sin(angle * 0.5f);
+            if (UnityEngine.Mathf.Abs(sinHalfAngle) < 1e-6f)
+            {
+                return UnityEngine.Vector3.zero;
+            }
+
+            // Extract axis
+            UnityEngine.Vector3 axis = new UnityEngine.Vector3(
+                qDelta.x / sinHalfAngle,
+                qDelta.y / sinHalfAngle,
+                qDelta.z / sinHalfAngle
+            );
+
+            // Angular velocity = axis * angle / deltaTime
+            UnityEngine.Vector3 omega = axis * (angle / deltaTime);
+
+            return omega;
         }
 
         /// <summary>

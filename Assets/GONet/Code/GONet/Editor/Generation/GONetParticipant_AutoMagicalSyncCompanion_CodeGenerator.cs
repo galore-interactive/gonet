@@ -561,9 +561,11 @@ namespace GONet.Editor.Generation
                     // VELOCITY branch: Serialize velocity (linear or angular)
                     if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
                     {
-                        sb.Append(indent).AppendLine("\t\t// TODO: Angular velocity (omega) serialization for Quaternion");
-                        sb.Append(indent).AppendLine("\t\t// For now, just serialize identity (placeholder)");
-                        sb.Append(indent).AppendLine("\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, UnityEngine.Quaternion.identity);");
+                        sb.Append(indent).AppendLine("\t\t// Angular velocity (omega) serialization for Quaternion");
+                        sb.Append(indent).AppendLine("\t\t// velocity is Vector3 (axis * radians/sec), serialize using Vector3Serializer");
+                        sb.Append(indent).AppendLine("\t\tvar vector3Serializer = new GONet.Vector3Serializer();");
+                        sb.Append(indent).AppendLine("\t\t// TODO: Use velocity quantization settings instead of position settings");
+                        sb.Append(indent).AppendLine("\t\tvector3Serializer.Serialize(bitStream_appendTo, gonetParticipant, velocity.UnityEngine_Vector3);");
                     }
                     else
                     {
