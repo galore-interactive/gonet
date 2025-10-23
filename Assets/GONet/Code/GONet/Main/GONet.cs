@@ -10620,21 +10620,11 @@ namespace GONet
                                     // QUANTITATIVE DIAGNOSTIC: Log velocity synthesis and time relationships
                                     if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
                                     {
-                                        // Calculate ACTUAL elapsed time since last snapshot (for debugging)
-                                        long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
-                                        float actualDeltaTime = (float)ticksSinceLastSnapshot / System.Diagnostics.Stopwatch.Frequency;
-
-                                        Vector3 expected = lastSnapshot.numericValue.UnityEngine_Vector3 + velocityValue.UnityEngine_Vector3 * deltaTime;
-                                        Vector3 actualExpected = lastSnapshot.numericValue.UnityEngine_Vector3 + velocityValue.UnityEngine_Vector3 * actualDeltaTime;
-
                                         GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VEL][{gonetParticipant.GONetId}][idx:{index}] " +
                                                       $"receivedVelocity: {velocityValue.UnityEngine_Vector3}, " +
                                                       $"lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, " +
-                                                      $"syncDeltaTime: {deltaTime:F4}s, " +
-                                                      $"actualDeltaTime: {actualDeltaTime:F4}s, " +
+                                                      $"deltaTime: {deltaTime:F4}s, " +
                                                       $"synthesized: {synthesizedValue.UnityEngine_Vector3}, " +
-                                                      $"expected(sync): {expected}, " +
-                                                      $"expected(actual): {actualExpected}, " +
                                                       $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                     }
 
