@@ -250,19 +250,39 @@ namespace GONet.Editor.Generation
                         // Velocity-augmented sync: Initialize VALUE serializer (same quantization as legacy for now)
                         sb.Append("\t\t\tcachedValueSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
 
-                        // Velocity-augmented sync: Initialize VELOCITY serializer with DYNAMICALLY CALCULATED quantization settings
-                        // Calculate velocity range from VALUE quantization precision (not from attribute fields!)
-                        var (velLowerBoundCalc, velUpperBoundCalc, velBitCountCalc) = CalculateVelocityQuantizationSettings(
-                            singleMember.attribute.QuantizeLowerBound,
-                            singleMember.attribute.QuantizeUpperBound,
-                            singleMember.attribute.QuantizeDownToBitCount,
-                            singleMember.attribute.SyncChangesEverySeconds,
-                            singleMember.attribute.PhysicsUpdateInterval,
-                            singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName);
+                        // Velocity-augmented sync: Initialize VELOCITY serializer
+                        // Use manual velocity settings if configured, otherwise calculate dynamically
+                        string velBitCount;
+                        string velLowerBound;
+                        string velUpperBound;
 
-                        string velBitCount = velBitCountCalc.ToString();
-                        string velLowerBound = velLowerBoundCalc == float.MinValue ? "float.MinValue" : velLowerBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
-                        string velUpperBound = velUpperBoundCalc == float.MaxValue ? "float.MaxValue" : velUpperBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                        // Check if user has manually configured velocity quantization (non-default values)
+                        bool hasManualVelocitySettings = singleMember.attribute.VelocityQuantizeLowerBound != -20f ||
+                                                         singleMember.attribute.VelocityQuantizeUpperBound != 20f ||
+                                                         singleMember.attribute.VelocityQuantizeDownToBitCount != 10;
+
+                        if (hasManualVelocitySettings)
+                        {
+                            // Use manually configured velocity quantization settings
+                            velBitCount = singleMember.attribute.VelocityQuantizeDownToBitCount.ToString();
+                            velLowerBound = singleMember.attribute.VelocityQuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
+                            velUpperBound = singleMember.attribute.VelocityQuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
+                        }
+                        else
+                        {
+                            // Calculate velocity range dynamically from VALUE quantization precision (for sub-quantization motion)
+                            var (velLowerBoundCalc, velUpperBoundCalc, velBitCountCalc) = CalculateVelocityQuantizationSettings(
+                                singleMember.attribute.QuantizeLowerBound,
+                                singleMember.attribute.QuantizeUpperBound,
+                                singleMember.attribute.QuantizeDownToBitCount,
+                                singleMember.attribute.SyncChangesEverySeconds,
+                                singleMember.attribute.PhysicsUpdateInterval,
+                                singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName);
+
+                            velBitCount = velBitCountCalc.ToString();
+                            velLowerBound = velLowerBoundCalc == float.MinValue ? "float.MinValue" : velLowerBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                            velUpperBound = velUpperBoundCalc == float.MaxValue ? "float.MaxValue" : velUpperBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                        }
 
                         // CRITICAL: Quaternion angular velocity uses Vector3Serializer (not QuaternionSerializer!)
                         string velocitySerializerType = singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName
