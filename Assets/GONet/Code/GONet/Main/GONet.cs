@@ -10724,8 +10724,12 @@ namespace GONet
                                                           $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                         }
 
-                                        // Apply synthesized value instead of received VALUE
-                                        syncCompanion.InitSingle(synthesizedValue, index, elapsedTicksAtSend);
+                                        // CRITICAL FIX: Apply RECEIVED VALUE (not synthesized) to ensure ground truth baseline
+                                        // Problem: If we apply synthesized, we NEVER store the actual authority value
+                                        // Result: All snapshots become synthesized → no ground truth for future VELOCITY bundles
+                                        // Solution: Accept quantization jitter on VALUE bundles, use VELOCITY for smooth synthesis
+                                        // The VALUE bundle IS the authority's actual state - we MUST store and use it!
+                                        syncCompanion.InitSingle(receivedValue, index, elapsedTicksAtSend);
                                     }
                                     else
                                     {
