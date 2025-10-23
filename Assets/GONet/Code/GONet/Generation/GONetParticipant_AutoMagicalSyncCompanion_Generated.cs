@@ -495,19 +495,20 @@ namespace GONet.Generation
                 return false;
             }
 
-            // Check if we have enough snapshots to calculate velocity
-            if (changesSupport.mostRecentChanges_usedSize < 2)
+            // CRITICAL FIX: Use lastKnownValue (authority's actual transform) NOT mostRecentChanges (client-received snapshots)!
+            // mostRecentChanges is for VALUE BLENDING on clients, not for authority velocity calculation!
+            var current = changesSupport.lastKnownValue;
+            var previous = changesSupport.lastKnownValue_previous;
+
+            // Check if we have previous value (if current == previous, no change has occurred yet)
+            if (current.GONetSyncType != previous.GONetSyncType)
             {
-                return false; // Not enough data yet
+                return false; // Types don't match - not initialized yet
             }
 
             // Get velocity quantization bounds from sync attribute
             float lowerBound = changesSupport.syncAttribute_VelocityQuantizeLowerBound;
             float upperBound = changesSupport.syncAttribute_VelocityQuantizeUpperBound;
-
-            // Calculate velocity from last two snapshots
-            var current = changesSupport.mostRecentChanges[0].numericValue;
-            var previous = changesSupport.mostRecentChanges[1].numericValue;
 
             // Get deterministic deltaTime (matches code generator calculation)
             float deltaTime;
