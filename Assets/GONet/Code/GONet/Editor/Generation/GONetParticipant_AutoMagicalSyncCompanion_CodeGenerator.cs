@@ -214,10 +214,41 @@ namespace GONet.Editor.Generation
 
                     // VELOCITY-AUGMENTED SYNC: Initialize velocity tracking fields
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".isVelocityEligible = ").Append(singleMember.attribute.IsVelocityEligible ? "true" : "false").AppendLine(";");
-                    string velocityLowerBound = singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
-                    string velocityUpperBound = singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
-                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBound).AppendLine(";");
-                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBound).AppendLine(";");
+
+                    // VELOCITY-AUGMENTED SYNC: Determine which velocity quantization bounds to use
+                    // Way 1 (Dynamic): Defaults [-20, 20, 10] → Calculate from VALUE precision
+                    // Way 2 (Manual): Custom values → Use directly from sync profile
+                    string velocityLowerBoundForRuntimeFields;
+                    string velocityUpperBoundForRuntimeFields;
+
+                    bool hasManualVelocitySettingsForRuntimeFields = singleMember.attribute.VelocityQuantizeLowerBound != -20f ||
+                                                     singleMember.attribute.VelocityQuantizeUpperBound != 20f ||
+                                                     singleMember.attribute.VelocityQuantizeDownToBitCount != 10;
+
+                    if (hasManualVelocitySettingsForRuntimeFields)
+                    {
+                        // Way 2: Use manual settings from sync profile
+                        velocityLowerBoundForRuntimeFields = singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
+                        velocityUpperBoundForRuntimeFields = singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
+                    }
+                    else
+                    {
+                        // Way 1: Calculate dynamic bounds from VALUE quantization precision
+                        // This must match the calculation done below for the velocity serializer (lines 277-283)
+                        var (velLowerBoundCalc, velUpperBoundCalc, velBitCountCalc) = CalculateVelocityQuantizationSettings(
+                            singleMember.attribute.QuantizeLowerBound,
+                            singleMember.attribute.QuantizeUpperBound,
+                            singleMember.attribute.QuantizeDownToBitCount,
+                            singleMember.attribute.SyncChangesEverySeconds,
+                            singleMember.attribute.PhysicsUpdateInterval,
+                            singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName);
+
+                        velocityLowerBoundForRuntimeFields = velLowerBoundCalc == float.MinValue ? "float.MinValue" : velLowerBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                        velocityUpperBoundForRuntimeFields = velUpperBoundCalc == float.MaxValue ? "float.MaxValue" : velUpperBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                    }
+
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBoundForRuntimeFields).AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBoundForRuntimeFields).AppendLine(";");
                     // Initialize lastVelocityTimestamp to current time to prevent false "EXPIRED" on first VALUE bundle
                     // (uninitialized = 0 → age = currentTime - 0 = HUGE → immediate expiration)
                     sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastVelocityTimestamp = GONet.GONetMain.Time.ElapsedTicks;");
@@ -587,6 +618,30 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\t\t// Delta time too small, use zero velocity");
             sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] DeltaTime too small: {{deltaTime:F6}}s\");");
             sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
+
+            // CRITICAL FIX: Initialize velocity type properly to avoid System_Boolean default
+            if (memberTypeFullName == typeof(float).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tvelocityValue.System_Single = 0f;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector2 = UnityEngine.Vector2.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
+            {
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector4 = UnityEngine.Vector4.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                // Quaternion velocity is stored as Vector3 angular velocity
+                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
+            }
+
             sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine("else");
@@ -594,6 +649,30 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("\t// Not enough snapshots, use zero velocity");
             sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] Not enough snapshots: recentChangesCount={{recentChangesCount}}\");");
             sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+
+            // CRITICAL FIX: Initialize velocity type properly to avoid System_Boolean default
+            if (memberTypeFullName == typeof(float).FullName)
+            {
+                sb.Append(indent).AppendLine("\tvelocityValue.System_Single = 0f;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+            {
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector2 = UnityEngine.Vector2.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+            {
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
+            {
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector4 = UnityEngine.Vector4.zero;");
+            }
+            else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                // Quaternion velocity is stored as Vector3 angular velocity
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
+            }
+
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine();
         }
@@ -1847,14 +1926,16 @@ namespace GONet.Editor.Generation
             // Apply safety margin (3× for tolerance)
             float velocityRange = maxSubQuantizationVelocity * 3.0f;
 
-            // Calculate optimal bit count (target: 10% of max velocity as precision)
-            float targetPrecision = maxSubQuantizationVelocity * 0.1f;
-            float velocityRangeTotal = velocityRange * 2.0f;  // ± range
-            float requiredLevels = velocityRangeTotal / targetPrecision;
-            int bitCount = UnityEngine.Mathf.CeilToInt(UnityEngine.Mathf.Log(requiredLevels + 1, 2));
-
-            // Clamp to reasonable range (6-12 bits)
-            bitCount = UnityEngine.Mathf.Clamp(bitCount, 6, 12);
+            // For dynamic mode (sub-quantization detection), use FULL VALUE precision
+            // Velocity deltas must have same resolution as position quantization to accurately
+            // detect movements smaller than one quantization step
+            //
+            // Example: Transform.position with 18-bit quantization (1mm precision)
+            // → Velocity should also use 18 bits to accurately represent 1mm deltas
+            // → This ensures sub-millimeter velocities can be transmitted without loss
+            //
+            // For manual mode, this method isn't called (user specifies bit count directly)
+            int bitCount = valueBitCount;
 
             return (-velocityRange, velocityRange, bitCount);
         }
