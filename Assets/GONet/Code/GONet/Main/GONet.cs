@@ -7738,6 +7738,87 @@ namespace GONet
                 }
             }
 
+            /// <summary>
+            /// Adds synthesized value from velocity packet to the queue, storing velocity metadata for velocity-aware blending.
+            /// </summary>
+            internal void AddToMostRecentChangeQueue_IfAppropriate_WithVelocity(long elapsedTicksAtChange, GONetSyncableValue synthesizedValue, GONetSyncableValue velocityValue)
+            {
+                // Reject late arrivals (same logic as base method)
+                if (hasAwaitingAtRest && elapsedTicksAtChange < hasAwaitingAtRest_assumedInitialRestElapsedTicks)
+                {
+                    GONetLog.Debug($"[LATE-ARRIVAL-REJECTED-AWAITING-VEL] index:{index} " +
+                        $"valueTime:{TimeSpan.FromTicks(elapsedTicksAtChange).TotalSeconds}s " +
+                        $"atRestTime:{TimeSpan.FromTicks(hasAwaitingAtRest_assumedInitialRestElapsedTicks).TotalSeconds}s");
+                    return;
+                }
+
+                if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 && elapsedTicksAtChange < hasAwaitingAtRest_lastProcessedAtRestTicks)
+                {
+                    GONetLog.Debug($"[LATE-ARRIVAL-REJECTED-PROCESSED-VEL] index:{index} " +
+                        $"valueTime:{TimeSpan.FromTicks(elapsedTicksAtChange).TotalSeconds}s " +
+                        $"lastAtRestTime:{TimeSpan.FromTicks(hasAwaitingAtRest_lastProcessedAtRestTicks).TotalSeconds}s");
+                    return;
+                }
+
+                // Check for duplicate timestamps
+                for (int i = 0; i < mostRecentChanges_usedSize; ++i)
+                {
+                    var item = mostRecentChanges[i];
+                    if (item.elapsedTicksAtChange == elapsedTicksAtChange)
+                    {
+                        return; // Avoid adding items with same timestamp
+                    }
+
+                    if (item.elapsedTicksAtChange < elapsedTicksAtChange)
+                    {
+                        // Insert new snapshot (more recent than current) at position i
+                        for (int j = mostRecentChanges_usedSize; j >= i; --j)
+                        {
+                            if (j < (mostRecentChanges_capacitySize - 1))
+                            {
+                                mostRecentChanges[j + 1] = mostRecentChanges[j];
+                            }
+                        }
+
+                        bool isPreviousValuePresent = (i + 1) < mostRecentChanges_usedSize;
+                        if (isPreviousValuePresent)
+                        {
+                            AdjustValueOnExpectedUpcomingNewBaseline_IfAppropriate(ref synthesizedValue, mostRecentChanges[i + 1].numericValue);
+                        }
+
+                        // CRITICAL: Use CreateFromVelocityPacket to store velocity metadata
+                        mostRecentChanges[i] = NumericValueChangeSnapshot.CreateFromVelocityPacket(elapsedTicksAtChange, synthesizedValue, velocityValue);
+                        if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
+                        {
+                            ++mostRecentChanges_usedSize;
+                        }
+
+                        if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 &&
+                            (elapsedTicksAtChange - hasAwaitingAtRest_lastProcessedAtRestTicks) > AT_REST_CLEAR_THRESHOLD_TICKS)
+                        {
+                            GONetLog.Debug($"[AT-REST-CLEARED-VEL] index:{index} - object moving again");
+                            hasAwaitingAtRest_lastProcessedAtRestTicks = 0;
+                        }
+
+                        return;
+                    }
+                }
+
+                // Add at the end if we made it here
+                if (mostRecentChanges_usedSize < mostRecentChanges_capacitySize)
+                {
+                    mostRecentChanges[mostRecentChanges_usedSize] = NumericValueChangeSnapshot.CreateFromVelocityPacket(elapsedTicksAtChange, synthesizedValue, velocityValue);
+                    ++mostRecentChanges_usedSize;
+
+                    if (hasAwaitingAtRest_lastProcessedAtRestTicks > 0 &&
+                        (elapsedTicksAtChange - hasAwaitingAtRest_lastProcessedAtRestTicks) > AT_REST_CLEAR_THRESHOLD_TICKS)
+                    {
+                        GONetLog.Debug($"[AT-REST-CLEARED-VEL] index:{index} - object moving again");
+                        hasAwaitingAtRest_lastProcessedAtRestTicks = 0;
+                    }
+                }
+            }
+
             private void AdjustValueOnExpectedUpcomingNewBaseline_IfAppropriate(ref GONetSyncableValue valueNew, GONetSyncableValue valuePrevious)
             {
                 switch (valueNew.GONetSyncType)
@@ -10556,8 +10637,8 @@ namespace GONet
                                                       $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                     }
 
-                                    // Store synthesized position as snapshot
-                                    syncCompanion.InitSingle(synthesizedValue, index, elapsedTicksAtSend);
+                                    // Store synthesized position as snapshot WITH velocity metadata for velocity-aware blending
+                                    changesSupport.AddToMostRecentChangeQueue_IfAppropriate_WithVelocity(elapsedTicksAtSend, synthesizedValue, velocityValue);
                                 }
                                 else
                                 {
