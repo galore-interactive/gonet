@@ -31,6 +31,5 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 14
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetValueBlending_Quaternion_ExtrapolateWithLowPassSmoothingFilter,
-        Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Quaternion_HighPerformance, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 1

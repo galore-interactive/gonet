@@ -255,7 +255,13 @@ namespace GONet.Editor.Generation
                         string velBitCount = singleMember.attribute.VelocityQuantizeDownToBitCount.ToString();
                         string velLowerBound = singleMember.attribute.VelocityQuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
                         string velUpperBound = singleMember.attribute.VelocityQuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
-                        sb.Append("\t\t\tcachedVelocitySerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(velBitCount).Append(", ").Append(velLowerBound).Append(", ").Append(velUpperBound).AppendLine(");");
+
+                        // CRITICAL: Quaternion angular velocity uses Vector3Serializer (not QuaternionSerializer!)
+                        string velocitySerializerType = singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName
+                            ? "GONet.Vector3Serializer"
+                            : singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".");
+
+                        sb.Append("\t\t\tcachedVelocitySerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(velocitySerializerType).Append(">(").Append(velBitCount).Append(", ").Append(velLowerBound).Append(", ").Append(velUpperBound).AppendLine(");");
                         sb.AppendLine();
                     }
                     if (singleMember.attribute.CustomValueBlending_Instance != null)
@@ -902,12 +908,12 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                // Angular velocity stored as Vector3 (uses Vector3 serializer)
-                // For Quaternion rotation, angular velocity is Vector3, so we need Vector3 serializer
-                sb.Append(indent).AppendLine($"\t\t// Angular velocity uses Vector3 serializer (not Quaternion)");
-                sb.Append(indent).AppendLine($"\t\t// Create temporary Vector3 serializer for angular velocity");
-                sb.Append(indent).AppendLine($"\t\tvar vector3Serializer = new GONet.Vector3Serializer();");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = vector3Serializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
+                // Angular velocity stored as Vector3 (uses cached Vector3Serializer with proper quantization)
+                // For Quaternion rotation, angular velocity is Vector3, so we use cachedVelocitySerializers
+                // which was initialized with Vector3Serializer (not QuaternionSerializer!) in the constructor
+                sb.Append(indent).AppendLine($"\t\t// Angular velocity uses cachedVelocitySerializers[{iOverall}] (Vector3Serializer with dynamic quantization)");
+                sb.Append(indent).AppendLine($"\t\tIGONetAutoMagicalSync_CustomSerializer angularVelocitySerializer = cachedVelocitySerializers[{iOverall}];");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = angularVelocitySerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
             }
 
             sb.AppendLine();

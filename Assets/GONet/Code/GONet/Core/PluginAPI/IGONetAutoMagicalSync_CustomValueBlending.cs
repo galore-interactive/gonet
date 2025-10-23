@@ -3111,5 +3111,27 @@ namespace GONet.PluginAPI
         }
     }
 
+    public class GONetValueBlending_Quaternion_HighPerformance : IGONetAutoMagicalSync_CustomValueBlending
+    {
+        public GONetSyncableValueTypes AppliesOnlyToGONetType => GONetSyncableValueTypes.UnityEngine_Quaternion;
+
+        public string Description => "High performance pass-through - returns most recent value without blending or extrapolation. Use for testing or when velocity-augmented sync handles smoothing.";
+
+        public bool TryGetBlendedValue(
+            NumericValueChangeSnapshot[] valueBuffer, int valueCount, long atElapsedTicks, out GONetSyncableValue blendedValue, out bool didExtrapolate)
+        {
+            if (valueCount == 0)
+            {
+                blendedValue = Quaternion.identity;
+                didExtrapolate = false;
+                return false;
+            }
+
+            blendedValue = valueBuffer[0].numericValue; // choose most recent value
+            didExtrapolate = false;
+            return true;
+        }
+    }
+
     #endregion
 }
