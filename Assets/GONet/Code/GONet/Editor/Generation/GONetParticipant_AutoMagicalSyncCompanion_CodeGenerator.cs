@@ -1596,17 +1596,22 @@ namespace GONet.Editor.Generation
             int physicsUpdateInterval,
             bool isQuaternion)
         {
+            // Determine sync interval (used by both Quaternion and standard calculation)
+            float syncInterval = physicsUpdateInterval > 0
+                ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
+                : syncChangesEverySeconds;
+
+            if (syncInterval <= 0.0001f)
+            {
+                syncInterval = 0.033f; // Fallback to 30 Hz
+            }
+
             // Special handling for Quaternion (angular velocity)
             if (isQuaternion)
             {
                 // Quaternion uses smallest-three compression with fixed range: ±(1/√2) ≈ ±0.707 per component
                 // With 9-bit default, this gives ~0.16° rotation precision
                 float rotationPrecisionDegrees = 0.16f;
-
-                // Determine sync interval
-                float syncInterval = physicsUpdateInterval > 0
-                    ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
-                    : syncChangesEverySeconds;
 
                 // Calculate maximum sub-quantization angular velocity (degrees/sec)
                 float maxAngularVelocityDegrees = rotationPrecisionDegrees / syncInterval;
@@ -1633,16 +1638,6 @@ namespace GONet.Editor.Generation
             // Calculate VALUE precision
             float valueRange = valueUpperBound - valueLowerBound;
             float valuePrecision = valueRange / ((1 << valueBitCount) - 1);
-
-            // Determine sync interval
-            float syncInterval = physicsUpdateInterval > 0
-                ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
-                : syncChangesEverySeconds;
-
-            if (syncInterval <= 0.0001f)
-            {
-                syncInterval = 0.033f; // Fallback to 30 Hz
-            }
 
             // Calculate maximum sub-quantization velocity
             float maxSubQuantizationVelocity = valuePrecision / syncInterval;
