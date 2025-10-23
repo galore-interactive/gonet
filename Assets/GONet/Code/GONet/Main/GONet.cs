@@ -10601,8 +10601,18 @@ namespace GONet
 
                                 if (recentChangesCount >= 1)
                                 {
-                                    // Get last known position
-                                    var lastSnapshot = changesSupport.mostRecentChanges[0];
+                                    // Get last RECEIVED VALUE (not synthesized) to use as baseline for velocity synthesis
+                                    // If we use a synthesized snapshot, we'll compound errors (synthesizing from synthesized data)
+                                    NumericValueChangeSnapshot lastSnapshot = changesSupport.mostRecentChanges[0];
+                                    for (int i = 0; i < recentChangesCount; i++)
+                                    {
+                                        var snapshot = changesSupport.mostRecentChanges[i];
+                                        if (!snapshot.wasSynthesizedFromVelocity)
+                                        {
+                                            lastSnapshot = snapshot;
+                                            break;
+                                        }
+                                    }
 
                                     // Calculate DETERMINISTIC deltaTime based on sync settings (matching server calculation)
                                     // This ensures client uses IDENTICAL deltaTime that server used for velocity calculation
@@ -10671,8 +10681,18 @@ namespace GONet
                                     int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
                                     if (recentChangesCount >= 1)
                                     {
-                                        // Get last known position
-                                        var lastSnapshot = changesSupport.mostRecentChanges[0];
+                                        // Get last RECEIVED VALUE (not synthesized) to use as baseline for velocity synthesis
+                                        // If we use a synthesized snapshot, we'll compound errors (synthesizing from synthesized data)
+                                        NumericValueChangeSnapshot lastSnapshot = changesSupport.mostRecentChanges[0];
+                                        for (int i = 0; i < recentChangesCount; i++)
+                                        {
+                                            var snapshot = changesSupport.mostRecentChanges[i];
+                                            if (!snapshot.wasSynthesizedFromVelocity)
+                                            {
+                                                lastSnapshot = snapshot;
+                                                break;
+                                            }
+                                        }
 
                                         // Calculate DETERMINISTIC deltaTime (matching server and VELOCITY bundle path)
                                         float deltaTime;

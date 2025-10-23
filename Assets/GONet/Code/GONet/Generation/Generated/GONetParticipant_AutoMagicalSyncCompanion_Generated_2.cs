@@ -526,18 +526,21 @@ namespace GONet.Generation
 						int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
 						GONetSyncableValue velocityValue;
 						
-						if (recentChangesCount >= 2)
+						// CRITICAL: Use lastKnownValue (authority's transform) NOT mostRecentChanges (client blending queue)
+						var current = changesSupport.lastKnownValue;
+						var previous = changesSupport.lastKnownValue_previous;
+						
+						// Check if we have valid previous value
+						if (current.GONetSyncType == previous.GONetSyncType && current.GONetSyncType != GONet.GONetSyncableValueTypes.System_Boolean)
 						{
-							var current = changesSupport.mostRecentChanges[0];
-							var previous = changesSupport.mostRecentChanges[1];
 							// DETERMINISTIC deltaTime for FixedUpdate path: Time.fixedDeltaTime × 1
 							float deltaTime = UnityEngine.Time.fixedDeltaTime * 1f;
 						
 							if (deltaTime > 0.0001f)
 							{
 								// Angular velocity for Quaternion (stored as Vector3)
-								UnityEngine.Quaternion currentValue = current.numericValue.UnityEngine_Quaternion;
-								UnityEngine.Quaternion previousValue = previous.numericValue.UnityEngine_Quaternion;
+								UnityEngine.Quaternion currentValue = current.UnityEngine_Quaternion;
+								UnityEngine.Quaternion previousValue = previous.UnityEngine_Quaternion;
 						
 								// DIAGNOSTIC: Log rotation values
 								GONet.GONetLog.Debug($"[AngularVelCalc][{gonetParticipant.GONetId}][idx:7] current={currentValue.eulerAngles}, previous={previousValue.eulerAngles}, deltaTime={deltaTime:F4}s");
@@ -590,17 +593,20 @@ namespace GONet.Generation
 						int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
 						GONetSyncableValue velocityValue;
 						
-						if (recentChangesCount >= 2)
+						// CRITICAL: Use lastKnownValue (authority's transform) NOT mostRecentChanges (client blending queue)
+						var current = changesSupport.lastKnownValue;
+						var previous = changesSupport.lastKnownValue_previous;
+						
+						// Check if we have valid previous value
+						if (current.GONetSyncType == previous.GONetSyncType && current.GONetSyncType != GONet.GONetSyncableValueTypes.System_Boolean)
 						{
-							var current = changesSupport.mostRecentChanges[0];
-							var previous = changesSupport.mostRecentChanges[1];
 							// DETERMINISTIC deltaTime for FixedUpdate path: Time.fixedDeltaTime × 3
 							float deltaTime = UnityEngine.Time.fixedDeltaTime * 3f;
 						
 							if (deltaTime > 0.0001f)
 							{
-								UnityEngine.Vector3 currentValue = current.numericValue.UnityEngine_Vector3;
-								UnityEngine.Vector3 previousValue = previous.numericValue.UnityEngine_Vector3;
+								UnityEngine.Vector3 currentValue = current.UnityEngine_Vector3;
+								UnityEngine.Vector3 previousValue = previous.UnityEngine_Vector3;
 						
 								// DIAGNOSTIC: Log snapshot values and velocity calculation
 								GONet.GONetLog.Debug($"[VelocityCalc][{gonetParticipant.GONetId}][idx:8] current={currentValue}, previous={previousValue}, deltaTime={deltaTime:F4}s");
@@ -795,7 +801,9 @@ namespace GONet.Generation
 				{ // GONetParticipant.GONetId
 					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[0] : cachedValueSerializers[0];
-					var value = customSerializer.Deserialize(bitStream_readFrom).System_UInt32;
+					GONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);
+					var typedValue = value.System_UInt32;
+					value.System_UInt32 = typedValue;
 					return value;
 				}
 				case 1:
@@ -844,18 +852,22 @@ namespace GONet.Generation
 				{ // Transform.rotation
 					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[7] : cachedValueSerializers[7];
-					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Quaternion;
+					GONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);
+					var typedValue = value.UnityEngine_Quaternion;
+					value.UnityEngine_Quaternion = typedValue;
 					return value;
 				}
 				case 8:
 				{ // Transform.position
 					// Velocity-augmented sync: Choose serializer based on packet type (VALUE vs VELOCITY)
 					IGONetAutoMagicalSync_CustomSerializer customSerializer = useVelocitySerializer ? cachedVelocitySerializers[8] : cachedValueSerializers[8];
-					var value = customSerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;
+					GONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);
+					var typedValue = value.UnityEngine_Vector3;
 					if (!useVelocitySerializer)
 					{
-						value += valuesChangesSupport[8].baselineValue_current.UnityEngine_Vector3;
+						typedValue += valuesChangesSupport[8].baselineValue_current.UnityEngine_Vector3;
 					}
+					value.UnityEngine_Vector3 = typedValue;
 					return value;
 				}
 			}

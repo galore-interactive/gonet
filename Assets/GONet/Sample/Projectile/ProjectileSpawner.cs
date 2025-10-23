@@ -186,7 +186,7 @@ public class ProjectileSpawner : GONetBehaviour
             if (shouldInstantiateBasedOnInput)
             {
                 // Spawn 9 projectiles in a spread pattern (160 degree arc)
-                const int PROJECTILE_COUNT = 9;
+                const int PROJECTILE_COUNT = 1; // TODO back to 9;
                 const float SPREAD_ANGLE = 160f; // Total spread in degrees
                 const float ANGLE_INCREMENT = SPREAD_ANGLE / (PROJECTILE_COUNT - 1); // Evenly distributed
                 const float START_ANGLE = -SPREAD_ANGLE / 2f; // Start at -80 degrees
@@ -222,8 +222,9 @@ public class ProjectileSpawner : GONetBehaviour
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
                 }
 
-                // Spawn just ONE set of 5 addressable physics cubes (not per projectile)
-                for (int i = 0; i < 5; i++)
+                const int PHYSICS_CUBE_COUNT = 1; // TODO back to 5;
+                // Spawn just ONE set of PHYSICS_CUBE_COUNT addressable physics cubes (not per projectile)
+                for (int i = 0; i < PHYSICS_CUBE_COUNT; i++)
                 {
                     float angleOffset = START_ANGLE + (i * (SPREAD_ANGLE / 4f)); // 5 cubes spread across arc
 
