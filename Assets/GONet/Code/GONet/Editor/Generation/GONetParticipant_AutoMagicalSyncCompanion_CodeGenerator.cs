@@ -249,6 +249,22 @@ namespace GONet.Editor.Generation
 
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBoundForRuntimeFields).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBoundForRuntimeFields).AppendLine(";");
+
+                    // OPTIMIZATION: Pre-calculate per-sync-interval bounds for efficient runtime checks
+                    // Convert from value-units/second to value-units-per-sync-interval
+                    // This eliminates division in hot path (range checking happens every VELOCITY frame)
+                    string deltaTimeCalc;
+                    if (singleMember.attribute.PhysicsUpdateInterval > 0)
+                    {
+                        deltaTimeCalc = $"UnityEngine.Time.fixedDeltaTime * {singleMember.attribute.PhysicsUpdateInterval}f";
+                    }
+                    else
+                    {
+                        deltaTimeCalc = $"{singleMember.attribute.SyncChangesEverySeconds.ToString("F6", CultureInfo.InvariantCulture)}f";
+                    }
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".velocityQuantizeLowerBound_PerSyncInterval = support").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound * ").Append(deltaTimeCalc).AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".velocityQuantizeUpperBound_PerSyncInterval = support").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound * ").Append(deltaTimeCalc).AppendLine(";");
+
                     // Initialize lastVelocityTimestamp to current time to prevent false "EXPIRED" on first VALUE bundle
                     // (uninitialized = 0 → age = currentTime - 0 = HUGE → immediate expiration)
                     sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastVelocityTimestamp = GONet.GONetMain.Time.ElapsedTicks;");
@@ -525,9 +541,8 @@ namespace GONet.Editor.Generation
         /// </summary>
         private void WriteVelocityCalculation(int iOverall, string memberTypeFullName, GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember, string indent)
         {
-            sb.Append(indent).AppendLine("// VELOCITY BUNDLE: Calculate velocity from last two snapshots");
+            sb.Append(indent).AppendLine("// VELOCITY BUNDLE: Send raw delta (no division - optimization!)");
             sb.Append(indent).AppendLine($"var changesSupport = valuesChangesSupport[{iOverall}];");
-            sb.Append(indent).AppendLine("int recentChangesCount = changesSupport.mostRecentChanges_usedSize;");
             sb.Append(indent).AppendLine("GONetSyncableValue velocityValue;");
             sb.Append(indent).AppendLine();
             sb.Append(indent).AppendLine("// CRITICAL: Use lastKnownValue (authority's transform) NOT mostRecentChanges (client blending queue)");
@@ -538,116 +553,80 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("if (current.GONetSyncType == previous.GONetSyncType && current.GONetSyncType != GONet.GONetSyncableValueTypes.System_Boolean)");
             sb.Append(indent).AppendLine("{");
 
-            // Calculate DETERMINISTIC deltaTime based on sync settings (not snapshot timestamps!)
-            // This ensures both server and client use IDENTICAL deltaTime for velocity calculations
-            if (singleMember.attribute.PhysicsUpdateInterval > 0)
-            {
-                // FIXEDUPDATE path: deltaTime = Time.fixedDeltaTime × PhysicsUpdateInterval
-                int physicsInterval = singleMember.attribute.PhysicsUpdateInterval;
-                sb.Append(indent).AppendLine($"\t// DETERMINISTIC deltaTime for FixedUpdate path: Time.fixedDeltaTime × {physicsInterval}");
-                sb.Append(indent).AppendLine($"\tfloat deltaTime = UnityEngine.Time.fixedDeltaTime * {physicsInterval}f;");
-            }
-            else
-            {
-                // UPDATE path: deltaTime = SyncChangesEverySeconds
-                float deltaTime = singleMember.attribute.SyncChangesEverySeconds;
-                sb.Append(indent).AppendLine($"\t// DETERMINISTIC deltaTime for Update path: {deltaTime:F6}s (from SyncChangesEverySeconds)");
-                sb.Append(indent).AppendLine($"\tfloat deltaTime = {deltaTime.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}f;");
-            }
-
-            sb.Append(indent).AppendLine();
-            sb.Append(indent).AppendLine("\tif (deltaTime > 0.0001f)");
-            sb.Append(indent).AppendLine("\t{");
-
-            // Type-specific velocity calculation
+            // Type-specific raw delta calculation (NO DIVISION - OPTIMIZATION!)
             if (memberTypeFullName == typeof(float).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tfloat currentValue = current.System_Single;");
-                sb.Append(indent).AppendLine("\t\tfloat previousValue = previous.System_Single;");
-                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-                sb.Append(indent).AppendLine("\t\tvelocityValue.System_Single = (currentValue - previousValue) / deltaTime;");
+                sb.Append(indent).AppendLine("\t// OPTIMIZATION: Send raw delta (meters-per-sync-interval), not velocity (m/s)");
+                sb.Append(indent).AppendLine("\tfloat currentValue = current.System_Single;");
+                sb.Append(indent).AppendLine("\tfloat previousValue = previous.System_Single;");
+                sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\tvelocityValue.System_Single = currentValue - previousValue;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 currentValue = current.UnityEngine_Vector2;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 previousValue = previous.UnityEngine_Vector2;");
-                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector2 = (currentValue - previousValue) / deltaTime;");
+                sb.Append(indent).AppendLine("\t// OPTIMIZATION: Send raw delta (meters-per-sync-interval), not velocity (m/s)");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector2 currentValue = current.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector2 previousValue = previous.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector2 = currentValue - previousValue;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 currentValue = current.UnityEngine_Vector3;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 previousValue = previous.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\t// OPTIMIZATION: Send raw delta (meters-per-sync-interval), not velocity (m/s)");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector3 currentValue = current.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector3 previousValue = previous.UnityEngine_Vector3;");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log snapshot values and velocity calculation");
-                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue}}, previous={{previousValue}}, deltaTime={{deltaTime:F4}}s\");");
+                sb.Append(indent).AppendLine($"\t// DIAGNOSTIC: Log snapshot values");
+                sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue}}, previous={{previousValue}}\");");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = (currentValue - previousValue) / deltaTime;");
+                sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = currentValue - previousValue;");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated velocity={{velocityValue.UnityEngine_Vector3}}\");");
+                sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated raw delta={{velocityValue.UnityEngine_Vector3}}\");");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 currentValue = current.UnityEngine_Vector4;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 previousValue = previous.UnityEngine_Vector4;");
-                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector4 = (currentValue - previousValue) / deltaTime;");
+                sb.Append(indent).AppendLine("\t// OPTIMIZATION: Send raw delta (value-units-per-sync-interval), not velocity");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector4 currentValue = current.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector4 previousValue = previous.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector4 = currentValue - previousValue;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                sb.Append(indent).AppendLine("\t\t// Angular velocity for Quaternion (stored as Vector3)");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion currentValue = current.UnityEngine_Quaternion;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion previousValue = previous.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t// Angular velocity for Quaternion (stored as Vector3 axis-angle)");
+                sb.Append(indent).AppendLine("\tUnityEngine.Quaternion currentValue = current.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Quaternion previousValue = previous.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log rotation values");
-                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue.eulerAngles}}, previous={{previousValue.eulerAngles}}, deltaTime={{deltaTime:F4}}s\");");
+                sb.Append(indent).AppendLine($"\t// DIAGNOSTIC: Log rotation values");
+                sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue.eulerAngles}}, previous={{previousValue.eulerAngles}}\");");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);");
-                sb.Append(indent).AppendLine("\t\tdeltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;");
-                sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);");
+                sb.Append(indent).AppendLine("\tdeltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);");
+                sb.Append(indent).AppendLine("\t// NOTE: Quaternion still uses radians/sec for now (requires more complex optimization)");
+                sb.Append(indent).AppendLine("\t// Get deltaTime for quaternion angular velocity calculation");
+                if (singleMember.attribute.PhysicsUpdateInterval > 0)
+                {
+                    int physicsInterval = singleMember.attribute.PhysicsUpdateInterval;
+                    sb.Append(indent).AppendLine($"\tfloat deltaTime = UnityEngine.Time.fixedDeltaTime * {physicsInterval}f;");
+                }
+                else
+                {
+                    float deltaTime = singleMember.attribute.SyncChangesEverySeconds;
+                    sb.Append(indent).AppendLine($"\tfloat deltaTime = {deltaTime.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}f;");
+                }
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;");
+                sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
+                sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
                 sb.Append(indent).AppendLine();
-                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated angularVelocity={{angularVelocity}} rad/s, degrees/s={{angularVelocity * UnityEngine.Mathf.Rad2Deg}}\");");
+                sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated angularVelocity={{angularVelocity}} rad/s, degrees/s={{angularVelocity * UnityEngine.Mathf.Rad2Deg}}\");");
             }
 
-            sb.Append(indent).AppendLine("\t}");
-            sb.Append(indent).AppendLine("\telse");
-            sb.Append(indent).AppendLine("\t{");
-            sb.Append(indent).AppendLine("\t\t// Delta time too small, use zero velocity");
-            sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] DeltaTime too small: {{deltaTime:F6}}s\");");
-            sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
-
-            // CRITICAL FIX: Initialize velocity type properly to avoid System_Boolean default
-            if (memberTypeFullName == typeof(float).FullName)
-            {
-                sb.Append(indent).AppendLine("\t\tvelocityValue.System_Single = 0f;");
-            }
-            else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
-            {
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector2 = UnityEngine.Vector2.zero;");
-            }
-            else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
-            {
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
-            }
-            else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
-            {
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector4 = UnityEngine.Vector4.zero;");
-            }
-            else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
-            {
-                // Quaternion velocity is stored as Vector3 angular velocity
-                sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
-            }
-
-            sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine("else");
             sb.Append(indent).AppendLine("{");
-            sb.Append(indent).AppendLine("\t// Not enough snapshots, use zero velocity");
-            sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] Not enough snapshots: recentChangesCount={{recentChangesCount}}\");");
+            sb.Append(indent).AppendLine("\t// Type mismatch, use zero delta");
+            sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] Type mismatch or not initialized\");");
             sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
 
             // CRITICAL FIX: Initialize velocity type properly to avoid System_Boolean default
@@ -1477,18 +1456,38 @@ namespace GONet.Editor.Generation
                 else if (readOnly) // ReadOnlyNotApply - extract specific type from GONetSyncableValue
                 {
                     sb.Append(indent).AppendLine("\tGONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);");
-                    sb.Append(indent).Append("\tvar typedValue = value.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
-                    // VELOCITY-AUGMENTED SYNC FIX: Only add baseline for VALUE bundles, NOT VELOCITY bundles
-                    // When useVelocitySerializer=true, we're deserializing velocity (not delta-from-baseline)
-                    if (singleMember.attribute.QuantizeDownToBitCount > 0)
+
+                    // CRITICAL FIX: Quaternion VELOCITY bundles contain Vector3 angular velocity, NOT Quaternion!
+                    if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
                     {
-                        sb.Append(indent).AppendLine("\tif (!useVelocitySerializer)");
+                        sb.Append(indent).AppendLine("\tif (useVelocitySerializer)");
                         sb.Append(indent).AppendLine("\t{");
-                        sb.Append(indent).Append("\t\ttypedValue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                        sb.Append(indent).AppendLine("\t\t// VELOCITY bundle: Contains Vector3 angular velocity (rad/s)");
+                        sb.Append(indent).AppendLine("\t\tvar typedValue = value.UnityEngine_Vector3;");
+                        sb.Append(indent).AppendLine("\t\tvalue.UnityEngine_Vector3 = typedValue;");
+                        sb.Append(indent).AppendLine("\t}");
+                        sb.Append(indent).AppendLine("\telse");
+                        sb.Append(indent).AppendLine("\t{");
+                        sb.Append(indent).AppendLine("\t\t// VALUE bundle: Contains Quaternion rotation");
+                        sb.Append(indent).AppendLine("\t\tvar typedValue = value.UnityEngine_Quaternion;");
+                        sb.Append(indent).AppendLine("\t\tvalue.UnityEngine_Quaternion = typedValue;");
                         sb.Append(indent).AppendLine("\t}");
                     }
-                    // Update the GONetSyncableValue with the adjusted typed value before returning
-                    sb.Append(indent).Append("\tvalue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(" = typedValue;");
+                    else
+                    {
+                        sb.Append(indent).Append("\tvar typedValue = value.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                        // VELOCITY-AUGMENTED SYNC FIX: Only add baseline for VALUE bundles, NOT VELOCITY bundles
+                        // When useVelocitySerializer=true, we're deserializing velocity (not delta-from-baseline)
+                        if (singleMember.attribute.QuantizeDownToBitCount > 0)
+                        {
+                            sb.Append(indent).AppendLine("\tif (!useVelocitySerializer)");
+                            sb.Append(indent).AppendLine("\t{");
+                            sb.Append(indent).Append("\t\ttypedValue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                            sb.Append(indent).AppendLine("\t}");
+                        }
+                        // Update the GONetSyncableValue with the adjusted typed value before returning
+                        sb.Append(indent).Append("\tvalue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(" = typedValue;");
+                    }
                 }
             }
             else if (memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
@@ -1878,14 +1877,39 @@ namespace GONet.Editor.Generation
             bool isQuaternion)
         {
             // Determine sync interval (used by both Quaternion and standard calculation)
+            // NOTE: At code generation time (editor), UnityEngine.Time.fixedDeltaTime is 0!
+            // Read the actual fixedDeltaTime from Project Settings → Time.
+            float fixedDeltaTime = 0.02f; // Default Unity value (50Hz)
+            try
+            {
+                var timeManager = UnityEditor.AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TimeManager.asset");
+                if (timeManager != null && timeManager.Length > 0)
+                {
+                    var serializedObject = new UnityEditor.SerializedObject(timeManager[0]);
+                    var fixedTimestepProperty = serializedObject.FindProperty("Fixed Timestep");
+                    if (fixedTimestepProperty != null)
+                    {
+                        fixedDeltaTime = fixedTimestepProperty.floatValue;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to default if we can't read project settings
+                fixedDeltaTime = 0.02f;
+            }
+
             float syncInterval = physicsUpdateInterval > 0
-                ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
+                ? fixedDeltaTime * physicsUpdateInterval
                 : syncChangesEverySeconds;
 
             if (syncInterval <= 0.0001f)
             {
                 syncInterval = 0.033f; // Fallback to 30 Hz
             }
+            // DEBUG: Log calculation details
+            UnityEngine.Debug.Log($"[VelocityCalc] physicsUpdateInterval={physicsUpdateInterval}, fixedDeltaTime={fixedDeltaTime}, syncChangesEverySeconds={syncChangesEverySeconds}, syncInterval={syncInterval}, isQuaternion={isQuaternion}, valueLowerBound={valueLowerBound}, valueUpperBound={valueUpperBound}, valueBitCount={valueBitCount}");
+
 
             // Special handling for Quaternion (angular velocity)
             if (isQuaternion)
@@ -1895,10 +1919,8 @@ namespace GONet.Editor.Generation
                 float rotationPrecisionDegrees = 0.16f;
 
                 // Calculate maximum sub-quantization angular velocity (degrees/sec)
+                // This is the quantization step per sync interval, converted to velocity (per second)
                 float maxAngularVelocityDegrees = rotationPrecisionDegrees / syncInterval;
-
-                // Apply safety margin (3× for tolerance)
-                maxAngularVelocityDegrees *= 3.0f;
 
                 // Convert to radians/sec (angular velocity stored as Vector3 in radians)
                 float maxAngularVelocityRad = maxAngularVelocityDegrees * UnityEngine.Mathf.Deg2Rad;
@@ -1916,15 +1938,20 @@ namespace GONet.Editor.Generation
                 return (-20f, 20f, 18);
             }
 
-            // Calculate VALUE precision
+            // Calculate VALUE precision (quantization step size in value units per sync interval)
             float valueRange = valueUpperBound - valueLowerBound;
             float valuePrecision = valueRange / ((1 << valueBitCount) - 1);
 
-            // Calculate maximum sub-quantization velocity
+            // Convert quantization step to equivalent velocity (value-units per SECOND)
+            // This value will be multiplied by deltaTime at line 265-266 to get per-interval bounds
+            // for runtime range checking.
+            //
+            // CRITICAL: No safety margin! We want to detect movements smaller than ONE quantization step.
+            // Example: Transform.position with 18-bit quantization over [-125, 125], syncInterval=0.075s
+            // → valuePrecision = 250 / (2^18 - 1) ≈ 0.000954 meters (~0.95mm per step)
+            // → maxSubQuantizationVelocity = 0.000954 / 0.075 ≈ 0.0127 m/s
+            // → Runtime bounds (after * deltaTime): 0.0127 * 0.075 = 0.000954 meters (one quantization step!)
             float maxSubQuantizationVelocity = valuePrecision / syncInterval;
-
-            // Apply safety margin (3× for tolerance)
-            float velocityRange = maxSubQuantizationVelocity * 3.0f;
 
             // For dynamic mode (sub-quantization detection), use FULL VALUE precision
             // Velocity deltas must have same resolution as position quantization to accurately
@@ -1937,7 +1964,7 @@ namespace GONet.Editor.Generation
             // For manual mode, this method isn't called (user specifies bit count directly)
             int bitCount = valueBitCount;
 
-            return (-velocityRange, velocityRange, bitCount);
+            return (-maxSubQuantizationVelocity, maxSubQuantizationVelocity, bitCount);
         }
     }
 }

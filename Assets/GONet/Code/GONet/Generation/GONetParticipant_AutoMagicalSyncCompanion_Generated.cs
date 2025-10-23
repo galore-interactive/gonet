@@ -506,36 +506,21 @@ namespace GONet.Generation
                 return false; // Types don't match - not initialized yet
             }
 
-            // Get velocity quantization bounds from sync attribute
-            float lowerBound = changesSupport.syncAttribute_VelocityQuantizeLowerBound;
-            float upperBound = changesSupport.syncAttribute_VelocityQuantizeUpperBound;
+            // OPTIMIZATION: Use pre-calculated per-sync-interval bounds (no division required)
+            // These were calculated at initialization: bounds_per_second * deltaTime
+            float lowerBoundPerInterval = changesSupport.velocityQuantizeLowerBound_PerSyncInterval;
+            float upperBoundPerInterval = changesSupport.velocityQuantizeUpperBound_PerSyncInterval;
 
-            // Get deterministic deltaTime (matches code generator calculation)
-            float deltaTime;
-            if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
-            {
-                deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
-            }
-            else
-            {
-                deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
-            }
-
-            if (deltaTime <= 0.0001f)
-            {
-                return false; // Avoid division by zero
-            }
-
-            // Calculate velocity based on value type
+            // Calculate raw delta (no division) and compare against per-interval bounds
             switch (changesSupport.codeGenerationMemberType)
             {
                 case GONetSyncableValueTypes.UnityEngine_Vector3:
                     {
-                        var velocity = (current.UnityEngine_Vector3 - previous.UnityEngine_Vector3) / deltaTime;
-                        // Check each component
-                        return velocity.x >= lowerBound && velocity.x <= upperBound &&
-                               velocity.y >= lowerBound && velocity.y <= upperBound &&
-                               velocity.z >= lowerBound && velocity.z <= upperBound;
+                        var positionDelta = current.UnityEngine_Vector3 - previous.UnityEngine_Vector3;
+                        // Check each component against per-interval bounds
+                        return positionDelta.x >= lowerBoundPerInterval && positionDelta.x <= upperBoundPerInterval &&
+                               positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval &&
+                               positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval;
                     }
 
                 case GONetSyncableValueTypes.UnityEngine_Quaternion:
@@ -547,8 +532,8 @@ namespace GONet.Generation
 
                 case GONetSyncableValueTypes.System_Single:
                     {
-                        var velocity = (current.System_Single - previous.System_Single) / deltaTime;
-                        return velocity >= lowerBound && velocity <= upperBound;
+                        var valueDelta = current.System_Single - previous.System_Single;
+                        return valueDelta >= lowerBoundPerInterval && valueDelta <= upperBoundPerInterval;
                     }
 
                 default:

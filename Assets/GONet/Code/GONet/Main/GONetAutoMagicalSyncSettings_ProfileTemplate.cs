@@ -161,7 +161,7 @@ namespace GONet
                  "RECOMMENDED: 8-10 bits for most use cases\n" +
                  "8 bits = 0.156 units/sec resolution (256 values)\n" +
                  "10 bits = 0.039 units/sec resolution (1024 values)")]
-        [Range(4, 16)]
+        [Range(1, 31)]
         public byte VelocityQuantizeDownToBitCount = 10;
 
         /// <summary>

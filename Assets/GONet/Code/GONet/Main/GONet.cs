@@ -7601,16 +7601,30 @@ namespace GONet
             internal bool isVelocityEligible;
 
             /// <summary>
-            /// Velocity quantization lower bound from sync attribute.
-            /// Used for range checking before sending VELOCITY bundles.
+            /// Velocity quantization lower bound from sync attribute (in value-units/second).
+            /// User-configured value for ease of use.
             /// </summary>
             internal float syncAttribute_VelocityQuantizeLowerBound;
 
             /// <summary>
-            /// Velocity quantization upper bound from sync attribute.
-            /// Used for range checking before sending VELOCITY bundles.
+            /// Velocity quantization upper bound from sync attribute (in value-units/second).
+            /// User-configured value for ease of use.
             /// </summary>
             internal float syncAttribute_VelocityQuantizeUpperBound;
+
+            /// <summary>
+            /// PRE-CALCULATED lower bound for velocity in value-units-per-sync-interval.
+            /// = syncAttribute_VelocityQuantizeLowerBound * deltaTime
+            /// Used for efficient runtime range checking (no division required).
+            /// </summary>
+            internal float velocityQuantizeLowerBound_PerSyncInterval;
+
+            /// <summary>
+            /// PRE-CALCULATED upper bound for velocity in value-units-per-sync-interval.
+            /// = syncAttribute_VelocityQuantizeUpperBound * deltaTime
+            /// Used for efficient runtime range checking (no division required).
+            /// </summary>
+            internal float velocityQuantizeUpperBound_PerSyncInterval;
 
             /// <summary>
             /// Last received velocity value from VELOCITY bundle.

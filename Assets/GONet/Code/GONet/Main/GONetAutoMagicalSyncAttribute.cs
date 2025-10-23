@@ -174,18 +174,22 @@ namespace GONet
         public bool IsVelocityEligible = false;
 
         /// <summary>
-        /// VELOCITY-AUGMENTED SYNC: Lower bound for velocity quantization.
+        /// VELOCITY-AUGMENTED SYNC: Lower bound for velocity quantization (rate of change per second).
         /// Only used when QuantizeDownToBitCount > 0 and IsVelocityEligible = true.
         /// Values outside [VelocityQuantizeLowerBound, VelocityQuantizeUpperBound] will fall back to VALUE bundles.
-        /// Default: -20 (units/second for Vector3, radians/second for Quaternion)
+        /// Units: value-units/second (e.g., meters/second for Vector3, radians/second for Quaternion)
+        /// Default: -20
+        /// NOTE: Internally converted to value-units-per-sync-interval for efficient runtime checks.
         /// </summary>
         public float VelocityQuantizeLowerBound = -20f;
 
         /// <summary>
-        /// VELOCITY-AUGMENTED SYNC: Upper bound for velocity quantization.
+        /// VELOCITY-AUGMENTED SYNC: Upper bound for velocity quantization (rate of change per second).
         /// Only used when QuantizeDownToBitCount > 0 and IsVelocityEligible = true.
         /// Values outside [VelocityQuantizeLowerBound, VelocityQuantizeUpperBound] will fall back to VALUE bundles.
-        /// Default: 20 (units/second for Vector3, radians/second for Quaternion)
+        /// Units: value-units/second (e.g., meters/second for Vector3, radians/second for Quaternion)
+        /// Default: 20
+        /// NOTE: Internally converted to value-units-per-sync-interval for efficient runtime checks.
         /// </summary>
         public float VelocityQuantizeUpperBound = 20f;
 

@@ -1,4 +1,4 @@
-﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
+/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential, email: contactus@galoreinteractive.com
  * 
@@ -3707,7 +3707,7 @@ namespace GONet.Generation
 
             if (!string.IsNullOrWhiteSpace(attribute.SettingsProfileTemplateName))
             {
-                GONetAutoMagicalSyncSettings_ProfileTemplate profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, attribute.SettingsProfileTemplateName).Replace(".asset", string.Empty));
+                GONetAutoMagicalSyncSettings_ProfileTemplate profile = LoadProfileAsset(attribute.SettingsProfileTemplateName);
 
                 if (profile == null)
                 {
@@ -3715,7 +3715,7 @@ namespace GONet.Generation
                     const string DEFAULT = ".  We will use the default profile/template instead (creating it if we have to).";
                     GONetLog.Warning(string.Concat(UNABLE, attribute.SettingsProfileTemplateName, DEFAULT));
 
-                    var defaultProfile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT).Replace(".asset", string.Empty));
+                    var defaultProfile = LoadProfileAsset(GONetAutoMagicalSyncAttribute.PROFILE_TEMPLATE_NAME___DEFAULT);
 
                     if (defaultProfile == null)
                     {
@@ -3745,6 +3745,9 @@ namespace GONet.Generation
                     profile = defaultProfile;
                 }
 
+
+
+
                 attribute.MustRunOnUnityMainThread = profile.MustRunOnUnityMainThread;
                 attribute.ProcessingPriority = profile.ProcessingPriority;
                 attribute.QuantizeDownToBitCount = profile.QuantizeDownToBitCount;
@@ -3754,6 +3757,9 @@ namespace GONet.Generation
                 attribute.ShouldBlendBetweenValuesReceived = profile.ShouldBlendBetweenValuesReceived;
                 attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
                 attribute.PhysicsUpdateInterval = profile.PhysicsUpdateInterval;
+                // DEBUG: Log profile application
+                UnityEngine.Debug.Log($"[ProfileApply] memberName={memberName}, profileName={attribute.SettingsProfileTemplateName}, PhysicsUpdateInterval={attribute.PhysicsUpdateInterval}, syncChangesEverySeconds={attribute.SyncChangesEverySeconds}");
+
 
                 // VELOCITY-AUGMENTED SYNC: Copy velocity quantization settings from profile to attribute
                 attribute.IsVelocityEligible = profile.IsVelocityEligible;
@@ -3850,6 +3856,38 @@ namespace GONet.Generation
             { typeof(Vector2), GONetSyncableValueTypes.UnityEngine_Vector2 },
             { typeof(Vector4), GONetSyncableValueTypes.UnityEngine_Vector4 },
         };
+
+        /// <summary>
+        /// Loads a sync profile asset using AssetDatabase (editor-time reliable) with fallback to Resources.Load.
+        /// CRITICAL: Resources.Load() can fail during code generation in the Editor, so we use AssetDatabase.LoadAssetAtPath as primary method.
+        /// </summary>
+        private static GONetAutoMagicalSyncSettings_ProfileTemplate LoadProfileAsset(string profileName)
+        {
+            // CRITICAL: Use AssetDatabase for reliable editor-time loading (Resources.Load can fail during code generation)
+            string assetPath = $"Assets/GONet/Resources/GONet/SyncSettingsProfiles/{profileName}.asset";
+            GONetAutoMagicalSyncSettings_ProfileTemplate profile = UnityEditor.AssetDatabase.LoadAssetAtPath<GONetAutoMagicalSyncSettings_ProfileTemplate>(assetPath);
+            
+            if (profile != null)
+            {
+                UnityEngine.Debug.Log($"[ProfileLoad] SUCCESS via AssetDatabase: {profileName} at {assetPath}, PhysicsUpdateInterval={profile.PhysicsUpdateInterval}");
+                return profile;
+            }
+            
+            // Fallback to Resources.Load (shouldn't be needed, but provides redundancy)
+            string resourcesPath = string.Format(SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI, profileName).Replace(".asset", string.Empty);
+            profile = Resources.Load<GONetAutoMagicalSyncSettings_ProfileTemplate>(resourcesPath);
+            
+            if (profile != null)
+            {
+                UnityEngine.Debug.LogWarning($"[ProfileLoad] Loaded via Resources.Load fallback: {profileName}, PhysicsUpdateInterval={profile.PhysicsUpdateInterval}");
+            }
+            else
+            {
+                UnityEngine.Debug.LogError($"[ProfileLoad] FAILED to load profile via both AssetDatabase and Resources: {profileName}");
+            }
+            
+            return profile;
+        }
 
         public const string SYNC_PROFILE_RESOURCES_FOLDER_FORMATSKI = "GONet/SyncSettingsProfiles/{0}.asset";
     }
