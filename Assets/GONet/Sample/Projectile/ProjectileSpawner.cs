@@ -208,8 +208,8 @@ public class ProjectileSpawner : GONetBehaviour
                     Quaternion spreadRotation = Quaternion.LookRotation(spreadDirection, transform.up);
 
                     GONetParticipant gnp = default;
-                    bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 0.5f;
-                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.0f;
+                    bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 1.5f; // TODO back to 0.5f
+                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.0f; // TODO back to 0.5f
                     if (shouldClientOwn)
                     {
                         gnp = Instantiate(shouldBeZeroSync ? projectilPrefab_zeroSync : projectilPrefab, transform.position, spreadRotation);

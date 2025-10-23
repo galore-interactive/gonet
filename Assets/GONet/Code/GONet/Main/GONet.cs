@@ -10724,12 +10724,14 @@ namespace GONet
                                                           $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
                                         }
 
-                                        // CRITICAL FIX: Apply RECEIVED VALUE (not synthesized) to ensure ground truth baseline
-                                        // Problem: If we apply synthesized, we NEVER store the actual authority value
-                                        // Result: All snapshots become synthesized → no ground truth for future VELOCITY bundles
-                                        // Solution: Accept quantization jitter on VALUE bundles, use VELOCITY for smooth synthesis
-                                        // The VALUE bundle IS the authority's actual state - we MUST store and use it!
-                                        syncCompanion.InitSingle(receivedValue, index, elapsedTicksAtSend);
+                                        // CRITICAL FIX: Store RECEIVED VALUE with velocity metadata for smooth extrapolation
+                                        // InitSingle stores WITHOUT velocity → blending falls back to standard interpolation
+                                        // We must store WITH velocity so TryGetBlendedValue can use velocity-aware extrapolation
+                                        // Between VALUE updates, extrapolation will be smooth using velocity data
+                                        changesSupport.AddToMostRecentChangeQueue_IfAppropriate_WithVelocity(
+                                            elapsedTicksAtSend,
+                                            receivedValue,
+                                            changesSupport.lastReceivedVelocity);
                                     }
                                     else
                                     {
