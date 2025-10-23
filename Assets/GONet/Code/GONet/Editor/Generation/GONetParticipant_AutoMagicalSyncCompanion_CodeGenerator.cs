@@ -250,11 +250,19 @@ namespace GONet.Editor.Generation
                         // Velocity-augmented sync: Initialize VALUE serializer (same quantization as legacy for now)
                         sb.Append("\t\t\tcachedValueSerializers[").Append(iOverall).Append("] = GONetAutoMagicalSyncAttribute.GetCustomSerializer<").Append(singleMember.attribute.CustomSerialize_Instance.GetType().FullName.Replace("+", ".")).Append(">(").Append(singleMember.attribute.QuantizeDownToBitCount).Append(", ").Append(singleMember.attribute.QuantizeLowerBound.ToString(CultureInfo.InvariantCulture)).Append("f, ").Append(singleMember.attribute.QuantizeUpperBound.ToString(CultureInfo.InvariantCulture)).AppendLine("f);");
 
-                        // Velocity-augmented sync: Initialize VELOCITY serializer with velocity-specific quantization settings
-                        // Use VelocityQuantize* fields instead of regular Quantize* fields
-                        string velBitCount = singleMember.attribute.VelocityQuantizeDownToBitCount.ToString();
-                        string velLowerBound = singleMember.attribute.VelocityQuantizeLowerBound == float.MinValue ? "float.MinValue" : singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
-                        string velUpperBound = singleMember.attribute.VelocityQuantizeUpperBound == float.MaxValue ? "float.MaxValue" : singleMember.attribute.VelocityQuantizeUpperBound.ToString(CultureInfo.InvariantCulture) + "f";
+                        // Velocity-augmented sync: Initialize VELOCITY serializer with DYNAMICALLY CALCULATED quantization settings
+                        // Calculate velocity range from VALUE quantization precision (not from attribute fields!)
+                        var (velLowerBoundCalc, velUpperBoundCalc, velBitCountCalc) = CalculateVelocityQuantizationSettings(
+                            singleMember.attribute.QuantizeLowerBound,
+                            singleMember.attribute.QuantizeUpperBound,
+                            singleMember.attribute.QuantizeDownToBitCount,
+                            singleMember.attribute.SyncChangesEverySeconds,
+                            singleMember.attribute.PhysicsUpdateInterval,
+                            singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName);
+
+                        string velBitCount = velBitCountCalc.ToString();
+                        string velLowerBound = velLowerBoundCalc == float.MinValue ? "float.MinValue" : velLowerBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
+                        string velUpperBound = velUpperBoundCalc == float.MaxValue ? "float.MaxValue" : velUpperBoundCalc.ToString("F6", CultureInfo.InvariantCulture) + "f";
 
                         // CRITICAL: Quaternion angular velocity uses Vector3Serializer (not QuaternionSerializer!)
                         string velocitySerializerType = singleMember.memberTypeFullName == typeof(UnityEngine.Quaternion).FullName
@@ -534,11 +542,17 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\t// Angular velocity for Quaternion (stored as Vector3)");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion currentValue = current.numericValue.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion previousValue = previous.numericValue.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log rotation values");
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue.eulerAngles}}, previous={{previousValue.eulerAngles}}, deltaTime={{deltaTime:F4}}s\");");
+                sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);");
                 sb.Append(indent).AppendLine("\t\tdeltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;");
                 sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated angularVelocity={{angularVelocity}} rad/s, degrees/s={{angularVelocity * UnityEngine.Mathf.Rad2Deg}}\");");
             }
 
             sb.Append(indent).AppendLine("\t}");
@@ -914,6 +928,9 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine($"\t\t// Angular velocity uses cachedVelocitySerializers[{iOverall}] (Vector3Serializer with dynamic quantization)");
                 sb.Append(indent).AppendLine($"\t\tIGONetAutoMagicalSync_CustomSerializer angularVelocitySerializer = cachedVelocitySerializers[{iOverall}];");
                 sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 angularVelocity = angularVelocitySerializer.Deserialize(bitStream_readFrom).UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log received angular velocity");
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[CLIENT-AngularVel][{{gonetParticipant.GONetId}}][idx:{iOverall}] receivedAngularVelocity={{angularVelocity}} rad/s, degrees/s={{angularVelocity * UnityEngine.Mathf.Rad2Deg}}\");");
             }
 
             sb.AppendLine();
@@ -941,6 +958,9 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Vector3 axis = angularVelocity.normalized;");
                 sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Quaternion deltaRotation = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);");
                 sb.Append(indent).AppendLine("\t\t\t\tsynthesizedValue = previousSnapshot.numericValue.UnityEngine_Quaternion * deltaRotation;");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\t\t\t\t// DIAGNOSTIC: Log synthesis");
+                sb.Append(indent).AppendLine($"\t\t\t\tGONet.GONetLog.Debug($\"[CLIENT-AngularVel][{{gonetParticipant.GONetId}}][idx:{iOverall}] previousRot={{previousSnapshot.numericValue.UnityEngine_Quaternion.eulerAngles}}, synthesized={{synthesizedValue.eulerAngles}}, deltaTime={{deltaTimeSeconds:F4}}s\");");
                 sb.Append(indent).AppendLine("\t\t\t}");
                 sb.Append(indent).AppendLine("\t\t\telse");
                 sb.Append(indent).AppendLine("\t\t\t{");
@@ -1562,6 +1582,84 @@ namespace GONet.Editor.Generation
         {
             sb.AppendLine("    }");
             sb.AppendLine("}");
+        }
+
+        /// <summary>
+        /// Dynamically calculates velocity quantization settings from VALUE quantization settings.
+        /// Velocity range should match quantization step size (sub-quantization motion detection).
+        /// </summary>
+        private (float lowerBound, float upperBound, int bitCount) CalculateVelocityQuantizationSettings(
+            float valueLowerBound,
+            float valueUpperBound,
+            int valueBitCount,
+            float syncChangesEverySeconds,
+            int physicsUpdateInterval,
+            bool isQuaternion)
+        {
+            // Special handling for Quaternion (angular velocity)
+            if (isQuaternion)
+            {
+                // Quaternion uses smallest-three compression with fixed range: ±(1/√2) ≈ ±0.707 per component
+                // With 9-bit default, this gives ~0.16° rotation precision
+                float rotationPrecisionDegrees = 0.16f;
+
+                // Determine sync interval
+                float syncInterval = physicsUpdateInterval > 0
+                    ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
+                    : syncChangesEverySeconds;
+
+                // Calculate maximum sub-quantization angular velocity (degrees/sec)
+                float maxAngularVelocityDegrees = rotationPrecisionDegrees / syncInterval;
+
+                // Apply safety margin (3× for tolerance)
+                maxAngularVelocityDegrees *= 3.0f;
+
+                // Convert to radians/sec (angular velocity stored as Vector3 in radians)
+                float maxAngularVelocityRad = maxAngularVelocityDegrees * UnityEngine.Mathf.Deg2Rad;
+
+                // Use 9 bits for good angular velocity precision (~0.056°/s)
+                int angularVelocityBitCount = 9;
+
+                return (-maxAngularVelocityRad, maxAngularVelocityRad, angularVelocityBitCount);
+            }
+
+            // Standard position/scalar velocity calculation
+            if (valueBitCount == 0 || valueLowerBound >= valueUpperBound)
+            {
+                // No quantization or invalid range - fallback to defaults
+                return (-20f, 20f, 18);
+            }
+
+            // Calculate VALUE precision
+            float valueRange = valueUpperBound - valueLowerBound;
+            float valuePrecision = valueRange / ((1 << valueBitCount) - 1);
+
+            // Determine sync interval
+            float syncInterval = physicsUpdateInterval > 0
+                ? UnityEngine.Time.fixedDeltaTime * physicsUpdateInterval
+                : syncChangesEverySeconds;
+
+            if (syncInterval <= 0.0001f)
+            {
+                syncInterval = 0.033f; // Fallback to 30 Hz
+            }
+
+            // Calculate maximum sub-quantization velocity
+            float maxSubQuantizationVelocity = valuePrecision / syncInterval;
+
+            // Apply safety margin (3× for tolerance)
+            float velocityRange = maxSubQuantizationVelocity * 3.0f;
+
+            // Calculate optimal bit count (target: 10% of max velocity as precision)
+            float targetPrecision = maxSubQuantizationVelocity * 0.1f;
+            float velocityRangeTotal = velocityRange * 2.0f;  // ± range
+            float requiredLevels = velocityRangeTotal / targetPrecision;
+            int bitCount = UnityEngine.Mathf.CeilToInt(UnityEngine.Mathf.Log(requiredLevels + 1, 2));
+
+            // Clamp to reasonable range (6-12 bits)
+            bitCount = UnityEngine.Mathf.Clamp(bitCount, 6, 12);
+
+            return (-velocityRange, velocityRange, bitCount);
         }
     }
 }
