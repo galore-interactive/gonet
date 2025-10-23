@@ -56,6 +56,9 @@ namespace GONet.Editor.Generation
             WriteAreEqualQuantized();
             WriteDeserializeInitAll();
             WriteDeserializeInitSingle_ReadOnlyNotApply();
+            WriteDeserializeInitSingle(); // Synthesis wrapper
+            WriteIsVelocityEligible();
+            WriteSynthesizeValueFromVelocity();
             WriteInitSingle();
             WriteUpdateLastKnownValues();
             WriteIsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange();
@@ -1149,6 +1152,179 @@ namespace GONet.Editor.Generation
             sb.AppendLine("\t\t\t}");
             sb.AppendLine();
             sb.AppendLine("\t\t\treturn default;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+        }
+
+        private void WriteDeserializeInitSingle()
+        {
+            sb.AppendLine();
+            sb.AppendLine("        /// <summary>");
+            sb.AppendLine("        /// Deserializes and initializes a single value.");
+            sb.AppendLine("        /// Velocity-augmented sync: For VELOCITY bundles, synthesizes position from velocity before applying.");
+            sb.AppendLine("        /// </summary>");
+            sb.AppendLine("        internal new void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange, bool useVelocitySerializer = false)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            GONetSyncableValue value = DeserializeInitSingle_ReadOnlyNotApply(bitStream_readFrom, singleIndex, useVelocitySerializer);");
+            sb.AppendLine();
+            sb.AppendLine("            // Velocity-augmented sync: Synthesize position from velocity for eligible fields");
+            sb.AppendLine("            if (useVelocitySerializer && IsVelocityEligible(singleIndex))");
+            sb.AppendLine("            {");
+            sb.AppendLine("                value = SynthesizeValueFromVelocity(value, singleIndex, assumedElapsedTicksAtChange);");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            InitSingle(value, singleIndex, assumedElapsedTicksAtChange);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+        }
+
+        private void WriteIsVelocityEligible()
+        {
+            sb.AppendLine();
+            sb.AppendLine("        /// <summary>");
+            sb.AppendLine("        /// Checks if a field is eligible for velocity-augmented sync.");
+            sb.AppendLine("        /// A field is eligible if it has PhysicsUpdateInterval > 0.");
+            sb.AppendLine("        /// </summary>");
+            sb.AppendLine("        private bool IsVelocityEligible(byte singleIndex)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            switch (singleIndex)");
+            sb.AppendLine("            {");
+
+            // Generate cases for fields with PhysicsUpdateInterval > 0
+            int iOverall = 0;
+            int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+            for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+            {
+                GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+                int singleMemberCount = single.autoSyncMembers.Length;
+                for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+                {
+                    GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+
+                    if (singleMember.attribute.PhysicsUpdateInterval > 0)
+                    {
+                        sb.Append("                case ").Append(iOverall).Append(": return true; // ").Append(single.componentTypeName).Append(".").Append(singleMember.memberName).Append(" (PhysicsUpdateInterval=").Append(singleMember.attribute.PhysicsUpdateInterval).AppendLine(")");
+                    }
+
+                    ++iOverall;
+                }
+            }
+
+            sb.AppendLine("                default: return false;");
+            sb.AppendLine("            }");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+        }
+
+        private void WriteSynthesizeValueFromVelocity()
+        {
+            sb.AppendLine();
+            sb.AppendLine("        /// <summary>");
+            sb.AppendLine("        /// Synthesizes a new value from velocity data.");
+            sb.AppendLine("        /// For Vector types: synthesizedValue = previousValue + velocity × deltaTime");
+            sb.AppendLine("        /// For Quaternion: synthesizedValue = previousValue * exp(angularVelocity × deltaTime)");
+            sb.AppendLine("        /// </summary>");
+            sb.AppendLine("        private GONetSyncableValue SynthesizeValueFromVelocity(GONetSyncableValue velocityValue, byte singleIndex, long assumedElapsedTicksAtChange)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            switch (singleIndex)");
+            sb.AppendLine("            {");
+
+            // Generate synthesis cases for fields with PhysicsUpdateInterval > 0
+            int iOverall = 0;
+            int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+            for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+            {
+                GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+                int singleMemberCount = single.autoSyncMembers.Length;
+                for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+                {
+                    GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+
+                    if (singleMember.attribute.PhysicsUpdateInterval > 0)
+                    {
+                        string memberTypeFullName = singleMember.memberTypeFullName;
+
+                        sb.Append("                case ").Append(iOverall).AppendLine(":");
+                        sb.Append("                { // ").Append(single.componentTypeName).Append(".").AppendLine(singleMember.memberName);
+
+                        // Get value change support
+                        sb.AppendLine("                    GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[" + iOverall + "];");
+                        sb.AppendLine("                    int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_usedSize - 1;");
+                        sb.AppendLine();
+                        sb.AppendLine("                    if (mostRecentChangesIndex >= 0 && valueChangeSupport.mostRecentChanges_usedSize > 0)");
+                        sb.AppendLine("                    {");
+                        sb.AppendLine("                        PluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
+                        sb.AppendLine("                        long deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
+                        sb.AppendLine("                        float deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                        sb.AppendLine();
+
+                        if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+                        {
+                            // Quaternion: Angular velocity integration
+                            sb.AppendLine("                        // Angular velocity stored as Vector3 (axis × radians/sec)");
+                            sb.AppendLine("                        UnityEngine.Vector3 angularVelocity = velocityValue.UnityEngine_Vector3;");
+                            sb.AppendLine("                        float angle = angularVelocity.magnitude * deltaTimeSeconds;");
+                            sb.AppendLine();
+                            sb.AppendLine("                        if (angle > 1e-6f)");
+                            sb.AppendLine("                        {");
+                            sb.AppendLine("                            UnityEngine.Vector3 axis = angularVelocity.normalized;");
+                            sb.AppendLine("                            UnityEngine.Quaternion deltaRotation = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);");
+                            sb.AppendLine("                            UnityEngine.Quaternion synthesized = previousSnapshot.numericValue.UnityEngine_Quaternion * deltaRotation;");
+                            sb.AppendLine();
+                            sb.AppendLine("                            // DIAGNOSTIC: Log synthesis");
+                            sb.Append("                            GONet.GONetLog.Debug($\"[CLIENT-AngularVel][{gonetParticipant.GONetId}][idx:").Append(iOverall).AppendLine("] previousRot={previousSnapshot.numericValue.UnityEngine_Quaternion.eulerAngles}, synthesized={synthesized.eulerAngles}, deltaTime={deltaTimeSeconds:F4}s\");");
+                            sb.AppendLine();
+                            sb.AppendLine("                            return new GONetSyncableValue { UnityEngine_Quaternion = synthesized };");
+                            sb.AppendLine("                        }");
+                            sb.AppendLine("                        else");
+                            sb.AppendLine("                        {");
+                            sb.AppendLine("                            // Angle too small, return previous value");
+                            sb.AppendLine("                            return new GONetSyncableValue { UnityEngine_Quaternion = previousSnapshot.numericValue.UnityEngine_Quaternion };");
+                            sb.AppendLine("                        }");
+                        }
+                        else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
+                        {
+                            // Vector3: Linear synthesis
+                            sb.AppendLine("                        UnityEngine.Vector3 velocity = velocityValue.UnityEngine_Vector3;");
+                            sb.AppendLine("                        UnityEngine.Vector3 synthesized = previousSnapshot.numericValue.UnityEngine_Vector3 + velocity * deltaTimeSeconds;");
+                            sb.AppendLine();
+                            sb.AppendLine("                        // DIAGNOSTIC: Log synthesis");
+                            sb.Append("                        GONet.GONetLog.Debug($\"[CLIENT-Vel][{gonetParticipant.GONetId}][idx:").Append(iOverall).AppendLine("] previousPos={previousSnapshot.numericValue.UnityEngine_Vector3}, velocity={velocity}, synthesized={synthesized}, deltaTime={deltaTimeSeconds:F4}s\");");
+                            sb.AppendLine();
+                            sb.AppendLine("                        return new GONetSyncableValue { UnityEngine_Vector3 = synthesized };");
+                        }
+                        else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
+                        {
+                            // Vector2: Linear synthesis
+                            sb.AppendLine("                        UnityEngine.Vector2 velocity = velocityValue.UnityEngine_Vector2;");
+                            sb.AppendLine("                        UnityEngine.Vector2 synthesized = previousSnapshot.numericValue.UnityEngine_Vector2 + velocity * deltaTimeSeconds;");
+                            sb.AppendLine();
+                            sb.AppendLine("                        return new GONetSyncableValue { UnityEngine_Vector2 = synthesized };");
+                        }
+                        else if (memberTypeFullName == typeof(float).FullName)
+                        {
+                            // Float: Linear synthesis
+                            sb.AppendLine("                        float velocity = velocityValue.System_Single;");
+                            sb.AppendLine("                        float synthesized = previousSnapshot.numericValue.System_Single + velocity * deltaTimeSeconds;");
+                            sb.AppendLine();
+                            sb.AppendLine("                        return new GONetSyncableValue { System_Single = synthesized };");
+                        }
+
+                        sb.AppendLine("                    }");
+                        sb.AppendLine();
+                        sb.AppendLine("                    // No previous value, return velocity as-is (fallback)");
+                        sb.AppendLine("                    return velocityValue;");
+                        sb.AppendLine("                }");
+                    }
+
+                    ++iOverall;
+                }
+            }
+
+            sb.AppendLine("                default:");
+            sb.AppendLine("                    // Not velocity-eligible, return as-is");
+            sb.AppendLine("                    return velocityValue;");
+            sb.AppendLine("            }");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
