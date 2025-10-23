@@ -499,10 +499,13 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("int recentChangesCount = changesSupport.mostRecentChanges_usedSize;");
             sb.Append(indent).AppendLine("GONetSyncableValue velocityValue;");
             sb.Append(indent).AppendLine();
-            sb.Append(indent).AppendLine("if (recentChangesCount >= 2)");
+            sb.Append(indent).AppendLine("// CRITICAL: Use lastKnownValue (authority's transform) NOT mostRecentChanges (client blending queue)");
+            sb.Append(indent).AppendLine("var current = changesSupport.lastKnownValue;");
+            sb.Append(indent).AppendLine("var previous = changesSupport.lastKnownValue_previous;");
+            sb.Append(indent).AppendLine();
+            sb.Append(indent).AppendLine("// Check if we have valid previous value");
+            sb.Append(indent).AppendLine("if (current.GONetSyncType == previous.GONetSyncType && current.GONetSyncType != GONet.GONetSyncableValueTypes.System_Boolean)");
             sb.Append(indent).AppendLine("{");
-            sb.Append(indent).AppendLine("\tvar current = changesSupport.mostRecentChanges[0];");
-            sb.Append(indent).AppendLine("\tvar previous = changesSupport.mostRecentChanges[1];");
 
             // Calculate DETERMINISTIC deltaTime based on sync settings (not snapshot timestamps!)
             // This ensures both server and client use IDENTICAL deltaTime for velocity calculations
@@ -528,22 +531,22 @@ namespace GONet.Editor.Generation
             // Type-specific velocity calculation
             if (memberTypeFullName == typeof(float).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tfloat currentValue = current.numericValue.System_Single;");
-                sb.Append(indent).AppendLine("\t\tfloat previousValue = previous.numericValue.System_Single;");
+                sb.Append(indent).AppendLine("\t\tfloat currentValue = current.System_Single;");
+                sb.Append(indent).AppendLine("\t\tfloat previousValue = previous.System_Single;");
                 sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\t\tvelocityValue.System_Single = (currentValue - previousValue) / deltaTime;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 currentValue = current.numericValue.UnityEngine_Vector2;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 previousValue = previous.numericValue.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 currentValue = current.UnityEngine_Vector2;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector2 previousValue = previous.UnityEngine_Vector2;");
                 sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector2 = (currentValue - previousValue) / deltaTime;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 currentValue = current.numericValue.UnityEngine_Vector3;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 previousValue = previous.numericValue.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 currentValue = current.UnityEngine_Vector3;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector3 previousValue = previous.UnityEngine_Vector3;");
                 sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log snapshot values and velocity calculation");
                 sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[VelocityCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue}}, previous={{previousValue}}, deltaTime={{deltaTime:F4}}s\");");
@@ -555,16 +558,16 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(UnityEngine.Vector4).FullName)
             {
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 currentValue = current.numericValue.UnityEngine_Vector4;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 previousValue = previous.numericValue.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 currentValue = current.UnityEngine_Vector4;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Vector4 previousValue = previous.UnityEngine_Vector4;");
                 sb.Append(indent).AppendLine("\t\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\t\tvelocityValue.UnityEngine_Vector4 = (currentValue - previousValue) / deltaTime;");
             }
             else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
                 sb.Append(indent).AppendLine("\t\t// Angular velocity for Quaternion (stored as Vector3)");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion currentValue = current.numericValue.UnityEngine_Quaternion;");
-                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion previousValue = previous.numericValue.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion currentValue = current.UnityEngine_Quaternion;");
+                sb.Append(indent).AppendLine("\t\tUnityEngine.Quaternion previousValue = previous.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine($"\t\t// DIAGNOSTIC: Log rotation values");
                 sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue.eulerAngles}}, previous={{previousValue.eulerAngles}}, deltaTime={{deltaTime:F4}}s\");");
