@@ -1397,20 +1397,19 @@ namespace GONet.Editor.Generation
                 }
                 else if (readOnly) // ReadOnlyNotApply - extract specific type from GONetSyncableValue
                 {
-                    sb.Append(indent).AppendLine("\tGONetSyncableValue deserializedValue = customSerializer.Deserialize(bitStream_readFrom);");
-                    sb.Append(indent).Append("\tvar value = deserializedValue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                    sb.Append(indent).AppendLine("\tGONetSyncableValue value = customSerializer.Deserialize(bitStream_readFrom);");
+                    sb.Append(indent).Append("\tvar typedValue = value.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
                     // VELOCITY-AUGMENTED SYNC FIX: Only add baseline for VALUE bundles, NOT VELOCITY bundles
                     // When useVelocitySerializer=true, we're deserializing velocity (not delta-from-baseline)
                     if (singleMember.attribute.QuantizeDownToBitCount > 0)
                     {
                         sb.Append(indent).AppendLine("\tif (!useVelocitySerializer)");
                         sb.Append(indent).AppendLine("\t{");
-                        sb.Append(indent).Append("\t\tvalue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                        sb.Append(indent).Append("\t\ttypedValue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
                         sb.Append(indent).AppendLine("\t}");
                     }
-                    // Return as GONetSyncableValue (deserializedValue already has correct GONetSyncType set by serializer)
-                    sb.Append(indent).Append("\tdeserializedValue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(" = value;");
-                    sb.Append(indent).AppendLine("\tvalue = deserializedValue; // Assign back to return properly typed GONetSyncableValue");
+                    // Update the GONetSyncableValue with the adjusted typed value before returning
+                    sb.Append(indent).Append("\tvalue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(" = typedValue;");
                 }
             }
             else if (memberTypeFullName == typeof(bool).FullName || singleMember.animatorControllerParameterTypeFullName == typeof(bool).FullName)
