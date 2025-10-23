@@ -1163,7 +1163,7 @@ namespace GONet.Editor.Generation
             sb.AppendLine("        /// Deserializes and initializes a single value.");
             sb.AppendLine("        /// Velocity-augmented sync: For VELOCITY bundles, synthesizes position from velocity before applying.");
             sb.AppendLine("        /// </summary>");
-            sb.AppendLine("        internal new void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange, bool useVelocitySerializer = false)");
+            sb.AppendLine("        internal override void DeserializeInitSingle(Utils.BitByBitByteArrayBuilder bitStream_readFrom, byte singleIndex, long assumedElapsedTicksAtChange, bool useVelocitySerializer = false)");
             sb.AppendLine("        {");
             sb.AppendLine("            GONetSyncableValue value = DeserializeInitSingle_ReadOnlyNotApply(bitStream_readFrom, singleIndex, useVelocitySerializer);");
             sb.AppendLine();
