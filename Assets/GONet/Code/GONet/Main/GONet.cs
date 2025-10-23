@@ -10601,32 +10601,15 @@ namespace GONet
 
                                 if (recentChangesCount >= 1)
                                 {
-                                    // Get last RECEIVED VALUE (not synthesized) to use as baseline for velocity synthesis
-                                    // If we use a synthesized snapshot, we'll compound errors (synthesizing from synthesized data)
+                                    // Use MOST RECENT snapshot (synthesized or not) as baseline
+                                    // We MUST use the most recent to avoid compounding errors when multiple VELOCITY bundles
+                                    // arrive before a VALUE bundle (otherwise we'd keep using a stale VALUE from seconds ago)
                                     NumericValueChangeSnapshot lastSnapshot = changesSupport.mostRecentChanges[0];
-                                    for (int i = 0; i < recentChangesCount; i++)
-                                    {
-                                        var snapshot = changesSupport.mostRecentChanges[i];
-                                        if (!snapshot.wasSynthesizedFromVelocity)
-                                        {
-                                            lastSnapshot = snapshot;
-                                            break;
-                                        }
-                                    }
 
-                                    // Calculate DETERMINISTIC deltaTime based on sync settings (matching server calculation)
-                                    // This ensures client uses IDENTICAL deltaTime that server used for velocity calculation
-                                    float deltaTime;
-                                    if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
-                                    {
-                                        // FIXEDUPDATE path: deltaTime = Time.fixedDeltaTime × PhysicsUpdateInterval
-                                        deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
-                                    }
-                                    else
-                                    {
-                                        // UPDATE path: deltaTime = syncChangesEverySeconds
-                                        deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
-                                    }
+                                    // Calculate ACTUAL elapsed time since last snapshot (not just sync interval!)
+                                    // This is critical: velocity = units/sec, so we need ACTUAL seconds elapsed
+                                    long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
+                                    float deltaTime = (float)ticksSinceLastSnapshot / System.Diagnostics.Stopwatch.Frequency;
 
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
@@ -10689,29 +10672,15 @@ namespace GONet
                                     int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
                                     if (recentChangesCount >= 1)
                                     {
-                                        // Get last RECEIVED VALUE (not synthesized) to use as baseline for velocity synthesis
-                                        // If we use a synthesized snapshot, we'll compound errors (synthesizing from synthesized data)
+                                        // Use MOST RECENT snapshot (synthesized or not) as baseline
+                                        // We MUST use the most recent to avoid compounding errors when multiple VELOCITY bundles
+                                        // arrive before a VALUE bundle (otherwise we'd keep using a stale VALUE from seconds ago)
                                         NumericValueChangeSnapshot lastSnapshot = changesSupport.mostRecentChanges[0];
-                                        for (int i = 0; i < recentChangesCount; i++)
-                                        {
-                                            var snapshot = changesSupport.mostRecentChanges[i];
-                                            if (!snapshot.wasSynthesizedFromVelocity)
-                                            {
-                                                lastSnapshot = snapshot;
-                                                break;
-                                            }
-                                        }
 
-                                        // Calculate DETERMINISTIC deltaTime (matching server and VELOCITY bundle path)
-                                        float deltaTime;
-                                        if (changesSupport.syncAttribute_PhysicsUpdateInterval > 0)
-                                        {
-                                            deltaTime = UnityEngine.Time.fixedDeltaTime * changesSupport.syncAttribute_PhysicsUpdateInterval;
-                                        }
-                                        else
-                                        {
-                                            deltaTime = changesSupport.syncAttribute_SyncChangesEverySeconds;
-                                        }
+                                        // Calculate ACTUAL elapsed time since last snapshot (not just sync interval!)
+                                        // This is critical: velocity = units/sec, so we need ACTUAL seconds elapsed
+                                        long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
+                                        float deltaTime = (float)ticksSinceLastSnapshot / System.Diagnostics.Stopwatch.Frequency;
 
                                         // Synthesize position from last received velocity (ignore received VALUE)
                                         GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
@@ -10727,6 +10696,9 @@ namespace GONet
                                             GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VAL][{gonetParticipant.GONetId}][idx:{index}] " +
                                                           $"receivedVALUE: {receivedValue.UnityEngine_Vector3}, " +
                                                           $"synthesizedFromVelocity: {synthesizedValue.UnityEngine_Vector3}, " +
+                                                          $"lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, " +
+                                                          $"velocity: {changesSupport.lastReceivedVelocity.UnityEngine_Vector3}, " +
+                                                          $"deltaTime: {deltaTime:F4}s, " +
                                                           $"diff: {diff}, diffMag: {diffMag:F4}, " +
                                                           $"velocityAge: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms, " +
                                                           $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
