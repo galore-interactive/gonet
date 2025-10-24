@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using UnityEngine;
 
 namespace GONet.Generation
 {
@@ -490,7 +491,6 @@ namespace GONet.Generation
         internal bool IsVelocityWithinQuantizationRange(byte valueIndex)
         {
             var changesSupport = valuesChangesSupport[valueIndex];
-
             // Non-velocity-eligible values always return false
             if (!changesSupport.isVelocityEligible)
             {
@@ -501,7 +501,6 @@ namespace GONet.Generation
             // mostRecentChanges is for VALUE BLENDING on clients, not for authority velocity calculation!
             var current = changesSupport.lastKnownValue;
             var previous = changesSupport.lastKnownValue_previous;
-
             // Check if we have previous value (if current == previous, no change has occurred yet)
             if (current.GONetSyncType != previous.GONetSyncType)
             {
@@ -512,10 +511,16 @@ namespace GONet.Generation
             // These were calculated at initialization: bounds_per_second * deltaTime
             float lowerBoundPerInterval = changesSupport.velocityQuantizeLowerBound_PerSyncInterval;
             float upperBoundPerInterval = changesSupport.velocityQuantizeUpperBound_PerSyncInterval;
-
             // Calculate raw delta (no division) and compare against per-interval bounds
             switch (changesSupport.codeGenerationMemberType)
             {
+                case GONetSyncableValueTypes.UnityEngine_Vector2:
+                    {
+                        var positionDelta = current.UnityEngine_Vector2 - previous.UnityEngine_Vector2;
+                        // Check each component against per-interval bounds
+                        return positionDelta.x >= lowerBoundPerInterval && positionDelta.x <= upperBoundPerInterval &&
+                               positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval;
+                    }
                 case GONetSyncableValueTypes.UnityEngine_Vector3:
                     {
                         var positionDelta = current.UnityEngine_Vector3 - previous.UnityEngine_Vector3;
@@ -524,20 +529,53 @@ namespace GONet.Generation
                                positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval &&
                                positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval;
                     }
-
+                case GONetSyncableValueTypes.UnityEngine_Vector4:
+                    {
+                        var positionDelta = current.UnityEngine_Vector4 - previous.UnityEngine_Vector4;
+                        // Check each component against per-interval bounds
+                        return positionDelta.x >= lowerBoundPerInterval && positionDelta.x <= upperBoundPerInterval &&
+                               positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval &&
+                               positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval &&
+                               positionDelta.w >= lowerBoundPerInterval && positionDelta.w <= upperBoundPerInterval;
+                    }
                 case GONetSyncableValueTypes.UnityEngine_Quaternion:
                     {
-                        // For quaternions, check angular velocity magnitude
-                        // TODO: Implement proper angular velocity check if needed
-                        return true; // For now, assume quaternions always fit (rotation is typically slow)
-                    }
+                        var currentQ = current.UnityEngine_Quaternion;
+                        var previousQ = previous.UnityEngine_Quaternion;
 
+                        // Compute delta quaternion
+                        var deltaQ = currentQ * Quaternion.Inverse(previousQ);
+
+                        // Normalize for safety (floating-point precision)
+                        deltaQ = Quaternion.Normalize(deltaQ);
+
+                        // Ensure smallest angle representation (q and -q are equivalent)
+                        if (deltaQ.w < 0f)
+                        {
+                            deltaQ = new Quaternion(-deltaQ.x, -deltaQ.y, -deltaQ.z, -deltaQ.w);
+                        }
+
+                        // Use optimized Log to get half-rotation vector
+                        var logDelta = QuaternionUtilsOptimized.Log(deltaQ);
+
+                        // Full rotation delta vector (angular displacement: axis * angle in radians)
+                        // Multiply by 2 to get full angle from half-angle representation
+                        var rotationDelta = new Vector3(
+                            logDelta.x * 2f,
+                            logDelta.y * 2f,
+                            logDelta.z * 2f
+                        );
+
+                        // Check each component against per-interval bounds (assuming isotropic quantization like Vector3)
+                        return rotationDelta.x >= lowerBoundPerInterval && rotationDelta.x <= upperBoundPerInterval &&
+                               rotationDelta.y >= lowerBoundPerInterval && rotationDelta.y <= upperBoundPerInterval &&
+                               rotationDelta.z >= lowerBoundPerInterval && rotationDelta.z <= upperBoundPerInterval;
+                    }
                 case GONetSyncableValueTypes.System_Single:
                     {
                         var valueDelta = current.System_Single - previous.System_Single;
                         return valueDelta >= lowerBoundPerInterval && valueDelta <= upperBoundPerInterval;
                     }
-
                 default:
                     return false; // Unknown type, use VALUE bundle
             }

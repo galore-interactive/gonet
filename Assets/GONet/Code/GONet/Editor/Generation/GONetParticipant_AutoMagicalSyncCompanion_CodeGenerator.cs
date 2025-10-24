@@ -1935,6 +1935,8 @@ namespace GONet.Editor.Generation
             }
             catch
             {
+                GONetLog.Error($"Unable to get actual fixed delta time from project settings.  Fallback value will be used, but THAT IS DANGEROUS for quality - things WILL NOT BE CALCULATED PERFECTLY!");
+
                 // Fallback to default if we can't read project settings
                 fixedDeltaTime = 0.02f;
             }
@@ -1961,11 +1963,9 @@ namespace GONet.Editor.Generation
 
                 // IMPORTANT: QuaternionSerializer ignores profile's QuantizeDownToBitCount (usually 0)
                 // and uses its own DEFAULT_BITS_PER_SMALLEST_THREE = 9. We must match this behavior.
-                const int QUATERNION_DEFAULT_BITS = 9;  // Must match QuaternionSerializer.DEFAULT_BITS_PER_SMALLEST_THREE
-                int actualBitCount = valueBitCount > 0 ? valueBitCount : QUATERNION_DEFAULT_BITS;
+                int actualBitCount = valueBitCount > 0 ? valueBitCount : QuaternionSerializer.DEFAULT_BITS_PER_SMALLEST_THREE;
 
-                const float SQRT_2 = 1.41421356f;
-                float quatComponentRange = 2.0f / SQRT_2;  // Full range: 1.4142 (from -0.7071 to +0.7071)
+                float quatComponentRange = 2.0f / QuaternionSerializer.SQUARE_ROOT_OF_2;  // Full range: 1.4142 (from -0.7071 to +0.7071)
 
                 // Calculate precision per quantization step for one quaternion component
                 int quantizationSteps = (1 << actualBitCount) - 1;  // e.g., 511 steps for 9 bits

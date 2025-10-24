@@ -323,9 +323,9 @@ namespace GONet
 
     public class QuaternionSerializer : IGONetAutoMagicalSync_CustomSerializer
     {
-        static readonly float SQUARE_ROOT_OF_2 = Mathf.Sqrt(2.0f);
-        static readonly float QuatValueMinimum = -1.0f / SQUARE_ROOT_OF_2;
-        static readonly float QuatValueMaximum = +1.0f / SQUARE_ROOT_OF_2;
+        internal static readonly float SQUARE_ROOT_OF_2 = Mathf.Sqrt(2.0f);
+        internal static readonly float QuatValueMinimum = -1.0f / SQUARE_ROOT_OF_2;
+        internal static readonly float QuatValueMaximum = +1.0f / SQUARE_ROOT_OF_2;
 
         bool isQuantizationInitialized = false;
         Quantizer quantizer;

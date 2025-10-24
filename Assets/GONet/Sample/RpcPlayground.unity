@@ -1486,6 +1486,9 @@ MonoBehaviour:
   enableTelemetry: 1
   enablePerObjectTracking: 0
   reportIntervalSeconds: 5
+  enableDetailedTracing: 1
+  traceGONetId: 208895
+  traceIndex: 8
   includePerObjectBreakdownInManualReports: 1
 --- !u!114 &1171946642
 MonoBehaviour:
