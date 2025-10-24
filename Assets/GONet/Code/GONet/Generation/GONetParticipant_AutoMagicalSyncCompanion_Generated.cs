@@ -750,6 +750,7 @@ namespace GONet.Generation
                     GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: Extrapolated value={blendedValue}");
 #endif
                     // Velocity extrapolation always extrapolates (uses velocity data)
+                    VelocitySyncTelemetry.TrackExtrapolation(gonetParticipant.GONetId);
                     didExtrapolatePastMostRecentChanges = true;
                     return true;
                 }
@@ -762,11 +763,17 @@ namespace GONet.Generation
             }
 
             // Fall back to standard value blending
+            VelocitySyncTelemetry.TrackStandardBlendingFallback();
             IGONetAutoMagicalSync_CustomValueBlending customValueBlending = cachedCustomValueBlendings[index];
             //GONetLog.Debug($"grease null blender? {(customValueBlending == null)} @ index: {index}");
             if (customValueBlending != null)
             {
-                return customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges);
+                bool result = customValueBlending.TryGetBlendedValue(valueBuffer, valueCount, atElapsedTicks, out blendedValue, out didExtrapolatePastMostRecentChanges);
+                if (result)
+                {
+                    VelocitySyncTelemetry.TrackInterpolation(gonetParticipant.GONetId);
+                }
+                return result;
             }
 
             didExtrapolatePastMostRecentChanges = false;

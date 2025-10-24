@@ -619,6 +619,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] calculated angularVelocity={{angularVelocity}} rad/s, degrees/s={{angularVelocity * UnityEngine.Mathf.Rad2Deg}}\");");
             }
 
+            sb.Append(indent).AppendLine("\tVelocitySyncTelemetry.TrackVelocityCalculation(true, gonetParticipant.GONetId);");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine("else");
             sb.Append(indent).AppendLine("{");
@@ -649,6 +650,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
             }
 
+            sb.Append(indent).AppendLine("\tVelocitySyncTelemetry.TrackVelocityCalculation(false, gonetParticipant.GONetId);");
             sb.Append(indent).AppendLine("}");
             sb.Append(indent).AppendLine();
         }
@@ -704,6 +706,7 @@ namespace GONet.Editor.Generation
 
                     sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
                     sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
+                    sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackVelocityBundleSent(gonetParticipant.GONetId);");
                     sb.Append(indent).AppendLine("\t}");
                     sb.Append(indent).AppendLine("\telse");
                     sb.Append(indent).AppendLine("\t{");
@@ -717,6 +720,7 @@ namespace GONet.Editor.Generation
                     {
                         sb.Append(indent).Append("\t\tbitStream_appendTo.WriteFloat(").Append(valueExpression).AppendLine(");");
                     }
+                    sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackValueBundleSent(gonetParticipant.GONetId);");
 
                     sb.Append(indent).AppendLine("\t}");
                 }
@@ -776,6 +780,7 @@ namespace GONet.Editor.Generation
 
                     sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
                     sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
+                    sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackVelocityBundleSent(gonetParticipant.GONetId);");
                     sb.Append(indent).AppendLine("\t}");
                     sb.Append(indent).AppendLine("\telse");
                     sb.Append(indent).AppendLine("\t{");
@@ -807,6 +812,7 @@ namespace GONet.Editor.Generation
                     string snapshotFieldName = memberTypeFullName.Replace(".", "_");
                     sb.Append(indent).AppendLine($"\t\tsnapshotValue.{snapshotFieldName} = {valueExpression};");
                     sb.Append(indent).AppendLine($"\t\tvaluesChangesSupport[{iOverall}].AddToMostRecentChangeQueue_IfAppropriate(GONet.GONetMain.Time.ElapsedTicks, snapshotValue);");
+                    sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackValueBundleSent(gonetParticipant.GONetId);");
 
                     sb.Append(indent).AppendLine("\t}");
                 }
@@ -1123,6 +1129,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).Append("\t\t").Append(single.componentTypeName).Append(".Set").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).AppendLine(", synthesizedValue);");
             }
 
+            sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackVelocityBundleReceived(gonetParticipant.GONetId);");
             sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
@@ -1134,6 +1141,7 @@ namespace GONet.Editor.Generation
             // VALUE packet: Normal deserialization
             WriteDeserializeSingle(iOverall, single, singleMember, indent + "\t", true);
 
+            sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackValueBundleReceived(gonetParticipant.GONetId);");
             sb.Append(indent).AppendLine("\t}");
         }
 
