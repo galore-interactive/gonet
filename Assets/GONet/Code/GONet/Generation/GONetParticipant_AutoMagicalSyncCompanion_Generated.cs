@@ -566,10 +566,20 @@ namespace GONet.Generation
                             logDelta.z * 2f
                         );
 
+                        // DIAGNOSTIC: Log quaternion velocity check details
+                        bool xPass = rotationDelta.x >= lowerBoundPerInterval && rotationDelta.x <= upperBoundPerInterval;
+                        bool yPass = rotationDelta.y >= lowerBoundPerInterval && rotationDelta.y <= upperBoundPerInterval;
+                        bool zPass = rotationDelta.z >= lowerBoundPerInterval && rotationDelta.z <= upperBoundPerInterval;
+                        bool result = xPass && yPass && zPass;
+
+                        GONetLog.Debug($"[QUAT-RANGE-CHECK] GONetId:{gonetParticipant.GONetId} " +
+                            $"currentEuler:{currentQ.eulerAngles} prevEuler:{previousQ.eulerAngles} " +
+                            $"rotDelta:({rotationDelta.x:F6},{rotationDelta.y:F6},{rotationDelta.z:F6}) " +
+                            $"bounds:[{lowerBoundPerInterval:F6}, {upperBoundPerInterval:F6}] " +
+                            $"checks:(x:{xPass} y:{yPass} z:{zPass}) result:{result}");
+
                         // Check each component against per-interval bounds (assuming isotropic quantization like Vector3)
-                        return rotationDelta.x >= lowerBoundPerInterval && rotationDelta.x <= upperBoundPerInterval &&
-                               rotationDelta.y >= lowerBoundPerInterval && rotationDelta.y <= upperBoundPerInterval &&
-                               rotationDelta.z >= lowerBoundPerInterval && rotationDelta.z <= upperBoundPerInterval;
+                        return result;
                     }
                 case GONetSyncableValueTypes.System_Single:
                     {
