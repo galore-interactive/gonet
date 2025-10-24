@@ -22,6 +22,28 @@ namespace GONet.Utils
 {
     public static class QuaternionUtils
     {
+        /// <summary>
+        /// Dot product threshold for detecting very small rotations (practical limit ~0.1 degrees due to float precision).
+        /// Used for quaternion equality comparisons and small-angle approximation decisions.
+        /// Value: 0.9999999f (7 nines) enables detection of 0.133° rotations (8°/s at 60 FPS).
+        /// </summary>
+        /// <remarks>
+        /// <para><b>History:</b></para>
+        /// <list type="bullet">
+        ///   <item>Original: 0.001° threshold using Quaternion.Angle() (slow but precise)</item>
+        ///   <item>May 2025 (v1.4.2): Changed to 0.9999f (4 nines) ≈ 1.62° using Quaternion.Dot() (fast but too coarse)</item>
+        ///   <item>October 2025: Changed to 0.9999999f (7 nines) to fix slow rotation detection for velocity sync</item>
+        /// </list>
+        /// <para><b>Why 7 nines?</b></para>
+        /// Rotation of 0.133° (8°/s at 60 FPS) produces dot product of 0.9999993, which requires
+        /// threshold of 0.9999999f (7 nines) to detect. Lower values fail to detect slow rotations.
+        /// <para><b>Float Precision Limit:</b></para>
+        /// Very small rotations (&lt; 0.1°) produce dot products that round to exactly 1.0 in float precision,
+        /// making them undetectable. The practical detection limit is ~0.1° (0.133° works, 0.027° doesn't).
+        /// This is acceptable for velocity-augmented sync which targets 8°/s (0.133°/frame at 60 FPS).
+        /// </remarks>
+        public const float DOT_PRODUCT_SMALL_ROTATION_THRESHOLD = 0.9999999f;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         /// <summary>
         /// Gets the square of the quaternion length (magnitude).
@@ -489,7 +511,7 @@ namespace GONet.Utils
             float cosHalfAngle = a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;
 
             // identity check:
-            if (Mathf.Abs(cosHalfAngle) >= 0.99999f)
+            if (Mathf.Abs(cosHalfAngle) >= QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD)
                 return a;
 
             // force shortest:
@@ -499,7 +521,7 @@ namespace GONet.Utils
                 cosHalfAngle = -cosHalfAngle;
             }
 
-            if (cosHalfAngle >= 0.99999f)
+            if (cosHalfAngle >= QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD)
                 return a;
 
             // exp/log path:
@@ -557,8 +579,8 @@ namespace GONet.Utils
             float dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 
             // Handle edge cases
-            if (dot > 0.99999f) return 0f;
-            if (dot < -0.99999f) return 180f;
+            if (dot > QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD) return 0f;
+            if (dot < -QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD) return 180f;
 
             // For small angles, use approximation: angle ≈ 2 * asin(|a - b| / 2)
             float absDot = dot < 0f ? -dot : dot;

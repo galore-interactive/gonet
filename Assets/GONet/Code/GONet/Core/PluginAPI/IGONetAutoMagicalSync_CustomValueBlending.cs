@@ -2183,7 +2183,7 @@ namespace GONet.PluginAPI
             // Check if it's a small rotation (close to identity)
             float dotProduct = Mathf.Abs(deltaRot.w);
 
-            if (dotProduct > 0.9999f) // Very small rotation
+            if (dotProduct > Utils.QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD) // Very small rotation
             {
                 // Use small angle approximation
                 // For small angles: sin(θ/2) ≈ θ/2
@@ -2274,7 +2274,7 @@ namespace GONet.PluginAPI
             // Check if it's a very small rotation
             float dotProduct = Mathf.Abs(deltaRot.w);
 
-            if (dotProduct > 0.9999f) // Very small rotation (< ~1 degree)
+            if (dotProduct > Utils.QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD) // Very small rotation (< ~0.026 degrees)
             {
                 // Small angle approximation
                 Vector3 angularVel = new Vector3(

@@ -2250,14 +2250,15 @@ namespace GONet
 
         internal static bool IsRotationNotSyncd(AutoMagicalSync_ValueMonitoringSupport_ChangedValue monitoringSupport, int index)
         {
+            GONetParticipant participant = monitoringSupport.syncCompanion.gonetParticipant;
+
             // Check if rotation sync is disabled
-            if (!monitoringSupport.syncCompanion.gonetParticipant.IsRotationSyncd)
+            if (!participant.IsRotationSyncd)
             {
                 return true; // Skip: rotation sync disabled
             }
 
             // PHYSICS SYNC FREQUENCY GATING: Check if this is a physics object and if so, gate by PhysicsUpdateInterval
-            GONetParticipant participant = monitoringSupport.syncCompanion.gonetParticipant;
             bool isPhysicsObject = participant.IsRigidBodyOwnerOnlyControlled && participant.myRigidBody != null && participant.IsMine;
 
             if (isPhysicsObject)

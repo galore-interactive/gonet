@@ -1,4 +1,4 @@
-﻿using GONet.PluginAPI;
+using GONet.PluginAPI;
 using System;
 using TypeReferences;
 using UnityEngine;
@@ -117,6 +117,29 @@ namespace GONet
                  "DO NOT enable for discrete values (health, ammo, etc.).\n\n" +
                  "RECOMMENDED: Enable for Transform.position/rotation on moving objects.")]
         public bool IsVelocityEligible = false;
+
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: If true, velocity quantization bounds are calculated automatically
+        /// from VALUE quantization settings. If false, uses manually configured VelocityQuantize* settings below.
+        ///
+        /// AUTO-CALCULATION (default, recommended):
+        /// - Calculates velocity bounds from VALUE precision / sync interval
+        /// - Ensures VELOCITY bundles are sent only for sub-quantization motion
+        /// - Bit count matches VALUE bit count for consistency
+        /// - VelocityQuantize* fields below are IGNORED when this is true
+        ///
+        /// MANUAL CONFIGURATION (advanced):
+        /// - Set to false to use custom VelocityQuantize* settings below
+        /// - Useful for fine-tuning bandwidth vs quality trade-offs
+        /// - Requires understanding of quantization math
+        ///
+        /// Default: true (auto-calculate)
+        /// </summary>
+        [Tooltip("AUTO-CALCULATE (default): Velocity bounds calculated from VALUE precision / sync interval.\n" +
+                 "VelocityQuantize* fields below are IGNORED when enabled.\n\n" +
+                 "MANUAL CONFIG (advanced): Uncheck to use custom VelocityQuantize* settings below.\n" +
+                 "Requires understanding of quantization math.")]
+        public bool AutoCalculateVelocityQuantization = true;
 
         /// <summary>
         /// Velocity/delta quantization lower bound. Used when alternating value/velocity packets enabled.

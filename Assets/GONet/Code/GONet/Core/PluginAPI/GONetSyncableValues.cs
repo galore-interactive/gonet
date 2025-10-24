@@ -455,7 +455,7 @@ namespace GONet
                 case GONetSyncableValueTypes.UnityEngine_Quaternion:
                     // Optimized quaternion comparison using dot product
                     float dot = Quaternion.Dot(left.unityEngine_Quaternion, right.unityEngine_Quaternion);
-                    return dot > 0.9999f; // ~0.81 degree threshold
+                    return dot > Utils.QuaternionUtils.DOT_PRODUCT_SMALL_ROTATION_THRESHOLD; // ~0.026 degree threshold (see QuaternionUtils for history)
             }
 
             return false;

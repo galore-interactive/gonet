@@ -1,4 +1,4 @@
-﻿/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
+/* GONet (TM, serial number 88592370), Copyright (c) 2019-2023 Galore Interactive LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential, email: contactus@galoreinteractive.com
  * 
@@ -200,6 +200,26 @@ namespace GONet
         /// Default: 10 bits (1024 discrete values across velocity range)
         /// </summary>
         public byte VelocityQuantizeDownToBitCount = 10;
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: If true, velocity quantization bounds are calculated automatically
+        /// from VALUE quantization settings (QuantizeDownToBitCount, QuantizeLowerBound, QuantizeUpperBound).
+        /// If false, uses manually configured VelocityQuantize* settings above.
+        ///
+        /// AUTO-CALCULATION (default, recommended):
+        /// - Calculates velocity bounds from VALUE precision / sync interval
+        /// - Ensures VELOCITY bundles are sent only for sub-quantization motion
+        /// - Bit count matches VALUE bit count for consistency
+        /// - VelocityQuantize* fields are IGNORED when this is true
+        ///
+        /// MANUAL CONFIGURATION (advanced):
+        /// - Set to false to use custom VelocityQuantize* settings
+        /// - Useful for fine-tuning bandwidth vs quality trade-offs
+        /// - Requires understanding of quantization math
+        ///
+        /// Default: true (auto-calculate)
+        /// </summary>
+        public bool AutoCalculateVelocityQuantization = true;
+
 
         #region GONet internal only
 

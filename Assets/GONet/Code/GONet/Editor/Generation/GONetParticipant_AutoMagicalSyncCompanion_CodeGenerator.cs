@@ -221,11 +221,10 @@ namespace GONet.Editor.Generation
                     string velocityLowerBoundForRuntimeFields;
                     string velocityUpperBoundForRuntimeFields;
 
-                    bool hasManualVelocitySettingsForRuntimeFields = singleMember.attribute.VelocityQuantizeLowerBound != -20f ||
-                                                     singleMember.attribute.VelocityQuantizeUpperBound != 20f ||
-                                                     singleMember.attribute.VelocityQuantizeDownToBitCount != 10;
+                    // Check if user wants manual velocity configuration (via boolean flag, not magic values)
+                    bool shouldAutoCalculateForRuntimeFields = singleMember.attribute.AutoCalculateVelocityQuantization;
 
-                    if (hasManualVelocitySettingsForRuntimeFields)
+                    if (!shouldAutoCalculateForRuntimeFields)
                     {
                         // Way 2: Use manual settings from sync profile
                         velocityLowerBoundForRuntimeFields = singleMember.attribute.VelocityQuantizeLowerBound.ToString(CultureInfo.InvariantCulture) + "f";
@@ -306,12 +305,10 @@ namespace GONet.Editor.Generation
                         string velLowerBound;
                         string velUpperBound;
 
-                        // Check if user has manually configured velocity quantization (non-default values)
-                        bool hasManualVelocitySettings = singleMember.attribute.VelocityQuantizeLowerBound != -20f ||
-                                                         singleMember.attribute.VelocityQuantizeUpperBound != 20f ||
-                                                         singleMember.attribute.VelocityQuantizeDownToBitCount != 10;
+                        // Check if user wants manual velocity configuration (via boolean flag, not magic values)
+                        bool shouldAutoCalculate = singleMember.attribute.AutoCalculateVelocityQuantization;
 
-                        if (hasManualVelocitySettings)
+                        if (!shouldAutoCalculate)
                         {
                             // Use manually configured velocity quantization settings
                             velBitCount = singleMember.attribute.VelocityQuantizeDownToBitCount.ToString();
@@ -1911,22 +1908,59 @@ namespace GONet.Editor.Generation
             UnityEngine.Debug.Log($"[VelocityCalc] physicsUpdateInterval={physicsUpdateInterval}, fixedDeltaTime={fixedDeltaTime}, syncChangesEverySeconds={syncChangesEverySeconds}, syncInterval={syncInterval}, isQuaternion={isQuaternion}, valueLowerBound={valueLowerBound}, valueUpperBound={valueUpperBound}, valueBitCount={valueBitCount}");
 
 
-            // Special handling for Quaternion (angular velocity)
+            // Special handling for Quaternion (angular velocity) - Option B: Exact calculation
             if (isQuaternion)
             {
-                // Quaternion uses smallest-three compression with fixed range: ±(1/√2) ≈ ±0.707 per component
-                // With 9-bit default, this gives ~0.16° rotation precision
-                float rotationPrecisionDegrees = 0.16f;
+                // Quaternion smallest-3 compression:
+                // - 3 components quantized over range ±(1/√2) ≈ ±0.7071
+                // - 4th component reconstructed using sqrt(1 - a² - b² - c²)
+                // - Each component uses 'valueBitCount' bits (typically 9)
 
-                // Calculate maximum sub-quantization angular velocity (degrees/sec)
-                // This is the quantization step per sync interval, converted to velocity (per second)
-                float maxAngularVelocityDegrees = rotationPrecisionDegrees / syncInterval;
+                // IMPORTANT: QuaternionSerializer ignores profile's QuantizeDownToBitCount (usually 0)
+                // and uses its own DEFAULT_BITS_PER_SMALLEST_THREE = 9. We must match this behavior.
+                const int QUATERNION_DEFAULT_BITS = 9;  // Must match QuaternionSerializer.DEFAULT_BITS_PER_SMALLEST_THREE
+                int actualBitCount = valueBitCount > 0 ? valueBitCount : QUATERNION_DEFAULT_BITS;
 
-                // Convert to radians/sec (angular velocity stored as Vector3 in radians)
-                float maxAngularVelocityRad = maxAngularVelocityDegrees * UnityEngine.Mathf.Deg2Rad;
+                const float SQRT_2 = 1.41421356f;
+                float quatComponentRange = 2.0f / SQRT_2;  // Full range: 1.4142 (from -0.7071 to +0.7071)
 
-                // Use 9 bits for good angular velocity precision (~0.056°/s)
-                int angularVelocityBitCount = 9;
+                // Calculate precision per quantization step for one quaternion component
+                int quantizationSteps = (1 << actualBitCount) - 1;  // e.g., 511 steps for 9 bits
+                float quatComponentPrecision = quatComponentRange / quantizationSteps;
+
+                // Calculate minimum angular change from quantization (exact, not linearized)
+                // Test all 3 smallest components to find worst-case angular precision
+                float minAnglePrecisionRad = float.MaxValue;
+
+                for (int component = 0; component < 3; component++)
+                {
+                    // Construct test quaternion with one component at precision limit
+                    float a = (component == 0) ? quatComponentPrecision : 0f;
+                    float b = (component == 1) ? quatComponentPrecision : 0f;
+                    float c = (component == 2) ? quatComponentPrecision : 0f;
+
+                    // Calculate largest component using quaternion normalization: w² + x² + y² + z² = 1
+                    float largestSquared = 1.0f - (a * a + b * b + c * c);
+                    float largest = UnityEngine.Mathf.Sqrt(UnityEngine.Mathf.Max(0f, largestSquared));
+
+                    // Calculate rotation angle: θ = 2 * arccos(w) where w is the largest component
+                    // (assumes largest is 'w', but result is same for any component due to symmetry)
+                    float angle = 2.0f * UnityEngine.Mathf.Acos(UnityEngine.Mathf.Clamp(largest, -1f, 1f));
+
+                    minAnglePrecisionRad = UnityEngine.Mathf.Min(minAnglePrecisionRad, angle);
+                }
+
+                // Calculate maximum angular velocity from angular precision / sync interval
+                float maxAngularVelocityRad = minAnglePrecisionRad / syncInterval;
+
+                // Use same bit count as VALUE quantization (actualBitCount, typically 9 bits)
+                int angularVelocityBitCount = actualBitCount;
+
+                // DEBUG: Log quaternion velocity calculation details
+                UnityEngine.Debug.Log($"[QuaternionVelocityCalc] valueBitCount={valueBitCount}, actualBitCount={actualBitCount}, quatComponentPrecision={quatComponentPrecision:F6}, " +
+                                      $"minAnglePrecisionRad={minAnglePrecisionRad:F6} ({minAnglePrecisionRad * UnityEngine.Mathf.Rad2Deg:F4}°), " +
+                                      $"syncInterval={syncInterval:F4}s, maxAngularVelocityRad={maxAngularVelocityRad:F6} ({maxAngularVelocityRad * UnityEngine.Mathf.Rad2Deg:F4}°/s), " +
+                                      $"angularVelocityBitCount={angularVelocityBitCount}");
 
                 return (-maxAngularVelocityRad, maxAngularVelocityRad, angularVelocityBitCount);
             }
