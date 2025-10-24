@@ -5,14 +5,14 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
 {
     /// <summary>
     /// Rotation speed presets for testing quaternion velocity quantization:
-    /// - SLOW: 8°/s (within ±19°/s bounds → sends VELOCITY bundles, smooth sub-quantization motion)
+    /// - SLOW: 5°/s (well within bounds → sends VELOCITY bundles, tests velocity-augmented sync)
     /// - MEDIUM: 25°/s (above ±19°/s threshold → sends VALUE bundles, slight quantization visible)
     /// - FAST: 180°/s (way above threshold → sends VALUE bundles, quantization acceptable due to motion blur)
     /// - CUSTOM: Use the 'Custom Rotation Speed' field below
     /// </summary>
     public enum RotationSpeedPreset
     {
-        Slow,   // 8°/s - Tests VELOCITY bundle path (angular velocity synthesis)
+        Slow,   // 5°/s - Tests VELOCITY bundle path (angular velocity synthesis)
         Medium, // 25°/s - Tests threshold boundary (just above VELOCITY range)
         Fast,   // 180°/s - Tests VALUE bundle path (typical physics simulation)
         Custom  // User-defined speed
@@ -23,7 +23,7 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
     public float angularSpeed = 30f; // The speed of the circular motion (degrees per second)
 
     [Header("Rotation Settings")]
-    [Tooltip("SLOW (8°/s): Tests VELOCITY bundles - should eliminate rotation snapping.\n" +
+    [Tooltip("SLOW (5°/s): Tests VELOCITY bundles - well within velocity bounds.\n" +
              "MEDIUM (25°/s): Tests threshold boundary - just above VELOCITY range.\n" +
              "FAST (180°/s): Tests VALUE bundles - typical fast physics rotation.\n" +
              "CUSTOM: Use the 'Custom Rotation Speed' field below.")]
@@ -45,7 +45,7 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
         switch (rotationSpeedPreset)
         {
             case RotationSpeedPreset.Slow:
-                return 8f;      // 8°/s - Within ±19°/s VELOCITY bounds
+                return 5f;      // 5°/s - Well within VELOCITY bounds, tests velocity-augmented sync
             case RotationSpeedPreset.Medium:
                 return 25f;     // 25°/s - Just above ±19°/s threshold
             case RotationSpeedPreset.Fast:
