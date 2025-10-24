@@ -97,6 +97,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\AdvancedTimeSyncIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetLocalCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\Editor\ClassTypeReferencePropertyDrawer.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\VelocitySyncTelemetryMenu.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\QuantizerTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\ExternalTimeSourceIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ChannelIsolationTests.cs" />

@@ -46,6 +46,23 @@ namespace GONet
         /// </summary>
         public static float PeriodicReportIntervalSeconds { get; set; } = 5.0f;
 
+        /// <summary>
+        /// Enable detailed per-frame trace logging (WARNING: massive log output).
+        /// Logs every server send, client receive, and blending decision with full values.
+        /// Only use for targeted debugging with specific GONetId/index filters.
+        /// </summary>
+        public static bool EnableDetailedTracing { get; set; } = false;
+
+        /// <summary>
+        /// Filter tracing to specific GONetId (0 = trace all).
+        /// </summary>
+        public static uint TraceGONetId { get; set; } = 0;
+
+        /// <summary>
+        /// Filter tracing to specific index (e.g., 8 for rotation). -1 = trace all.
+        /// </summary>
+        public static int TraceIndex { get; set; } = -1;
+
         #endregion
 
         #region Global Counters (Thread-Safe)
@@ -412,6 +429,82 @@ namespace GONet
             }
 
             return false;
+        }
+
+        #endregion
+
+        #region Detailed Tracing (Per-Frame Logging)
+
+        private static bool ShouldTrace(uint gonetId, int index)
+        {
+            if (!IsEnabled || !EnableDetailedTracing) return false;
+            if (TraceGONetId > 0 && gonetId != TraceGONetId) return false;
+            if (TraceIndex >= 0 && index != TraceIndex) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Trace server authority value (what server has BEFORE deciding what to send).
+        /// </summary>
+        public static void TraceServerAuthority(uint gonetId, int index, string memberName, UnityEngine.Quaternion value)
+        {
+            if (!ShouldTrace(gonetId, index)) return;
+            GONetLog.Info($"[TRACE][SERVER-AUTH] GONetId:{gonetId} idx:{index} {memberName} euler:({value.eulerAngles.x:F2},{value.eulerAngles.y:F2},{value.eulerAngles.z:F2}) quat:({value.w:F4},{value.x:F4},{value.y:F4},{value.z:F4})");
+        }
+
+        /// <summary>
+        /// Trace server send decision (VALUE or VELOCITY bundle with reasoning).
+        /// </summary>
+        public static void TraceServerSend(uint gonetId, int index, string bundleType, UnityEngine.Quaternion quaternionValue,
+            UnityEngine.Vector3 angularVelocityRad, string reason, int snapshotCount, bool velocityWithinRange)
+        {
+            if (!ShouldTrace(gonetId, index)) return;
+            UnityEngine.Vector3 angularVelocityDeg = angularVelocityRad * UnityEngine.Mathf.Rad2Deg;
+            GONetLog.Info($"[TRACE][SERVER-SEND] GONetId:{gonetId} idx:{index} bundleType:{bundleType} " +
+                $"euler:({quaternionValue.eulerAngles.x:F2},{quaternionValue.eulerAngles.y:F2},{quaternionValue.eulerAngles.z:F2}) " +
+                $"angVel:({angularVelocityDeg.x:F2},{angularVelocityDeg.y:F2},{angularVelocityDeg.z:F2})°/s " +
+                $"snapshots:{snapshotCount} velInRange:{velocityWithinRange} reason:{reason}");
+        }
+
+        /// <summary>
+        /// Trace client receive (what client receives from network).
+        /// </summary>
+        public static void TraceClientReceive(uint gonetId, int index, string bundleType, UnityEngine.Quaternion quaternionValue,
+            UnityEngine.Vector3 angularVelocityRad, UnityEngine.Quaternion synthesizedQuaternion)
+        {
+            if (!ShouldTrace(gonetId, index)) return;
+            UnityEngine.Vector3 angularVelocityDeg = angularVelocityRad * UnityEngine.Mathf.Rad2Deg;
+            if (bundleType == "VELOCITY")
+            {
+                GONetLog.Info($"[TRACE][CLIENT-RECV] GONetId:{gonetId} idx:{index} bundleType:VELOCITY " +
+                    $"angVel:({angularVelocityDeg.x:F2},{angularVelocityDeg.y:F2},{angularVelocityDeg.z:F2})°/s " +
+                    $"synthesized:({synthesizedQuaternion.eulerAngles.x:F2},{synthesizedQuaternion.eulerAngles.y:F2},{synthesizedQuaternion.eulerAngles.z:F2})");
+            }
+            else
+            {
+                GONetLog.Info($"[TRACE][CLIENT-RECV] GONetId:{gonetId} idx:{index} bundleType:VALUE " +
+                    $"euler:({quaternionValue.eulerAngles.x:F2},{quaternionValue.eulerAngles.y:F2},{quaternionValue.eulerAngles.z:F2})");
+            }
+        }
+
+        /// <summary>
+        /// Trace client blend decision (EXTRAPOLATION vs INTERPOLATION with result).
+        /// </summary>
+        public static void TraceClientBlend(uint gonetId, int index, string blendType, bool hasVelocityData, UnityEngine.Quaternion resultQuaternion)
+        {
+            if (!ShouldTrace(gonetId, index)) return;
+            GONetLog.Info($"[TRACE][CLIENT-BLEND] GONetId:{gonetId} idx:{index} blendType:{blendType} hasVel:{hasVelocityData} " +
+                $"result:({resultQuaternion.eulerAngles.x:F2},{resultQuaternion.eulerAngles.y:F2},{resultQuaternion.eulerAngles.z:F2})");
+        }
+
+        /// <summary>
+        /// Trace client apply (final value applied to transform).
+        /// </summary>
+        public static void TraceClientApply(uint gonetId, int index, UnityEngine.Quaternion appliedQuaternion)
+        {
+            if (!ShouldTrace(gonetId, index)) return;
+            GONetLog.Info($"[TRACE][CLIENT-APPLY] GONetId:{gonetId} idx:{index} " +
+                $"applied:({appliedQuaternion.eulerAngles.x:F2},{appliedQuaternion.eulerAngles.y:F2},{appliedQuaternion.eulerAngles.z:F2})");
         }
 
         #endregion

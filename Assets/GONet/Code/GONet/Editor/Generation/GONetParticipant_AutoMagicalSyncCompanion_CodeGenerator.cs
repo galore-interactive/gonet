@@ -772,6 +772,12 @@ namespace GONet.Editor.Generation
 
                 if (usesVelocitySync && !isSerializeAll)
                 {
+                    // TRACE: Capture server authority value before serialization
+                    if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+                    {
+                        sb.Append(indent).AppendLine($"\tVelocitySyncTelemetry.TraceServerAuthority(gonetParticipant.GONetId, {iOverall}, \"{singleMember.memberName}\", {valueExpression});");
+                    }
+
                     // VELOCITY-CAPABLE: Branch on bundle type
                     sb.Append(indent).AppendLine("\tif (isVelocityBundle)");
                     sb.Append(indent).AppendLine("\t{");
@@ -781,6 +787,13 @@ namespace GONet.Editor.Generation
                     sb.Append(indent).AppendLine($"\t\t// Serialize velocity using velocity serializer");
                     sb.Append(indent).AppendLine($"\t\tcachedVelocitySerializers[{iOverall}].Serialize(bitStream_appendTo, gonetParticipant, velocityValue);");
                     sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackVelocityBundleSent(gonetParticipant.GONetId);");
+
+                    // TRACE: Log VELOCITY bundle send (Quaternion only)
+                    if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+                    {
+                        sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TraceServerSend(gonetParticipant.GONetId, {iOverall}, \"VELOCITY\", {valueExpression}, velocityValue.UnityEngine_Vector3, \"partition_decision\", valuesChangesSupport[{iOverall}].mostRecentChanges_usedSize, true);");
+                    }
+
                     sb.Append(indent).AppendLine("\t}");
                     sb.Append(indent).AppendLine("\telse");
                     sb.Append(indent).AppendLine("\t{");
@@ -813,6 +826,12 @@ namespace GONet.Editor.Generation
                     sb.Append(indent).AppendLine($"\t\tsnapshotValue.{snapshotFieldName} = {valueExpression};");
                     sb.Append(indent).AppendLine($"\t\tvaluesChangesSupport[{iOverall}].AddToMostRecentChangeQueue_IfAppropriate(GONet.GONetMain.Time.ElapsedTicks, snapshotValue);");
                     sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackValueBundleSent(gonetParticipant.GONetId);");
+
+                    // TRACE: Log VALUE bundle send (Quaternion only)
+                    if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+                    {
+                        sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TraceServerSend(gonetParticipant.GONetId, {iOverall}, \"VALUE\", {valueExpression}, UnityEngine.Vector3.zero, \"partition_decision\", valuesChangesSupport[{iOverall}].mostRecentChanges_usedSize, false);");
+                    }
 
                     sb.Append(indent).AppendLine("\t}");
                 }
@@ -1130,6 +1149,12 @@ namespace GONet.Editor.Generation
             }
 
             sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackVelocityBundleReceived(gonetParticipant.GONetId);");
+
+            // TRACE: Log VELOCITY bundle receive (Quaternion only)
+            if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TraceClientReceive(gonetParticipant.GONetId, {iOverall}, \"VELOCITY\", UnityEngine.Quaternion.identity, angularVelocity, synthesizedValue);");
+            }
             sb.Append(indent).AppendLine("\t}");
             sb.Append(indent).AppendLine("\telse");
             sb.Append(indent).AppendLine("\t{");
@@ -1142,6 +1167,16 @@ namespace GONet.Editor.Generation
             WriteDeserializeSingle(iOverall, single, singleMember, indent + "\t", true);
 
             sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TrackValueBundleReceived(gonetParticipant.GONetId);");
+
+            // TRACE: Log VALUE bundle receive (Quaternion only)
+            if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
+            {
+                string valueExpression = singleMember.animatorControllerParameterId == 0
+                    ? $"{single.componentTypeName}.{singleMember.memberName}"
+                    : $"{single.componentTypeName}.Get{singleMember.animatorControllerParameterMethodSuffix}({singleMember.animatorControllerParameterId})";
+                sb.Append(indent).AppendLine($"\t\tVelocitySyncTelemetry.TraceClientReceive(gonetParticipant.GONetId, {iOverall}, \"VALUE\", {valueExpression}, UnityEngine.Vector3.zero, UnityEngine.Quaternion.identity);");
+            }
+
             sb.Append(indent).AppendLine("\t}");
         }
 

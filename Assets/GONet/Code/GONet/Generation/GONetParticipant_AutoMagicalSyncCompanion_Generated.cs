@@ -751,6 +751,13 @@ namespace GONet.Generation
 #endif
                     // Velocity extrapolation always extrapolates (uses velocity data)
                     VelocitySyncTelemetry.TrackExtrapolation(gonetParticipant.GONetId);
+
+                    // TRACE: Log velocity-aware extrapolation decision
+                    if (blendedValue is UnityEngine.Quaternion quaternionResult)
+                    {
+                        VelocitySyncTelemetry.TraceClientBlend(gonetParticipant.GONetId, index, "EXTRAPOLATION", hasVelocityData, quaternionResult);
+                    }
+
                     didExtrapolatePastMostRecentChanges = true;
                     return true;
                 }
@@ -772,6 +779,12 @@ namespace GONet.Generation
                 if (result)
                 {
                     VelocitySyncTelemetry.TrackInterpolation(gonetParticipant.GONetId);
+
+                    // TRACE: Log standard interpolation decision
+                    if (blendedValue is UnityEngine.Quaternion quaternionResult)
+                    {
+                        VelocitySyncTelemetry.TraceClientBlend(gonetParticipant.GONetId, index, "INTERPOLATION", hasVelocityData, quaternionResult);
+                    }
                 }
                 return result;
             }

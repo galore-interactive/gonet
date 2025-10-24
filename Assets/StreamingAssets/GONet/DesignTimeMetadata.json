@@ -66,6 +66,11 @@
             "codeGenerationId": 1
         },
         {
+            "location": "scene://RpcPlayground/GONetSyncAnalysis",
+            "unityGuid": "",
+            "codeGenerationId": 1
+        },
+        {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor",
             "unityGuid": "",
             "codeGenerationId": 3

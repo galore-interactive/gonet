@@ -34,6 +34,16 @@ namespace GONet
         [Range(0f, 60f)]
         public float reportIntervalSeconds = 5.0f;
 
+        [Header("Detailed Tracing (WARNING: Massive Log Output)")]
+        [Tooltip("Enable per-frame detailed tracing (use with filters!)")]
+        public bool enableDetailedTracing = false;
+
+        [Tooltip("Trace only this GONetId (0 = trace all objects)")]
+        public uint traceGONetId = 208895; // Default to rotating cube
+
+        [Tooltip("Trace only this index (e.g., 8 for rotation, -1 = trace all)")]
+        public int traceIndex = 8; // Default to rotation
+
         [Header("Manual Reporting")]
         [Tooltip("Include per-object breakdown in manual reports")]
         public bool includePerObjectBreakdownInManualReports = true;
@@ -44,11 +54,18 @@ namespace GONet
             VelocitySyncTelemetry.IsEnabled = enableTelemetry;
             VelocitySyncTelemetry.EnablePerObjectTracking = enablePerObjectTracking;
             VelocitySyncTelemetry.PeriodicReportIntervalSeconds = reportIntervalSeconds;
+            VelocitySyncTelemetry.EnableDetailedTracing = enableDetailedTracing;
+            VelocitySyncTelemetry.TraceGONetId = traceGONetId;
+            VelocitySyncTelemetry.TraceIndex = traceIndex;
 
             if (enableTelemetry)
             {
                 GONetLog.Info("[VelocitySyncTelemetry] Reporter initialized - telemetry ENABLED");
                 GONetLog.Info($"[VelocitySyncTelemetry] Report interval: {reportIntervalSeconds}s, Per-object tracking: {enablePerObjectTracking}");
+                if (enableDetailedTracing)
+                {
+                    GONetLog.Warning($"[VelocitySyncTelemetry] Detailed tracing ENABLED - filtering GONetId:{traceGONetId}, index:{traceIndex}");
+                }
             }
             else
             {
@@ -62,6 +79,9 @@ namespace GONet
             VelocitySyncTelemetry.IsEnabled = enableTelemetry;
             VelocitySyncTelemetry.EnablePerObjectTracking = enablePerObjectTracking;
             VelocitySyncTelemetry.PeriodicReportIntervalSeconds = reportIntervalSeconds;
+            VelocitySyncTelemetry.EnableDetailedTracing = enableDetailedTracing;
+            VelocitySyncTelemetry.TraceGONetId = traceGONetId;
+            VelocitySyncTelemetry.TraceIndex = traceIndex;
 
             // Periodic reporting (if enabled)
             if (enableTelemetry)

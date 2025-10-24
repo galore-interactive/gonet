@@ -1427,13 +1427,15 @@ GameObject:
   m_Component:
   - component: {fileID: 1171946640}
   - component: {fileID: 1171946639}
+  - component: {fileID: 1171946642}
+  - component: {fileID: 1171946641}
   m_Layer: 0
-  m_Name: ValueBlendingAnalysis
+  m_Name: GONetSyncAnalysis
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1171946639
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1441,7 +1443,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1171946638}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7ce350e422ec8ba42bc560535d9e8626, type: 3}
   m_Name: 
@@ -1468,6 +1470,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1171946641
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1171946638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5b7832c812fe784d8ddb15b0c4bc768, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTickReceiver: 0
+  enableTelemetry: 1
+  enablePerObjectTracking: 0
+  reportIntervalSeconds: 5
+  includePerObjectBreakdownInManualReports: 1
+--- !u!114 &1171946642
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1171946638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a90b92e03441514aba6c47a0110582a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  UnityGuid: 
+  animatorSyncSupport:
+    keys: []
+    values: []
+  RemotelyControlledByAuthorityId: 0
+  IsRigidBodyOwnerOnlyControlled: 0
+  ShouldHideDuringRemoteInstantiate: 0
+  AutoDontDestroyOnLoad: 0
+  client_overrideLimboMode: 0
+  client_limboMode: 2
+  IsPositionSyncd: 0
+  IsRotationSyncd: 0
+  wasInstantiatedForce: 0
+  myRigidBody: {fileID: 0}
+  myRigidBody2D: {fileID: 0}
 --- !u!1 &1172820475
 GameObject:
   m_ObjectHideFlags: 0
