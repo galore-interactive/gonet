@@ -13,6 +13,8 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
+#undef GONET_VELOCITY_SYNC_DEBUG // Disable velocity sync debug logging (massive spam in logs)
+
 using GONet.PluginAPI;
 using GONet.Utils;
 using System;
