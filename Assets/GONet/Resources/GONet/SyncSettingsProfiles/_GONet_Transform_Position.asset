@@ -22,10 +22,10 @@ MonoBehaviour:
   QuantizeUpperBound: 125
   QuantizationResultingPrecision: 0.0009536743 (i.e., 0.954 millimeters)
   IsVelocityEligible: 1
-  VelocityQuantizeLowerBound: -15
-  VelocityQuantizeUpperBound: 15
-  VelocityQuantizeDownToBitCount: 18
-  VelocityQuantizationResultingPrecision: 0.000114 units/sec
+  VelocityQuantizeLowerBound: -20
+  VelocityQuantizeUpperBound: 20
+  VelocityQuantizeDownToBitCount: 10
+  VelocityQuantizationResultingPrecision: 0.039063 units/sec
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   PhysicsUpdateInterval: 3

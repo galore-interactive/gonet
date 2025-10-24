@@ -61,64 +61,109 @@
             "codeGenerationId": 1
         },
         {
-            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (1)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (2)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (3)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/AutoRotaters/AutoRotatingOrbitor (4)",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower ",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower_+30N06",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower_+31N06",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower_+32N06",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
-            "location": "scene://RpcPlayground/Followers/Follower_+33N06",
-            "unityGuid": "",
-            "codeGenerationId": 2
-        },
-        {
             "location": "scene://RpcPlayground/GONet_GlobalContext",
             "unityGuid": "",
             "codeGenerationId": 1
         },
         {
-            "location": "scene://RpcPlayground/NADA/GameObject (3)",
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor",
             "unityGuid": "",
             "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (1)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (2)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (3)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (4)",
+            "unityGuid": "",
+            "codeGenerationId": 3
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower ",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower_+30N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower_+31N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower_+32N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower_+33N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Auto Rotaters/AutoRotatingOrbitor",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Auto Rotaters/AutoRotatingOrbitor (1)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Auto Rotaters/AutoRotatingOrbitor (2)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Auto Rotaters/AutoRotatingOrbitor (3)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Auto Rotaters/AutoRotatingOrbitor (4)",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Followers (follows zero sync, but self syncs automagically)/Follower ",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Followers (follows zero sync, but self syncs automagically)/Follower_+30N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Followers (follows zero sync, but self syncs automagically)/Follower_+31N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Followers (follows zero sync, but self syncs automagically)/Follower_+32N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
+        },
+        {
+            "location": "scene://RpcPlayground/ZERO Sync/Followers (follows zero sync, but self syncs automagically)/Follower_+33N06",
+            "unityGuid": "",
+            "codeGenerationId": 2
         }
     ]
 }

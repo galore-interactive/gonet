@@ -90,6 +90,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\TieredArrayPoolTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\SecretaryOfTemporalAffairsTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_GeneratedTemplate_Code.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\QuaternionThresholdTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetEventBusTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\GONetLimboModeTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\ReliableNetcode\ReliableChannelMessageQueueExhaustionTests.cs" />
@@ -146,6 +147,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\NetcodeIO\NetcodeIOTestBase.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\Utils\Time\HighPerfTimeSyncIntegrationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\Generation\BobWad_Generated_Generator.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\QuaternionThresholdDebugTest.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\GONetParticipantCompanionBehaviourCustomInspector.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Editor\UnitTests\GONet\RpcEventPoolingSoakTests.cs" />
   </ItemGroup>

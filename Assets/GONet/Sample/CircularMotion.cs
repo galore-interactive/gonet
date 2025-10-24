@@ -3,17 +3,59 @@ using UnityEngine;
 
 public class CircularMotion : GONetParticipantCompanionBehaviour
 {
+    /// <summary>
+    /// Rotation speed presets for testing quaternion velocity quantization:
+    /// - SLOW: 8°/s (within ±19°/s bounds → sends VELOCITY bundles, smooth sub-quantization motion)
+    /// - MEDIUM: 25°/s (above ±19°/s threshold → sends VALUE bundles, slight quantization visible)
+    /// - FAST: 180°/s (way above threshold → sends VALUE bundles, quantization acceptable due to motion blur)
+    /// - CUSTOM: Use the 'Custom Rotation Speed' field below
+    /// </summary>
+    public enum RotationSpeedPreset
+    {
+        Slow,   // 8°/s - Tests VELOCITY bundle path (angular velocity synthesis)
+        Medium, // 25°/s - Tests threshold boundary (just above VELOCITY range)
+        Fast,   // 180°/s - Tests VALUE bundle path (typical physics simulation)
+        Custom  // User-defined speed
+    }
+
     [Header("Movement Settings")]
     public float radius = 5f; // The radius of the circular path
     public float angularSpeed = 30f; // The speed of the circular motion (degrees per second)
 
     [Header("Rotation Settings")]
-    public float rotationSpeed = 90f; // The speed of the rotation around the object's own axis (degrees per second)
+    [Tooltip("SLOW (8°/s): Tests VELOCITY bundles - should eliminate rotation snapping.\n" +
+             "MEDIUM (25°/s): Tests threshold boundary - just above VELOCITY range.\n" +
+             "FAST (180°/s): Tests VALUE bundles - typical fast physics rotation.\n" +
+             "CUSTOM: Use the 'Custom Rotation Speed' field below.")]
+    public RotationSpeedPreset rotationSpeedPreset = RotationSpeedPreset.Medium;
+
+    [Tooltip("Custom rotation speed (degrees/sec). Only used when preset is set to 'Custom'.")]
+    public float customRotationSpeed = 90f;
 
     private float angle = 0f; // Current angle in radians
 
     [GONetAutoMagicalSync]
     public float NettyWorkedFloat { get; set; }
+
+    /// <summary>
+    /// Gets the actual rotation speed based on the selected preset.
+    /// </summary>
+    private float GetRotationSpeed()
+    {
+        switch (rotationSpeedPreset)
+        {
+            case RotationSpeedPreset.Slow:
+                return 8f;      // 8°/s - Within ±19°/s VELOCITY bounds
+            case RotationSpeedPreset.Medium:
+                return 25f;     // 25°/s - Just above ±19°/s threshold
+            case RotationSpeedPreset.Fast:
+                return 180f;    // 180°/s - Typical fast physics rotation
+            case RotationSpeedPreset.Custom:
+                return customRotationSpeed;
+            default:
+                return 25f;     // Default to Medium
+        }
+    }
 
     public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
     {
@@ -23,8 +65,8 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
         {
             angle = UnityEngine.Random.Range(0, Mathf.PI) * 2f;
             radius *= Random.Range(0.25f, 1.5f);
-            rotationSpeed *= Random.Range(0.25f, 1.5f);
             angularSpeed *= Random.Range(0.25f, 1.5f);
+            // Note: Don't randomize rotation speed - use preset for testing
         }
     }
 
@@ -38,8 +80,9 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
             float z = Mathf.Sin(angle * Mathf.Deg2Rad) * radius;
             transform.position = new Vector3(x, transform.position.y, z);
 
-            // Rotate the object around its own axis
-            transform.Rotate(Vector3.up, rotationSpeed * Time.deltaTime);
+            // Rotate the object around its own axis using preset speed
+            float currentRotationSpeed = GetRotationSpeed();
+            transform.Rotate(Vector3.up, currentRotationSpeed * Time.deltaTime);
 
             // just testing some network stuff
             NettyWorkedFloat += Time.deltaTime;

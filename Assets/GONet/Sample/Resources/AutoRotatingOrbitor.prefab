@@ -77,7 +77,8 @@ MonoBehaviour:
   isTickReceiver: 0
   radius: 5
   angularSpeed: 30
-  rotationSpeed: 90
+  rotationSpeedPreset: 0
+  customRotationSpeed: 90
 --- !u!114 &3790580374815426940
 MonoBehaviour:
   m_ObjectHideFlags: 0
