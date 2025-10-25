@@ -200,6 +200,29 @@ namespace GONet
         /// Default: 10 bits (1024 discrete values across velocity range)
         /// </summary>
         public byte VelocityQuantizeDownToBitCount = 10;
+
+        /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Interval (in seconds) between mandatory VALUE anchor bundles.
+        /// Prevents drift accumulation from packet loss during VELOCITY-augmented sync.
+        /// Only used when IsVelocityEligible = true.
+        ///
+        /// CONFIGURATION:
+        /// - 0 (default): Use global setting from GONetGlobal.velocityAnchorIntervalSeconds
+        /// - >0: Custom interval for this specific sync value (overrides global)
+        ///
+        /// HOW IT WORKS:
+        /// - Values within velocity range → VELOCITY bundles (smooth extrapolation)
+        /// - Every N seconds → Force VALUE anchor (re-sync to server truth)
+        /// - Values exceeding velocity range → Automatic VALUE bundles
+        ///
+        /// TUNING:
+        /// - Lower (0.5s): Less drift, more frequent corrections
+        /// - Higher (2-5s): Maximum smoothness, tolerate more drift
+        ///
+        /// Default: 0 (use global setting)
+        /// </summary>
+        public float VelocityAnchorIntervalSeconds = 0f;
+
         /// <summary>
         /// VELOCITY-AUGMENTED SYNC: If true, velocity quantization bounds are calculated automatically
         /// from VALUE quantization settings (QuantizeDownToBitCount, QuantizeLowerBound, QuantizeUpperBound).

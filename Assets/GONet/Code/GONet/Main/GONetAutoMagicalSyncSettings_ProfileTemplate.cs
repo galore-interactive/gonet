@@ -188,6 +188,35 @@ namespace GONet
         public byte VelocityQuantizeDownToBitCount = 10;
 
         /// <summary>
+        /// VELOCITY-AUGMENTED SYNC: Interval (in seconds) between mandatory VALUE anchor bundles.
+        /// Prevents drift accumulation from packet loss during VELOCITY-augmented sync.
+        ///
+        /// HOW IT WORKS:
+        /// - Values within velocity range → VELOCITY bundles (smooth extrapolation)
+        /// - Every N seconds → Force VALUE anchor (re-sync to server truth)
+        /// - Values exceeding velocity range → Automatic VALUE bundles
+        ///
+        /// CONFIGURATION:
+        /// - 0 (default): Use global setting from GONetGlobal.velocityAnchorIntervalSeconds
+        /// - >0: Custom interval for this specific sync profile (overrides global)
+        ///
+        /// TUNING:
+        /// - Lower (0.5s): Less drift, more frequent corrections
+        /// - Higher (2-5s): Maximum smoothness, tolerate more drift
+        ///
+        /// Only applies when <see cref="IsVelocityEligible"/> is true.
+        ///
+        /// Default: 0 (use global setting)
+        /// </summary>
+        [Tooltip("Interval (seconds) between mandatory VALUE anchors during VELOCITY sync.\n" +
+                 "0 = Use global setting (GONetGlobal.velocityAnchorIntervalSeconds)\n" +
+                 ">0 = Custom interval for this profile\n\n" +
+                 "Only applies when 'Is Velocity Eligible' is enabled.\n\n" +
+                 "RECOMMENDED: Leave at 0 (use global) unless specific profile needs different timing.")]
+        [Range(0f, 5.0f)]
+        public float VelocityAnchorIntervalSeconds = 0f;
+
+        /// <summary>
         /// READONLY: Velocity quantization resulting precision (calculated from above settings)
         /// </summary>
         [Tooltip("READONLY: Velocity quantization precision (calculated from above settings)")]

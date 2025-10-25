@@ -324,12 +324,15 @@ namespace GONet.Generation
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
 
-            // Get previous snapshot
-            int mostRecentChangesIndex = valueChangeSupport.mostRecentChanges_usedSize - 1;
-            if (mostRecentChangesIndex < 0 || valueChangeSupport.mostRecentChanges_usedSize == 0)
+            // VELOCITY FIX: Use lastKnownValue_previous (value at PREVIOUS SYNC) instead of mostRecentChanges (most recent physics frame)
+            // This ensures velocity is calculated over the SYNC interval (~41ms at 24Hz), not physics frame interval (~17ms at 60Hz)
+            GONetSyncableValue previousValue = valueChangeSupport.lastKnownValue_previous;
+
+            // Check if we have a previous value (if types don't match, not initialized yet)
+            if (currentValue.GONetSyncType != previousValue.GONetSyncType)
             {
 #if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity: No previous snapshot, returning zero velocity");
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity: No previous value (type mismatch), returning zero velocity");
 #endif
                 // No previous value, velocity is zero
                 if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
@@ -341,13 +344,13 @@ namespace GONet.Generation
                 else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
                     return UnityEngine.Vector4.zero;
                 else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
-                    return UnityEngine.Quaternion.identity; // Angular velocity handling will be added later
+                    return UnityEngine.Quaternion.identity;
 
                 return currentValue; // Fallback
             }
 
-            PluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];
-            long deltaTimeTicks = currentElapsedTicks - previousSnapshot.elapsedTicksAtChange;
+            // VELOCITY FIX: Use timestamp from when lastKnownValue_previous was captured (previous SYNC time)
+            long deltaTimeTicks = currentElapsedTicks - valueChangeSupport.lastKnownValue_previous_elapsedTicks;
 
             if (deltaTimeTicks <= 0)
             {
@@ -366,21 +369,21 @@ namespace GONet.Generation
                 return currentValue;
             }
 
-            float deltaTimeSeconds = (float)deltaTimeTicks / System.Diagnostics.Stopwatch.Frequency;
+            float deltaTimeSeconds = (float)deltaTimeTicks * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
             // Calculate velocity based on type
             if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
             {
-                float delta = currentValue.System_Single - previousSnapshot.numericValue.System_Single;
+                float delta = currentValue.System_Single - previousValue.System_Single;
                 float velocity = delta / deltaTimeSeconds;
 #if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Float current={currentValue.System_Single}, prev={previousSnapshot.numericValue.System_Single}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Float current={currentValue.System_Single}, prev={previousValue.System_Single}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
 #endif
                 return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
             {
-                UnityEngine.Vector2 delta = currentValue.UnityEngine_Vector2 - previousSnapshot.numericValue.UnityEngine_Vector2;
+                UnityEngine.Vector2 delta = currentValue.UnityEngine_Vector2 - previousValue.UnityEngine_Vector2;
                 UnityEngine.Vector2 velocity = delta / deltaTimeSeconds;
 #if GONET_VELOCITY_SYNC_DEBUG
                 GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector2 delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
@@ -389,22 +392,22 @@ namespace GONet.Generation
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
             {
-                UnityEngine.Vector3 delta = currentValue.UnityEngine_Vector3 - previousSnapshot.numericValue.UnityEngine_Vector3;
+                UnityEngine.Vector3 delta = currentValue.UnityEngine_Vector3 - previousValue.UnityEngine_Vector3;
                 UnityEngine.Vector3 velocity = delta / deltaTimeSeconds;
 #if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector3 current={currentValue.UnityEngine_Vector3}, prev={previousSnapshot.numericValue.UnityEngine_Vector3}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
+                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector3 current={currentValue.UnityEngine_Vector3}, prev={previousValue.UnityEngine_Vector3}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
 #endif
                 return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
             {
-                UnityEngine.Vector4 delta = currentValue.UnityEngine_Vector4 - previousSnapshot.numericValue.UnityEngine_Vector4;
+                UnityEngine.Vector4 delta = currentValue.UnityEngine_Vector4 - previousValue.UnityEngine_Vector4;
                 return delta / deltaTimeSeconds;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion)
             {
                 // Calculate angular velocity (omega) from quaternion delta
-                UnityEngine.Quaternion q0 = previousSnapshot.numericValue.UnityEngine_Quaternion;
+                UnityEngine.Quaternion q0 = previousValue.UnityEngine_Quaternion;
                 UnityEngine.Quaternion q1 = currentValue.UnityEngine_Quaternion;
                 UnityEngine.Vector3 omega = CalculateAngularVelocity(q0, q1, deltaTimeSeconds);
                 return omega; // Store as Vector3 (axis * radians/sec)

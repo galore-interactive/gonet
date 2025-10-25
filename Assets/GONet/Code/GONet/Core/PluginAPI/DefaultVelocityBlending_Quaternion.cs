@@ -69,7 +69,7 @@ namespace GONet.PluginAPI
             if (ticksDelta <= 0)
                 return mostRecent.numericValue;
 
-            float deltaTimeSeconds = (float)ticksDelta / System.Diagnostics.Stopwatch.Frequency;
+            float deltaTimeSeconds = (float)ticksDelta * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
             // Check if most recent value has angular velocity data (omega stored as Vector3)
             bool hasAngularVelocity = mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3;
@@ -98,7 +98,7 @@ namespace GONet.PluginAPI
                 if (prevTicksDelta <= 0)
                     return mostRecent.numericValue;
 
-                float prevDeltaTime = (float)prevTicksDelta / System.Diagnostics.Stopwatch.Frequency;
+                float prevDeltaTime = (float)prevTicksDelta * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
                 // Calculate angular velocity from quaternion delta
                 Quaternion q0 = prev.numericValue.UnityEngine_Quaternion;

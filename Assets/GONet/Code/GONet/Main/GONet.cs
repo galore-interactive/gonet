@@ -260,7 +260,7 @@ namespace GONet
                         }
 
                         // Format timestamp
-                        double elapsedSeconds = elapsedTicks / (double)Stopwatch.Frequency;
+                        double elapsedSeconds = elapsedTicks * GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
                         // Write event entry
                         writer.WriteLine($"[Event {eventIndex:D6}] Type={eventTypeName}");
@@ -2842,7 +2842,7 @@ namespace GONet
             {
                 long receiveTimestamp = Time.ElapsedTicks;
                 long latencyTicks = receiveTimestamp - elapsedTicksAtSend;
-                double latencyMs = (latencyTicks / (double)Stopwatch.Frequency) * 1000.0;
+                double latencyMs = (latencyTicks * GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS) * 1000.0;
 
                 string sceneHistory = GetSceneHistory();
                 string metadata = ExtractMessageMetadata(messageBytes, bytesUsedCount, channelId);
@@ -7550,6 +7550,20 @@ namespace GONet
             internal GONetSyncableValue lastKnownValue_previous;
 
             /// <summary>
+            /// Timestamp (in ticks) when lastKnownValue was captured (CURRENT value).
+            /// Copied to lastKnownValue_previous_elapsedTicks on next sync.
+            /// </summary>
+            internal long lastKnownValue_elapsedTicks;
+
+            /// <summary>
+            /// Timestamp (in ticks) when lastKnownValue_previous was captured (PREVIOUS sync).
+            /// Used for correct velocity calculation: velocity = (current - previous) / (currentTime - previousTime).
+            /// Updated by copying lastKnownValue_elapsedTicks before it's overwritten.
+            /// CRITICAL: Velocity MUST be calculated over SYNC interval, not physics frame interval!
+            /// </summary>
+            internal long lastKnownValue_previous_elapsedTicks;
+
+            /// <summary>
             /// Throughout a session, this will represent the minimum value of <see cref="lastKnownValue"/> encountered since the start of the session.
             /// IMPORTANT: This is only updated ***on the owner's machine*** if the following precompiler definition exists: GONET_MEASURE_VALUES_MIN_MAX (see <see cref="GONetSyncableValue.UpdateMinimumEncountered_IfApppropriate"/>)
             /// </summary>
@@ -7614,6 +7628,14 @@ namespace GONet
             internal float syncAttribute_VelocityQuantizeUpperBound;
 
             /// <summary>
+            /// Velocity anchor interval from sync attribute (in seconds).
+            /// Interval between mandatory VALUE anchor bundles during VELOCITY-augmented sync.
+            /// 0 = use global default from GONetGlobal.velocityAnchorIntervalSeconds
+            /// >0 = custom interval for this specific sync value
+            /// </summary>
+            internal float syncAttribute_VelocityAnchorIntervalSeconds;
+
+            /// <summary>
             /// PRE-CALCULATED lower bound for velocity in value-units-per-sync-interval.
             /// = syncAttribute_VelocityQuantizeLowerBound * deltaTime
             /// Used for efficient runtime range checking (no division required).
@@ -7649,6 +7671,16 @@ namespace GONet
             /// Default: 200ms (~12 frames at 60fps)
             /// </summary>
             internal const long VELOCITY_VALID_DURATION_MS = 200;
+
+            /// <summary>
+            /// Timestamp (in ticks) when last VALUE anchor bundle was sent for this value.
+            /// Used to enforce periodic anchoring during VELOCITY-augmented sync.
+            /// Prevents drift accumulation from packet loss on unreliable channels.
+            /// Resets to current time when:
+            /// - VALUE bundle sent (forced anchor or velocity out of range)
+            /// - First sync after object spawn
+            /// </summary>
+            internal long lastAnchorTimeTicks;
             #endregion
 
             /// <summary>
@@ -9798,45 +9830,89 @@ namespace GONet
 
             int lastIndexUsed = 0;
 
-            // VELOCITY-AUGMENTED SYNC: Decide if this is a VELOCITY frame (time-based alternation)
+            // VELOCITY-AUGMENTED SYNC: Partition changes by velocity magnitude + periodic anchoring
+            // - Values within range → VELOCITY bundle (jitter elimination)
+            // - Values exceeding range → VALUE bundle (fallback)
+            // - Periodic forced anchors → VALUE bundle (drift prevention)
+            // Result: Send up to TWO bundles this frame
             long currentTimeMs = elapsedTicksAtCapture / System.TimeSpan.TicksPerMillisecond;
-            bool isVelocityFrame = ((currentTimeMs / 16) % 2 == 0);
 
-            if (isVelocityFrame)
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> withinRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> outOfRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
+
+            int velocityEligibleCount = 0;
+            int nonVelocityEligibleCount = 0;
+
+            // Partition changes based on velocity eligibility, range, and anchor timing
+            for (int i = 0; i < countTotal; ++i)
             {
-                // VELOCITY FRAME: Partition changes by velocity magnitude
-                // - Values within range → VELOCITY bundle (jitter elimination)
-                // - Values exceeding range → VALUE bundle (fallback)
-                // Result: Send up to TWO bundles this frame
-
-                List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> withinRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
-                List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> outOfRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
-
-                int velocityEligibleCount = 0;
-                int nonVelocityEligibleCount = 0;
-
-                // Partition changes based on velocity eligibility and range
-                for (int i = 0; i < countTotal; ++i)
+                AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
+                if (!ShouldSendChange(change, filterUsingOwnerAuthorityId))
                 {
-                    AutoMagicalSync_ValueMonitoringSupport_ChangedValue change = changes[i];
-                    if (!ShouldSendChange(change, filterUsingOwnerAuthorityId))
+                    continue; // Skip filtered changes
+                }
+
+                // Check if this value is velocity-eligible
+                var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
+                bool isVelocityEligible = changesSupport.isVelocityEligible;
+
+                if (isVelocityEligible)
+                {
+                    velocityEligibleCount++;
+
+                    // TODO: UNCOMMENT FORCED ANCHOR LOGIC AFTER IMPLEMENTING SMART QUANTIZATION-AWARE ANCHORING
+                    // CURRENT: Disabled for testing - pure VELOCITY synthesis (no time-based forced anchors)
+                    // FUTURE: Replace time-based anchors with quantization-aware anchors:
+                    //   - Server detects when actualValue ≈ quantizedValue (minimal quantization error)
+                    //   - Send VALUE anchor at that moment (zero visual snap on client)
+                    //   - Natural drift correction without jittering
+                    //   - Adaptive rate: slow motion = fewer anchors, fast motion = more anchors
+                    //   - "The server is the man" - server decides optimal anchor timing
+                    //
+                    // Example for 5°/s rotation with 9-bit quantization (~0.3° precision):
+                    //   - VALUE anchors every ~0.06 seconds (when crossing quantization boundaries)
+                    //   - Client sees smooth synthesis + imperceptible corrections
+                    //
+                    // Implementation approach:
+                    //   float quantizedValue = Quantize(currentValue);
+                    //   float quantizationError = Abs(currentValue - quantizedValue);
+                    //   if (quantizationError < threshold && timeSinceLastAnchor > minInterval)
+                    //   {
+                    //       // Send VALUE anchor (actualValue ≈ quantizedValue = zero snap)
+                    //       outOfRangeChanges.Add(change);
+                    //       changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
+                    //   }
+
+                    /* TEMPORARILY DISABLED - Forced time-based anchors
+                    // Check if periodic anchor is needed (drift prevention)
+                    float anchorIntervalSeconds = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
+                    if (anchorIntervalSeconds == 0f)
                     {
-                        continue; // Skip filtered changes
+                        // Use global default from GONetGlobal
+                        anchorIntervalSeconds = GONetGlobal.Instance.velocityAnchorIntervalSeconds;
                     }
+                    long anchorIntervalTicks = (long)(anchorIntervalSeconds * TimeSpan.TicksPerSecond);
+                    bool needsAnchor = (elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks) >= anchorIntervalTicks;
 
-                    // Check if this value is velocity-eligible
-                    bool isVelocityEligible = change.syncCompanion.valuesChangesSupport[change.index].isVelocityEligible;
-
-                    if (isVelocityEligible)
+                    if (needsAnchor)
                     {
-                        velocityEligibleCount++;
+                        // FORCE VALUE anchor (periodic drift correction)
+                        outOfRangeChanges.Add(change);
+                        changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
+
+                        GONetLog.Debug($"[VelocitySync][ANCHOR-FORCED] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                      $"timeSinceLastAnchor:{TimeSpan.FromTicks(elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks).TotalSeconds}s " +
+                                      $"interval:{anchorIntervalSeconds}s → Forcing VALUE anchor");
+                    }
+                    else
+                    */
+                    {
                         // Check if velocity fits in quantization range
                         bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
 
                         // DIAGNOSTIC: Log first velocity-eligible value per frame to debug range check
                         if (velocityEligibleCount == 1)
                         {
-                            var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
                             GONetLog.Debug($"[VelocitySync][PARTITION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
                                           $"velocityWithinRange:{velocityWithinRange}, snapshotCount:{changesSupport.mostRecentChanges_usedSize}, " +
                                           $"range:[{changesSupport.syncAttribute_VelocityQuantizeLowerBound}, {changesSupport.syncAttribute_VelocityQuantizeUpperBound}]");
@@ -9848,93 +9924,47 @@ namespace GONet
                         }
                         else
                         {
+                            // Velocity out of range → VALUE anchor (automatic drift correction)
                             outOfRangeChanges.Add(change);
+                            changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
                         }
                     }
-                    else
+                }
+                else
+                {
+                    nonVelocityEligibleCount++;
+                    // Non-velocity-eligible values always go in VALUE bundle
+                    outOfRangeChanges.Add(change);
+                }
+            }
+            // DIAGNOSTIC: Log partition results
+            GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total, {velocityEligibleCount} velEligible, {nonVelocityEligibleCount} nonEligible)");
+
+            // Send VELOCITY bundle for values within range
+            if (withinRangeChanges.Count > 0)
+            {
+                GONetLog.Debug($"[VelocitySync] Sending VELOCITY bundle ({withinRangeChanges.Count} values, time: {currentTimeMs}ms)");
+
+                // QUANTITATIVE DIAGNOSTIC: Log exact position and velocity being sent
+                foreach (var change in withinRangeChanges)
+                {
+                    if (change.lastKnownValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
                     {
-                        nonVelocityEligibleCount++;
-                        // Non-velocity-eligible values always go in VALUE bundle
-                        outOfRangeChanges.Add(change);
+                        GONetLog.Debug($"[VelocitySync][SERVER-SEND][{change.syncCompanion.gonetParticipant.GONetId}][idx:{change.index}] " +
+                                      $"currentPosition: {change.lastKnownValue.UnityEngine_Vector3}, " +
+                                      $"velocity: {(change.lastKnownValue.UnityEngine_Vector3 - change.lastKnownValue_previous.UnityEngine_Vector3) / ((elapsedTicksAtCapture - change.mostRecentChanges[0].elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond)}, " +
+                                      $"time: {currentTimeMs}ms");
                     }
                 }
-                // DIAGNOSTIC: Log partition results
-                GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total, {velocityEligibleCount} velEligible, {nonVelocityEligibleCount} nonEligible)");
 
-
-                // Send VELOCITY bundle for values within range
-                if (withinRangeChanges.Count > 0)
-                {
-                    GONetLog.Debug($"[VelocitySync] Sending VELOCITY bundle ({withinRangeChanges.Count} values, time: {currentTimeMs}ms)");
-
-                    // QUANTITATIVE DIAGNOSTIC: Log exact position and velocity being sent
-                    foreach (var change in withinRangeChanges)
-                    {
-                        if (change.lastKnownValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
-                        {
-                            GONetLog.Debug($"[VelocitySync][SERVER-SEND][{change.syncCompanion.gonetParticipant.GONetId}][idx:{change.index}] " +
-                                          $"currentPosition: {change.lastKnownValue.UnityEngine_Vector3}, " +
-                                          $"velocity: {(change.lastKnownValue.UnityEngine_Vector3 - change.lastKnownValue_previous.UnityEngine_Vector3) / ((elapsedTicksAtCapture - change.mostRecentChanges[0].elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond)}, " +
-                                          $"time: {currentTimeMs}ms");
-                        }
-                    }
-
-                    SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
-                }
-
-                // Send VALUE bundle for values out of range (and non-velocity-eligible)
-                if (outOfRangeChanges.Count > 0)
-                {
-                    GONetLog.Debug($"[VelocitySync] Sending VALUE bundle ({outOfRangeChanges.Count} values, time: {currentTimeMs}ms)");
-                    SerializeWhole_BundleOfChoice_Internal(outOfRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
-                }
-
-                return; // Done with VELOCITY frame
+                SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
             }
 
-            // VALUE FRAME: Send all changes as VALUE bundle (normal alternation)
-            GONetLog.Debug($"[VelocitySync] Sending VALUE bundle (VALUE frame, {countFiltered} changes, time: {currentTimeMs}ms)");
-            bool isVelocityBundle = false;
-
-            while (individualChangesCountRemaining > 0)
+            // Send VALUE bundle for values out of range, forced anchors, and non-velocity-eligible values
+            if (outOfRangeChanges.Count > 0)
             {
-                using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
-                {
-                    { // header...just message type/id...well, and now time...and velocity flag
-                        uint messageID = messageTypeToMessageIDMap[chosenBundleType];
-                        bitStream.WriteUInt(messageID);
-
-                        bitStream.WriteLong(elapsedTicksAtCapture);
-
-                        // VELOCITY-AUGMENTED SYNC: Write velocity bit (ONE bit for entire bundle)
-                        bitStream.WriteBit(isVelocityBundle);
-                    }
-
-                    // body
-                    int changesInBundleCount = SerializeBody_ChangesBundle(changes, bitStream, filterUsingOwnerAuthorityId, ref lastIndexUsed, isVelocityBundle);
-                    
-                    if (changesInBundleCount > 0)
-                    {
-                        bitStream.WriteCurrentPartialByte();
-
-                        var byteCount = bitStream.Length_WrittenBytes;
-                        bundleFragments.fragmentBytesUsedCount[bundleFragments.fragmentCount] = byteCount;
-                        byte[] bytes = byteArrayPool.Borrow(byteCount);
-                        Array.Copy(bitStream.GetBuffer(), 0, bytes, 0, byteCount);
-                        bundleFragments.fragmentBytes[bundleFragments.fragmentCount] = bytes;
-
-                        individualChangesCountRemaining -= changesInBundleCount;
-                        bundleFragments.fragmentCount++;
-                    }
-                    else
-                    {
-                        if (individualChangesCountRemaining > 0)
-                        {
-                            GONetLog.Warning("Why mismatch in remaining expected versus actual.  This could be serious!");
-                        }
-                        break;
-                    }
-                }
+                GONetLog.Debug($"[VelocitySync] Sending VALUE bundle ({outOfRangeChanges.Count} values, time: {currentTimeMs}ms)");
+                SerializeWhole_BundleOfChoice_Internal(outOfRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
             }
         }
 
@@ -10624,7 +10654,7 @@ namespace GONet
                                     // Calculate ACTUAL elapsed time since last snapshot (not just sync interval!)
                                     // This is critical: velocity = units/sec, so we need ACTUAL seconds elapsed
                                     long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
-                                    float deltaTime = (float)ticksSinceLastSnapshot / System.Diagnostics.Stopwatch.Frequency;
+                                    float deltaTime = (float)ticksSinceLastSnapshot * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
@@ -10685,7 +10715,7 @@ namespace GONet
                                         // Calculate ACTUAL elapsed time since last snapshot (not just sync interval!)
                                         // This is critical: velocity = units/sec, so we need ACTUAL seconds elapsed
                                         long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
-                                        float deltaTime = (float)ticksSinceLastSnapshot / System.Diagnostics.Stopwatch.Frequency;
+                                        float deltaTime = (float)ticksSinceLastSnapshot * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
                                         // Synthesize position from last received velocity (ignore received VALUE)
                                         GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
@@ -11415,8 +11445,8 @@ namespace GONet
             // Create delta rotation quaternion (Unity's AngleAxis expects degrees)
             UnityEngine.Quaternion deltaRot = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);
 
-            // Apply delta rotation: deltaRot * current (order matters for quaternions!)
-            return (deltaRot * current).normalized;
+            // Apply delta rotation: current * deltaRot (order matters! This applies rotation in local space)
+            return current * deltaRot;
         }
 
         #endregion

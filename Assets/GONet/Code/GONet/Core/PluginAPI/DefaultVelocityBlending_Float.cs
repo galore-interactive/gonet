@@ -60,7 +60,7 @@ namespace GONet.PluginAPI
             if (ticksDelta <= 0)
                 return mostRecent.numericValue;
 
-            float deltaTimeSeconds = (float)ticksDelta / System.Diagnostics.Stopwatch.Frequency;
+            float deltaTimeSeconds = (float)ticksDelta * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
             // Check if most recent value has velocity data (was from velocity packet or synthesized)
             bool hasVelocity = mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.System_Single;
@@ -85,7 +85,7 @@ namespace GONet.PluginAPI
                 if (prevTicksDelta <= 0)
                     return mostRecent.numericValue;
 
-                float prevDeltaTime = (float)prevTicksDelta / System.Diagnostics.Stopwatch.Frequency;
+                float prevDeltaTime = (float)prevTicksDelta * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
                 float valueDelta = mostRecent.numericValue.System_Single - prev.numericValue.System_Single;
                 float calculatedVelocity = valueDelta / prevDeltaTime;
 

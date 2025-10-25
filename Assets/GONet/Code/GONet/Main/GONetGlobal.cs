@@ -209,6 +209,31 @@ namespace GONet
         [Range(1, 50)]
         public int maxBundlesProcessedPerGONetReadyCallback = 10;
 
+        [Header("Velocity-Augmented Sync")]
+        [Tooltip("Interval (in seconds) between mandatory VALUE anchor bundles during VELOCITY-augmented sync.\n\n" +
+                "PURPOSE:\n" +
+                "When slow-moving values (rotation, position) use VELOCITY bundles for jitter elimination,\n" +
+                "periodic VALUE anchors prevent drift accumulation from packet loss on unreliable channels.\n\n" +
+                "HOW IT WORKS:\n" +
+                "• Values within velocity quantization range → VELOCITY bundles (smooth client extrapolation)\n" +
+                "• Every N seconds → Force VALUE anchor (re-sync client to server truth)\n" +
+                "• Values exceeding velocity range → Automatic VALUE bundles (no waiting for anchor interval)\n\n" +
+                "TUNING GUIDELINES:\n" +
+                "• Lower (0.5s): Less drift, more frequent corrections (slight jitter risk)\n" +
+                "• Medium (1.0s): Balanced - recommended for most games\n" +
+                "• Higher (2-5s): Maximum smoothness, tolerate more drift (physics-heavy games)\n\n" +
+                "EXAMPLE USE CASE:\n" +
+                "Slowly rotating platform (5°/s) with players fighting on it:\n" +
+                "• 1-second anchors → Max drift: ~2.1° (~36cm at 10m radius)\n" +
+                "• 2-second anchors → Max drift: ~4.2° (~73cm at 10m radius)\n\n" +
+                "OVERRIDE:\n" +
+                "Per-value override available in GONetAutoMagicalSyncSettings_ProfileTemplate.VelocityAnchorIntervalSeconds\n" +
+                "(0 = use this global default, >0 = custom interval for specific sync profile)\n\n" +
+                "Default: 1.0 second\n" +
+                "Range: 0.5-5.0 seconds")]
+        [Range(0.5f, 5.0f)]
+        public float velocityAnchorIntervalSeconds = 1.0f;
+
         [Header("GONetId Reuse Protection")]
         [Tooltip("Time in seconds to wait after an object despawns before allowing its GONetId to be reused.\n\n" +
                 "PURPOSE:\n" +

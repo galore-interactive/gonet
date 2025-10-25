@@ -127,6 +127,40 @@ namespace GONet.Editor.Generation
                 sb.AppendLine("\t\t}");
                 sb.AppendLine();
             }
+
+            // PHYSICS TIMING: Add class field for physics check (initialized once in constructor, used everywhere)
+            // Check if we have any rigidbody-aware members (Transform.position or Transform.rotation)
+            bool hasRigidbodyAwareMembers = false;
+            for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+            {
+                GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+                if (single.componentTypeName == "Transform")
+                {
+                    int singleMemberCount = single.autoSyncMembers.Length;
+                    for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+                    {
+                        GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+                        if (singleMember.memberName == "position" || singleMember.memberName == "rotation")
+                        {
+                            hasRigidbodyAwareMembers = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasRigidbodyAwareMembers) break;
+            }
+
+            if (hasRigidbodyAwareMembers)
+            {
+                sb.AppendLine("\t\t/// <summary>");
+                sb.AppendLine("\t\t/// PHYSICS TIMING: Cached physics check for Transform.position/rotation time source selection.");
+                sb.AppendLine("\t\t/// Initialized once in constructor based on gonetParticipant.IsRigidBodyOwnerOnlyControlled.");
+                sb.AppendLine("\t\t/// NOTE: Changing IsRigidBodyOwnerOnlyControlled at runtime will NOT update this cached value!");
+                sb.AppendLine("\t\t/// This is an optimization to avoid redundant checks in constructor and UpdateLastKnownValues hot paths.");
+                sb.AppendLine("\t\t/// </summary>");
+                sb.AppendLine("\t\tprivate readonly bool shouldSourceFromRigidbody;");
+                sb.AppendLine();
+            }
         }
 
         private void WriteCodeGenerationIdProperty()
@@ -179,8 +213,43 @@ namespace GONet.Editor.Generation
 
         private void WriteConstructorBody()
         {
-            int iOverall = 0;
+            // VELOCITY FIX: Check if we have any rigidbody-aware members (Transform.position or Transform.rotation)
+            // If so, initialize shouldSourceFromRigidbody class field once at the beginning
+            bool hasRigidbodyAwareMembers = false;
             int singleCount = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName.Length;
+            for (int iSingle = 0; iSingle < singleCount; ++iSingle)
+            {
+                GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
+                if (single.componentTypeName == "Transform")
+                {
+                    int singleMemberCount = single.autoSyncMembers.Length;
+                    for (int iSingleMember = 0; iSingleMember < singleMemberCount; ++iSingleMember)
+                    {
+                        GONetParticipant_ComponentsWithAutoSyncMembers_SingleMember singleMember = single.autoSyncMembers[iSingleMember];
+                        if (singleMember.memberName == "position" || singleMember.memberName == "rotation")
+                        {
+                            hasRigidbodyAwareMembers = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasRigidbodyAwareMembers) break;
+            }
+
+            // Initialize shouldSourceFromRigidbody class field if needed
+            if (hasRigidbodyAwareMembers)
+            {
+                sb.AppendLine("\t\t\t// PHYSICS TIMING: Initialize class field for physics timing (used in constructor and UpdateLastKnownValues)");
+                sb.AppendLine("\t\t\t// CRITICAL: myRigidBody is not set until GONetParticipant.Start(), so we need to do the lookup ourselves");
+                sb.AppendLine("\t\t\tif (gonetParticipant.myRigidBody == null)");
+                sb.AppendLine("\t\t\t{");
+                sb.AppendLine("\t\t\t\tgonetParticipant.myRigidBody = gonetParticipant.GetComponent<UnityEngine.Rigidbody>();");
+                sb.AppendLine("\t\t\t}");
+                sb.AppendLine("\t\t\tshouldSourceFromRigidbody = gonetParticipant.IsRigidBodyOwnerOnlyControlled && gonetParticipant.myRigidBody != null;");
+                sb.AppendLine();
+            }
+
+            int iOverall = 0;
             for (int iSingle = 0; iSingle < singleCount; ++iSingle)
             {
                 GONetParticipant_ComponentsWithAutoSyncMembers_Single single = uniqueEntry.ComponentMemberNames_By_ComponentTypeFullName[iSingle];
@@ -248,6 +317,7 @@ namespace GONet.Editor.Generation
 
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeLowerBound = ").Append(velocityLowerBoundForRuntimeFields).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityQuantizeUpperBound = ").Append(velocityUpperBoundForRuntimeFields).AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_VelocityAnchorIntervalSeconds = ").Append(singleMember.attribute.VelocityAnchorIntervalSeconds.ToString("F1", CultureInfo.InvariantCulture)).AppendLine("f;");
 
                     // OPTIMIZATION: Pre-calculate per-sync-interval bounds for efficient runtime checks
                     // Convert from value-units/second to value-units-per-sync-interval
@@ -372,6 +442,28 @@ namespace GONet.Editor.Generation
             sb.Append("            support").Append(iOverall).Append(".lastKnownValue_previous.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass \"has anything changed\" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!");
             sb.Append("\t\t\tsupport").Append(iOverall).Append(".valueLimitEncountered_min.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; ");
             sb.Append("\t\t\tsupport").Append(iOverall).Append(".valueLimitEncountered_max.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; ");
+
+            // VELOCITY FIX: Initialize timestamp fields
+            // Determine if this is a rigidbody-aware member (Transform.position or Transform.rotation)
+            bool isTransformComponent = single.componentTypeName == "Transform";
+            bool isPositionMember = singleMember.memberName == "position";
+            bool isRotationMember = singleMember.memberName == "rotation";
+            bool isRigidbodyAwareMember = isTransformComponent && (isPositionMember || isRotationMember);
+
+            // CRITICAL: ONLY position/rotation are physics-aware, everything else uses ElapsedTicks
+            // Initialize both timestamp fields to current time (since current and previous are same at initialization)
+            if (isRigidbodyAwareMember)
+            {
+                // For position/rotation: Use shouldSourceFromRigidbody variable declared at constructor level
+                sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastKnownValue_elapsedTicks = shouldSourceFromRigidbody ? GONetMain.Time.FixedElapsedTicks : GONetMain.Time.ElapsedTicks; // Initialize current timestamp");
+                sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastKnownValue_previous_elapsedTicks = shouldSourceFromRigidbody ? GONetMain.Time.FixedElapsedTicks : GONetMain.Time.ElapsedTicks; // Initialize previous timestamp (same as current at initialization)");
+            }
+            else
+            {
+                // For all other members: ALWAYS ElapsedTicks (non-physics)
+                sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastKnownValue_elapsedTicks = GONetMain.Time.ElapsedTicks; // Initialize current timestamp");
+                sb.Append("\t\t\tsupport").Append(iOverall).AppendLine(".lastKnownValue_previous_elapsedTicks = GONetMain.Time.ElapsedTicks; // Initialize previous timestamp (same as current at initialization)");
+            }
         }
 
         private void WriteSetAutoMagicalSyncValue()
@@ -591,28 +683,32 @@ namespace GONet.Editor.Generation
             }
             else if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
             {
-                sb.Append(indent).AppendLine("\t// Angular velocity for Quaternion (stored as Vector3 axis-angle)");
+                sb.Append(indent).AppendLine("\t// Angular velocity for Quaternion (stored as Vector3)");
                 sb.Append(indent).AppendLine("\tUnityEngine.Quaternion currentValue = current.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine("\tUnityEngine.Quaternion previousValue = previous.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine($"\t// DIAGNOSTIC: Log rotation values");
                 sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] current={{currentValue.eulerAngles}}, previous={{previousValue.eulerAngles}}\");");
                 sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine("\t// Calculate deltaTime from timestamps (SYNC interval, not hardcoded constants!)");
+                sb.Append(indent).AppendLine("\tlong deltaTimeTicks = changesSupport.lastKnownValue_elapsedTicks - changesSupport.lastKnownValue_previous_elapsedTicks;");
+                sb.Append(indent).AppendLine("\tfloat deltaTime = (float)(deltaTimeTicks * GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS);");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine($"\tGONet.GONetLog.Debug($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] deltaTimeTicks={{deltaTimeTicks}}, deltaTime={{deltaTime}}s\");");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine("\t// CRITICAL: Protect against zero deltaTime (would cause NaN/Infinity)");
+                sb.Append(indent).AppendLine("\tif (deltaTime <= 0f)");
+                sb.Append(indent).AppendLine("\t{");
+                sb.Append(indent).AppendLine("\t\t// Use minimum frame time as fallback");
+                sb.Append(indent).AppendLine("\t\tdeltaTime = UnityEngine.Time.deltaTime > 0f ? UnityEngine.Time.deltaTime : 0.0167f; // 60 FPS fallback");
+                sb.Append(indent).AppendLine($"\t\tGONet.GONetLog.Warning($\"[AngularVelCalc][{{gonetParticipant.GONetId}}][idx:{iOverall}] Zero deltaTime detected! Using fallback: {{deltaTime}}s\");");
+                sb.Append(indent).AppendLine("\t}");
+                sb.Append(indent).AppendLine();
+                sb.Append(indent).AppendLine("\t// Use quaternion exponential map for perfect precision (not ToAngleAxis)");
                 sb.Append(indent).AppendLine("\tUnityEngine.Quaternion deltaRotation = currentValue * UnityEngine.Quaternion.Inverse(previousValue);");
-                sb.Append(indent).AppendLine("\tdeltaRotation.ToAngleAxis(out float angle, out UnityEngine.Vector3 axis);");
-                sb.Append(indent).AppendLine("\t// NOTE: Quaternion still uses radians/sec for now (requires more complex optimization)");
-                sb.Append(indent).AppendLine("\t// Get deltaTime for quaternion angular velocity calculation");
-                if (singleMember.attribute.PhysicsUpdateInterval > 0)
-                {
-                    int physicsInterval = singleMember.attribute.PhysicsUpdateInterval;
-                    sb.Append(indent).AppendLine($"\tfloat deltaTime = UnityEngine.Time.fixedDeltaTime * {physicsInterval}f;");
-                }
-                else
-                {
-                    float deltaTime = singleMember.attribute.SyncChangesEverySeconds;
-                    sb.Append(indent).AppendLine($"\tfloat deltaTime = {deltaTime.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}f;");
-                }
-                sb.Append(indent).AppendLine("\tUnityEngine.Vector3 angularVelocity = axis * (angle * UnityEngine.Mathf.Deg2Rad) / deltaTime;");
+                sb.Append(indent).AppendLine("\tUnityEngine.Quaternion logDelta = GONet.Utils.QuaternionUtilsOptimized.Log(deltaRotation);");
+                sb.Append(indent).AppendLine("\t// logDelta contains half-angle rotation vector, multiply by 2 for full angular velocity");
+                sb.Append(indent).AppendLine("\tUnityEngine.Vector3 angularVelocity = new UnityEngine.Vector3(logDelta.x * 2f, logDelta.y * 2f, logDelta.z * 2f) / deltaTime;");
                 sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
                 sb.Append(indent).AppendLine();
@@ -1055,14 +1151,16 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\t{");
                 sb.Append(indent).AppendLine("\t\t\tPluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
                 sb.Append(indent).AppendLine("\t\t\tlong deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
-                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS);");
                 sb.AppendLine();
-                sb.Append(indent).AppendLine("\t\t\t// Integrate angular velocity: q_new = q_old * exp(omega * dt / 2)");
+                sb.Append(indent).AppendLine("\t\t\t// Integrate angular velocity using quaternion exponential map: q_new = q_old * exp(omega * dt / 2)");
                 sb.Append(indent).AppendLine("\t\t\tfloat angle = angularVelocity.magnitude * deltaTimeSeconds;");
                 sb.Append(indent).AppendLine("\t\t\tif (angle > 1e-6f)");
                 sb.Append(indent).AppendLine("\t\t\t{");
-                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Vector3 axis = angularVelocity.normalized;");
-                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Quaternion deltaRotation = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);");
+                sb.Append(indent).AppendLine("\t\t\t\t// Use quaternion exponential map for perfect precision (matches server-side Log)");
+                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Vector3 halfOmegaDt = angularVelocity * (deltaTimeSeconds * 0.5f);");
+                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Quaternion halfDeltaQ = new UnityEngine.Quaternion(halfOmegaDt.x, halfOmegaDt.y, halfOmegaDt.z, 0f);");
+                sb.Append(indent).AppendLine("\t\t\t\tUnityEngine.Quaternion deltaRotation = GONet.Utils.QuaternionUtilsOptimized.Exp(halfDeltaQ);");
                 sb.Append(indent).AppendLine("\t\t\t\tsynthesizedValue = previousSnapshot.numericValue.UnityEngine_Quaternion * deltaRotation;");
                 sb.Append(indent).AppendLine();
                 sb.Append(indent).AppendLine($"\t\t\t\t// DIAGNOSTIC: Log synthesis");
@@ -1070,6 +1168,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\t\t}");
                 sb.Append(indent).AppendLine("\t\t\telse");
                 sb.Append(indent).AppendLine("\t\t\t{");
+                sb.Append(indent).AppendLine("\t\t\t\t// Angle too small, return previous value");
                 sb.Append(indent).AppendLine("\t\t\t\tsynthesizedValue = previousSnapshot.numericValue.UnityEngine_Quaternion;");
                 sb.Append(indent).AppendLine("\t\t\t}");
                 sb.Append(indent).AppendLine("\t\t}");
@@ -1087,7 +1186,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\t\t{");
                 sb.Append(indent).AppendLine("\t\t\tPluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
                 sb.Append(indent).AppendLine("\t\t\tlong deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
-                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                sb.Append(indent).AppendLine("\t\t\tfloat deltaTimeSeconds = (float)(deltaTimeTicks * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS);");
                 sb.AppendLine();
                 sb.Append(indent).AppendLine($"\t\t\t// Synthesize: position = previousPosition + velocity × deltaTime");
                 sb.Append(indent).AppendLine($"\t\t\tsynthesizedValue = previousSnapshot.numericValue.{memberTypeReplaced} + velocity * deltaTimeSeconds;");
@@ -1356,20 +1455,22 @@ namespace GONet.Editor.Generation
                         sb.AppendLine("                    {");
                         sb.AppendLine("                        PluginAPI.NumericValueChangeSnapshot previousSnapshot = valueChangeSupport.mostRecentChanges[mostRecentChangesIndex];");
                         sb.AppendLine("                        long deltaTimeTicks = assumedElapsedTicksAtChange - previousSnapshot.elapsedTicksAtChange;");
-                        sb.AppendLine("                        float deltaTimeSeconds = (float)(deltaTimeTicks / (double)System.Diagnostics.Stopwatch.Frequency);");
+                        sb.AppendLine("                        float deltaTimeSeconds = (float)(deltaTimeTicks * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS);");
                         sb.AppendLine();
 
                         if (memberTypeFullName == typeof(UnityEngine.Quaternion).FullName)
                         {
-                            // Quaternion: Angular velocity integration
-                            sb.AppendLine("                        // Angular velocity stored as Vector3 (axis × radians/sec)");
+                            // Quaternion: Angular velocity integration using exponential map
+                            sb.AppendLine("                        // Angular velocity stored as Vector3 (radians/sec)");
                             sb.AppendLine("                        UnityEngine.Vector3 angularVelocity = velocityValue.UnityEngine_Vector3;");
                             sb.AppendLine("                        float angle = angularVelocity.magnitude * deltaTimeSeconds;");
                             sb.AppendLine();
                             sb.AppendLine("                        if (angle > 1e-6f)");
                             sb.AppendLine("                        {");
-                            sb.AppendLine("                            UnityEngine.Vector3 axis = angularVelocity.normalized;");
-                            sb.AppendLine("                            UnityEngine.Quaternion deltaRotation = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);");
+                            sb.AppendLine("                            // Use quaternion exponential map for perfect precision (matches server-side Log)");
+                            sb.AppendLine("                            UnityEngine.Vector3 halfOmegaDt = angularVelocity * (deltaTimeSeconds * 0.5f);");
+                            sb.AppendLine("                            UnityEngine.Quaternion halfDeltaQ = new UnityEngine.Quaternion(halfOmegaDt.x, halfOmegaDt.y, halfOmegaDt.z, 0f);");
+                            sb.AppendLine("                            UnityEngine.Quaternion deltaRotation = GONet.Utils.QuaternionUtilsOptimized.Exp(halfDeltaQ);");
                             sb.AppendLine("                            UnityEngine.Quaternion synthesized = previousSnapshot.numericValue.UnityEngine_Quaternion * deltaRotation;");
                             sb.AppendLine();
                             sb.AppendLine("                            // DIAGNOSTIC: Log synthesis");
@@ -1742,12 +1843,16 @@ namespace GONet.Editor.Generation
                     bool isRigidbodyAwareMember = isTransformComponent && (isPositionMember || isRotationMember);
 
                     sb.Append("\t\t\t\tvar valuesChangesSupport").Append(iOverall).Append(" = valuesChangesSupport[").Append(iOverall).AppendLine("];");
+
                     sb.Append("\t\t\t\tif (DoesMatchUniqueGrouping(valuesChangesSupport").Append(iOverall).Append(", onlyMatchIfUniqueGroupingMatches) &&");
                     sb.AppendLine();
                     sb.Append("\t\t\t\t\t!ShouldSkipSync(valuesChangesSupport").Append(iOverall).Append(", ").Append(iOverall).AppendLine(")) // TODO examine eval order and performance...should this be first or last?, TODO also consider taking this check out of this condition alltogether, because it is perhaps more expensive to do this check than it is to just execute the body AND the body execution will not actually affect whether or not this value change will get sync'd or not..hmm...");
                     sb.AppendLine("\t\t\t\t{");
 
-                    // Standard value update - always update tracking values first
+                    // Step 1: Copy current timestamp to previous (INSIDE the if block - CRITICAL FIX!)
+                    sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue_previous_elapsedTicks = valuesChangesSupport").Append(iOverall).AppendLine(".lastKnownValue_elapsedTicks;");
+
+                    // Step 2: Copy current value to previous
                     sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue_previous = valuesChangesSupport").Append(iOverall).AppendLine(".lastKnownValue;");
 
                     if (isRigidbodyAwareMember && singleMember.animatorControllerParameterId == 0)
@@ -1755,7 +1860,7 @@ namespace GONet.Editor.Generation
                         // PHYSICS SYNC: For Transform.position/rotation, source from Rigidbody when appropriate (IsRigidBodyOwnerOnlyControlled).
                         // This is filtered at call site (AutoMagicalSyncProcessing.Process()) - physics pipeline only calls this for physics objects.
                         // So we check here to determine SOURCE (Rigidbody vs Transform), not to skip processing (that's done at call site).
-                        sb.AppendLine("\t\t\t\t\tbool shouldSourceFromRigidbody = gonetParticipant.IsRigidBodyOwnerOnlyControlled && gonetParticipant.myRigidBody != null;");
+                        // NOTE: Using class field 'shouldSourceFromRigidbody' initialized in constructor.
                         sb.AppendLine("\t\t\t\t\tif (shouldSourceFromRigidbody)");
                         sb.AppendLine("\t\t\t\t\t{");
                         sb.AppendLine("\t\t\t\t\t\t// Source from Rigidbody (physics simulation)");
@@ -1774,6 +1879,21 @@ namespace GONet.Editor.Generation
                     else
                     {
                         sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).Append(".lastKnownValue.").Append(singleMember.animatorControllerParameterTypeFullName.Replace(".", "_")).Append(" = ").Append(single.componentTypeName).Append(".Get").Append(singleMember.animatorControllerParameterMethodSuffix).Append("(").Append(singleMember.animatorControllerParameterId).AppendLine(");");
+                    }
+
+                    // Step 4: Save timestamp of NEW value (AFTER capturing it)
+                    // CRITICAL: ONLY position/rotation are physics-aware, everything else uses ElapsedTicks
+                    if (isRigidbodyAwareMember)
+                    {
+                        // For Transform.position/rotation, use RUNTIME check to determine time source
+                        // Physics objects (IsRigidBodyOwnerOnlyControlled) update in FixedUpdate → use FixedElapsedTicks
+                        // Non-physics objects update in LateUpdate → use ElapsedTicks
+                        sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).AppendLine(".lastKnownValue_elapsedTicks = shouldSourceFromRigidbody ? GONetMain.Time.FixedElapsedTicks : GONetMain.Time.ElapsedTicks;");
+                    }
+                    else
+                    {
+                        // All other members (not position/rotation): ALWAYS use ElapsedTicks (non-physics timing)
+                        sb.Append("\t\t\t\t\tvaluesChangesSupport").Append(iOverall).AppendLine(".lastKnownValue_elapsedTicks = GONetMain.Time.ElapsedTicks;");
                     }
 
                     sb.AppendLine("\t\t\t\t}");
