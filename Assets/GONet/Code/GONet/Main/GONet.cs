@@ -10242,6 +10242,12 @@ namespace GONet
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 //GONetLog.AppendLine($"serialize change index: {change.index}");
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index, isVelocityBundle);
+
+                // DIAGNOSTIC: Log when velocity bundles are sent for rotation (index 8)
+                if (isVelocityBundle && change.index == 8 && change.syncCompanion.gonetParticipant.GONetId == 208895)
+                {
+                    GONetLog.Info($"[SERVER-SEND-VEL] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} VELOCITY BUNDLE SENT at time:{UnityEngine.Time.time:F3}s");
+                }
             }
             //GONetLog.Append_FlushDebug();
 
@@ -10636,6 +10642,12 @@ namespace GONet
                                 // VELOCITY BUNDLE: Deserialize velocity, synthesize position
                                 GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
 
+                                // DIAGNOSTIC: Log velocity reception with full details
+                                if (index == 8 && gonetParticipant.GONetId == 208895)
+                                {
+                                    GONetLog.Info($"[CLIENT-RECV-VEL] GONetId:{gonetParticipant.GONetId} idx:{index} velocityValue:{velocityValue.UnityEngine_Vector3} time:{UnityEngine.Time.time:F3}s frame:{UnityEngine.Time.frameCount}");
+                                }
+
                                 var changesSupport = syncCompanion.valuesChangesSupport[index];
 
                                 // CRITICAL: Store velocity and timestamp for future VALUE bundle synthesis
@@ -10656,11 +10668,23 @@ namespace GONet
                                     long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
                                     float deltaTime = (float)ticksSinceLastSnapshot * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
+                                    // DIAGNOSTIC: Log synthesis inputs
+                                    if (gonetParticipant.GONetId == 208895)
+                                    {
+                                        GONetLog.Info($"[PRE-SYNTH] GONetId:{gonetParticipant.GONetId} idx:{index} lastValue.type:{lastSnapshot.numericValue.GONetSyncType} velocity.type:{velocityValue.GONetSyncType} dt:{deltaTime:F4}s");
+                                    }
+
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
                                         lastSnapshot.numericValue,
                                         velocityValue,
                                         deltaTime);
+
+                                    // DIAGNOSTIC: Log synthesized type
+                                    if (gonetParticipant.GONetId == 208895)
+                                    {
+                                        GONetLog.Info($"[POST-SYNTH] GONetId:{gonetParticipant.GONetId} idx:{index} synthesized.type:{synthesizedValue.GONetSyncType}");
+                                    }
 
                                     // QUANTITATIVE DIAGNOSTIC: Log velocity synthesis and time relationships
                                     if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
@@ -10678,10 +10702,28 @@ namespace GONet
                                 }
                                 else
                                 {
-                                    // No previous snapshot - treat velocity as initial value (shouldn't happen in practice)
-                                    GONetLog.Warning($"[VelocitySync] VELOCITY bundle received but no previous snapshot for GONetId {gonetParticipant.GONetId}, index {index}. Cannot synthesize.");
-                                    // Still initialize with velocity data to keep bitstream in sync
-                                    syncCompanion.InitSingle(velocityValue, index, elapsedTicksAtSend);
+                                    // No previous snapshot - cannot synthesize, must use fallback
+                                    GONetLog.Warning($"[VelocitySync] VELOCITY bundle received but no previous snapshot for GONetId {gonetParticipant.GONetId}, index {index}. Using fallback.");
+
+                                    // CRITICAL: For Quaternion fields, velocity is Vector3 (angular velocity) - cannot use as rotation!
+                                    // We can detect this by checking the member name (contains "rotation") or if a VALUE bundle
+                                    // exists, checking its type. For now, use member name as safest approach.
+                                    string memberName = changesSupport.memberName?.ToLowerInvariant() ?? "";
+                                    GONetSyncableValue fallbackValue;
+
+                                    if (memberName.Contains("rotation") || memberName.Contains("quaternion"))
+                                    {
+                                        // Quaternion field: Use identity rotation, NOT the Vector3 velocity!
+                                        fallbackValue = new GONetSyncableValue { UnityEngine_Quaternion = UnityEngine.Quaternion.identity };
+                                        GONetLog.Debug($"[VelocitySync] Index {index} ({memberName}) is Quaternion - using identity fallback instead of Vector3 velocity");
+                                    }
+                                    else
+                                    {
+                                        // For Vector types, velocity can serve as initial value
+                                        fallbackValue = velocityValue;
+                                    }
+
+                                    syncCompanion.InitSingle(fallbackValue, index, elapsedTicksAtSend);
                                 }
                             }
                             else
@@ -10772,7 +10814,20 @@ namespace GONet
                                                           $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms < {AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS}ms), using received VALUE");
                                         }
                                     }
+
+                                    // DIAGNOSTIC: Log initial VALUE deserialization
+                                    if (gonetParticipant.GONetId == 208895)
+                                    {
+                                        GONetLog.Info($"[INIT-VALUE] GONetId:{gonetParticipant.GONetId} idx:{index} About to deserialize initial VALUE (velocity expired/not eligible)");
+                                    }
+
                                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
+
+                                    // DIAGNOSTIC: Log what was stored
+                                    if (gonetParticipant.GONetId == 208895 && changesSupport.mostRecentChanges_usedSize > 0)
+                                    {
+                                        GONetLog.Info($"[INIT-VALUE-STORED] GONetId:{gonetParticipant.GONetId} idx:{index} stored.type:{changesSupport.mostRecentChanges[0].numericValue.GONetSyncType}");
+                                    }
                                 }
                             }
 
@@ -11366,6 +11421,9 @@ namespace GONet
         {
             GONetSyncableValue result;
 
+            // DIAGNOSTIC: Log synthesis type info
+            GONetLog.Info($"[SYNTH-TYPE] lastValue.GONetSyncType:{lastValue.GONetSyncType} velocity.GONetSyncType:{velocity.GONetSyncType} dt:{deltaTime:F4}s");
+
             switch (lastValue.GONetSyncType)
             {
                 case GONetSyncableValueTypes.System_Single: // float
@@ -11446,7 +11504,14 @@ namespace GONet
             UnityEngine.Quaternion deltaRot = UnityEngine.Quaternion.AngleAxis(angle * UnityEngine.Mathf.Rad2Deg, axis);
 
             // Apply delta rotation: current * deltaRot (order matters! This applies rotation in local space)
-            return current * deltaRot;
+            UnityEngine.Quaternion result = current * deltaRot;
+
+            // DIAGNOSTIC: Log quaternion multiplication details
+            UnityEngine.Vector3 currentEuler = current.eulerAngles;
+            UnityEngine.Vector3 resultEuler = result.eulerAngles;
+            GONetLog.Info($"[QUAT-MULT] omega:{angularVelocity} dt:{deltaTime:F4}s angle:{angle * UnityEngine.Mathf.Rad2Deg:F2}deg axis:{axis} | currentQ:{current} euler:{currentEuler} | resultQ:{result} euler:{resultEuler}");
+
+            return result;
         }
 
         #endregion

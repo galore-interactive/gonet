@@ -80,9 +80,15 @@ namespace GONet.PluginAPI
                 Quaternion currentRotation = mostRecent.numericValue.UnityEngine_Quaternion;
                 Vector3 omega = mostRecent.velocity.UnityEngine_Vector3;
 
+                // DIAGNOSTIC: Log extrapolation inputs
+                GONetLog.Info($"[CLIENT-EXTRAP] currentRot:{currentRotation} euler:{currentRotation.eulerAngles} omega:{omega} dt:{deltaTimeSeconds:F4}s");
+
                 // Integrate angular velocity
                 Quaternion deltaRotation = IntegrateAngularVelocity(omega, deltaTimeSeconds);
                 Quaternion extrapolated = currentRotation * deltaRotation;
+
+                // DIAGNOSTIC: Log extrapolation result
+                GONetLog.Info($"[CLIENT-EXTRAP-RESULT] extrapolated:{extrapolated} euler:{extrapolated.eulerAngles}");
 
                 return extrapolated;
             }

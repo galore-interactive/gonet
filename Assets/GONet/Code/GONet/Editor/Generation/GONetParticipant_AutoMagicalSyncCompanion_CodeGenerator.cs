@@ -56,9 +56,11 @@ namespace GONet.Editor.Generation
             WriteAreEqualQuantized();
             WriteDeserializeInitAll();
             WriteDeserializeInitSingle_ReadOnlyNotApply();
-            WriteDeserializeInitSingle(); // Synthesis wrapper
-            WriteIsVelocityEligible();
-            WriteSynthesizeValueFromVelocity();
+            WriteDeserializeInitSingle(); // Synthesis wrapper (now simplified - no synthesis here)
+            // NOTE: WriteIsVelocityEligible() and WriteSynthesizeValueFromVelocity() generate unused code
+            // GONet.cs uses static method for synthesis instead, these are never called
+            // WriteIsVelocityEligible();
+            // WriteSynthesizeValueFromVelocity();
             WriteInitSingle();
             WriteUpdateLastKnownValues();
             WriteIsLastKnownValue_VeryCloseTo_Or_AlreadyOutsideOf_QuantizationRange();
@@ -1367,11 +1369,9 @@ namespace GONet.Editor.Generation
             sb.AppendLine("        {");
             sb.AppendLine("            GONetSyncableValue value = DeserializeInitSingle_ReadOnlyNotApply(bitStream_readFrom, singleIndex, useVelocitySerializer);");
             sb.AppendLine();
-            sb.AppendLine("            // Velocity-augmented sync: Synthesize position from velocity for eligible fields");
-            sb.AppendLine("            if (useVelocitySerializer && IsVelocityEligible(singleIndex))");
-            sb.AppendLine("            {");
-            sb.AppendLine("                value = SynthesizeValueFromVelocity(value, singleIndex, assumedElapsedTicksAtChange);");
-            sb.AppendLine("            }");
+            sb.AppendLine("            // NOTE: Velocity synthesis removed - GONet.cs handles synthesis manually via static method");
+            sb.AppendLine("            // This code path (DeserializeInitSingle with synthesis) is never actually reached in practice.");
+            sb.AppendLine("            // GONet.cs calls DeserializeInitSingle_ReadOnlyNotApply and does synthesis itself.");
             sb.AppendLine();
             sb.AppendLine("            InitSingle(value, singleIndex, assumedElapsedTicksAtChange);");
             sb.AppendLine("        }");
@@ -1483,6 +1483,11 @@ namespace GONet.Editor.Generation
                             sb.AppendLine("                            // Angle too small, return previous value");
                             sb.AppendLine("                            return new GONetSyncableValue { UnityEngine_Quaternion = previousSnapshot.numericValue.UnityEngine_Quaternion };");
                             sb.AppendLine("                        }");
+                            sb.AppendLine("                    }");
+                            sb.AppendLine();
+                            sb.AppendLine("                    // No previous value for quaternion - return identity rotation");
+                            sb.AppendLine("                    // CRITICAL: Cannot use velocityValue (Vector3) as quaternion!");
+                            sb.AppendLine("                    return new GONetSyncableValue { UnityEngine_Quaternion = UnityEngine.Quaternion.identity };");
                         }
                         else if (memberTypeFullName == typeof(UnityEngine.Vector3).FullName)
                         {
@@ -1494,6 +1499,10 @@ namespace GONet.Editor.Generation
                             sb.Append("                        GONet.GONetLog.Debug($\"[CLIENT-Vel][{gonetParticipant.GONetId}][idx:").Append(iOverall).AppendLine("] previousPos={previousSnapshot.numericValue.UnityEngine_Vector3}, velocity={velocity}, synthesized={synthesized}, deltaTime={deltaTimeSeconds:F4}s\");");
                             sb.AppendLine();
                             sb.AppendLine("                        return new GONetSyncableValue { UnityEngine_Vector3 = synthesized };");
+                            sb.AppendLine("                    }");
+                            sb.AppendLine();
+                            sb.AppendLine("                    // No previous value for Vector3 - return velocity as fallback");
+                            sb.AppendLine("                    return velocityValue;");
                         }
                         else if (memberTypeFullName == typeof(UnityEngine.Vector2).FullName)
                         {
@@ -1502,6 +1511,10 @@ namespace GONet.Editor.Generation
                             sb.AppendLine("                        UnityEngine.Vector2 synthesized = previousSnapshot.numericValue.UnityEngine_Vector2 + velocity * deltaTimeSeconds;");
                             sb.AppendLine();
                             sb.AppendLine("                        return new GONetSyncableValue { UnityEngine_Vector2 = synthesized };");
+                            sb.AppendLine("                    }");
+                            sb.AppendLine();
+                            sb.AppendLine("                    // No previous value for Vector2 - return velocity as fallback");
+                            sb.AppendLine("                    return velocityValue;");
                         }
                         else if (memberTypeFullName == typeof(float).FullName)
                         {
@@ -1510,12 +1523,22 @@ namespace GONet.Editor.Generation
                             sb.AppendLine("                        float synthesized = previousSnapshot.numericValue.System_Single + velocity * deltaTimeSeconds;");
                             sb.AppendLine();
                             sb.AppendLine("                        return new GONetSyncableValue { System_Single = synthesized };");
+                            sb.AppendLine("                    }");
+                            sb.AppendLine();
+                            sb.AppendLine("                    // No previous value for float - return velocity as fallback");
+                            sb.AppendLine("                    return velocityValue;");
+                        }
+                        else
+                        {
+                            // Unknown type - no synthesis, just return velocity as-is
+                            sb.AppendLine("                        // Type not supported for velocity synthesis");
+                            sb.AppendLine("                        return velocityValue;");
+                            sb.AppendLine("                    }");
+                            sb.AppendLine();
+                            sb.AppendLine("                    // No previous value - return velocity as fallback");
+                            sb.AppendLine("                    return velocityValue;");
                         }
 
-                        sb.AppendLine("                    }");
-                        sb.AppendLine();
-                        sb.AppendLine("                    // No previous value, return velocity as-is (fallback)");
-                        sb.AppendLine("                    return velocityValue;");
                         sb.AppendLine("                }");
                     }
 
