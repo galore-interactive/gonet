@@ -62,9 +62,6 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
 
     private float angle = 0f; // Current angle in radians
 
-    [GONetAutoMagicalSync]
-    public float NettyWorkedFloat { get; set; }
-
     /// <summary>
     /// Gets the actual rotation speed based on the selected preset.
     /// </summary>
@@ -150,9 +147,6 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
             // Rotate the object around its own axis using preset rotation speed
             float currentRotationSpeed = GetRotationSpeed();
             transform.Rotate(Vector3.up, currentRotationSpeed * Time.deltaTime);
-
-            // just testing some network stuff
-            NettyWorkedFloat += Time.deltaTime;
         }
     }
 }

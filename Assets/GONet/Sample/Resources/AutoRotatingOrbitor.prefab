@@ -59,7 +59,7 @@ MonoBehaviour:
   client_overrideLimboMode: 0
   client_limboMode: 2
   IsPositionSyncd: 1
-  IsRotationSyncd: 1
+  IsRotationSyncd: 0
   wasInstantiatedForce: 0
   myRigidBody: {fileID: 0}
   myRigidBody2D: {fileID: 0}
@@ -77,7 +77,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isTickReceiver: 0
   radius: 5
-  angularSpeed: 30
+  movementSpeedPreset: 0
+  customAngularSpeed: 30
   rotationSpeedPreset: 0
   customRotationSpeed: 90
 --- !u!114 &3790580374815426940

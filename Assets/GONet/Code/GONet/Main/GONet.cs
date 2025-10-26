@@ -10927,10 +10927,11 @@ namespace GONet
                                 // VELOCITY BUNDLE: Deserialize velocity, synthesize position
                                 GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
 
-                                // DIAGNOSTIC: Log velocity reception with full details
+                                // DIAGNOSTIC: Log velocity reception with full details (high precision)
                                 if (index == 8 && gonetParticipant.GONetId == 208895)
                                 {
-                                    GONetLog.Info($"[CLIENT-RECV-VEL] GONetId:{gonetParticipant.GONetId} idx:{index} velocityValue:{velocityValue.UnityEngine_Vector3} time:{UnityEngine.Time.time:F3}s frame:{UnityEngine.Time.frameCount}");
+                                    var vel = velocityValue.UnityEngine_Vector3;
+                                    GONetLog.Info($"[CLIENT-RECV-VEL] GONetId:{gonetParticipant.GONetId} idx:{index} velocityValue:({vel.x:F6},{vel.y:F6},{vel.z:F6}) time:{UnityEngine.Time.time:F3}s frame:{UnityEngine.Time.frameCount}");
                                 }
 
                                 var changesSupport = syncCompanion.valuesChangesSupport[index];

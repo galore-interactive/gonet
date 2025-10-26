@@ -33,7 +33,7 @@
         {
             "location": "resources://Assets/GONet/Sample/Resources/AutoRotatingOrbitor.prefab",
             "unityGuid": "d06b4174f9cd9ea45a8e7a16669f297b",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "resources://Assets/GONet/Sample/Resources/AutoRotatingOrbitor_ZeroSync.prefab",
@@ -73,27 +73,27 @@
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor",
             "unityGuid": "",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (1)",
             "unityGuid": "",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (2)",
             "unityGuid": "",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (3)",
             "unityGuid": "",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Auto Rotaters/AutoRotatingOrbitor (4)",
             "unityGuid": "",
-            "codeGenerationId": 3
+            "codeGenerationId": 2
         },
         {
             "location": "scene://RpcPlayground/Standard-Automagical Sync/Followers/Follower ",

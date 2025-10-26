@@ -11,7 +11,6 @@ namespace GONet
 		SyncEvent_Transform_position = 6,
 		SyncEvent_ClaimableObjectViaRpcs_ClaimedByAuthorityId = 7,
 		SyncEvent_ClaimableObjectViaRpcs_TotalClaimCount = 8,
-		SyncEvent_CircularMotion_NettyWorkedFloat = 9,
 
 	}
 }

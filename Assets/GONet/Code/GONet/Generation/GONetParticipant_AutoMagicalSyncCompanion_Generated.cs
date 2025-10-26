@@ -247,6 +247,26 @@ namespace GONet.Generation
         private bool AreEqualConsideringQuantization(GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport, GONetSyncableValue valueA, GONetSyncableValue valueB)
         {
             bool areEqual = valueA == valueB;
+
+            // CRITICAL FIX (Oct 2025): For velocity-eligible fields, ALWAYS compare ACTUAL (unquantized) values.
+            // Comparing quantized values causes change detection to fail when actual value changes by sub-quantization amounts.
+            //
+            // Example bug scenario:
+            // - Position quantization step: 76mm
+            // - Movement per sync @24Hz: 0.833mm
+            // - Quantized value stays SAME for ~92 syncs (3.8 seconds)
+            // - Change detection fails → VELOCITY bundles never sent → client sees teleporting
+            //
+            // The ENTIRE PURPOSE of velocity synthesis is to handle sub-quantization motion!
+            // Quantization should ONLY happen during serialization, NOT during change detection.
+            if (valueChangeSupport.isVelocityEligible)
+            {
+                // Velocity-eligible: Compare ACTUAL values (no quantization)
+                // This allows detection of sub-quantization motion (e.g., 0.833mm movement per sync with 76mm quantization step)
+                return areEqual;  // Already compared actual values above (valueA == valueB)
+            }
+
+            // Non-velocity fields: Use quantized comparison (existing behavior)
             if (!areEqual // if they are equal unquantized, then ASSume they will also be the same after quantization since that process is supposed to be deterministic!
                 /* && valueChangeSupport.syncAttribute_QuantizerSettingsGroup.CanBeUsedForQuantization */) // IMPORTANT: we had to remove this since the custom serializer ones would have this as false!
             {
@@ -527,10 +547,19 @@ namespace GONet.Generation
                 case GONetSyncableValueTypes.UnityEngine_Vector3:
                     {
                         var positionDelta = current.UnityEngine_Vector3 - previous.UnityEngine_Vector3;
-                        // Check each component against per-interval bounds
-                        return positionDelta.x >= lowerBoundPerInterval && positionDelta.x <= upperBoundPerInterval &&
-                               positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval &&
-                               positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval;
+                        bool xInRange = positionDelta.x >= lowerBoundPerInterval && positionDelta.x <= upperBoundPerInterval;
+                        bool yInRange = positionDelta.y >= lowerBoundPerInterval && positionDelta.y <= upperBoundPerInterval;
+                        bool zInRange = positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval;
+                        bool result = xInRange && yInRange && zInRange;
+
+                        // DIAGNOSTIC: Log velocity range check details
+                        GONetLog.Debug($"[VELOCITY-RANGE-CHECK] GONetId:{gonetParticipant.GONetId} idx:{valueIndex} " +
+                                      $"current:{current.UnityEngine_Vector3} prev:{previous.UnityEngine_Vector3} " +
+                                      $"delta:({positionDelta.x:F6},{positionDelta.y:F6},{positionDelta.z:F6}) " +
+                                      $"bounds:[{lowerBoundPerInterval:F6}, {upperBoundPerInterval:F6}] " +
+                                      $"checks:(x:{xInRange} y:{yInRange} z:{zInRange}) result:{result}");
+
+                        return result;
                     }
                 case GONetSyncableValueTypes.UnityEngine_Vector4:
                     {
