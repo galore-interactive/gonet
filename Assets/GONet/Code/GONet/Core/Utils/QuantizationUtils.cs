@@ -118,6 +118,32 @@ namespace GONet.Utils
         }
 
         /// <summary>
+        /// Calculate quantization error for Vector4 given quantization settings.
+        /// Returns Euclidean distance between actual and quantized values.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float GetVector4QuantizationError(
+            Vector4 actual,
+            float lowerBound,
+            float upperBound,
+            byte bitsPerComponent)
+        {
+            if (bitsPerComponent == 0) return 0f; // No quantization
+
+            Quantizer quantizer = new Quantizer(lowerBound, upperBound, bitsPerComponent, true);
+
+            // Quantize each component
+            float qx = quantizer.Unquantize(quantizer.Quantize(actual.x));
+            float qy = quantizer.Unquantize(quantizer.Quantize(actual.y));
+            float qz = quantizer.Unquantize(quantizer.Quantize(actual.z));
+            float qw = quantizer.Unquantize(quantizer.Quantize(actual.w));
+
+            Vector4 quantized = new Vector4(qx, qy, qz, qw);
+
+            return Vector4.Distance(actual, quantized);
+        }
+
+        /// <summary>
         /// Calculate quantization error for Vector2 given quantization settings.
         /// Returns Euclidean distance between actual and quantized values.
         /// </summary>
