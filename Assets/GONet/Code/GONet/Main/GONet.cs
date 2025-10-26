@@ -9860,55 +9860,99 @@ namespace GONet
                 {
                     velocityEligibleCount++;
 
-                    // TODO: UNCOMMENT FORCED ANCHOR LOGIC AFTER IMPLEMENTING SMART QUANTIZATION-AWARE ANCHORING
-                    // CURRENT: Disabled for testing - pure VELOCITY synthesis (no time-based forced anchors)
-                    // FUTURE: Replace time-based anchors with quantization-aware anchors:
-                    //   - Server detects when actualValue ≈ quantizedValue (minimal quantization error)
-                    //   - Send VALUE anchor at that moment (zero visual snap on client)
-                    //   - Natural drift correction without jittering
-                    //   - Adaptive rate: slow motion = fewer anchors, fast motion = more anchors
-                    //   - "The server is the man" - server decides optimal anchor timing
-                    //
-                    // Example for 5°/s rotation with 9-bit quantization (~0.3° precision):
-                    //   - VALUE anchors every ~0.06 seconds (when crossing quantization boundaries)
-                    //   - Client sees smooth synthesis + imperceptible corrections
-                    //
-                    // Implementation approach:
-                    //   float quantizedValue = Quantize(currentValue);
-                    //   float quantizationError = Abs(currentValue - quantizedValue);
-                    //   if (quantizationError < threshold && timeSinceLastAnchor > minInterval)
-                    //   {
-                    //       // Send VALUE anchor (actualValue ≈ quantizedValue = zero snap)
-                    //       outOfRangeChanges.Add(change);
-                    //       changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
-                    //   }
+                    // QUANTIZATION-AWARE ANCHORING: Send VALUE anchors intelligently
+                    // Instead of time-based forced anchors, send anchors when actualValue ≈ quantizedValue
+                    // This provides drift correction with ZERO visual jitter (imperceptible snaps)
+                    bool shouldSendQuantizationAnchor = false;
 
-                    /* TEMPORARILY DISABLED - Forced time-based anchors
-                    // Check if periodic anchor is needed (drift prevention)
-                    float anchorIntervalSeconds = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
-                    if (anchorIntervalSeconds == 0f)
+                    // Check if velocity fits in quantization range (needed for both paths)
+                    bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
+
+                    if (velocityWithinRange)
                     {
-                        // Use global default from GONetGlobal
-                        anchorIntervalSeconds = GONetGlobal.Instance.velocityAnchorIntervalSeconds;
-                    }
-                    long anchorIntervalTicks = (long)(anchorIntervalSeconds * TimeSpan.TicksPerSecond);
-                    bool needsAnchor = (elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks) >= anchorIntervalTicks;
+                        // Velocity within range - consider smart anchoring
+                        if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Quaternion)
+                        {
+                            // Get current rotation and calculate quantization error
+                            Quaternion currentRotation = change.lastKnownValue.UnityEngine_Quaternion;
 
-                    if (needsAnchor)
-                    {
-                        // FORCE VALUE anchor (periodic drift correction)
-                        outOfRangeChanges.Add(change);
-                        changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
+                            // Get quantization bits from settings (default: 9 bits for quaternions)
+                            byte quantizeBits = (byte)changesSupport.syncAttribute_QuantizerSettingsGroup.quantizeToBitCount;
+                            if (quantizeBits == 0) quantizeBits = 9; // Default for quaternions
 
-                        GONetLog.Debug($"[VelocitySync][ANCHOR-FORCED] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                      $"timeSinceLastAnchor:{TimeSpan.FromTicks(elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks).TotalSeconds}s " +
-                                      $"interval:{anchorIntervalSeconds}s → Forcing VALUE anchor");
+                            float quantizationError = Utils.QuantizationUtils.GetQuaternionQuantizationError(
+                                currentRotation,
+                                quantizeBits);
+
+                            // HYBRID ANCHORING STRATEGY:
+                            // 1. PRIMARY: Quantization-aware anchors (optimal - zero visual snap)
+                            // 2. FALLBACK: Time-based anchors (safety - prevent unbounded drift)
+
+                            // Quantization-aware threshold: MUST be sub-quantization
+                            // We're looking for moments when rotation is NEAR quantization grid boundaries
+                            // 0% error = on boundary (perfect), 50% error = between boundaries (worst)
+                            // Use 30% threshold = accept anchors when reasonably close to boundaries
+                            float quantizationStepDegrees = 1.41421356f / (float)((1 << quantizeBits) - 1) * (180f / MathF.PI); // Smallest3 range / steps * rad2deg
+                            float MAX_ANCHOR_ERROR_DEGREES = quantizationStepDegrees * 0.30f; // 30% of step (close to boundary)
+                            const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f; // 50ms min interval (prevent spam)
+
+                            // Time-based fallback threshold (from profile or global setting)
+                            float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
+                            if (maxTimeWithoutAnchor == 0f)
+                            {
+                                maxTimeWithoutAnchor = GONetGlobal.Instance.velocityAnchorIntervalSeconds;
+                            }
+
+                            long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
+                            float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
+
+                            // Determine anchor type
+                            bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_DEGREES && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
+                            bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
+
+                            // DIAGNOSTIC: Always log quaternion quantization checks (first eligible field only to reduce spam)
+                            if (velocityEligibleCount == 1)
+                            {
+                                GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                              $"quantError:{quantizationError:F4}° quantStep:{quantizationStepDegrees:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
+                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
+                                              $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                            }
+
+                            if (isQuantizationAnchor)
+                            {
+                                shouldSendQuantizationAnchor = true;
+
+                                GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                              $"quantError:{quantizationError:F4}° timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Smart anchor (clean boundary)");
+                            }
+                            else if (isTimeFallbackAnchor)
+                            {
+                                shouldSendQuantizationAnchor = true;
+
+                                GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s → Fallback anchor (drift prevention)");
+                            }
+                        }
+                        // TODO: Add Vector3, Vector2, float quantization-aware anchoring here
+
+                        if (shouldSendQuantizationAnchor)
+                        {
+                            // Send VALUE anchor (actualValue ≈ quantizedValue = zero visual snap)
+                            outOfRangeChanges.Add(change);
+                            changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
+                        }
+                        else
+                        {
+                            // Send VELOCITY bundle (smooth synthesis)
+                            withinRangeChanges.Add(change);
+                        }
                     }
                     else
-                    */
                     {
-                        // Check if velocity fits in quantization range
-                        bool velocityWithinRange = change.syncCompanion.IsVelocityWithinQuantizationRange(change.index);
+                        // Velocity out of range → VALUE anchor (automatic drift correction)
+                        outOfRangeChanges.Add(change);
+                        changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
 
                         // DIAGNOSTIC: Log first velocity-eligible value per frame to debug range check
                         if (velocityEligibleCount == 1)
@@ -9916,17 +9960,6 @@ namespace GONet
                             GONetLog.Debug($"[VelocitySync][PARTITION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
                                           $"velocityWithinRange:{velocityWithinRange}, snapshotCount:{changesSupport.mostRecentChanges_usedSize}, " +
                                           $"range:[{changesSupport.syncAttribute_VelocityQuantizeLowerBound}, {changesSupport.syncAttribute_VelocityQuantizeUpperBound}]");
-                        }
-
-                        if (velocityWithinRange)
-                        {
-                            withinRangeChanges.Add(change);
-                        }
-                        else
-                        {
-                            // Velocity out of range → VALUE anchor (automatic drift correction)
-                            outOfRangeChanges.Add(change);
-                            changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
                         }
                     }
                 }

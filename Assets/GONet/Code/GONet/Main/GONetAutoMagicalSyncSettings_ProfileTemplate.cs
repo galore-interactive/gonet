@@ -188,31 +188,41 @@ namespace GONet
         public byte VelocityQuantizeDownToBitCount = 10;
 
         /// <summary>
-        /// VELOCITY-AUGMENTED SYNC: Interval (in seconds) between mandatory VALUE anchor bundles.
+        /// VELOCITY-AUGMENTED SYNC: Maximum time without VALUE anchor (HYBRID ANCHORING STRATEGY).
         /// Prevents drift accumulation from packet loss during VELOCITY-augmented sync.
         ///
-        /// HOW IT WORKS:
-        /// - Values within velocity range → VELOCITY bundles (smooth extrapolation)
-        /// - Every N seconds → Force VALUE anchor (re-sync to server truth)
-        /// - Values exceeding velocity range → Automatic VALUE bundles
+        /// HOW IT WORKS (Two-Tier Strategy):
+        ///
+        /// PRIMARY - Quantization-Aware Anchoring (optimal):
+        /// - Monitors when actualValue ≈ quantizedValue (rotation aligns with quantization grid)
+        /// - Sends VALUE anchor at these moments (ZERO visual snap/jitter)
+        /// - Adaptive rate: slow motion = fewer anchors, fast motion = more anchors
+        ///
+        /// FALLBACK - Time-Based Anchoring (safety):
+        /// - If no quantization-aware anchor for N seconds → FORCE VALUE anchor
+        /// - Prevents unbounded drift accumulation (safety net)
+        /// - This setting controls the fallback interval
         ///
         /// CONFIGURATION:
         /// - 0 (default): Use global setting from GONetGlobal.velocityAnchorIntervalSeconds
-        /// - >0: Custom interval for this specific sync profile (overrides global)
+        /// - >0: Custom max interval for this specific sync profile (overrides global)
         ///
         /// TUNING:
-        /// - Lower (0.5s): Less drift, more frequent corrections
-        /// - Higher (2-5s): Maximum smoothness, tolerate more drift
+        /// - Lower (0.5-1.0s): Tighter drift control, more fallback anchors
+        /// - Higher (2-5s): Rely more on quantization-aware anchors, tolerate more drift
         ///
         /// Only applies when <see cref="IsVelocityEligible"/> is true.
         ///
-        /// Default: 0 (use global setting)
+        /// Default: 0 (use global setting, typically 1.0s)
         /// </summary>
-        [Tooltip("Interval (seconds) between mandatory VALUE anchors during VELOCITY sync.\n" +
+        [Tooltip("Maximum seconds without VALUE anchor during VELOCITY sync (FALLBACK for drift prevention).\n\n" +
+                 "HYBRID STRATEGY:\n" +
+                 "• PRIMARY: Quantization-aware anchors (clean boundaries, zero jitter)\n" +
+                 "• FALLBACK: Time-based anchor if primary doesn't fire (prevents drift)\n\n" +
                  "0 = Use global setting (GONetGlobal.velocityAnchorIntervalSeconds)\n" +
-                 ">0 = Custom interval for this profile\n\n" +
+                 ">0 = Custom max interval for this profile\n\n" +
                  "Only applies when 'Is Velocity Eligible' is enabled.\n\n" +
-                 "RECOMMENDED: Leave at 0 (use global) unless specific profile needs different timing.")]
+                 "RECOMMENDED: Leave at 0 (use global default of 1.0s).")]
         [Range(0f, 5.0f)]
         public float VelocityAnchorIntervalSeconds = 0f;
 
