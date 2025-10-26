@@ -157,6 +157,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\StringUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetSceneManager.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\IO\PacketIO.cs" />
+    <Compile Include="Assets\GONet\Code\GONet\Core\Utils\QuantizationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Analysis\ValueBlendingAnalyzerBehavior.cs" />
     <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.cs" />
