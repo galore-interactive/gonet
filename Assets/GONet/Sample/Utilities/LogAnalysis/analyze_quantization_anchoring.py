@@ -85,18 +85,15 @@ class QuantizationAnchoringAnalyzer:
             r'type:(\w+) timeSinceAnchor:([\d.]+)s → Fallback anchor'
         )
 
+        # VELOCITY bundles have GONetId in the log message
         self.velocity_bundle_pattern = re.compile(
-            r'Sending VELOCITY bundle'
-        )
-
-        self.value_bundle_pattern = re.compile(
-            r'Sending VALUE bundle'
+            r'\[SERVER-SEND-VEL\] GONetId:(\d+)'
         )
 
     def parse_log(self):
         """Parse log file and extract relevant events."""
-        print(f"📂 Parsing log file: {self.log_file}")
-        print(f"   (This may take a while for large files...)")
+        print(f"[*] Parsing log file: {self.log_file}")
+        print(f"    (This may take a while for large files...)")
 
         line_count = 0
         with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -162,28 +159,26 @@ class QuantizationAnchoringAnalyzer:
                         self.anchors.append(event)
                     continue
 
-                # Parse VELOCITY bundle events
-                if self.velocity_bundle_pattern.search(line):
-                    self.velocity_bundles_by_gonetid[0] += 1  # Use 0 as generic key (no GONetId in log)
+                # Parse VELOCITY bundle events (with GONetId filtering)
+                match = self.velocity_bundle_pattern.search(line)
+                if match:
+                    gonetid = int(match.group(1))
+                    if self.filter_gonetid is None or gonetid == self.filter_gonetid:
+                        self.velocity_bundles_by_gonetid[gonetid] += 1
                     continue
 
-                # Parse VALUE bundle events
-                if self.value_bundle_pattern.search(line):
-                    self.value_bundles_by_gonetid[0] += 1  # Use 0 as generic key (no GONetId in log)
-                    continue
-
-        print(f"✅ Parsing complete! Processed {line_count:,} lines")
+        print(f"[OK] Parsing complete! Processed {line_count:,} lines")
 
     def generate_report(self):
         """Generate comprehensive analysis report."""
         print("\n" + "="*80)
-        print("📊 QUANTIZATION-AWARE ANCHORING ANALYSIS REPORT")
+        print("[REPORT] QUANTIZATION-AWARE ANCHORING ANALYSIS")
         print("="*80)
 
         if self.filter_gonetid:
-            print(f"\n🔍 Filtered to GONetId: {self.filter_gonetid}")
+            print(f"\n[FILTER] GONetId: {self.filter_gonetid}")
         else:
-            print(f"\n🔍 Analyzing all GONetIds")
+            print(f"\n[FILTER] All GONetIds")
 
         # Section 1: Overall Statistics
         print("\n" + "-"*80)
@@ -205,8 +200,14 @@ class QuantizationAnchoringAnalyzer:
         print("2. VELOCITY vs VALUE BUNDLE STATISTICS")
         print("-"*80)
 
-        velocity_count = self.velocity_bundles_by_gonetid.get(0, 0)
-        value_count = self.value_bundles_by_gonetid.get(0, 0)
+        # Calculate VELOCITY bundle count (sum all GONetIds or specific filtered one)
+        if self.filter_gonetid:
+            velocity_count = self.velocity_bundles_by_gonetid.get(self.filter_gonetid, 0)
+        else:
+            velocity_count = sum(self.velocity_bundles_by_gonetid.values())
+
+        # VALUE bundles = anchors (QUANTIZATION + FALLBACK)
+        value_count = total_anchors
         total = velocity_count + value_count
 
         if total > 0:
@@ -293,26 +294,26 @@ class QuantizationAnchoringAnalyzer:
             quant_anchor_ratio = total_quant_anchors / max(1, total_anchors)
             fallback_ratio = total_fallback_anchors / max(1, total_anchors)
 
-            print(f"\n  ✅ VELOCITY bundle ratio: {velocity_ratio*100:.1f}% (target: >90% for SLOW preset)")
+            print(f"\n  [CHECK] VELOCITY bundle ratio: {velocity_ratio*100:.1f}% (target: >90% for SLOW preset)")
             if velocity_ratio > 0.9:
                 print(f"     SUCCESS: System correctly using VELOCITY bundles for sub-quantization motion!")
             else:
                 print(f"     WARNING: Expected higher VELOCITY ratio for SLOW movement preset")
 
-            print(f"\n  ✅ Quantization-aware anchor ratio: {quant_anchor_ratio*100:.1f}% (target: >70%)")
+            print(f"\n  [CHECK] Quantization-aware anchor ratio: {quant_anchor_ratio*100:.1f}% (target: >70%)")
             if quant_anchor_ratio > 0.7:
                 print(f"     SUCCESS: Most anchors are quantization-aware (clean boundaries)!")
             else:
                 print(f"     WARNING: Too many fallback anchors - may need threshold adjustment")
 
-            print(f"\n  ✅ Fallback anchor ratio: {fallback_ratio*100:.1f}% (target: <30%)")
+            print(f"\n  [CHECK] Fallback anchor ratio: {fallback_ratio*100:.1f}% (target: <30%)")
             if fallback_ratio < 0.3:
                 print(f"     SUCCESS: Fallback safety net rarely needed!")
             else:
                 print(f"     NOTE: Fallback anchors firing frequently - consider longer VelocityAnchorIntervalSeconds")
 
         print("\n" + "="*80)
-        print("📋 ANALYSIS COMPLETE")
+        print("[DONE] ANALYSIS COMPLETE")
         print("="*80 + "\n")
 
 
@@ -329,7 +330,7 @@ def main():
         try:
             filter_gonetid = int(sys.argv[3])
         except ValueError:
-            print(f"❌ Error: Invalid GONetId '{sys.argv[3]}' (must be integer)")
+            print(f"[ERROR] Invalid GONetId '{sys.argv[3]}' (must be integer)")
             sys.exit(1)
 
     # Run analysis
