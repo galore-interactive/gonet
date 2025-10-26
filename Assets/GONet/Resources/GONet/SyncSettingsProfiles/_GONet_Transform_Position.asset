@@ -18,9 +18,9 @@ MonoBehaviour:
   SendViaReliability: 1
   ShouldBlendBetweenValuesReceived: 1
   QuantizeDownToBitCount: 18
-  QuantizeLowerBound: -10000
-  QuantizeUpperBound: 10000
-  QuantizationResultingPrecision: 0.07629395 (i.e., 76.294 millimeters)
+  QuantizeLowerBound: -125
+  QuantizeUpperBound: 125
+  QuantizationResultingPrecision: 0.0009536743 (i.e., 0.954 millimeters)
   IsVelocityEligible: 1
   AutoCalculateVelocityQuantization: 1
   VelocityQuantizeLowerBound: -20
