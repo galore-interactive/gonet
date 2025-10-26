@@ -187,5 +187,153 @@ namespace GONet.Utils
 
             return Mathf.Abs(actual - dequantized);
         }
+
+        /// <summary>
+        /// QUANTIZATION-AWARE ANCHORING: Check if Vector3 is near quantization boundaries.
+        /// ALL components must be within threshold for clean VALUE anchor.
+        /// Returns per-component errors and boundary check result.
+        /// </summary>
+        public static bool IsVector3NearQuantizationBoundary(
+            Vector3 actual,
+            float lowerBound,
+            float upperBound,
+            byte bitsPerComponent,
+            float thresholdFraction,  // e.g., 0.30 for 30%
+            out float errorX,
+            out float errorY,
+            out float errorZ,
+            out float threshold)
+        {
+            errorX = errorY = errorZ = threshold = 0f;
+
+            if (bitsPerComponent == 0) return false; // No quantization
+
+            Quantizer quantizer = new Quantizer(lowerBound, upperBound, bitsPerComponent, true);
+
+            // Quantize each component
+            float qx = quantizer.Unquantize(quantizer.Quantize(actual.x));
+            float qy = quantizer.Unquantize(quantizer.Quantize(actual.y));
+            float qz = quantizer.Unquantize(quantizer.Quantize(actual.z));
+
+            // Calculate per-component errors
+            errorX = Mathf.Abs(actual.x - qx);
+            errorY = Mathf.Abs(actual.y - qy);
+            errorZ = Mathf.Abs(actual.z - qz);
+
+            // Calculate threshold (30% of quantization step)
+            float range = upperBound - lowerBound;
+            float quantizationStep = range / (float)((1 << bitsPerComponent) - 1);
+            threshold = quantizationStep * thresholdFraction;
+
+            // ALL components must be within threshold
+            return errorX < threshold &&
+                   errorY < threshold &&
+                   errorZ < threshold;
+        }
+
+        /// <summary>
+        /// QUANTIZATION-AWARE ANCHORING: Check if Vector2 is near quantization boundaries.
+        /// ALL components must be within threshold for clean VALUE anchor.
+        /// </summary>
+        public static bool IsVector2NearQuantizationBoundary(
+            Vector2 actual,
+            float lowerBound,
+            float upperBound,
+            byte bitsPerComponent,
+            float thresholdFraction,
+            out float errorX,
+            out float errorY,
+            out float threshold)
+        {
+            errorX = errorY = threshold = 0f;
+
+            if (bitsPerComponent == 0) return false;
+
+            Quantizer quantizer = new Quantizer(lowerBound, upperBound, bitsPerComponent, true);
+
+            float qx = quantizer.Unquantize(quantizer.Quantize(actual.x));
+            float qy = quantizer.Unquantize(quantizer.Quantize(actual.y));
+
+            errorX = Mathf.Abs(actual.x - qx);
+            errorY = Mathf.Abs(actual.y - qy);
+
+            float range = upperBound - lowerBound;
+            float quantizationStep = range / (float)((1 << bitsPerComponent) - 1);
+            threshold = quantizationStep * thresholdFraction;
+
+            return errorX < threshold && errorY < threshold;
+        }
+
+        /// <summary>
+        /// QUANTIZATION-AWARE ANCHORING: Check if Vector4 is near quantization boundaries.
+        /// ALL components must be within threshold for clean VALUE anchor.
+        /// </summary>
+        public static bool IsVector4NearQuantizationBoundary(
+            Vector4 actual,
+            float lowerBound,
+            float upperBound,
+            byte bitsPerComponent,
+            float thresholdFraction,
+            out float errorX,
+            out float errorY,
+            out float errorZ,
+            out float errorW,
+            out float threshold)
+        {
+            errorX = errorY = errorZ = errorW = threshold = 0f;
+
+            if (bitsPerComponent == 0) return false;
+
+            Quantizer quantizer = new Quantizer(lowerBound, upperBound, bitsPerComponent, true);
+
+            float qx = quantizer.Unquantize(quantizer.Quantize(actual.x));
+            float qy = quantizer.Unquantize(quantizer.Quantize(actual.y));
+            float qz = quantizer.Unquantize(quantizer.Quantize(actual.z));
+            float qw = quantizer.Unquantize(quantizer.Quantize(actual.w));
+
+            errorX = Mathf.Abs(actual.x - qx);
+            errorY = Mathf.Abs(actual.y - qy);
+            errorZ = Mathf.Abs(actual.z - qz);
+            errorW = Mathf.Abs(actual.w - qw);
+
+            float range = upperBound - lowerBound;
+            float quantizationStep = range / (float)((1 << bitsPerComponent) - 1);
+            threshold = quantizationStep * thresholdFraction;
+
+            return errorX < threshold &&
+                   errorY < threshold &&
+                   errorZ < threshold &&
+                   errorW < threshold;
+        }
+
+        /// <summary>
+        /// QUANTIZATION-AWARE ANCHORING: Check if float is near quantization boundary.
+        /// </summary>
+        public static bool IsFloatNearQuantizationBoundary(
+            float actual,
+            float lowerBound,
+            float upperBound,
+            byte bits,
+            float thresholdFraction,
+            out float error,
+            out float threshold)
+        {
+            error = threshold = 0f;
+
+            if (bits == 0) return false;
+
+            Quantizer quantizer = new Quantizer(lowerBound, upperBound, bits, true);
+
+            uint quantized = quantizer.Quantize(actual);
+            float dequantized = quantizer.Unquantize(quantized);
+
+            error = Mathf.Abs(actual - dequantized);
+
+            float range = upperBound - lowerBound;
+            float quantizationStep = range / (float)((1 << bits) - 1);
+            threshold = quantizationStep * thresholdFraction;
+
+            return error < threshold;
+        }
     }
 }

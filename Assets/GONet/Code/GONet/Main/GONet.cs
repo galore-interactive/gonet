@@ -9936,8 +9936,9 @@ namespace GONet
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector3)
                         {
-                            // Get current position and calculate quantization error
+                            // Get current position
                             Vector3 currentValue = change.lastKnownValue.UnityEngine_Vector3;
+                            Vector3 previousValue = change.lastKnownValue_previous.UnityEngine_Vector3;
 
                             // Get quantization settings
                             byte quantizeBits = (byte)changesSupport.syncAttribute_QuantizerSettingsGroup.quantizeToBitCount;
@@ -9946,20 +9947,35 @@ namespace GONet
 
                             if (quantizeBits > 0) // Only if quantization is enabled
                             {
-                                float quantizationError = Utils.QuantizationUtils.GetVector3QuantizationError(
+                                // PER-COMPONENT BOUNDARY CHECK: All components must be within 30% for clean anchor
+                                const float THRESHOLD_FRACTION = 0.30f;
+                                bool allComponentsNearBoundary = Utils.QuantizationUtils.IsVector3NearQuantizationBoundary(
                                     currentValue,
                                     lowerBound,
                                     upperBound,
-                                    quantizeBits);
+                                    quantizeBits,
+                                    THRESHOLD_FRACTION,
+                                    out float errorX,
+                                    out float errorY,
+                                    out float errorZ,
+                                    out float threshold);
 
-                                // HYBRID ANCHORING STRATEGY (same as Quaternion)
-                                // Quantization-aware threshold: 30% of quantization step
+                                // PHASE 1: MOTION DETECTION (Observational Only - No Behavior Change)
+                                // Calculate per-component delta to identify which components are moving
+                                Vector3 delta = currentValue - previousValue;
+
+                                // Motion epsilon: 1% of quantization step (filters float precision noise)
                                 float range = upperBound - lowerBound;
-                                float quantizationStepUnits = range / (float)((1 << quantizeBits) - 1);
-                                float MAX_ANCHOR_ERROR_UNITS = quantizationStepUnits * 0.30f; // 30% of step
-                                const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f;
+                                float quantizationStep = range / (float)((1 << quantizeBits) - 1);
+                                float motionEpsilon = quantizationStep * 0.01f;  // e.g., 0.15mm for 14-bit
 
-                                // Time-based fallback threshold
+                                // Determine which components are "moving" (above epsilon threshold)
+                                bool xMoving = Mathf.Abs(delta.x) >= motionEpsilon;
+                                bool yMoving = Mathf.Abs(delta.y) >= motionEpsilon;
+                                bool zMoving = Mathf.Abs(delta.z) >= motionEpsilon;
+
+                                // RATE LIMITING: Use fallback interval as minimum for BOTH anchor types
+                                // This prevents VALUE spam even if we find "perfect" moments frequently
                                 float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
                                 if (maxTimeWithoutAnchor == 0f)
                                 {
@@ -9968,40 +9984,63 @@ namespace GONet
 
                                 long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
+                                bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Determine anchor type
-                                bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_UNITS && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
-                                bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
-
-                                // DIAGNOSTIC: Log Vector3 quantization checks
+                                // ALWAYS LOG DIAGNOSTICS (even when not sending anchor)
+                                // PHASE 1: Includes motion detection data for observation
                                 if (velocityEligibleCount == 1)
                                 {
+                                    bool xPass = errorX < threshold;
+                                    bool yPass = errorY < threshold;
+                                    bool zPass = errorZ < threshold;
+
                                     GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector3 quantError:{quantizationError:F6} quantStep:{quantizationStepUnits:F6} threshold:{MAX_ANCHOR_ERROR_UNITS:F6} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
-                                                  $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                                                  $"type:Vector3 errorX:{errorX:F6} errorY:{errorY:F6} errorZ:{errorZ:F6} threshold:{threshold:F6} " +
+                                                  $"delta:({delta.x:F6},{delta.y:F6},{delta.z:F6}) motionEps:{motionEpsilon:F6} " +
+                                                  $"moving:(x:{xMoving} y:{yMoving} z:{zMoving}) checks:(x:{xPass} y:{yPass} z:{zPass}) allPass:{allComponentsNearBoundary} " +
+                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
                                 }
 
-                                if (isQuantizationAnchor)
+                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
+                                // Only check boundary conditions for components that are actually moving
+                                bool allMovingComponentsNearBoundary = true;
+
+                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
+                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
+                                if (zMoving && errorZ >= threshold) allMovingComponentsNearBoundary = false;
+
+                                // Require at least one component to be moving (avoid anchoring stationary objects)
+                                bool anyComponentMoving = xMoving || yMoving || zMoving;
+
+                                // DECISION: Only send anchor if timing allows (prevents VALUE spam)
+                                if (timingAllowsAnchor)
                                 {
-                                    shouldSendQuantizationAnchor = true;
+                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
+                                    {
+                                        // QUANTIZATION-AWARE ANCHOR: All MOVING components near boundaries (smart re-sync)
+                                        shouldSendQuantizationAnchor = true;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector3 quantError:{quantizationError:F6} → Smart anchor (clean boundary)");
-                                }
-                                else if (isTimeFallbackAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector3 errors:({errorX:F6},{errorY:F6},{errorZ:F6}) threshold:{threshold:F6} " +
+                                                      $"moving:({xMoving},{yMoving},{zMoving}) → Smart anchor (all moving components clean)");
+                                    }
+                                    else
+                                    {
+                                        // FALLBACK ANCHOR: Time limit reached, send anyway (drift prevention)
+                                        shouldSendQuantizationAnchor = true;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector3 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector3 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                    }
                                 }
+                                // ELSE: Timing doesn't allow anchor yet, but diagnostics were still logged above
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector2)
                         {
-                            // Get current value and calculate quantization error
+                            // Get current value
                             Vector2 currentValue = change.lastKnownValue.UnityEngine_Vector2;
+                            Vector2 previousValue = change.lastKnownValue_previous.UnityEngine_Vector2;
 
                             // Get quantization settings
                             byte quantizeBits = (byte)changesSupport.syncAttribute_QuantizerSettingsGroup.quantizeToBitCount;
@@ -10010,19 +10049,27 @@ namespace GONet
 
                             if (quantizeBits > 0) // Only if quantization is enabled
                             {
-                                float quantizationError = Utils.QuantizationUtils.GetVector2QuantizationError(
+                                // PER-COMPONENT BOUNDARY CHECK
+                                const float THRESHOLD_FRACTION = 0.30f;
+                                bool allComponentsNearBoundary = Utils.QuantizationUtils.IsVector2NearQuantizationBoundary(
                                     currentValue,
                                     lowerBound,
                                     upperBound,
-                                    quantizeBits);
+                                    quantizeBits,
+                                    THRESHOLD_FRACTION,
+                                    out float errorX,
+                                    out float errorY,
+                                    out float threshold);
 
-                                // HYBRID ANCHORING STRATEGY (same as Vector3)
+                                // PHASE 1: MOTION DETECTION
+                                Vector2 delta = currentValue - previousValue;
                                 float range = upperBound - lowerBound;
-                                float quantizationStepUnits = range / (float)((1 << quantizeBits) - 1);
-                                float MAX_ANCHOR_ERROR_UNITS = quantizationStepUnits * 0.30f; // 30% of step
-                                const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f;
+                                float quantizationStep = range / (float)((1 << quantizeBits) - 1);
+                                float motionEpsilon = quantizationStep * 0.01f;
+                                bool xMoving = Mathf.Abs(delta.x) >= motionEpsilon;
+                                bool yMoving = Mathf.Abs(delta.y) >= motionEpsilon;
 
-                                // Time-based fallback threshold
+                                // RATE LIMITING
                                 float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
                                 if (maxTimeWithoutAnchor == 0f)
                                 {
@@ -10031,61 +10078,91 @@ namespace GONet
 
                                 long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
+                                bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Determine anchor type
-                                bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_UNITS && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
-                                bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
-
-                                // DIAGNOSTIC: Log Vector2 quantization checks
+                                // ALWAYS LOG DIAGNOSTICS (PHASE 1: includes motion detection)
                                 if (velocityEligibleCount == 1)
                                 {
+                                    bool xPass = errorX < threshold;
+                                    bool yPass = errorY < threshold;
+
                                     GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector2 quantError:{quantizationError:F6} quantStep:{quantizationStepUnits:F6} threshold:{MAX_ANCHOR_ERROR_UNITS:F6} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
-                                                  $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                                                  $"type:Vector2 errorX:{errorX:F6} errorY:{errorY:F6} threshold:{threshold:F6} " +
+                                                  $"delta:({delta.x:F6},{delta.y:F6}) motionEps:{motionEpsilon:F6} " +
+                                                  $"moving:(x:{xMoving} y:{yMoving}) checks:(x:{xPass} y:{yPass}) allPass:{allComponentsNearBoundary} " +
+                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
                                 }
 
-                                if (isQuantizationAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
+                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
+                                bool allMovingComponentsNearBoundary = true;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector2 quantError:{quantizationError:F6} → Smart anchor (clean boundary)");
-                                }
-                                else if (isTimeFallbackAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
+                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
+                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector2 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                // Require at least one component to be moving
+                                bool anyComponentMoving = xMoving || yMoving;
+
+                                // DECISION
+                                if (timingAllowsAnchor)
+                                {
+                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector2 errors:({errorX:F6},{errorY:F6}) threshold:{threshold:F6} " +
+                                                      $"moving:({xMoving},{yMoving}) → Smart anchor (all moving components clean)");
+                                    }
+                                    else
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector2 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
+                                    }
                                 }
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector4)
                         {
-                            // Get current value and calculate quantization error
+                            // Get current value
                             Vector4 currentValue = change.lastKnownValue.UnityEngine_Vector4;
+                            Vector4 previousValue = change.lastKnownValue_previous.UnityEngine_Vector4; // PHASE 1: For motion detection
 
                             // Get quantization settings
                             byte quantizeBits = (byte)changesSupport.syncAttribute_QuantizerSettingsGroup.quantizeToBitCount;
                             float lowerBound = changesSupport.syncAttribute_QuantizerSettingsGroup.lowerBound;
                             float upperBound = changesSupport.syncAttribute_QuantizerSettingsGroup.upperBound;
 
-                            if (quantizeBits > 0) // Only if quantization is enabled
+                            if (quantizeBits > 0)
                             {
-                                float quantizationError = Utils.QuantizationUtils.GetVector4QuantizationError(
+                                // PER-COMPONENT BOUNDARY CHECK
+                                const float THRESHOLD_FRACTION = 0.30f;
+                                bool allComponentsNearBoundary = Utils.QuantizationUtils.IsVector4NearQuantizationBoundary(
                                     currentValue,
                                     lowerBound,
                                     upperBound,
-                                    quantizeBits);
+                                    quantizeBits,
+                                    THRESHOLD_FRACTION,
+                                    out float errorX,
+                                    out float errorY,
+                                    out float errorZ,
+                                    out float errorW,
+                                    out float threshold);
 
-                                // HYBRID ANCHORING STRATEGY (same as Vector3)
+                                // PHASE 1: MOTION DETECTION (Observational Only - No Behavior Change)
+                                Vector4 delta = currentValue - previousValue;
+
+                                // Motion epsilon: 1% of quantization step (filters float precision noise)
                                 float range = upperBound - lowerBound;
-                                float quantizationStepUnits = range / (float)((1 << quantizeBits) - 1);
-                                float MAX_ANCHOR_ERROR_UNITS = quantizationStepUnits * 0.30f; // 30% of step
-                                const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f;
+                                float quantizationStep = range / (float)((1 << quantizeBits) - 1);
+                                float motionEpsilon = quantizationStep * 0.01f;
 
-                                // Time-based fallback threshold
+                                // Determine which components are "moving" (above epsilon threshold)
+                                bool xMoving = Mathf.Abs(delta.x) >= motionEpsilon;
+                                bool yMoving = Mathf.Abs(delta.y) >= motionEpsilon;
+                                bool zMoving = Mathf.Abs(delta.z) >= motionEpsilon;
+                                bool wMoving = Mathf.Abs(delta.w) >= motionEpsilon;
+
+                                // RATE LIMITING
                                 float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
                                 if (maxTimeWithoutAnchor == 0f)
                                 {
@@ -10094,39 +10171,56 @@ namespace GONet
 
                                 long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
+                                bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Determine anchor type
-                                bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_UNITS && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
-                                bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
-
-                                // DIAGNOSTIC: Log Vector4 quantization checks
+                                // ALWAYS LOG DIAGNOSTICS (ENHANCED with motion detection)
                                 if (velocityEligibleCount == 1)
                                 {
+                                    bool xPass = errorX < threshold;
+                                    bool yPass = errorY < threshold;
+                                    bool zPass = errorZ < threshold;
+                                    bool wPass = errorW < threshold;
+
                                     GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector4 quantError:{quantizationError:F6} quantStep:{quantizationStepUnits:F6} threshold:{MAX_ANCHOR_ERROR_UNITS:F6} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
-                                                  $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                                                  $"type:Vector4 errorX:{errorX:F6} errorY:{errorY:F6} errorZ:{errorZ:F6} errorW:{errorW:F6} threshold:{threshold:F6} " +
+                                                  $"delta:({delta.x:F6},{delta.y:F6},{delta.z:F6},{delta.w:F6}) motionEps:{motionEpsilon:F6} " +
+                                                  $"moving:(x:{xMoving} y:{yMoving} z:{zMoving} w:{wMoving}) checks:(x:{xPass} y:{yPass} z:{zPass} w:{wPass}) allPass:{allComponentsNearBoundary} " +
+                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
                                 }
 
-                                if (isQuantizationAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
+                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
+                                bool allMovingComponentsNearBoundary = true;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector4 quantError:{quantizationError:F6} → Smart anchor (clean boundary)");
-                                }
-                                else if (isTimeFallbackAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
+                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
+                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
+                                if (zMoving && errorZ >= threshold) allMovingComponentsNearBoundary = false;
+                                if (wMoving && errorW >= threshold) allMovingComponentsNearBoundary = false;
 
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector4 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                // Require at least one component to be moving
+                                bool anyComponentMoving = xMoving || yMoving || zMoving || wMoving;
+
+                                // DECISION
+                                if (timingAllowsAnchor)
+                                {
+                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector4 errors:({errorX:F6},{errorY:F6},{errorZ:F6},{errorW:F6}) threshold:{threshold:F6} " +
+                                                      $"moving:({xMoving},{yMoving},{zMoving},{wMoving}) → Smart anchor (all moving components clean)");
+                                    }
+                                    else
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:Vector4 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
+                                    }
                                 }
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.System_Single)
                         {
-                            // Get current float value and calculate quantization error
+                            // Get current float value
                             float currentValue = change.lastKnownValue.System_Single;
 
                             // Get quantization settings
@@ -10134,21 +10228,20 @@ namespace GONet
                             float lowerBound = changesSupport.syncAttribute_QuantizerSettingsGroup.lowerBound;
                             float upperBound = changesSupport.syncAttribute_QuantizerSettingsGroup.upperBound;
 
-                            if (quantizeBits > 0) // Only if quantization is enabled
+                            if (quantizeBits > 0)
                             {
-                                float quantizationError = Utils.QuantizationUtils.GetFloatQuantizationError(
+                                // BOUNDARY CHECK (single component)
+                                const float THRESHOLD_FRACTION = 0.30f;
+                                bool nearBoundary = Utils.QuantizationUtils.IsFloatNearQuantizationBoundary(
                                     currentValue,
                                     lowerBound,
                                     upperBound,
-                                    quantizeBits);
+                                    quantizeBits,
+                                    THRESHOLD_FRACTION,
+                                    out float error,
+                                    out float threshold);
 
-                                // HYBRID ANCHORING STRATEGY (same as Vector3)
-                                float range = upperBound - lowerBound;
-                                float quantizationStepUnits = range / (float)((1 << quantizeBits) - 1);
-                                float MAX_ANCHOR_ERROR_UNITS = quantizationStepUnits * 0.30f; // 30% of step
-                                const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f;
-
-                                // Time-based fallback threshold
+                                // RATE LIMITING
                                 float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
                                 if (maxTimeWithoutAnchor == 0f)
                                 {
@@ -10157,33 +10250,31 @@ namespace GONet
 
                                 long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
+                                bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Determine anchor type
-                                bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_UNITS && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
-                                bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
-
-                                // DIAGNOSTIC: Log float quantization checks
+                                // ALWAYS LOG DIAGNOSTICS
                                 if (velocityEligibleCount == 1)
                                 {
                                     GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:float quantError:{quantizationError:F6} quantStep:{quantizationStepUnits:F6} threshold:{MAX_ANCHOR_ERROR_UNITS:F6} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
-                                                  $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                                                  $"type:float error:{error:F6} threshold:{threshold:F6} nearBoundary:{nearBoundary} " +
+                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
                                 }
 
-                                if (isQuantizationAnchor)
+                                // DECISION
+                                if (timingAllowsAnchor)
                                 {
-                                    shouldSendQuantizationAnchor = true;
-
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:float quantError:{quantizationError:F6} → Smart anchor (clean boundary)");
-                                }
-                                else if (isTimeFallbackAnchor)
-                                {
-                                    shouldSendQuantizationAnchor = true;
-
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:float timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                    if (nearBoundary)
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:float error:{error:F6} threshold:{threshold:F6} → Smart anchor");
+                                    }
+                                    else
+                                    {
+                                        shouldSendQuantizationAnchor = true;
+                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                      $"type:float timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
+                                    }
                                 }
                             }
                         }
