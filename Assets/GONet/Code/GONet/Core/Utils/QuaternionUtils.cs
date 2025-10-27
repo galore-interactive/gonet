@@ -477,6 +477,46 @@ namespace GONet.Utils
             return result;
         }
 
+        /// <summary>
+        /// Exact quaternion logarithm using Mathf.Acos/Sin instead of polynomial approximations.
+        /// USE THIS FOR: Velocity calculation (angular velocity from rotation delta)
+        /// USE Log() FOR: Value blending/interpolation (SlerpFast, SquadFast)
+        ///
+        /// Why separate methods?
+        /// - Velocity calculation: ~0.29° ApproxAcos error causes systematic bias in angular velocity
+        ///   → client rotates faster/slower than server → visible snap every VALUE anchor
+        /// - Value blending: ApproxAcos error is random (not systematic) and smoothed by interpolation
+        ///   → negligible visual impact, performance matters more
+        ///
+        /// Performance: ~5-10 CPU cycles slower than Log() due to Mathf.Acos (transcendental function)
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quaternion Log_Exact(Quaternion q)
+        {
+            // Normalize to handle potential floating-point drift (ensures unit length assumption)
+            q = q.normalized;
+
+            // Clamp w to valid acos range [-1, 1] for numeric safety
+            float clampedW = Mathf.Clamp(q.w, -1f, 1f);
+
+            // Use exact Mathf.Acos (eliminates approximation errors)
+            float angle = Mathf.Acos(clampedW);
+
+            // Use exact Mathf.Sin
+            float sinAngle = Mathf.Sin(angle);
+
+            if (Mathf.Abs(sinAngle) > 1e-6f) // Slightly tighter threshold for better precision on very small angles
+            {
+                float coeff = angle / sinAngle;
+                return new Quaternion(q.x * coeff, q.y * coeff, q.z * coeff, 0f);
+            }
+            else
+            {
+                // For tiny angles, sin(angle) ≈ angle, so coeff ≈ 1; use components directly to avoid division instability
+                return new Quaternion(q.x, q.y, q.z, 0f);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion Exp(Quaternion q)
         {

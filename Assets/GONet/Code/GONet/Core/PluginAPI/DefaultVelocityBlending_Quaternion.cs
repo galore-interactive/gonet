@@ -43,7 +43,24 @@ namespace GONet.PluginAPI
             Quaternion deltaRotation = IntegrateAngularVelocity(omega, deltaTime);
 
             // Apply delta rotation
-            Quaternion synthesized = prevRot * deltaRotation;
+            Quaternion unnormalized = prevRot * deltaRotation;
+
+            // CRITICAL FIX: Normalize after quaternion multiplication to prevent magnitude drift
+            // Quaternion multiplication accumulates floating-point errors → non-unit quaternions → incorrect rotation speed
+            float magnitudeBeforeNormalization = Mathf.Sqrt(
+                unnormalized.x * unnormalized.x +
+                unnormalized.y * unnormalized.y +
+                unnormalized.z * unnormalized.z +
+                unnormalized.w * unnormalized.w);
+
+            Quaternion synthesized = unnormalized.normalized;
+
+            // DIAGNOSTIC: Log magnitude drift and normalization correction
+            float magnitudeError = Mathf.Abs(magnitudeBeforeNormalization - 1.0f);
+            float magnitudeErrorPercent = magnitudeError * 100f;
+            GONetLog.Debug($"[QUAT-NORM][{gonetParticipant.GONetId}][SynthesizeValueFromVelocity] " +
+                          $"magBefore={magnitudeBeforeNormalization:F8} (error={magnitudeErrorPercent:F5}%), " +
+                          $"magAfter=1.00000000, omega={omega.magnitude:F6}rad/s, dt={deltaTime:F4}s");
 
             return synthesized;
         }
@@ -85,7 +102,23 @@ namespace GONet.PluginAPI
 
                 // Integrate angular velocity
                 Quaternion deltaRotation = IntegrateAngularVelocity(omega, deltaTimeSeconds);
-                Quaternion extrapolated = currentRotation * deltaRotation;
+                Quaternion unnormalized = currentRotation * deltaRotation;
+
+                // CRITICAL FIX: Normalize after quaternion multiplication to prevent magnitude drift
+                float magnitudeBeforeNormalization = Mathf.Sqrt(
+                    unnormalized.x * unnormalized.x +
+                    unnormalized.y * unnormalized.y +
+                    unnormalized.z * unnormalized.z +
+                    unnormalized.w * unnormalized.w);
+
+                Quaternion extrapolated = unnormalized.normalized;
+
+                // DIAGNOSTIC: Log magnitude drift and normalization correction
+                float magnitudeError = Mathf.Abs(magnitudeBeforeNormalization - 1.0f);
+                float magnitudeErrorPercent = magnitudeError * 100f;
+                GONetLog.Debug($"[QUAT-NORM][{gonetParticipant.GONetId}][ExtrapolateWithVelocity-HasOmega] " +
+                              $"magBefore={magnitudeBeforeNormalization:F8} (error={magnitudeErrorPercent:F5}%), " +
+                              $"magAfter=1.00000000, omega={omega.magnitude:F6}rad/s, dt={deltaTimeSeconds:F4}s");
 
                 // DIAGNOSTIC: Log extrapolation result
                 GONetLog.Info($"[CLIENT-EXTRAP-RESULT] extrapolated:{extrapolated} euler:{extrapolated.eulerAngles}");
@@ -113,7 +146,23 @@ namespace GONet.PluginAPI
 
                 // Extrapolate using calculated omega
                 Quaternion deltaRotation = IntegrateAngularVelocity(calculatedOmega, deltaTimeSeconds);
-                Quaternion extrapolated = mostRecent.numericValue.UnityEngine_Quaternion * deltaRotation;
+                Quaternion unnormalized = mostRecent.numericValue.UnityEngine_Quaternion * deltaRotation;
+
+                // CRITICAL FIX: Normalize after quaternion multiplication to prevent magnitude drift
+                float magnitudeBeforeNormalization = Mathf.Sqrt(
+                    unnormalized.x * unnormalized.x +
+                    unnormalized.y * unnormalized.y +
+                    unnormalized.z * unnormalized.z +
+                    unnormalized.w * unnormalized.w);
+
+                Quaternion extrapolated = unnormalized.normalized;
+
+                // DIAGNOSTIC: Log magnitude drift and normalization correction
+                float magnitudeError = Mathf.Abs(magnitudeBeforeNormalization - 1.0f);
+                float magnitudeErrorPercent = magnitudeError * 100f;
+                GONetLog.Debug($"[QUAT-NORM][{gonetParticipant.GONetId}][ExtrapolateWithVelocity-CalcOmega] " +
+                              $"magBefore={magnitudeBeforeNormalization:F8} (error={magnitudeErrorPercent:F5}%), " +
+                              $"magAfter=1.00000000, omega={calculatedOmega.magnitude:F6}rad/s, dt={deltaTimeSeconds:F4}s");
 
                 return extrapolated;
             }
