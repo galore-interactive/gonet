@@ -168,6 +168,15 @@ namespace GONet.Generation
             return lastKnownValueAtRestBits[index] != LAST_KNOWN_VALUE_NOT_AT_REST;
         }
 
+        /// <summary>
+        /// Check if value has PENDING at-rest broadcast (different from ALREADY_BROADCASTED initial state).
+        /// Use this to avoid skipping regular updates for objects that start in ALREADY_BROADCASTED state.
+        /// </summary>
+        public bool IsValuePendingAtRestBroadcast(byte index)
+        {
+            return lastKnownValueAtRestBits[index] == LAST_KNOWN_VALUE_IS_AT_REST_NEEDS_TO_BROADCAST;
+        }
+
         internal void IndicateAtRestBroadcasted(byte index)
         {
             lastKnownValueAtRestBits[index] = LAST_KNOWN_VALUE_IS_AT_REST_ALREADY_BROADCASTED;

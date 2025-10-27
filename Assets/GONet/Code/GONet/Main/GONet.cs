@@ -9867,15 +9867,16 @@ namespace GONet
                     continue; // Skip filtered changes
                 }
 
-                // CRITICAL: Skip values flagged as at-rest (will be sent via reliable AT-REST message)
-                // This prevents race conditions where VELOCITY bundles with velocity=(0,0,0) arrive after AT-REST message clears queue
-                if (change.syncCompanion.IsValueAtRest(change.index))
+                // CRITICAL: Skip values with PENDING at-rest broadcast (will be sent via reliable AT-REST message)
+                // Only skip if NEEDS_TO_BROADCAST (AT-REST message is queued), NOT if ALREADY_BROADCASTED (past event)
+                // ALREADY_BROADCASTED is the initial state to avoid spam, but we MUST still send regular updates!
+                var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
+                if (change.syncCompanion.IsValuePendingAtRestBroadcast(change.index))
                 {
-                    continue; // Skip - at-rest message will handle this value authoritatively
+                    continue; // Skip - at-rest message will be sent this frame
                 }
 
                 // Check if this value is velocity-eligible
-                var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
                 bool isVelocityEligible = changesSupport.isVelocityEligible;
 
                 if (isVelocityEligible)
