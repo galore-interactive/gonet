@@ -9894,7 +9894,6 @@ namespace GONet
                             // Use 30% threshold = accept anchors when reasonably close to boundaries
                             float quantizationStepDegrees = 1.41421356f / (float)((1 << quantizeBits) - 1) * (180f / MathF.PI); // Smallest3 range / steps * rad2deg
                             float MAX_ANCHOR_ERROR_DEGREES = quantizationStepDegrees * 0.30f; // 30% of step (close to boundary)
-                            const float MIN_ANCHOR_INTERVAL_SECONDS = 0.05f; // 50ms min interval (prevent spam)
 
                             // Time-based fallback threshold (from profile or global setting)
                             float maxTimeWithoutAnchor = changesSupport.syncAttribute_VelocityAnchorIntervalSeconds;
@@ -9906,32 +9905,38 @@ namespace GONet
                             long timeSinceLastAnchor = elapsedTicksAtCapture - changesSupport.lastAnchorTimeTicks;
                             float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
 
-                            // Determine anchor type
-                            bool isQuantizationAnchor = quantizationError < MAX_ANCHOR_ERROR_DEGREES && timeSinceLastAnchorSeconds > MIN_ANCHOR_INTERVAL_SECONDS;
-                            bool isTimeFallbackAnchor = timeSinceLastAnchorSeconds > maxTimeWithoutAnchor;
+                            // RATE LIMITING: Use fallback interval as minimum (consistent with Vector3 Phase 2)
+                            // Prevents VALUE spam - max 1 anchor/sec (default)
+                            bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
                             // DIAGNOSTIC: Always log quaternion quantization checks (first eligible field only to reduce spam)
                             if (velocityEligibleCount == 1)
                             {
                                 GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                              $"quantError:{quantizationError:F4}° quantStep:{quantizationStepDegrees:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
-                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s " +
-                                              $"quantAnchor:{isQuantizationAnchor} fallbackAnchor:{isTimeFallbackAnchor}");
+                                              $"type:Quaternion quantError:{quantizationError:F4}° quantStep:{quantizationStepDegrees:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
+                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s");
                             }
 
-                            if (isQuantizationAnchor)
+                            // DECISION: Only send anchor if timing allows (prevents VALUE spam)
+                            if (timingAllowsAnchor)
                             {
-                                shouldSendQuantizationAnchor = true;
+                                if (quantizationError < MAX_ANCHOR_ERROR_DEGREES)
+                                {
+                                    // QUANTIZATION-AWARE ANCHOR: Rotation near quantization boundary
+                                    shouldSendQuantizationAnchor = true;
 
-                                GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                              $"quantError:{quantizationError:F4}° timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Smart anchor (clean boundary)");
-                            }
-                            else if (isTimeFallbackAnchor)
-                            {
-                                shouldSendQuantizationAnchor = true;
+                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                  $"type:Quaternion quantError:{quantizationError:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
+                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Smart anchor (clean boundary)");
+                                }
+                                else
+                                {
+                                    // FALLBACK ANCHOR: Time limit reached, send anyway (drift prevention)
+                                    shouldSendQuantizationAnchor = true;
 
-                                GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s → Fallback anchor (drift prevention)");
+                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
+                                                  $"type:Quaternion timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
+                                }
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector3)

@@ -59,7 +59,7 @@ MonoBehaviour:
   client_overrideLimboMode: 0
   client_limboMode: 2
   IsPositionSyncd: 1
-  IsRotationSyncd: 0
+  IsRotationSyncd: 1
   wasInstantiatedForce: 0
   myRigidBody: {fileID: 0}
   myRigidBody2D: {fileID: 0}
