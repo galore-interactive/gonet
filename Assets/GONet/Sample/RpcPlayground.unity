@@ -511,7 +511,7 @@ PrefabInstance:
     - target: {fileID: 845533208056157181, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7362903355672422917, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
@@ -562,6 +562,21 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: radius
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: movementSpeedPreset
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: rotationSpeedPreset
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -702,7 +717,7 @@ PrefabInstance:
     - target: {fileID: 845533208056157181, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7362903355672422917, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
@@ -753,6 +768,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: radius
+      value: 6.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: movementSpeedPreset
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -875,7 +900,7 @@ PrefabInstance:
     - target: {fileID: 845533208056157181, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7362903355672422917, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
@@ -926,6 +951,21 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: radius
+      value: 5.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: movementSpeedPreset
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: rotationSpeedPreset
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1348,7 +1388,7 @@ PrefabInstance:
     - target: {fileID: 845533208056157181, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7362903355672422917, guid: d06b4174f9cd9ea45a8e7a16669f297b,
         type: 3}
@@ -1400,6 +1440,21 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: radius
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: movementSpeedPreset
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7471983608880836016, guid: d06b4174f9cd9ea45a8e7a16669f297b,
+        type: 3}
+      propertyPath: rotationSpeedPreset
+      value: 2
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1435,7 +1490,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1171946639
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1532,7 +1587,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1172820476
 Transform:
   m_ObjectHideFlags: 0

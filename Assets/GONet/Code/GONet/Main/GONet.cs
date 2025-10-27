@@ -9909,34 +9909,10 @@ namespace GONet
                             // Prevents VALUE spam - max 1 anchor/sec (default)
                             bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                            // DIAGNOSTIC: Always log quaternion quantization checks (first eligible field only to reduce spam)
-                            if (velocityEligibleCount == 1)
-                            {
-                                GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                              $"type:Quaternion quantError:{quantizationError:F4}° quantStep:{quantizationStepDegrees:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
-                                              $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s");
-                            }
-
                             // DECISION: Only send anchor if timing allows (prevents VALUE spam)
                             if (timingAllowsAnchor)
                             {
-                                if (quantizationError < MAX_ANCHOR_ERROR_DEGREES)
-                                {
-                                    // QUANTIZATION-AWARE ANCHOR: Rotation near quantization boundary
-                                    shouldSendQuantizationAnchor = true;
-
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Quaternion quantError:{quantizationError:F4}° threshold:{MAX_ANCHOR_ERROR_DEGREES:F4}° " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Smart anchor (clean boundary)");
-                                }
-                                else
-                                {
-                                    // FALLBACK ANCHOR: Time limit reached, send anyway (drift prevention)
-                                    shouldSendQuantizationAnchor = true;
-
-                                    GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Quaternion timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
-                                }
+                                shouldSendQuantizationAnchor = true;
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector3)
@@ -9991,52 +9967,13 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // ALWAYS LOG DIAGNOSTICS (even when not sending anchor)
-                                // PHASE 1: Includes motion detection data for observation
-                                if (velocityEligibleCount == 1)
-                                {
-                                    bool xPass = errorX < threshold;
-                                    bool yPass = errorY < threshold;
-                                    bool zPass = errorZ < threshold;
-
-                                    GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector3 errorX:{errorX:F6} errorY:{errorY:F6} errorZ:{errorZ:F6} threshold:{threshold:F6} " +
-                                                  $"delta:({delta.x:F6},{delta.y:F6},{delta.z:F6}) motionEps:{motionEpsilon:F6} " +
-                                                  $"moving:(x:{xMoving} y:{yMoving} z:{zMoving}) checks:(x:{xPass} y:{yPass} z:{zPass}) allPass:{allComponentsNearBoundary} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
-                                }
-
-                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
-                                // Only check boundary conditions for components that are actually moving
-                                bool allMovingComponentsNearBoundary = true;
-
-                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
-                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
-                                if (zMoving && errorZ >= threshold) allMovingComponentsNearBoundary = false;
-
                                 // Require at least one component to be moving (avoid anchoring stationary objects)
                                 bool anyComponentMoving = xMoving || yMoving || zMoving;
 
                                 // DECISION: Only send anchor if timing allows (prevents VALUE spam)
                                 if (timingAllowsAnchor)
                                 {
-                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
-                                    {
-                                        // QUANTIZATION-AWARE ANCHOR: All MOVING components near boundaries (smart re-sync)
-                                        shouldSendQuantizationAnchor = true;
-
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector3 errors:({errorX:F6},{errorY:F6},{errorZ:F6}) threshold:{threshold:F6} " +
-                                                      $"moving:({xMoving},{yMoving},{zMoving}) → Smart anchor (all moving components clean)");
-                                    }
-                                    else
-                                    {
-                                        // FALLBACK ANCHOR: Time limit reached, send anyway (drift prevention)
-                                        shouldSendQuantizationAnchor = true;
-
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector3 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor (drift prevention)");
-                                    }
+                                    shouldSendQuantizationAnchor = true;
                                 }
                                 // ELSE: Timing doesn't allow anchor yet, but diagnostics were still logged above
                             }
@@ -10085,44 +10022,13 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // ALWAYS LOG DIAGNOSTICS (PHASE 1: includes motion detection)
-                                if (velocityEligibleCount == 1)
-                                {
-                                    bool xPass = errorX < threshold;
-                                    bool yPass = errorY < threshold;
-
-                                    GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector2 errorX:{errorX:F6} errorY:{errorY:F6} threshold:{threshold:F6} " +
-                                                  $"delta:({delta.x:F6},{delta.y:F6}) motionEps:{motionEpsilon:F6} " +
-                                                  $"moving:(x:{xMoving} y:{yMoving}) checks:(x:{xPass} y:{yPass}) allPass:{allComponentsNearBoundary} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
-                                }
-
-                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
-                                bool allMovingComponentsNearBoundary = true;
-
-                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
-                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
-
                                 // Require at least one component to be moving
                                 bool anyComponentMoving = xMoving || yMoving;
 
                                 // DECISION
                                 if (timingAllowsAnchor)
                                 {
-                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector2 errors:({errorX:F6},{errorY:F6}) threshold:{threshold:F6} " +
-                                                      $"moving:({xMoving},{yMoving}) → Smart anchor (all moving components clean)");
-                                    }
-                                    else
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector2 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
-                                    }
+                                    shouldSendQuantizationAnchor = true;
                                 }
                             }
                         }
@@ -10178,48 +10084,13 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // ALWAYS LOG DIAGNOSTICS (ENHANCED with motion detection)
-                                if (velocityEligibleCount == 1)
-                                {
-                                    bool xPass = errorX < threshold;
-                                    bool yPass = errorY < threshold;
-                                    bool zPass = errorZ < threshold;
-                                    bool wPass = errorW < threshold;
-
-                                    GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:Vector4 errorX:{errorX:F6} errorY:{errorY:F6} errorZ:{errorZ:F6} errorW:{errorW:F6} threshold:{threshold:F6} " +
-                                                  $"delta:({delta.x:F6},{delta.y:F6},{delta.z:F6},{delta.w:F6}) motionEps:{motionEpsilon:F6} " +
-                                                  $"moving:(x:{xMoving} y:{yMoving} z:{zMoving} w:{wMoving}) checks:(x:{xPass} y:{yPass} z:{zPass} w:{wPass}) allPass:{allComponentsNearBoundary} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
-                                }
-
-                                // PHASE 2: MOVING-COMPONENT LOGIC (Exclude stationary components from boundary check)
-                                bool allMovingComponentsNearBoundary = true;
-
-                                if (xMoving && errorX >= threshold) allMovingComponentsNearBoundary = false;
-                                if (yMoving && errorY >= threshold) allMovingComponentsNearBoundary = false;
-                                if (zMoving && errorZ >= threshold) allMovingComponentsNearBoundary = false;
-                                if (wMoving && errorW >= threshold) allMovingComponentsNearBoundary = false;
-
                                 // Require at least one component to be moving
                                 bool anyComponentMoving = xMoving || yMoving || zMoving || wMoving;
 
                                 // DECISION
                                 if (timingAllowsAnchor)
                                 {
-                                    if (allMovingComponentsNearBoundary && anyComponentMoving)
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector4 errors:({errorX:F6},{errorY:F6},{errorZ:F6},{errorW:F6}) threshold:{threshold:F6} " +
-                                                      $"moving:({xMoving},{yMoving},{zMoving},{wMoving}) → Smart anchor (all moving components clean)");
-                                    }
-                                    else
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:Vector4 timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
-                                    }
+                                    shouldSendQuantizationAnchor = true;
                                 }
                             }
                         }
@@ -10257,29 +10128,10 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // ALWAYS LOG DIAGNOSTICS
-                                if (velocityEligibleCount == 1)
-                                {
-                                    GONetLog.Debug($"[VelocitySync][QUANT-CHECK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                  $"type:float error:{error:F6} threshold:{threshold:F6} nearBoundary:{nearBoundary} " +
-                                                  $"timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s maxTime:{maxTimeWithoutAnchor:F1}s timingOK:{timingAllowsAnchor}");
-                                }
-
                                 // DECISION
                                 if (timingAllowsAnchor)
                                 {
-                                    if (nearBoundary)
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-QUANTIZATION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:float error:{error:F6} threshold:{threshold:F6} → Smart anchor");
-                                    }
-                                    else
-                                    {
-                                        shouldSendQuantizationAnchor = true;
-                                        GONetLog.Debug($"[VelocitySync][ANCHOR-FALLBACK] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                                      $"type:float timeSinceAnchor:{timeSinceLastAnchorSeconds:F3}s → Fallback anchor");
-                                    }
+                                    shouldSendQuantizationAnchor = true;
                                 }
                             }
                         }
@@ -10301,14 +10153,6 @@ namespace GONet
                         // Velocity out of range → VALUE anchor (automatic drift correction)
                         outOfRangeChanges.Add(change);
                         changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
-
-                        // DIAGNOSTIC: Log first velocity-eligible value per frame to debug range check
-                        if (velocityEligibleCount == 1)
-                        {
-                            GONetLog.Debug($"[VelocitySync][PARTITION] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} " +
-                                          $"velocityWithinRange:{velocityWithinRange}, snapshotCount:{changesSupport.mostRecentChanges_usedSize}, " +
-                                          $"range:[{changesSupport.syncAttribute_VelocityQuantizeLowerBound}, {changesSupport.syncAttribute_VelocityQuantizeUpperBound}]");
-                        }
                     }
                 }
                 else
@@ -10318,33 +10162,16 @@ namespace GONet
                     outOfRangeChanges.Add(change);
                 }
             }
-            // DIAGNOSTIC: Log partition results
-            GONetLog.Debug($"[VelocitySync][PARTITION] Frame {currentTimeMs}ms: {withinRangeChanges.Count} withinRange, {outOfRangeChanges.Count} outOfRange (from {countTotal} total, {velocityEligibleCount} velEligible, {nonVelocityEligibleCount} nonEligible)");
 
             // Send VELOCITY bundle for values within range
             if (withinRangeChanges.Count > 0)
             {
-                GONetLog.Debug($"[VelocitySync] Sending VELOCITY bundle ({withinRangeChanges.Count} values, time: {currentTimeMs}ms)");
-
-                // QUANTITATIVE DIAGNOSTIC: Log exact position and velocity being sent
-                foreach (var change in withinRangeChanges)
-                {
-                    if (change.lastKnownValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
-                    {
-                        GONetLog.Debug($"[VelocitySync][SERVER-SEND][{change.syncCompanion.gonetParticipant.GONetId}][idx:{change.index}] " +
-                                      $"currentPosition: {change.lastKnownValue.UnityEngine_Vector3}, " +
-                                      $"velocity: {(change.lastKnownValue.UnityEngine_Vector3 - change.lastKnownValue_previous.UnityEngine_Vector3) / ((elapsedTicksAtCapture - change.mostRecentChanges[0].elapsedTicksAtChange) / (float)TimeSpan.TicksPerSecond)}, " +
-                                      $"time: {currentTimeMs}ms");
-                    }
-                }
-
                 SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
             }
 
             // Send VALUE bundle for values out of range, forced anchors, and non-velocity-eligible values
             if (outOfRangeChanges.Count > 0)
             {
-                GONetLog.Debug($"[VelocitySync] Sending VALUE bundle ({outOfRangeChanges.Count} values, time: {currentTimeMs}ms)");
                 SerializeWhole_BundleOfChoice_Internal(outOfRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
             }
         }
@@ -10623,12 +10450,6 @@ namespace GONet
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 //GONetLog.AppendLine($"serialize change index: {change.index}");
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index, isVelocityBundle);
-
-                // DIAGNOSTIC: Log when velocity bundles are sent for rotation (index 8)
-                if (isVelocityBundle && change.index == 8 && change.syncCompanion.gonetParticipant.GONetId == 208895)
-                {
-                    GONetLog.Info($"[SERVER-SEND-VEL] GONetId:{change.syncCompanion.gonetParticipant.GONetId} idx:{change.index} VELOCITY BUNDLE SENT at time:{UnityEngine.Time.time:F3}s");
-                }
             }
             //GONetLog.Append_FlushDebug();
 
@@ -10994,15 +10815,6 @@ namespace GONet
                         // VELOCITY-AUGMENTED SYNC: Always pass isVelocityBundle to keep bitstream in sync
                         // (even when skipping, we must read the same number of bits)
                         syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, isVelocityBundle);
-
-                        // IMPORTANT: Log when Client:2 skips its own values
-                        if (IsClient)
-                        {
-                            // DEFENSIVE: Check again before accessing properties (object could be destroyed mid-processing)
-                            string logName = (gonetParticipant != null && gonetParticipant.gameObject != null) ? gonetParticipant.gameObject.name : "<destroyed>";
-                            uint logId = (gonetParticipant != null) ? gonetParticipant.GONetId : GONetParticipant.GONetId_Unset;
-                            GONetLog.Info($"[SYNC-SKIP] Client skipping own value - GONetId: {logId}, GameObject: '{logName}', index: {index}");
-                        }
                     }
                     else
                     {
@@ -11022,13 +10834,6 @@ namespace GONet
                             {
                                 // VELOCITY BUNDLE: Deserialize velocity, synthesize position
                                 GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
-
-                                // DIAGNOSTIC: Log velocity reception with full details (high precision)
-                                if (index == 8 && gonetParticipant.GONetId == 208895)
-                                {
-                                    var vel = velocityValue.UnityEngine_Vector3;
-                                    GONetLog.Info($"[CLIENT-RECV-VEL] GONetId:{gonetParticipant.GONetId} idx:{index} velocityValue:({vel.x:F6},{vel.y:F6},{vel.z:F6}) time:{UnityEngine.Time.time:F3}s frame:{UnityEngine.Time.frameCount}");
-                                }
 
                                 var changesSupport = syncCompanion.valuesChangesSupport[index];
 
@@ -11050,43 +10855,17 @@ namespace GONet
                                     long ticksSinceLastSnapshot = elapsedTicksAtSend - lastSnapshot.elapsedTicksAtChange;
                                     float deltaTime = (float)ticksSinceLastSnapshot * (float)GONet.Utils.HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
-                                    // DIAGNOSTIC: Log synthesis inputs
-                                    if (gonetParticipant.GONetId == 208895)
-                                    {
-                                        GONetLog.Info($"[PRE-SYNTH] GONetId:{gonetParticipant.GONetId} idx:{index} lastValue.type:{lastSnapshot.numericValue.GONetSyncType} velocity.type:{velocityValue.GONetSyncType} dt:{deltaTime:F4}s");
-                                    }
-
                                     // Synthesize new position from velocity
                                     GONetSyncableValue synthesizedValue = SynthesizeValueFromVelocity(
                                         lastSnapshot.numericValue,
                                         velocityValue,
                                         deltaTime);
 
-                                    // DIAGNOSTIC: Log synthesized type
-                                    if (gonetParticipant.GONetId == 208895)
-                                    {
-                                        GONetLog.Info($"[POST-SYNTH] GONetId:{gonetParticipant.GONetId} idx:{index} synthesized.type:{synthesizedValue.GONetSyncType}");
-                                    }
-
-                                    // QUANTITATIVE DIAGNOSTIC: Log velocity synthesis and time relationships
-                                    if (velocityValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
-                                    {
-                                        GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VEL][{gonetParticipant.GONetId}][idx:{index}] " +
-                                                      $"receivedVelocity: {velocityValue.UnityEngine_Vector3}, " +
-                                                      $"lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, " +
-                                                      $"deltaTime: {deltaTime:F4}s, " +
-                                                      $"synthesized: {synthesizedValue.UnityEngine_Vector3}, " +
-                                                      $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
-                                    }
-
                                     // Store synthesized position as snapshot WITH velocity metadata for velocity-aware blending
                                     changesSupport.AddToMostRecentChangeQueue_IfAppropriate_WithVelocity(elapsedTicksAtSend, synthesizedValue, velocityValue);
                                 }
                                 else
                                 {
-                                    // No previous snapshot - cannot synthesize, must use fallback
-                                    GONetLog.Warning($"[VelocitySync] VELOCITY bundle received but no previous snapshot for GONetId {gonetParticipant.GONetId}, index {index}. Using fallback.");
-
                                     // CRITICAL: For Quaternion fields, velocity is Vector3 (angular velocity) - cannot use as rotation!
                                     // We can detect this by checking the member name (contains "rotation") or if a VALUE bundle
                                     // exists, checking its type. For now, use member name as safest approach.
@@ -11097,7 +10876,6 @@ namespace GONet
                                     {
                                         // Quaternion field: Use identity rotation, NOT the Vector3 velocity!
                                         fallbackValue = new GONetSyncableValue { UnityEngine_Quaternion = UnityEngine.Quaternion.identity };
-                                        GONetLog.Debug($"[VelocitySync] Index {index} ({memberName}) is Quaternion - using identity fallback instead of Vector3 velocity");
                                     }
                                     else
                                     {
@@ -11147,22 +10925,6 @@ namespace GONet
                                             changesSupport.lastReceivedVelocity,
                                             deltaTime);
 
-                                        // QUANTITATIVE DIAGNOSTIC: Compare received VALUE vs synthesized (anti-jitter)
-                                        if (synthesizedValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
-                                        {
-                                            Vector3 diff = synthesizedValue.UnityEngine_Vector3 - receivedValue.UnityEngine_Vector3;
-                                            float diffMag = diff.magnitude;
-                                            GONetLog.Debug($"[VelocitySync][CLIENT-RECV-VAL][{gonetParticipant.GONetId}][idx:{index}] " +
-                                                          $"receivedVALUE: {receivedValue.UnityEngine_Vector3}, " +
-                                                          $"synthesizedFromVelocity: {synthesizedValue.UnityEngine_Vector3}, " +
-                                                          $"lastPos: {lastSnapshot.numericValue.UnityEngine_Vector3}, " +
-                                                          $"velocity: {changesSupport.lastReceivedVelocity.UnityEngine_Vector3}, " +
-                                                          $"deltaTime: {deltaTime:F4}s, " +
-                                                          $"diff: {diff}, diffMag: {diffMag:F4}, " +
-                                                          $"velocityAge: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms, " +
-                                                          $"time: {TimeSpan.FromTicks(elapsedTicksAtSend).TotalMilliseconds:F0}ms");
-                                        }
-
                                         // CRITICAL FIX: Store RECEIVED VALUE with velocity metadata for smooth extrapolation
                                         // InitSingle stores WITHOUT velocity → blending falls back to standard interpolation
                                         // We must store WITH velocity so TryGetBlendedValue can use velocity-aware extrapolation
@@ -11175,41 +10937,12 @@ namespace GONet
                                     else
                                     {
                                         // No previous snapshot - use received VALUE as fallback
-                                        GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - no snapshot, using received VALUE");
                                         syncCompanion.InitSingle(receivedValue, index, elapsedTicksAtSend);
                                     }
                                 }
                                 else
                                 {
-                                    // Velocity expired or not eligible - use received VALUE directly
-                                    if (changesSupport.isVelocityEligible)
-                                    {
-                                        // DIAGNOSTIC: Distinguish between "expired" vs "waiting for first VELOCITY"
-                                        if (changesSupport.lastVelocityTimestamp > 0 && velocityAgeTicks > velocityValidDurationTicks)
-                                        {
-                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - velocity EXPIRED " +
-                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms), using received VALUE");
-                                        }
-                                        else
-                                        {
-                                            GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}][idx:{index}] VALUE bundle - waiting for first VELOCITY " +
-                                                          $"(age: {TimeSpan.FromTicks(velocityAgeTicks).TotalMilliseconds:F1}ms < {AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS}ms), using received VALUE");
-                                        }
-                                    }
-
-                                    // DIAGNOSTIC: Log initial VALUE deserialization
-                                    if (gonetParticipant.GONetId == 208895)
-                                    {
-                                        GONetLog.Info($"[INIT-VALUE] GONetId:{gonetParticipant.GONetId} idx:{index} About to deserialize initial VALUE (velocity expired/not eligible)");
-                                    }
-
                                     syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, false);
-
-                                    // DIAGNOSTIC: Log what was stored
-                                    if (gonetParticipant.GONetId == 208895 && changesSupport.mostRecentChanges_usedSize > 0)
-                                    {
-                                        GONetLog.Info($"[INIT-VALUE-STORED] GONetId:{gonetParticipant.GONetId} idx:{index} stored.type:{changesSupport.mostRecentChanges[0].numericValue.GONetSyncType}");
-                                    }
                                 }
                             }
 
@@ -11803,9 +11536,6 @@ namespace GONet
         {
             GONetSyncableValue result;
 
-            // DIAGNOSTIC: Log synthesis type info
-            GONetLog.Info($"[SYNTH-TYPE] lastValue.GONetSyncType:{lastValue.GONetSyncType} velocity.GONetSyncType:{velocity.GONetSyncType} dt:{deltaTime:F4}s");
-
             switch (lastValue.GONetSyncType)
             {
                 case GONetSyncableValueTypes.System_Single: // float
@@ -11887,11 +11617,6 @@ namespace GONet
 
             // Apply delta rotation: current * deltaRot (order matters! This applies rotation in local space)
             UnityEngine.Quaternion result = current * deltaRot;
-
-            // DIAGNOSTIC: Log quaternion multiplication details
-            UnityEngine.Vector3 currentEuler = current.eulerAngles;
-            UnityEngine.Vector3 resultEuler = result.eulerAngles;
-            GONetLog.Info($"[QUAT-MULT] omega:{angularVelocity} dt:{deltaTime:F4}s angle:{angle * UnityEngine.Mathf.Rad2Deg:F2}deg axis:{axis} | currentQ:{current} euler:{currentEuler} | resultQ:{result} euler:{resultEuler}");
 
             return result;
         }

@@ -13,8 +13,6 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-#undef GONET_VELOCITY_SYNC_DEBUG // Disable velocity sync debug logging (massive spam in logs)
-
 using GONet.PluginAPI;
 using GONet.Utils;
 using System;
@@ -312,6 +310,7 @@ namespace GONet.Generation
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             QuantizerSettingsGroup quantizeSettings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
 
+            /*
             // SUB-QUANTIZATION DIAGNOSTIC: Check delta-from-baseline before quantizing
             float currentValue = value.System_Single;
             float baselineValue = valuesChangesSupport[singleIndex].baselineValue_current.System_Single;
@@ -322,6 +321,7 @@ namespace GONet.Generation
                 deltaFromBaseline,
                 quantizeSettings,
                 null); // No custom serializer for plain float quantization
+            */
 
             uint valueQuantized = QuantizeSingle(singleIndex, value);
             bitStream_appendTo.WriteUInt(valueQuantized, quantizeSettings.quantizeToBitCount);
@@ -351,9 +351,6 @@ namespace GONet.Generation
             // Check if we have a previous value (if types don't match, not initialized yet)
             if (currentValue.GONetSyncType != previousValue.GONetSyncType)
             {
-#if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity: No previous value (type mismatch), returning zero velocity");
-#endif
                 // No previous value, velocity is zero
                 if (currentValue.GONetSyncType == GONetSyncableValueTypes.System_Single)
                     return 0f;
@@ -396,27 +393,18 @@ namespace GONet.Generation
             {
                 float delta = currentValue.System_Single - previousValue.System_Single;
                 float velocity = delta / deltaTimeSeconds;
-#if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Float current={currentValue.System_Single}, prev={previousValue.System_Single}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
-#endif
                 return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector2)
             {
                 UnityEngine.Vector2 delta = currentValue.UnityEngine_Vector2 - previousValue.UnityEngine_Vector2;
                 UnityEngine.Vector2 velocity = delta / deltaTimeSeconds;
-#if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector2 delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
-#endif
                 return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3)
             {
                 UnityEngine.Vector3 delta = currentValue.UnityEngine_Vector3 - previousValue.UnityEngine_Vector3;
                 UnityEngine.Vector3 velocity = delta / deltaTimeSeconds;
-#if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] CalculateVelocity[{singleIndex}]: Vector3 current={currentValue.UnityEngine_Vector3}, prev={previousValue.UnityEngine_Vector3}, delta={delta}, Δt={deltaTimeSeconds}s, velocity={velocity}");
-#endif
                 return velocity;
             }
             else if (currentValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector4)
@@ -552,13 +540,6 @@ namespace GONet.Generation
                         bool zInRange = positionDelta.z >= lowerBoundPerInterval && positionDelta.z <= upperBoundPerInterval;
                         bool result = xInRange && yInRange && zInRange;
 
-                        // DIAGNOSTIC: Log velocity range check details
-                        GONetLog.Debug($"[VELOCITY-RANGE-CHECK] GONetId:{gonetParticipant.GONetId} idx:{valueIndex} " +
-                                      $"current:{current.UnityEngine_Vector3} prev:{previous.UnityEngine_Vector3} " +
-                                      $"delta:({positionDelta.x:F6},{positionDelta.y:F6},{positionDelta.z:F6}) " +
-                                      $"bounds:[{lowerBoundPerInterval:F6}, {upperBoundPerInterval:F6}] " +
-                                      $"checks:(x:{xInRange} y:{yInRange} z:{zInRange}) result:{result}");
-
                         return result;
                     }
                 case GONetSyncableValueTypes.UnityEngine_Vector4:
@@ -603,12 +584,6 @@ namespace GONet.Generation
                         bool yPass = rotationDelta.y >= lowerBoundPerInterval && rotationDelta.y <= upperBoundPerInterval;
                         bool zPass = rotationDelta.z >= lowerBoundPerInterval && rotationDelta.z <= upperBoundPerInterval;
                         bool result = xPass && yPass && zPass;
-
-                        GONetLog.Debug($"[QUAT-RANGE-CHECK] GONetId:{gonetParticipant.GONetId} " +
-                            $"currentEuler:{currentQ.eulerAngles} prevEuler:{previousQ.eulerAngles} " +
-                            $"rotDelta:({rotationDelta.x:F6},{rotationDelta.y:F6},{rotationDelta.z:F6}) " +
-                            $"bounds:[{lowerBoundPerInterval:F6}, {upperBoundPerInterval:F6}] " +
-                            $"checks:(x:{xPass} y:{yPass} z:{zPass}) result:{result}");
 
                         // Check each component against per-interval bounds (assuming isotropic quantization like Vector3)
                         return result;
@@ -805,9 +780,6 @@ namespace GONet.Generation
                                   (mostRecent.velocity.GONetSyncType == mostRecent.numericValue.GONetSyncType) ||
                                   (mostRecent.numericValue.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Quaternion &&
                                    mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3); // Angular velocity stored as Vector3
-#if GONET_VELOCITY_SYNC_DEBUG
-                GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: hasVelocityData={hasVelocityData}, wasSynthesized={mostRecent.wasSynthesizedFromVelocity}, velocityType={mostRecent.velocity.GONetSyncType}, valueType={mostRecent.numericValue.GONetSyncType}");
-#endif
             }
 
             // Use velocity blending if available and velocity data exists
@@ -816,9 +788,6 @@ namespace GONet.Generation
                 IGONetAutoMagicalSync_CustomVelocityBlending customVelocityBlending = cachedCustomVelocityBlendings[index];
                 if (customVelocityBlending != null)
                 {
-#if GONET_VELOCITY_SYNC_DEBUG
-                    GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: Using velocity-aware extrapolation with {customVelocityBlending.GetType().Name}");
-#endif
                     // Use velocity-aware extrapolation
                     blendedValue = customVelocityBlending.ExtrapolateWithVelocityContext(
                         valueBuffer,
@@ -826,9 +795,6 @@ namespace GONet.Generation
                         atElapsedTicks,
                         gonetParticipant);
 
-#if GONET_VELOCITY_SYNC_DEBUG
-                    GONetLog.Debug($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: Extrapolated value={blendedValue}");
-#endif
                     // Velocity extrapolation always extrapolates (uses velocity data)
                     VelocitySyncTelemetry.TrackExtrapolation(gonetParticipant.GONetId);
 
@@ -841,12 +807,6 @@ namespace GONet.Generation
                     didExtrapolatePastMostRecentChanges = true;
                     return true;
                 }
-#if GONET_VELOCITY_SYNC_DEBUG
-                else
-                {
-                    GONetLog.Warning($"[VelocitySync][{gonetParticipant.GONetId}] TryGetBlendedValue[{index}]: hasVelocityData=true but customVelocityBlending is NULL! Falling back to standard blending.");
-                }
-#endif
             }
 
             // Fall back to standard value blending
