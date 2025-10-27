@@ -127,6 +127,14 @@ namespace GONet
                 ownerAuthorityId = value;
                 OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true, gonetId);
 
+                // DIAGNOSTIC: Track when Follower objects become IsMine=True (enables sync)
+                if (gameObject.name.Contains("Follower") && previous != ownerAuthorityId)
+                {
+                    bool previousIsMine = (previous == GONetMain.MyAuthorityId && previous != GONetMain.OwnerAuthorityId_Unset);
+                    bool nowIsMine = (ownerAuthorityId == GONetMain.MyAuthorityId && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset);
+                    GONetLog.Info($"[ISMINE-CHANGE] '{gameObject.name}' OwnerAuthorityId changed from {previous} to {ownerAuthorityId} (IsMine: {previousIsMine} → {nowIsMine}, MyAuthorityId={GONetMain.MyAuthorityId}, GONetId={GONetId})");
+                }
+
                 if (ownerAuthorityId == GONetMain.MyAuthorityId)
                 {
                     WasMineAtAnyPoint = true;
@@ -886,16 +894,29 @@ namespace GONet
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
-                //const string GNPS = "GNP.Start() name: ";
-                //const string WAS = " WasInstantiated: ";
-                //GONetLog.Info(string.Concat(GNPS, gameObject.name, WAS, WasInstantiated));
+                // DIAGNOSTIC: Track Start() for GONetLocal (critical for initialization timeline)
+                bool isGONetLocal = gameObject.GetComponent<GONetLocal>() != null;
+                if (isGONetLocal)
+                {
+                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+3: GONetParticipant.Start() CALLED for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (GONetId={GONetId}, OwnerAuthorityId={OwnerAuthorityId})");
+                }
 
                 if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
                 {
                     IsOKToStartAutoMagicalProcessing = true;
                 }
 
+                if (isGONetLocal)
+                {
+                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+4: Calling Start_AutoPropagateInstantiation_IfAppropriate for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (will send spawn event to server)");
+                }
+
                 GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
+
+                if (isGONetLocal)
+                {
+                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+5: Returned from Start_AutoPropagateInstantiation_IfAppropriate for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (spawn event should be sent)");
+                }
 
                 if ((myRigidBody = GetComponent<Rigidbody>()) != null)
                 {
@@ -912,6 +933,13 @@ namespace GONet
                     myRigidbody2DSettingsAtStart.bodyType = myRigidBody2D.bodyType;
 
                     SetRigidBodySettingsConsideringOwner();
+                }
+
+                // DIAGNOSTIC: Track when Start() completes for ALL scene objects (gates OnGONetReady)
+                // This reveals if Unity's Start() execution is delayed system-wide (CRAP pattern)
+                if (!WasInstantiated) // Scene-defined objects only
+                {
+                    GONetLog.Info($"[START-COMPLETE] '{gameObject.name}' Start() completed at time {GONetMain.Time.ElapsedSeconds:F3}s (GONetId={GONetId}, OwnerAuthorityId={OwnerAuthorityId}, WasInstantiated={WasInstantiated})");
                 }
 
                 // LIFECYCLE GATE: Mark Start complete and check if OnGONetReady can fire

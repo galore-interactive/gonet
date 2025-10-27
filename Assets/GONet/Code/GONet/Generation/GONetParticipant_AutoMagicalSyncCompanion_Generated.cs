@@ -90,7 +90,7 @@ namespace GONet.Generation
         /// Velocity-augmented sync: Serializers initialized with VELOCITY quantization settings.
         /// Used when sending/receiving VELOCITY packets (velocity/angular velocity data).
         /// </summary>
-        protected IGONetAutoMagicalSync_CustomSerializer[] cachedVelocitySerializers;
+        internal IGONetAutoMagicalSync_CustomSerializer[] cachedVelocitySerializers;
 
         protected static readonly ArrayPool<IGONetAutoMagicalSync_CustomValueBlending> cachedCustomValueBlendingsArrayPool =
             new ArrayPool<IGONetAutoMagicalSync_CustomValueBlending>(1000, 10, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MIN, EXPECTED_AUTO_SYNC_MEMBER_COUNT_PER_GONetParticipant_MAX);

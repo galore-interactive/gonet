@@ -762,6 +762,7 @@ namespace GONet.Editor.Generation
                 sb.Append(indent).AppendLine("\tUnityEngine.Vector3 angularVelocity = new UnityEngine.Vector3(logDelta.x * 2f, logDelta.y * 2f, logDelta.z * 2f) / deltaTime;");
                 sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
                 sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = angularVelocity;");
+                sb.Append(indent).AppendLine("\tGONet.GONetLog.Info($\"[VELOCITY-CALC-QUAT] GONetId={gonetParticipant.GONetId} angularVel={angularVelocity} deltaTime={deltaTime} velocityType={velocityValue.GONetSyncType}\");");
             }
 
             sb.Append(indent).AppendLine("\t// VelocitySyncTelemetry.TrackVelocityCalculation(true, gonetParticipant.GONetId);");
@@ -769,6 +770,7 @@ namespace GONet.Editor.Generation
             sb.Append(indent).AppendLine("else");
             sb.Append(indent).AppendLine("{");
             sb.Append(indent).AppendLine("\t// Type mismatch, use zero delta");
+            sb.Append(indent).AppendLine("\tGONet.GONetLog.Warning($\"[VELOCITY-CALC-FALLBACK] GONetId={gonetParticipant.GONetId} currentType={current.GONetSyncType} previousType={previous.GONetSyncType} - Using zero velocity\");");
             sb.Append(indent).AppendLine("\tvelocityValue = new GONetSyncableValue();");
 
             // CRITICAL FIX: Initialize velocity type properly to avoid System_Boolean default
@@ -793,6 +795,8 @@ namespace GONet.Editor.Generation
                 // Quaternion velocity is stored as Vector3 angular velocity
                 sb.Append(indent).AppendLine("\tvelocityValue.UnityEngine_Vector3 = UnityEngine.Vector3.zero;");
             }
+
+            sb.Append(indent).AppendLine("\tGONet.GONetLog.Info($\"[VELOCITY-CALC-FALLBACK-AFTER] GONetId={gonetParticipant.GONetId} velocityType={velocityValue.GONetSyncType}\");");
 
             sb.Append(indent).AppendLine("\t// VelocitySyncTelemetry.TrackVelocityCalculation(false, gonetParticipant.GONetId);");
             sb.Append(indent).AppendLine("}");

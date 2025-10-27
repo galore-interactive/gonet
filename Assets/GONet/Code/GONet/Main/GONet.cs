@@ -943,9 +943,12 @@ namespace GONet
 
         private static void Client_gonetClient_InitializedWithServer(GONetClient client)
         {
-            GONetLog.Info($"[INIT] Client_gonetClient_InitializedWithServer() called - MyAuthorityId={MyAuthorityId}");
+            GONetLog.Info($"[INIT-TIMELINE] CLIENT T+1: Client_gonetClient_InitializedWithServer() CALLED at {Time.ElapsedSeconds:F3}s - MyAuthorityId={MyAuthorityId}");
+            GONetLog.Info($"[INIT-TIMELINE] CLIENT T+1: About to instantiate GONetLocal prefab at {Time.ElapsedSeconds:F3}s");
 
             MyLocal = UnityEngine.Object.Instantiate(Global.gonetLocalPrefab);
+
+            GONetLog.Info($"[INIT-TIMELINE] CLIENT T+2: GONetLocal instantiated (Awake/OnEnable completed) at {Time.ElapsedSeconds:F3}s");
 
             // CRITICAL: Set OwnerAuthorityId AFTER instantiation but BEFORE Start() is called
             // The GONetParticipant.Start() sends spawn event, so OwnerAuthorityId must be correct by then
@@ -954,7 +957,7 @@ namespace GONet
             // CRITICAL: Move GONetLocal to DontDestroyOnLoad scene IMMEDIATELY after instantiation
             // This prevents it from being incorrectly recorded as "defined in scene" if a scene load is in progress
             UnityEngine.Object.DontDestroyOnLoad(MyLocal.gameObject);
-            GONetLog.Info($"[INIT] GONetLocal instantiated and moved to DontDestroyOnLoad scene - MyLocal GONetId: {(MyLocal?.GONetParticipant?.GONetId ?? 0)}, OwnerAuthorityId: {MyLocal?.GONetParticipant?.OwnerAuthorityId ?? 0}");
+            GONetLog.Info($"[INIT-TIMELINE] CLIENT T+2: GONetLocal setup complete (OwnerAuthorityId set, moved to DontDestroyOnLoad) at {Time.ElapsedSeconds:F3}s - MyLocal GONetId: {(MyLocal?.GONetParticipant?.GONetId ?? 0)}, OwnerAuthorityId: {MyLocal?.GONetParticipant?.OwnerAuthorityId ?? 0}");
 
             while (client.incomingNetworkData_mustProcessAfterClientInitialized.Count > 0)
             {
@@ -1981,14 +1984,16 @@ namespace GONet
         /// </summary>
         private static void CompleteRemoteInstantiation(GONetParticipant instance, InstantiateGONetParticipantEvent spawnEvent, ushort sourceAuthorityId)
         {
-            //GONetLog.Debug($"[SPAWN_SYNC] CompleteRemoteInstantiation called for GONetId {spawnEvent.GONetId}, instance '{instance.gameObject.name}', IsServer: {IsServer}");
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: CompleteRemoteInstantiation() CALLED for GONetId {spawnEvent.GONetId} (name: '{instance.gameObject.name}') from AuthorityId {sourceAuthorityId} at {Time.ElapsedSeconds:F3}s");
 
             if (IsServer)
             {
                 GONetLocal gonetLocal = instance.gameObject.GetComponent<GONetLocal>();
                 if (gonetLocal != null)
                 {
+                    GONetLog.Info($"[INIT-TIMELINE] SERVER: Found GONetLocal component on '{instance.gameObject.name}', calling Server_OnNewClientInstantiatedItsGONetLocal at {Time.ElapsedSeconds:F3}s");
                     Server_OnNewClientInstantiatedItsGONetLocal(gonetLocal);
+                    GONetLog.Info($"[INIT-TIMELINE] SERVER: Returned from Server_OnNewClientInstantiatedItsGONetLocal at {Time.ElapsedSeconds:F3}s");
                 }
 
                 if (spawnEvent.ImmediatelyRelinquishAuthorityToServer_AndTakeRemoteControlAuthority)
@@ -5959,10 +5964,10 @@ namespace GONet
                             {
                                 if (IsClient)
                                 {
-                                    //GONetLog.Info($"[INIT] Client received ServerSaysClientInitializationCompletion - MyAuthorityId is currently: {MyAuthorityId}");
-                                    //GONetLog.Debug($"[INIT] Setting IsInitializedWithServer = true (this will fire InitializedWithServer event)");
+                                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+0: RECEIVED ServerSaysClientInitializationCompletion at {Time.ElapsedSeconds:F3}s");
+                                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+0: Setting GONetClient.IsInitializedWithServer=true at {Time.ElapsedSeconds:F3}s");
                                     GONetClient.IsInitializedWithServer = true;
-                                    //GONetLog.Debug($"[INIT] Client is now initialized with server - GONetLocal should be instantiated");
+                                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+0: GONetClient.IsInitializedWithServer flag set (InitializedWithServer event will fire) at {Time.ElapsedSeconds:F3}s");
 
                                     // IMPORTANT: Log registered sync companions for debugging
                                     int totalCompanions = 0;
@@ -6333,16 +6338,22 @@ namespace GONet
             Server_SendClientCurrentState_AllAutoMagicalSync(connectionToClient);
             //GONetLog.Debug($"[INIT] Sent current state (all auto-magical sync values)");
 
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: Sending ServerSaysClientInitializationCompletion to AuthorityId {connectionToClient.OwnerAuthorityId} at {Time.ElapsedSeconds:F3}s");
             Server_SendClientIndicationOfInitializationCompletion(connectionToClient); // NOTE: sending this will cause the client to instantiate its GONetLocal
-            //GONetLog.Debug($"[INIT] Sent initialization completion message to client AuthorityId: {connectionToClient.OwnerAuthorityId}");
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: Sent ServerSaysClientInitializationCompletion to AuthorityId {connectionToClient.OwnerAuthorityId} at {Time.ElapsedSeconds:F3}s");
         }
 
         private static void Server_OnNewClientInstantiatedItsGONetLocal(GONetLocal newClientGONetLocal)
         {
-            GONetRemoteClient remoteClient = _gonetServer.GetRemoteClientByAuthorityId(newClientGONetLocal.GONetParticipant.OwnerAuthorityId);
-            //GONetLog.Debug($"[INIT] Server received GONetLocal from client AuthorityId: {newClientGONetLocal.GONetParticipant.OwnerAuthorityId} - marking client as IsInitializedWithServer = true");
+            ushort authorityId = newClientGONetLocal.GONetParticipant.OwnerAuthorityId;
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: Server_OnNewClientInstantiatedItsGONetLocal() CALLED for AuthorityId {authorityId} at {Time.ElapsedSeconds:F3}s");
+
+            GONetRemoteClient remoteClient = _gonetServer.GetRemoteClientByAuthorityId(authorityId);
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: About to set remoteClient.IsInitializedWithServer=true for AuthorityId {authorityId} at {Time.ElapsedSeconds:F3}s");
+
             remoteClient.IsInitializedWithServer = true;
-            //GONetLog.Debug($"[INIT] Client AuthorityId {newClientGONetLocal.GONetParticipant.OwnerAuthorityId} is now fully initialized with server");
+
+            GONetLog.Info($"[INIT-TIMELINE] SERVER: ✅ remoteClient.IsInitializedWithServer=true SET for AuthorityId {authorityId} at {Time.ElapsedSeconds:F3}s - Client can now receive continuous sync bundles!");
 
             // REMOVED: Scene-defined object ID sync no longer happens immediately
             // Instead, it's triggered by SceneLoadCompleteEvent from the client after each scene finishes loading
@@ -9665,10 +9676,19 @@ namespace GONet
                                 GONetRemoteClient remoteClient = _gonetServer.GetRemoteClientByAuthorityId(gONetConnection_ServerToClient.OwnerAuthorityId);
                                 bool isInitialized = remoteClient.IsInitializedWithServer;
 
-                                // IMPORTANT: Log why AutoMagicalSync messages are NOT sent to specific clients
-                                if (!isInitialized && bundleFragments.fragmentCount > 0)
+                                // DIAGNOSTIC: Log sync bundle gate checks (blocked AND allowed)
+                                if (bundleFragments.fragmentCount > 0)
                                 {
-                                    GONetLog.Warning($"[SYNC-BLOCKED] Server NOT sending AutoMagicalSync to AuthorityId {gONetConnection_ServerToClient.OwnerAuthorityId} - client IsInitializedWithServer: {isInitialized}");
+                                    if (!isInitialized)
+                                    {
+                                        GONetLog.Warning($"[SYNC-BLOCKED] ⛔ Server NOT sending {bundleFragments.fragmentCount} sync bundle fragments to AuthorityId {gONetConnection_ServerToClient.OwnerAuthorityId} - IsInitializedWithServer: {isInitialized} at {Time.ElapsedSeconds:F3}s");
+                                    }
+                                    else
+                                    {
+                                        // Only log first successful send to avoid spam (check if this is first time isInitialized=true for this client)
+                                        // We'll rely on the Server_OnNewClientInstantiatedItsGONetLocal log for the "gate opened" message
+                                        // GONetLog.Info($"[SYNC-SENDING] ✅ Server sending {bundleFragments.fragmentCount} sync bundle fragments to AuthorityId {gONetConnection_ServerToClient.OwnerAuthorityId} at {Time.ElapsedSeconds:F3}s");
+                                    }
                                 }
 
                                 for (int iFragment = 0; iFragment < bundleFragments.fragmentCount; ++iFragment)
@@ -10512,6 +10532,18 @@ namespace GONet
 
                 bitStream_headerAlreadyWritten.WriteByte(change.index); // then have to write the index, otherwise other end does not know which index to deserialize
                 //GONetLog.AppendLine($"serialize change index: {change.index}");
+
+                // DIAGNOSTIC: Log what we're about to serialize
+                if (isVelocityBundle)
+                {
+                    var changesSupport_ser = change.syncCompanion.valuesChangesSupport[change.index];
+                    GONetLog.Info($"[VELOCITY-SER] GONetId={change.syncCompanion.gonetParticipant.GONetId} index={change.index} " +
+                                  $"isVelocityBundle=true " +
+                                  $"isVelocityEligible={changesSupport_ser.isVelocityEligible} " +
+                                  $"lastKnownType={changesSupport_ser.lastKnownValue.GONetSyncType} " +
+                                  $"previousType={changesSupport_ser.lastKnownValue_previous.GONetSyncType}");
+                }
+
                 change.syncCompanion.SerializeSingle(bitStream_headerAlreadyWritten, change.index, isVelocityBundle);
             }
             //GONetLog.Append_FlushDebug();
@@ -10900,8 +10932,25 @@ namespace GONet
                             // VELOCITY-AUGMENTED SYNC: Handle VELOCITY vs VALUE bundles
                             if (isVelocityBundle)
                             {
+                                // DIAGNOSTIC: Log velocity deserialization attempt
+                                var changesSupport_diag = syncCompanion.valuesChangesSupport[index];
+                                var velocitySerializer_diag = syncCompanion.cachedVelocitySerializers != null && index < syncCompanion.cachedVelocitySerializers.Length
+                                    ? syncCompanion.cachedVelocitySerializers[index]
+                                    : null;
+                                GONetLog.Info($"[VELOCITY-DESER-BEFORE] GONetId={gonetId} index={index} " +
+                                              $"isVelocityEligible={changesSupport_diag.isVelocityEligible} " +
+                                              $"velocitySerializer={velocitySerializer_diag?.GetType().Name ?? "NULL"} " +
+                                              $"lastKnownType={changesSupport_diag.lastKnownValue.GONetSyncType} " +
+                                              $"previousType={changesSupport_diag.lastKnownValue_previous.GONetSyncType}");
+
                                 // VELOCITY BUNDLE: Deserialize velocity, synthesize position
                                 GONetSyncableValue velocityValue = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, true);
+
+                                // DIAGNOSTIC: Log deserialized velocity type
+                                GONetLog.Info($"[VELOCITY-DESER-AFTER] GONetId={gonetId} index={index} " +
+                                              $"velocityType={velocityValue.GONetSyncType} " +
+                                              $"expected=UnityEngine_Vector3");
+
 
                                 var changesSupport = syncCompanion.valuesChangesSupport[index];
 
@@ -10955,7 +11004,12 @@ namespace GONet
                                 long currentTicks = Time.ElapsedTicks;
                                 long velocityAgeTicks = currentTicks - changesSupport.lastVelocityTimestamp;
                                 long velocityValidDurationTicks = AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS * TimeSpan.TicksPerMillisecond;
-                                bool hasRecentVelocity = (velocityAgeTicks < velocityValidDurationTicks) && changesSupport.isVelocityEligible;
+
+                                // CRITICAL FIX: Also check if lastReceivedVelocity has a valid type (not default System_Boolean)
+                                // Late-joiners receive VALUE bundles before any VELOCITY bundles, so lastReceivedVelocity
+                                // is uninitialized (defaults to System_Boolean). Using it causes VelocitySync errors.
+                                bool velocityHasValidType = changesSupport.lastReceivedVelocity.GONetSyncType != GONetSyncableValueTypes.System_Boolean;
+                                bool hasRecentVelocity = (velocityAgeTicks < velocityValidDurationTicks) && changesSupport.isVelocityEligible && velocityHasValidType;
 
                                 if (hasRecentVelocity)
                                 {
