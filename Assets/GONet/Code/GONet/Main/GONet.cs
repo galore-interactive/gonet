@@ -10867,12 +10867,10 @@ namespace GONet
                                 else
                                 {
                                     // CRITICAL: For Quaternion fields, velocity is Vector3 (angular velocity) - cannot use as rotation!
-                                    // We can detect this by checking the member name (contains "rotation") or if a VALUE bundle
-                                    // exists, checking its type. For now, use member name as safest approach.
-                                    string memberName = changesSupport.memberName?.ToLowerInvariant() ?? "";
+                                    // Use codeGenerationMemberType enum for 100% reliable type detection (zero allocations, no string guessing)
                                     GONetSyncableValue fallbackValue;
 
-                                    if (memberName.Contains("rotation") || memberName.Contains("quaternion"))
+                                    if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Quaternion)
                                     {
                                         // Quaternion field: Use identity rotation, NOT the Vector3 velocity!
                                         fallbackValue = new GONetSyncableValue { UnityEngine_Quaternion = UnityEngine.Quaternion.identity };
