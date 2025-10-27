@@ -6497,7 +6497,18 @@ namespace GONet
             SceneLoadCompleteEvent evt = eventEnvelope.Event;
             ushort clientAuthorityId = eventEnvelope.SourceAuthorityId;
 
-            GONetLog.Debug($"Client {clientAuthorityId} finished loading scene '{evt.SceneName}' - sending scene-defined object IDs");
+            // DEDUPLICATION: Check if client already received proactive GONetIds
+            // Proactive flow: Server broadcasts GONetIds when server loads scene (early-joiners receive this)
+            // Reactive flow: Server sends GONetIds when client notifies scene load complete (late-joiners receive this)
+            // Early-joiners should NOT receive duplicate sends from both flows
+            if (GONetGlobal.HasClientReceivedProactiveGonetIds(evt.SceneName, clientAuthorityId))
+            {
+                GONetLog.Debug($"[REACTIVE-SKIP] Client {clientAuthorityId} already received proactive GONetIds for '{evt.SceneName}' - skipping duplicate reactive send (early-joiner)");
+                return;
+            }
+
+            // Late-joiner path: Client connected AFTER server loaded the scene, so proactive flow didn't reach them
+            GONetLog.Debug($"[REACTIVE-SEND] Client {clientAuthorityId} finished loading scene '{evt.SceneName}' - sending scene-defined object IDs (late-joiner)");
 
             // Send scene-defined object GONetIds for this specific scene now that client has loaded it
             Server_SendClientSceneDefinedObjectIds_ForSpecificScene(evt.SceneName, clientAuthorityId);
@@ -8452,11 +8463,37 @@ namespace GONet
             bool wasDefinedInScene = WasDefinedInScene(gonetParticipant);
             //GONetLog.Info($"[SPAWN] Start_AutoPropogateInstantiation_IfAppropriate_INTERNAL - name: '{gonetParticipant.gameObject.name}', wasDefinedInScene: {wasDefinedInScene}, IsServer: {IsServer}, IsClient: {IsClient}");
 
+            // DIAGNOSTIC: Log when this is called for Follower objects
+            if (gonetParticipant.gameObject.name.Contains("Follower"))
+            {
+                GONetLog.Debug($"[START-TIMING] Start_AutoPropogateInstantiation called for '{gonetParticipant.gameObject.name}', wasDefinedInScene: {wasDefinedInScene}, IsServer: {IsServer}, OwnerAuthorityId: {gonetParticipant.OwnerAuthorityId}, GONetId: {gonetParticipant.GONetId}");
+            }
+
             if (wasDefinedInScene)
             {
                 //GONetLog.Info($"[SPAWN] '{gonetParticipant.gameObject.name}' was defined in scene - will only assign GONetId on server, NO spawn event propagation");
                 if (IsServer) // stuff defined in the scene will be owned by the server and therefore needs to be assigned a GONetId by server
                 {
+                    // CRITICAL: Set OwnerAuthorityId BEFORE AssignGONetIdRaw so GONetId is composed correctly
+                    // This is a fallback for cases where GONetGlobal.OnSceneLoaded doesn't fire (e.g., duplicate GONetGlobal in scene)
+                    // Normally AssignOwnerAuthorityIds_IfAppropriate handles this, but this ensures it happens even if that doesn't fire
+                    if (gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset)
+                    {
+                        // DIAGNOSTIC: Track if fallback is being used (means AssignOwnerAuthorityIds_IfAppropriate didn't run)
+                        if (gonetParticipant.gameObject.name.Contains("Follower"))
+                        {
+                            GONetLog.Warning($"[SCENE-FALLBACK] FALLBACK PATH used for '{gonetParticipant.gameObject.name}' - AssignOwnerAuthorityIds_IfAppropriate did NOT set OwnerAuthorityId! Setting now: {MyAuthorityId}");
+                        }
+                        gonetParticipant.OwnerAuthorityId = MyAuthorityId;
+                    }
+                    else
+                    {
+                        // DIAGNOSTIC: AssignOwnerAuthorityIds_IfAppropriate already set OwnerAuthorityId (normal path)
+                        if (gonetParticipant.gameObject.name.Contains("Follower"))
+                        {
+                            GONetLog.Info($"[SCENE-NORMAL] Normal path for '{gonetParticipant.gameObject.name}' - OwnerAuthorityId already set to {gonetParticipant.OwnerAuthorityId} by AssignOwnerAuthorityIds_IfAppropriate");
+                        }
+                    }
                     AssignGONetIdRaw_IfAppropriate(gonetParticipant);
                 }
                 else if (IsClient)
@@ -9142,8 +9179,21 @@ namespace GONet
                 for (int i = 0; i < count; ++i)
                 {
                     GONetParticipant item = gonetParticipantsInConsideration[i];
+
+                    // DIAGNOSTIC: Track when Follower objects get OwnerAuthorityId set (makes IsMine=True)
+                    if (item.gameObject.name.Contains("Follower"))
+                    {
+                        GONetLog.Info($"[SYNC-START] SERVER setting OwnerAuthorityId={MyAuthorityId} for '{item.gameObject.name}' (will make IsMine=True, enabling sync)");
+                    }
+
                     item.OwnerAuthorityId = MyAuthorityId;
                     AssignGONetIdRaw_IfAppropriate(item); // IMPORTANT: After setting OwnerAuthorityId, we need to assign the full GONetId (composite of raw + authority) to avoid partial GONetId
+
+                    // DIAGNOSTIC: Confirm GONetId assigned
+                    if (item.gameObject.name.Contains("Follower"))
+                    {
+                        GONetLog.Info($"[SYNC-START] SERVER assigned GONetId={item.GONetId} to '{item.gameObject.name}' (IsMine={IsMine(item)})");
+                    }
                 }
             }
         }
@@ -10677,6 +10727,11 @@ namespace GONet
                     GONetLog.Debug($"GONetId lookup: Found in instantiation map (current: {gonetId}, instantiation: {gonetIdAtInstantiation}), IsInitialized: {(IsClient ? GONetClient.IsInitializedWithServer : true)}");
                 }
 
+                // DIAGNOSTIC: Track sync bundle reception/drops to identify if updates arrive but are dropped
+                bool foundParticipant = (object)gonetParticipant != null;
+                string objectName = foundParticipant ? gonetParticipant.gameObject.name : $"UNKNOWN-{gonetId}";
+                TrackSyncBundleReception(gonetId, foundParticipant, objectName);
+
                 if ((object)gonetParticipant == null)
                 {
                     QosType channelQuality = GONetChannel.ById(channelId).QualityOfService;
@@ -11479,6 +11534,83 @@ namespace GONet
         }
 
         /// <summary>
+        /// DIAGNOSTIC: Track sync bundle reception/drops on CLIENT to identify if updates are arriving but being dropped.
+        /// Call this at the entry point of sync bundle deserialization.
+        /// </summary>
+        private static void TrackSyncBundleReception(uint gonetId, bool foundInMap, string objectName)
+        {
+            // Only log for scene-defined objects in RpcPlayground (avoid spam from runtime spawns)
+            if (IsClient && (objectName.Contains("Follower") || objectName.Contains("CircularMotion")))
+            {
+                if (foundInMap)
+                {
+                    // Participant found - bundle will be processed
+                    // Only log first reception to avoid spam (once per object)
+                    if (!syncBundleFirstReceptionTracked.Contains(gonetId))
+                    {
+                        syncBundleFirstReceptionTracked.Add(gonetId);
+                        GONetLog.Info($"[SYNC-RECV-OK] CLIENT received first sync bundle for '{objectName}' (GONetId={gonetId}) at time {Time.ElapsedSeconds:F3}s - WILL PROCESS");
+                    }
+                }
+                else
+                {
+                    // Participant NOT found - bundle will be dropped or deferred
+                    GONetLog.Warning($"[SYNC-RECV-DROP] CLIENT received sync bundle for GONetId={gonetId} but participant NOT FOUND in map (will drop/defer) at time {Time.ElapsedSeconds:F3}s");
+                }
+            }
+        }
+        private static readonly HashSet<uint> syncBundleFirstReceptionTracked = new HashSet<uint>();
+
+        /// <summary>
+        /// DIAGNOSTIC HELPER: Returns a string describing which gate condition is blocking OnGONetReady.
+        /// Used to identify the exact bottleneck preventing objects from becoming ready.
+        /// </summary>
+        private static string GetIsGONetReadyBlockingReason(GONetParticipant gonetParticipant)
+        {
+            if (gonetParticipant == null)
+                return "participant is NULL";
+
+            if (gonetParticipant.OwnerAuthorityId == OwnerAuthorityId_Unset)
+                return "OwnerAuthorityId not set";
+
+            if (gonetParticipant.gonetId_raw == GONetParticipant.GONetIdRaw_Unset)
+                return "GONetId not assigned";
+
+            if (!gonetParticipant.IsInternallyConfigured)
+                return "IsInternallyConfigured=false";
+
+            if (!IsClientVsServerStatusKnown)
+                return "Client/Server status unknown";
+
+            if (IsClient && GONetClient == null)
+                return "Client mode but GONetClient is NULL";
+
+            if (IsClient && !GONetClient.IsInitializedWithServer)
+                return "GONetClient not initialized with server";
+
+            if (GONetLocal.LookupByAuthorityId == null)
+                return "GONetLocal.LookupByAuthorityId is NULL";
+
+            GONetLocal local = GONetLocal.LookupByAuthorityId[gonetParticipant.OwnerAuthorityId];
+            if (local == null)
+                return $"GONetLocal not found for OwnerAuthorityId={gonetParticipant.OwnerAuthorityId}";
+
+            if (!gonetParticipant.didAwakeComplete)
+                return "Awake() not complete";
+
+            if (!gonetParticipant.didStartComplete)
+                return "Start() not complete ← LIKELY BOTTLENECK!";
+
+            if (gonetParticipant.requiresDeserializeInit && !gonetParticipant.didDeserializeInitComplete)
+                return "DeserializeInit required but not complete";
+
+            if (gonetParticipant.Client_IsInLimbo)
+                return "In limbo (waiting for GONetId batch)";
+
+            return "Unknown reason (all gates should be passed!)";
+        }
+
+        /// <summary>
         /// Checks if all OnGONetReady prerequisites are met and broadcasts to all GONetBehaviours if so.
         /// Called after each lifecycle milestone (Awake, Start, DeserializeInit, ExitLimbo).
         ///
@@ -11487,6 +11619,9 @@ namespace GONet
         /// </summary>
         internal static void CheckAndPublishOnGONetReady_IfAllConditionsMet(GONetParticipant gonetParticipant)
         {
+            // DIAGNOSTIC: Track OnGONetReady gate checks for Follower objects
+            bool isFollower = gonetParticipant.gameObject.name.Contains("Follower");
+
             // Prevent duplicate calls - OnGONetReady should only fire once
             if (gonetParticipant.didOnGONetReadyFire)
             {
@@ -11496,7 +11631,19 @@ namespace GONet
             // Check if all prerequisites are met (delegates to IsGONetReady)
             if (!IsGONetReady(gonetParticipant))
             {
+                // DIAGNOSTIC: Log why Follower objects are not ready (helps identify bottleneck)
+                if (isFollower)
+                {
+                    string reason = GetIsGONetReadyBlockingReason(gonetParticipant);
+                    GONetLog.Info($"[ONGONETREADY-BLOCKED] '{gonetParticipant.name}' NOT ready - Reason: {reason} (GONetId={gonetParticipant.GONetId}, Time={Time.ElapsedSeconds:F3}s)");
+                }
                 return; // Not ready yet, wait for next milestone
+            }
+
+            // DIAGNOSTIC: Follower is now ready - log successful gate passage
+            if (isFollower)
+            {
+                GONetLog.Info($"[ONGONETREADY-FIRE] '{gonetParticipant.name}' OnGONetReady FIRING NOW (GONetId={gonetParticipant.GONetId}, IsMine={IsMine(gonetParticipant)}, Time={Time.ElapsedSeconds:F3}s)");
             }
 
             // All conditions met! Mark as fired and broadcast OnGONetReady to all GONetBehaviours

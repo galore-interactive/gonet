@@ -783,6 +783,17 @@ namespace GONet
             return scene.IsValid() && scene.isLoaded;
         }
 
+        /// <summary>
+        /// Gets a Unity Scene by name.
+        /// Wrapper for UnityEngine.SceneManager.GetSceneByName for GONet API consistency.
+        /// </summary>
+        /// <param name="sceneName">The name of the scene to get</param>
+        /// <returns>The Scene if found, or an invalid Scene if not found. Check scene.IsValid() and scene.isLoaded before using.</returns>
+        public Scene GetSceneByName(string sceneName)
+        {
+            return SceneManager.GetSceneByName(sceneName);
+        }
+
         // ========================================
         // STATE TRACKING (from SceneManagementUtils)
         // ========================================
@@ -916,6 +927,10 @@ namespace GONet
         {
             if (scenesUnloading.Contains(scene.name))
                 scenesUnloading.Remove(scene.name);
+
+            // Clear proactive GONetId tracking for this scene (supports scene reload)
+            // When scene reloads, clients need to receive GONetIds again
+            GONetGlobal.ClearProactiveGonetIdTrackingForScene(scene.name);
         }
 
         // ========================================

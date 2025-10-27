@@ -477,24 +477,23 @@ namespace GONet
 
         protected override void OnDestroy()
         {
-            // CRITICAL: Clear singleton reference when this instance is destroyed
-            // This is essential for Unity Editor play mode to prevent stale references
-            // that cause non-deterministic behavior between play sessions
+            // IMPORTANT: Call base first to ensure proper Unity cleanup order
+            base.OnDestroy();
+
+            // CRITICAL: Only the singleton instance should cleanup subscriptions
+            // Duplicate instances that were destroyed in Awake() never subscribed in the first place
             if (instance == this)
             {
+                // Unsubscribe from scene events BEFORE clearing instance reference
+                // This ensures any cleanup code can still reference the singleton
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+                GONetLog.Debug("[GONetGlobal] Unsubscribed from sceneLoaded event");
+
+                // Clear singleton reference last
                 instance = null;
                 GONetLog.Debug("[GONetGlobal] Cleared singleton instance reference on destroy");
             }
-
-            // Unsubscribe from scene events to prevent memory leaks
-            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
-
-            // NOTE: We do NOT clear design-time metadata caches here as they contain
-            // critical build-time information needed to detect changes between builds.
-            // The 98 vs 51 log difference is acceptable - it's not a bug, just different
-            // code paths on first load vs cached load.
-
-            base.OnDestroy();
+            // NOTE: Duplicate instances do nothing here - they never subscribed, never set instance reference
         }
 
         public override void OnGONetClientVsServerStatusKnown(bool isClient, bool isServer, ushort myAuthorityId)
@@ -616,6 +615,9 @@ namespace GONet
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)
         {
+            // DIAGNOSTIC: Log that handler is being called
+            GONetLog.Info($"[OnSceneLoaded] ENTRY - Scene: '{sceneLoaded.name}', LoadMode: {loadMode}, IsServer: {GONetMain.IsServer}, IsClient: {GONetMain.IsClient}, Instance: {(instance == this ? "Singleton" : "OTHER")}, Time: {GONetMain.Time.ElapsedSeconds:F3}s");
+
             { // do auto-assign authority id stuffs for all gonet stuff in scene
                 List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
                 GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
@@ -624,12 +626,18 @@ namespace GONet
 
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
 
-                GONetLog.Debug($"Found {gonetParticipantsInLevel.Count} GONetParticipants in scene. Names: {string.Join(", ", gonetParticipantsInLevel.ConvertAll(gnp => gnp.name))}");
+                int followerCount = 0;
+                foreach (var gnp in gonetParticipantsInLevel)
+                {
+                    if (gnp.name.Contains("Follower")) followerCount++;
+                }
+                GONetLog.Info($"[OnSceneLoaded] Found {gonetParticipantsInLevel.Count} GONetParticipants in scene '{sceneLoaded.name}'. Follower count: {followerCount}");
 
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)
                 {
+                    GONetLog.Info($"[OnSceneLoaded] About to call AssignOwnerAuthorityIds_IfAppropriate for {gonetParticipantsInLevel.Count} participants (IsServer: {GONetMain.IsServer})");
                     GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
 
                     // IMPORTANT: If this is the server, initialize scene-defined objects with IGONetSyncdBehaviourInitializer
@@ -637,6 +645,27 @@ namespace GONet
                     if (GONetMain.IsServer)
                     {
                         StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
+                    }
+                    else if (GONetMain.IsClient)
+                    {
+                        // CLIENT: Check if we have buffered GONetId assignments for this scene
+                        // Server sends GONetIds proactively (no round-trip wait), so they may arrive BEFORE scene loads
+                        if (bufferedGONetIdAssignmentsByScene.TryGetValue(sceneLoaded.name, out BufferedGONetIdAssignments buffered))
+                        {
+                            double receiveDelay = GONetMain.Time.ElapsedSeconds - buffered.receivedAtTime;
+                            GONetLog.Info($"[GONetId-BUFFER-APPLY] CLIENT applying buffered GONetId assignments for scene '{sceneLoaded.name}' ({buffered.designTimeLocations.Length} objects, received {receiveDelay * 1000:F1}ms ago, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
+
+                            // Apply the buffered assignments now that scene is loaded
+                            ApplyGONetIdAssignments(buffered.sceneName, buffered.designTimeLocations, buffered.gonetIds, buffered.customInitData);
+
+                            // Clear the buffer entry
+                            bufferedGONetIdAssignmentsByScene.Remove(sceneLoaded.name);
+                            GONetLog.Info($"[GONetId-BUFFER-CLEARED] Cleared buffer for scene '{sceneLoaded.name}' (time: {GONetMain.Time.ElapsedSeconds:F3}s)");
+                        }
+                        else
+                        {
+                            GONetLog.Info($"[GONetId-BUFFER-CHECK] No buffered GONetId assignments for scene '{sceneLoaded.name}' (will receive via RPC later, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
+                        }
                     }
                 }
                 else
@@ -677,6 +706,35 @@ namespace GONet
         private static readonly Dictionary<string, byte[]> sceneObjectInitDataCache = new Dictionary<string, byte[]>();
 
         /// <summary>
+        /// Helper class to store buffered GONetId assignments received before scene is loaded.
+        /// Server sends GONetIds proactively (no round-trip wait), client buffers if scene not ready.
+        /// </summary>
+        private class BufferedGONetIdAssignments
+        {
+            public string sceneName;
+            public string[] designTimeLocations;
+            public uint[] gonetIds;
+            public byte[][] customInitData;
+            public double receivedAtTime; // For diagnostics
+        }
+
+        /// <summary>
+        /// Client-side buffer for GONetId assignments received before scene loads.
+        /// Keyed by scene name. Cleared when assignments are applied.
+        /// </summary>
+        private static readonly Dictionary<string, BufferedGONetIdAssignments> bufferedGONetIdAssignmentsByScene = new Dictionary<string, BufferedGONetIdAssignments>();
+
+        /// <summary>
+        /// Tracks which clients have already received proactive GONetId assignments for each scene.
+        /// Prevents duplicate sends when both proactive (server OnSceneLoaded) and reactive (client SceneLoadCompleteEvent) flows fire.
+        /// Key: (sceneName, clientAuthorityId)
+        /// - Proactive flow records clients when broadcasting GONetIds
+        /// - Reactive flow checks this set to skip sending duplicates to early-joiners
+        /// - Late-joiners (not in set) still receive GONetIds via reactive flow
+        /// </summary>
+        private static readonly HashSet<(string sceneName, ushort clientAuthorityId)> clientsReceivedProactiveGonetIds = new HashSet<(string, ushort)>();
+
+        /// <summary>
         /// Retrieves cached scene object initialization data for late-joiners.
         /// Returns null if not cached (object has no IGONetSyncdBehaviourInitializer or cache miss).
         /// </summary>
@@ -697,10 +755,37 @@ namespace GONet
             return cachedData; // null if not found
         }
 
+        /// <summary>
+        /// Checks if a client has already received proactive GONetId assignments for a scene.
+        /// Used by reactive flow (Server_OnClientSceneLoadComplete) to avoid duplicate sends to early-joiners.
+        /// </summary>
+        /// <param name="sceneName">The scene name</param>
+        /// <param name="clientAuthorityId">The client's authority ID</param>
+        /// <returns>True if client already received proactive GONetIds, false if late-joiner needs reactive send</returns>
+        internal static bool HasClientReceivedProactiveGonetIds(string sceneName, ushort clientAuthorityId)
+        {
+            return clientsReceivedProactiveGonetIds.Contains((sceneName, clientAuthorityId));
+        }
+
+        /// <summary>
+        /// Clears proactive GONetId tracking for a scene when it unloads.
+        /// Prevents memory leaks and ensures fresh tracking if scene is reloaded.
+        /// </summary>
+        /// <param name="sceneName">The scene name</param>
+        internal static void ClearProactiveGonetIdTrackingForScene(string sceneName)
+        {
+            clientsReceivedProactiveGonetIds.RemoveWhere(entry => entry.sceneName == sceneName);
+            GONetLog.Debug($"[GONETID-TRACKING] Cleared proactive GONetId tracking for scene '{sceneName}'");
+        }
+
         private IEnumerator SyncSceneDefinedObjectIds_WhenReady(string sceneName, List<GONetParticipant> sceneParticipants)
         {
-            // CRITICAL: Initialize server's OWN scene objects IMMEDIATELY (before first Update() runs)
-            // Otherwise objects with IGONetSyncdBehaviourInitializer will have isInitialized=false on first Update()
+            // DIAGNOSTIC: Track coroutine start
+            GONetLog.Info($"[SYNC-COROUTINE-START] Server starting SyncSceneDefinedObjectIds_WhenReady for scene '{sceneName}' with {sceneParticipants.Count} participants at time {GONetMain.Time.ElapsedSeconds:F3}s");
+
+            // CRITICAL: Process ALL scene participants to send their GONetIds to clients
+            // Init data is OPTIONAL (only for objects with IGONetSyncdBehaviourInitializer)
+            // GONetId assignment is MANDATORY (all scene objects need them)
             //
             // This happens SYNCHRONOUSLY (not after yield) because:
             // 1. Update() runs every frame starting immediately after scene load
@@ -713,14 +798,21 @@ namespace GONet
             List<uint> gonetIds = new List<uint>();
             List<byte[]> customInitDataList = new List<byte[]>();
 
+            int participantProcessedCount = 0;
+            int participantWithInitDataCount = 0;
             foreach (var participant in sceneParticipants)
             {
+                participantProcessedCount++;
                 if (participant != null &&
                     participant.IsDesignTimeMetadataInitd &&
                     !string.IsNullOrEmpty(participant.DesignTimeLocation))
                 {
+                    // ALWAYS add participant to send list (GONetIds are mandatory for all)
+                    designTimeLocations.Add(participant.DesignTimeLocation);
+
                     // Serialize initialization data - this ALSO initializes the server's own instance!
                     // Spawner_SerializeSpawnData() sets fields and isInitialized=true
+                    // NOTE: This can be null if participant doesn't implement IGONetSyncdBehaviourInitializer
                     byte[] initData = GONetMain.SerializeSceneObjectInitData(participant);
 
                     // Cache for late-joiners (avoids re-randomization on second serialization call)
@@ -730,22 +822,30 @@ namespace GONet
                         string cacheKey = $"{sceneName}|{participant.DesignTimeLocation}";
                         sceneObjectInitDataCache[cacheKey] = initData;
                         GONetLog.Info($"[CACHE-ADD] Cached init data for '{participant.DesignTimeLocation}' in scene '{sceneName}' - {initData.Length} bytes (total cache entries: {sceneObjectInitDataCache.Count})");
-
-                        // Store participant reference for later (after GONetId assignment)
-                        designTimeLocations.Add(participant.DesignTimeLocation);
-                        customInitDataList.Add(initData);
+                        participantWithInitDataCount++;
                     }
                     else
                     {
                         GONetLog.Debug($"[CACHE-SKIP] No init data to cache for '{participant.DesignTimeLocation}' (no IGONetSyncdBehaviourInitializer)");
                     }
+
+                    // Add init data to list (can be null)
+                    customInitDataList.Add(initData);
                 }
             }
+
+            // DIAGNOSTIC: Show processing summary before yield
+            GONetLog.Info($"[SYNC-COROUTINE-PRE-YIELD] Processed {participantProcessedCount} participants, {participantWithInitDataCount} with init data, designTimeLocations.Count={designTimeLocations.Count} at time {GONetMain.Time.ElapsedSeconds:F3}s");
 
             // Wait a frame to ensure all GONetIds have been assigned
             yield return null;
 
+            // DIAGNOSTIC: Track post-yield continuation
+            GONetLog.Info($"[SYNC-COROUTINE-POST-YIELD] Resumed after yield, collecting GONetIds at time {GONetMain.Time.ElapsedSeconds:F3}s");
+
             // Now collect GONetIds (which are guaranteed to be assigned after the yield)
+            int gonetIdCollectedCount = 0;
+            int gonetIdMissingCount = 0;
             for (int i = 0; i < designTimeLocations.Count; i++)
             {
                 string location = designTimeLocations[i];
@@ -759,19 +859,47 @@ namespace GONet
                 if (participant != null && participant.GONetId != 0)
                 {
                     gonetIds.Add(participant.GONetId);
+                    gonetIdCollectedCount++;
                 }
                 else
                 {
                     GONetLog.Warning($"[GONetGlobal] Could not find GONetId for participant at location '{location}'");
                     gonetIds.Add(0); // Placeholder to maintain array alignment
+                    gonetIdMissingCount++;
                 }
             }
+
+            // DIAGNOSTIC: Show GONetId collection results
+            GONetLog.Info($"[SYNC-COROUTINE-GONETIDS] Collected {gonetIdCollectedCount} GONetIds, {gonetIdMissingCount} missing for scene '{sceneName}' at time {GONetMain.Time.ElapsedSeconds:F3}s");
+
+            // DIAGNOSTIC: Show connection check details
+            int numConnections = (GONetMain.gonetServer != null) ? (int)GONetMain.gonetServer.numConnections : -1;
+            bool hasServer = GONetMain.gonetServer != null;
+            bool hasLocations = designTimeLocations.Count > 0;
+            bool hasConnections = numConnections > 0;
+            GONetLog.Info($"[SYNC-COROUTINE-CHECK] Scene '{sceneName}': hasLocations={hasLocations} (count={designTimeLocations.Count}), hasServer={hasServer}, numConnections={numConnections}, hasConnections={hasConnections} at time {GONetMain.Time.ElapsedSeconds:F3}s");
 
             // Only send RPC if there are connected clients
             if (designTimeLocations.Count > 0 && GONetMain.gonetServer != null && GONetMain.gonetServer.numConnections > 0)
             {
                 GONetLog.Info($"[GONetGlobal] Syncing {designTimeLocations.Count} scene-defined object GONetIds for scene '{sceneName}' to all clients");
                 SendSceneDefinedObjectIdSync(sceneName, designTimeLocations.ToArray(), gonetIds.ToArray(), customInitDataList.ToArray());
+
+                // Record which clients received this proactive send (for deduplication)
+                // This prevents duplicate sends when reactive flow (SceneLoadCompleteEvent) fires for early-joiners
+                int recordedClientCount = 0;
+                foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
+                {
+                    ushort clientAuthorityId = client.ConnectionToClient.OwnerAuthorityId;
+                    clientsReceivedProactiveGonetIds.Add((sceneName, clientAuthorityId));
+                    recordedClientCount++;
+                }
+
+                GONetLog.Info($"[SYNC-COROUTINE-SENT] Successfully sent proactive GONetId sync RPC for scene '{sceneName}' to {recordedClientCount} clients at time {GONetMain.Time.ElapsedSeconds:F3}s");
+            }
+            else
+            {
+                GONetLog.Warning($"[SYNC-COROUTINE-SKIP] NOT sending GONetId sync RPC for scene '{sceneName}' - Reason: hasLocations={hasLocations}, hasServer={hasServer}, numConnections={numConnections} at time {GONetMain.Time.ElapsedSeconds:F3}s");
             }
         }
 
@@ -1215,7 +1343,39 @@ namespace GONet
             if (GONetMain.IsServer)
                 return;
 
-            GONetLog.Info($"[GONetGlobal] Received scene GONetId sync for '{sceneName}' - {designTimeLocations.Length} objects");
+            // Check if scene is loaded yet
+            Scene scene = GONetMain.SceneManager.GetSceneByName(sceneName);
+
+            if (!scene.isLoaded)
+            {
+                // Scene not loaded yet - BUFFER assignments for later
+                bufferedGONetIdAssignmentsByScene[sceneName] = new BufferedGONetIdAssignments
+                {
+                    sceneName = sceneName,
+                    designTimeLocations = designTimeLocations,
+                    gonetIds = gonetIds,
+                    customInitData = customInitData,
+                    receivedAtTime = GONetMain.Time.ElapsedSeconds
+                };
+                GONetLog.Info($"[GONetId-BUFFER] Buffered GONetId assignments for scene '{sceneName}' (scene not loaded yet, {designTimeLocations.Length} objects, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
+                return;
+            }
+
+            // Scene already loaded - apply immediately
+            ApplyGONetIdAssignments(sceneName, designTimeLocations, gonetIds, customInitData);
+        }
+
+        /// <summary>
+        /// Applies GONetId assignments to scene objects.
+        /// Extracted from RPC_SyncSceneDefinedObjectIds to support both immediate application and buffered application.
+        /// </summary>
+        private void ApplyGONetIdAssignments(string sceneName, string[] designTimeLocations, uint[] gonetIds, byte[][] customInitData)
+        {
+            // DIAGNOSTIC: Track APPLICATION-LEVEL processing start time
+            // This shows when the RPC is pulled from the message queue and starts executing
+            // Compare this to network receive time (MessageFlow log) to detect queue processing delays
+            double processStartTime = GONetMain.Time.ElapsedSeconds;
+            GONetLog.Info($"[GONETID-PROCESS-START] CLIENT processing GONetId sync RPC for '{sceneName}' - {designTimeLocations.Length} objects at time {processStartTime:F3}s");
 
             int assignedCount = 0;
             int notFoundCount = 0;
@@ -1243,10 +1403,8 @@ namespace GONet
                         GONetLog.Info($"[GONetGlobal] FINISHED DESERIALIZE for '{participant.gameObject.name}'");
                         initDataCount++;
                     }
-                    else
-                    {
-                        GONetLog.Warning($"[GONetGlobal] NO INIT DATA for '{participant.gameObject.name}' at location '{location}'");
-                    }
+                    // NOTE: No init data is normal for objects without IGONetSyncdBehaviourInitializer (most scene objects)
+                    // Logging at Debug level to avoid spam
 
                     GONetLog.Debug($"[GONetGlobal] Assigned GONetId {gonetId} to scene object '{participant.gameObject.name}' at location '{location}'{(initData != null ? $" with {initData.Length} bytes init data" : "")}");
                     assignedCount++;
@@ -1271,8 +1429,15 @@ namespace GONet
             if (GONetMain.IsClient && GONetMain.GONetClient != null)
             {
                 GONetMain.GONetClient.areSceneDefinedObjectIdsReady = true;
+                GONetLog.Info($"[GONETID-QUEUE-PROCESS] About to process queued messages waiting for GONetIds (time: {GONetMain.Time.ElapsedSeconds:F3}s)");
                 GONetMain.ProcessQueuedMessagesWaitingForGONetIds();
+                GONetLog.Info($"[GONETID-QUEUE-COMPLETE] Finished processing queued messages (time: {GONetMain.Time.ElapsedSeconds:F3}s)");
             }
+
+            // DIAGNOSTIC: Track APPLICATION-LEVEL processing completion time
+            double processEndTime = GONetMain.Time.ElapsedSeconds;
+            double processDuration = processEndTime - processStartTime;
+            GONetLog.Info($"[GONETID-PROCESS-END] CLIENT finished processing GONetId sync RPC for '{sceneName}' at time {processEndTime:F3}s (duration: {processDuration * 1000:F1}ms, assigned: {assignedCount})");
         }
 
         /// <summary>
@@ -1281,7 +1446,10 @@ namespace GONet
         /// </summary>
         internal void SendSceneDefinedObjectIdSync(string sceneName, string[] designTimeLocations, uint[] gonetIds, byte[][] customInitData)
         {
+            // DIAGNOSTIC: Track when SERVER sends GONetId assignments
+            GONetLog.Info($"[GONETID-SEND] SERVER sending GONetId sync RPC for '{sceneName}' - {designTimeLocations.Length} objects at time {GONetMain.Time.ElapsedSeconds:F3}s");
             CallRpc(nameof(RPC_SyncSceneDefinedObjectIds), GONetMain.OwnerAuthorityId_Unset, sceneName, designTimeLocations, gonetIds, customInitData);
+            GONetLog.Info($"[GONETID-SENT] SERVER finished sending GONetId sync RPC at time {GONetMain.Time.ElapsedSeconds:F3}s");
         }
 
         /// <summary>
