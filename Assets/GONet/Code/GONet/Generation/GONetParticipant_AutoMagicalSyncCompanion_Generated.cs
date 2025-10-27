@@ -695,6 +695,15 @@ namespace GONet.Generation
                 if (doesBaselineValueNeedAdjusting[i])
                 {
                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
+
+                    // DIAGNOSTIC: Log baseline update for position on Follower objects
+                    if (i == 8 && gonetParticipant.name.Contains("Follower"))
+                    {
+                        var oldBaseline = valueChangeSupport.baselineValue_current.UnityEngine_Vector3;
+                        var newBaseline = valueChangeSupport.lastKnownValue.UnityEngine_Vector3;
+                        GONetLog.Debug($"[BASELINE-UPDATE] GONetId={gonetParticipant.GONetId} name={gonetParticipant.name} IsMine={gonetParticipant.IsMine} valueIndex={i} oldBaseline={oldBaseline} newBaseline={newBaseline}");
+                    }
+
                     valueChangeSupport.baselineValue_current = valueChangeSupport.lastKnownValue;
 
                     { // queue up for later (i.e., in proper thread): fire reliable events to everyone that the baseline changed so everyone adjusts accordingly so the networking will work 
@@ -782,8 +791,20 @@ namespace GONet.Generation
                                    mostRecent.velocity.GONetSyncType == GONetSyncableValueTypes.UnityEngine_Vector3); // Angular velocity stored as Vector3
             }
 
-            // Use velocity blending if available and velocity data exists
+            // CRITICAL: Check velocity expiration (same as VALUE bundle handling in GONet.cs)
+            // Velocity should only be used if it's recent (< 200ms old) to prevent wildly incorrect extrapolation
+            bool isVelocityRecent = false;
             if (hasVelocityData)
+            {
+                var changesSupport = valuesChangesSupport[index];
+                long currentTicks = GONetMain.Time.ElapsedTicks;
+                long velocityAgeTicks = currentTicks - changesSupport.lastVelocityTimestamp;
+                long velocityValidDurationTicks = GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue.VELOCITY_VALID_DURATION_MS * System.TimeSpan.TicksPerMillisecond;
+                isVelocityRecent = (velocityAgeTicks < velocityValidDurationTicks);
+            }
+
+            // Use velocity blending if available, velocity data exists, AND velocity is recent
+            if (hasVelocityData && isVelocityRecent)
             {
                 IGONetAutoMagicalSync_CustomVelocityBlending customVelocityBlending = cachedCustomVelocityBlendings[index];
                 if (customVelocityBlending != null)

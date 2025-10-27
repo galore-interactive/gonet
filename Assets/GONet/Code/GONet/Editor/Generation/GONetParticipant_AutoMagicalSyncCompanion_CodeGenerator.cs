@@ -457,6 +457,18 @@ namespace GONet.Editor.Generation
             string fieldName = typeFullName.Replace(".", "_");
             sb.Append("            support").Append(iOverall).Append(".baselineValue_current.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used");
             sb.Append("            support").Append(iOverall).Append(".lastKnownValue.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; // IMPORTANT: The use of the property here (i.e., prior to use anywhere herein after) ensures GetComponnet<T>() called up front and that component is cached and available subsequently as needed/referenced/used");
+
+            // DIAGNOSTIC: Log baseline initialization for Transform.position on Follower objects
+            if (singleMember.memberName == "position" && single.componentTypeName == "Transform")
+            {
+                sb.AppendLine();
+                sb.AppendLine("\t\t\t// DIAGNOSTIC: Log initial baseline for Follower objects");
+                sb.AppendLine("\t\t\tif (gonetParticipant.name.Contains(\"Follower\"))");
+                sb.AppendLine("\t\t\t{");
+                sb.Append("\t\t\t\tGONetLog.Debug($\"[BASELINE-INIT] GONetId={gonetParticipant.GONetId} name={gonetParticipant.name} IsMine={gonetParticipant.IsMine} initialPosition={").Append(valueExpression).Append("} initialBaseline={support").Append(iOverall).Append(".baselineValue_current.").Append(fieldName).AppendLine("}\");");
+                sb.AppendLine("\t\t\t}");
+            }
+
             sb.Append("            support").Append(iOverall).Append(".lastKnownValue_previous.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; // IMPORTANT: same as above PLUS capturing the initial value now as the previous will ensure we do not accumulate changes during first pass \"has anything changed\" checks, which caused some problems before putting this in because things run in different threads and this is appropriate!");
             sb.Append("\t\t\tsupport").Append(iOverall).Append(".valueLimitEncountered_min.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; ");
             sb.Append("\t\t\tsupport").Append(iOverall).Append(".valueLimitEncountered_max.").Append(fieldName).Append(" = ").Append(valueExpression).AppendLine("; ");
@@ -939,6 +951,18 @@ namespace GONet.Editor.Generation
                         sb.Append(indent).AppendLine($"\t\t\tvar currentValue = {valueExpression};");
                         sb.Append(indent).AppendLine($"\t\t\tvar baselineValue = valuesChangesSupport[{iOverall}].baselineValue_current.{deltaFieldName};");
                         sb.Append(indent).AppendLine($"\t\t\tvar deltaFromBaseline = currentValue - baselineValue;");
+
+                        // DIAGNOSTIC: Log at-rest VALUE bundle serialization for Transform.position on Follower
+                        if (singleMember.memberName == "position")
+                        {
+                            sb.AppendLine();
+                            sb.Append(indent).AppendLine("\t\t\t// DIAGNOSTIC: Log at-rest VALUE bundle serialization");
+                            sb.Append(indent).AppendLine("\t\t\tif (gonetParticipant.name.Contains(\"Follower\"))");
+                            sb.Append(indent).AppendLine("\t\t\t{");
+                            sb.Append(indent).AppendLine($"\t\t\t\tGONetLog.Debug($\"[AT-REST-SERIALIZE] GONetId={{gonetParticipant.GONetId}} name={{gonetParticipant.name}} IsMine={{gonetParticipant.IsMine}} currentValue={{currentValue}} baselineValue={{baselineValue}} deltaFromBaseline={{deltaFromBaseline}}\");");
+                            sb.Append(indent).AppendLine("\t\t\t}");
+                        }
+
                         sb.Append(indent).AppendLine($"\t\t\t// GONet.Utils.SubQuantizationDiagnostics.CheckAndLogIfSubQuantization(gonetParticipant.GONetId, \"{singleMember.memberName}\", deltaFromBaseline, valuesChangesSupport[{iOverall}].syncAttribute_QuantizerSettingsGroup, customSerializer);");
                         sb.Append(indent).Append("\t\t\tcustomSerializer.Serialize(bitStream_appendTo, gonetParticipant, deltaFromBaseline").AppendLine(");");
                         sb.Append(indent).AppendLine("\t\t}");
@@ -1145,6 +1169,20 @@ namespace GONet.Editor.Generation
                     // Compact single-line format to match T4 template
                     sb.Append("\t\t\t\tcase ").Append(iOverall).Append(":\t\t\t\t\t");
 
+                    // DIAGNOSTIC: Log InitSingle value application for Transform.position on Follower objects
+                    if (singleMember.memberName == "position" && single.componentTypeName == "Transform")
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("\t\t\t\t\t\t// DIAGNOSTIC: Log InitSingle value application for Follower");
+                        sb.AppendLine("\t\t\t\t\t\tif (gonetParticipant.name.Contains(\"Follower\"))");
+                        sb.AppendLine("\t\t\t\t\t\t{");
+                        sb.AppendLine("\t\t\t\t\t\t\tvar valueToApply = value.UnityEngine_Vector3;");
+                        sb.AppendLine("\t\t\t\t\t\t\tvar currentPosition = Transform.position;");
+                        sb.AppendLine($"\t\t\t\t\t\t\tGONetLog.Debug($\"[INITSINGLE-APPLY] GONetId={{gonetParticipant.GONetId}} name={{gonetParticipant.name}} IsMine={{gonetParticipant.IsMine}} singleIndex={{singleIndex}} currentPosition={{currentPosition}} valueToApply={{valueToApply}} assumedElapsedTicks={{assumedElapsedTicksAtChange}}\");");
+                        sb.AppendLine("\t\t\t\t\t\t}");
+                        sb.Append("\t\t\t\t\t\t");
+                    }
+
                     // Apply value based on blend settings
                     if (singleMember.attribute.ShouldBlendBetweenValuesReceived && (singleMember.animatorControllerParameterId == 0 || singleMember.animatorControllerParameterTypeFullName == typeof(float).FullName))
                     {
@@ -1303,6 +1341,33 @@ namespace GONet.Editor.Generation
                     else
                     {
                         sb.Append(indent).Append("\tvar typedValue = value.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+
+                        // DIAGNOSTIC: Log VELOCITY bundle deserialization for Transform.position on Follower
+                        if (singleMember.memberName == "position")
+                        {
+                            sb.AppendLine();
+                            sb.Append(indent).AppendLine("\t// DIAGNOSTIC: Log VELOCITY bundle deserialization");
+                            sb.Append(indent).AppendLine("\tif (useVelocitySerializer && gonetParticipant.name.Contains(\"Follower\"))");
+                            sb.Append(indent).AppendLine("\t{");
+                            sb.Append(indent).AppendLine("\t\tvar velocityReceived = typedValue;");
+                            sb.Append(indent).AppendLine("\t\tvar currentPosition = Transform.position;");
+                            sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[VELOCITY-DESERIALIZE] GONetId={{gonetParticipant.GONetId}} name={{gonetParticipant.name}} IsMine={{gonetParticipant.IsMine}} velocityReceived={{velocityReceived}} currentPosition={{currentPosition}}\");");
+                            sb.Append(indent).AppendLine("\t}");
+                        }
+
+                        // DIAGNOSTIC: Log at-rest VALUE bundle deserialization for Transform.position on Follower (BEFORE baseline add)
+                        if (singleMember.memberName == "position" && singleMember.attribute.QuantizeDownToBitCount > 0)
+                        {
+                            sb.AppendLine();
+                            sb.Append(indent).AppendLine("\t// DIAGNOSTIC: Log at-rest VALUE bundle deserialization");
+                            sb.Append(indent).AppendLine("\tif (!useVelocitySerializer && gonetParticipant.name.Contains(\"Follower\"))");
+                            sb.Append(indent).AppendLine("\t{");
+                            sb.Append(indent).Append("\t\tvar baselineValue = valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
+                            sb.Append(indent).AppendLine("\t\tvar deltaReceived = typedValue;");
+                            sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[AT-REST-DESERIALIZE-BEFORE] GONetId={{gonetParticipant.GONetId}} name={{gonetParticipant.name}} IsMine={{gonetParticipant.IsMine}} deltaReceived={{deltaReceived}} baselineValue={{baselineValue}}\");");
+                            sb.Append(indent).AppendLine("\t}");
+                        }
+
                         // VELOCITY-AUGMENTED SYNC FIX: Only add baseline for VALUE bundles, NOT VELOCITY bundles
                         // When useVelocitySerializer=true, we're deserializing velocity (not delta-from-baseline)
                         if (singleMember.attribute.QuantizeDownToBitCount > 0)
@@ -1312,6 +1377,18 @@ namespace GONet.Editor.Generation
                             sb.Append(indent).Append("\t\ttypedValue += valuesChangesSupport[").Append(iOverall).Append("].baselineValue_current.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(";");
                             sb.Append(indent).AppendLine("\t}");
                         }
+
+                        // DIAGNOSTIC: Log at-rest VALUE bundle deserialization for Transform.position on Follower (AFTER baseline add)
+                        if (singleMember.memberName == "position" && singleMember.attribute.QuantizeDownToBitCount > 0)
+                        {
+                            sb.AppendLine();
+                            sb.Append(indent).AppendLine("\t// DIAGNOSTIC: Log final reconstructed position");
+                            sb.Append(indent).AppendLine("\tif (!useVelocitySerializer && gonetParticipant.name.Contains(\"Follower\"))");
+                            sb.Append(indent).AppendLine("\t{");
+                            sb.Append(indent).AppendLine($"\t\tGONetLog.Debug($\"[AT-REST-DESERIALIZE-AFTER] GONetId={{gonetParticipant.GONetId}} name={{gonetParticipant.name}} IsMine={{gonetParticipant.IsMine}} finalPosition={{typedValue}}\");");
+                            sb.Append(indent).AppendLine("\t}");
+                        }
+
                         // Update the GONetSyncableValue with the adjusted typed value before returning
                         sb.Append(indent).Append("\tvalue.").Append(memberTypeFullName.Replace(".", "_")).AppendLine(" = typedValue;");
                     }

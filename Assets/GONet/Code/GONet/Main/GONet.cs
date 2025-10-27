@@ -1566,7 +1566,17 @@ namespace GONet
 
                 if (@event is ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3) // most common first
                 {
-                    valueChangeSupport.baselineValue_current = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3)@event).NewBaselineValue;
+                    var newBaselineValue = ((ValueMonitoringSupport_NewBaselineEvent_UnityEngine_Vector3)@event).NewBaselineValue;
+
+                    // DIAGNOSTIC: Log baseline update event received on client for Follower position
+                    if (@event.ValueIndex == 8 && gnp.name.Contains("Follower"))
+                    {
+                        var oldBaseline = valueChangeSupport.baselineValue_current.UnityEngine_Vector3;
+                        var newBaseline = newBaselineValue;
+                        GONetLog.Debug($"[BASELINE-EVENT-RECEIVED] GONetId={@event.GONetId} name={gnp.name} IsMine={gnp.IsMine} valueIndex={@event.ValueIndex} oldBaseline={oldBaseline} newBaseline={newBaseline}");
+                    }
+
+                    valueChangeSupport.baselineValue_current = newBaselineValue;
                 }
                 else if (@event is ValueMonitoringSupport_NewBaselineEvent_System_Single)
                 {
@@ -8073,6 +8083,11 @@ namespace GONet
             {
                 //GONetLog.Debug("Clearing most recent changes...gonetId: " + syncCompanion.gonetParticipant.GONetId + " index: " + index + "\nbuffer:\n" + GetMostRecentChangesString());
                 mostRecentChanges_usedSize = 0; // TODO there really may need to be some more housekeeping to do here, but this is functional.
+
+                // CRITICAL: Invalidate velocity data when clearing queue
+                // This prevents blending from using stale velocity after AT-REST messages
+                // Set timestamp to 0 so velocity expiration check (200ms) will fail
+                lastVelocityTimestamp = 0;
             }
 
             private string GetMostRecentChangesString()
@@ -9852,6 +9867,13 @@ namespace GONet
                     continue; // Skip filtered changes
                 }
 
+                // CRITICAL: Skip values flagged as at-rest (will be sent via reliable AT-REST message)
+                // This prevents race conditions where VELOCITY bundles with velocity=(0,0,0) arrive after AT-REST message clears queue
+                if (change.syncCompanion.IsValueAtRest(change.index))
+                {
+                    continue; // Skip - at-rest message will handle this value authoritatively
+                }
+
                 // Check if this value is velocity-eligible
                 var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
                 bool isVelocityEligible = changesSupport.isVelocityEligible;
@@ -9967,15 +9989,11 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Require at least one component to be moving (avoid anchoring stationary objects)
-                                bool anyComponentMoving = xMoving || yMoving || zMoving;
-
                                 // DECISION: Only send anchor if timing allows (prevents VALUE spam)
                                 if (timingAllowsAnchor)
                                 {
                                     shouldSendQuantizationAnchor = true;
                                 }
-                                // ELSE: Timing doesn't allow anchor yet, but diagnostics were still logged above
                             }
                         }
                         else if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Vector2)
@@ -10022,10 +10040,7 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Require at least one component to be moving
-                                bool anyComponentMoving = xMoving || yMoving;
-
-                                // DECISION
+                                // DECISION: Only send anchor if timing allows (prevents VALUE spam)
                                 if (timingAllowsAnchor)
                                 {
                                     shouldSendQuantizationAnchor = true;
@@ -10084,10 +10099,7 @@ namespace GONet
                                 float timeSinceLastAnchorSeconds = timeSinceLastAnchor / (float)TimeSpan.TicksPerSecond;
                                 bool timingAllowsAnchor = timeSinceLastAnchorSeconds >= maxTimeWithoutAnchor;
 
-                                // Require at least one component to be moving
-                                bool anyComponentMoving = xMoving || yMoving || zMoving || wMoving;
-
-                                // DECISION
+                                // DECISION: Only send anchor if timing allows (prevents VALUE spam)
                                 if (timingAllowsAnchor)
                                 {
                                     shouldSendQuantizationAnchor = true;
@@ -10866,22 +10878,16 @@ namespace GONet
                                 }
                                 else
                                 {
-                                    // CRITICAL: For Quaternion fields, velocity is Vector3 (angular velocity) - cannot use as rotation!
-                                    // Use codeGenerationMemberType enum for 100% reliable type detection (zero allocations, no string guessing)
-                                    GONetSyncableValue fallbackValue;
+                                    // No recent changes in queue - use current transform value as baseline
+                                    // CRITICAL: NEVER use velocity as position (would cause jumps to origin/weird positions)!
+                                    // This can happen when:
+                                    // - AT-REST message cleared the queue
+                                    // - First VELOCITY bundle received after spawn
+                                    // - Queue was cleared for other reasons
+                                    // Solution: Use current transform value (maintains continuity)
+                                    GONetSyncableValue currentValue = syncCompanion.GetAutoMagicalSyncValue(index);
 
-                                    if (changesSupport.codeGenerationMemberType == GONetSyncableValueTypes.UnityEngine_Quaternion)
-                                    {
-                                        // Quaternion field: Use identity rotation, NOT the Vector3 velocity!
-                                        fallbackValue = new GONetSyncableValue { UnityEngine_Quaternion = UnityEngine.Quaternion.identity };
-                                    }
-                                    else
-                                    {
-                                        // For Vector types, velocity can serve as initial value
-                                        fallbackValue = velocityValue;
-                                    }
-
-                                    syncCompanion.InitSingle(fallbackValue, index, elapsedTicksAtSend);
+                                    syncCompanion.InitSingle(currentValue, index, elapsedTicksAtSend);
                                 }
                             }
                             else
