@@ -226,12 +226,16 @@ namespace GONet.Generation
                                         GONetSyncableValue calculatedVelocity = CalculateVelocity((byte)i, valueChangeSupport.lastKnownValue, nowElapsedTicks);
                                         bool isVelocityEffectivelyZero = IsVelocityEffectivelyZero(calculatedVelocity, valueChangeSupport);
 
+                                        GONetLog.Debug($"[STAGE1-CHECK] GNP:{gonetParticipant.GONetId} index:{i} name:{valueChangeSupport.memberName} " +
+                                            $"velocity:{calculatedVelocity} isZero:{isVelocityEffectivelyZero} current:{valueChangeSupport.lastKnownValue} " +
+                                            $"previous:{valueChangeSupport.lastKnownValue_previous}");
+
                                         if (!isVelocityEffectivelyZero)
                                         {
                                             // Object is still moving (slow sub-quantization motion)
                                             // Velocity bundles are handling this, don't spam at-rest messages
                                             shouldSendAtRest = false;
-                                            //GONetLog.Debug($"[AT-REST-SKIP] Index={i} still has active velocity, skipping at-rest broadcast");
+                                            GONetLog.Debug($"[AT-REST-SKIP] GNP:{gonetParticipant.GONetId} Index={i} still has active velocity, skipping at-rest broadcast");
                                         }
                                     }
 
@@ -520,80 +524,10 @@ namespace GONet.Generation
         }
 
         /// <summary>
-        /// STAGE 2: Smart at-rest value selection for velocity-eligible fields.
-        ///
-        /// Chooses between quantized at-rest value and local synthesized value to minimize snapping.
-        ///
-        /// Logic:
-        /// - If distance between values < quantization step: Use local synthesized (no snap)
-        /// - If distance between values > quantization step: Use quantized (correction needed)
-        ///
-        /// Example: Object decelerates to rest at position 10.0755 (high precision from extrapolation)
-        /// - Quantized at-rest: 10.08 (76mm step) → 4.5mm snap
-        /// - Smart selection: 10.0755 (local value) → 0mm snap!
-        ///
-        /// TODO: This method is ready but needs integration into serialization pipeline (GONet.cs:10070 SerializeWhole_BundleOfChoice)
-        /// </summary>
-        protected virtual GONetSyncableValue GetSmartAtRestValue(byte singleIndex, GONetSyncableValue quantizedValue)
-        {
-            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
-
-            // Non-velocity fields: use quantized value (existing behavior)
-            if (!valueChangeSupport.isVelocityEligible)
-            {
-                return quantizedValue;
-            }
-
-            // Get local synthesized value (what non-authority extrapolated to)
-            GONetSyncableValue localSynthesized = GetLastExtrapolatedValue(singleIndex);
-            if (localSynthesized == null)
-            {
-                // No extrapolation data available (first sync, teleport, etc.)
-                return quantizedValue;
-            }
-
-            // Calculate distance between values
-            float distance = CalculateDistanceBetweenValues(localSynthesized, quantizedValue);
-            float quantizationStep = GetQuantizationStepForValue(singleIndex);
-
-            if (distance < quantizationStep)
-            {
-                // Non-authority already close to this position from extrapolation
-                // Use high-precision local value to avoid snap
-                GONetLog.Debug($"[SMART-AT-REST] Index={singleIndex} name={valueChangeSupport.memberName} " +
-                    $"using local synthesized (distance={distance:F6} < step={quantizationStep:F6})");
-                return localSynthesized;
-            }
-            else
-            {
-                // Extrapolation was significantly off
-                // Use quantized value to correct the error
-                GONetLog.Debug($"[SMART-AT-REST] Index={singleIndex} name={valueChangeSupport.memberName} " +
-                    $"using quantized for correction (distance={distance:F6} >= step={quantizationStep:F6})");
-                return quantizedValue;
-            }
-        }
-
-        /// <summary>
-        /// Gets the last extrapolated value from velocity integration.
-        /// This represents what non-authority should have from velocity synthesis.
-        ///
-        /// For authority side, this is simply the current local value (what we're about to send).
-        /// Non-authorities will have extrapolated to approximately this same value via velocity synthesis.
-        /// </summary>
-        protected virtual GONetSyncableValue GetLastExtrapolatedValue(byte singleIndex)
-        {
-            // The current local value IS the extrapolated value
-            // Non-authority should have synthesized to ~this position via velocity integration
-            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
-            return valueChangeSupport.lastKnownValue;
-        }
-
-        /// <summary>
         /// Calculates distance between two values based on type.
         /// Used to determine if local synthesized value is close enough to quantized value.
         /// </summary>
-        private float CalculateDistanceBetweenValues(GONetSyncableValue valueA, GONetSyncableValue valueB)
+        public float CalculateDistanceBetweenValues(GONetSyncableValue valueA, GONetSyncableValue valueB)
         {
             if (valueA.GONetSyncType == GONetSyncableValueTypes.System_Single)
             {
@@ -627,7 +561,7 @@ namespace GONet.Generation
         /// Formula: step = (upperBound - lowerBound) / (2^bitCount - 1)
         /// Example: (-125 to 125) with 14 bits = 250 / 16383 = 0.01526 units
         /// </summary>
-        protected virtual float GetQuantizationStepForValue(byte singleIndex)
+        public float GetQuantizationStepForValue(byte singleIndex)
         {
             GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
             GONet.Utils.QuantizerSettingsGroup settings = valueChangeSupport.syncAttribute_QuantizerSettingsGroup;
@@ -719,44 +653,6 @@ namespace GONet.Generation
         internal abstract void SerializeAll(Utils.BitByBitByteArrayBuilder bitStream_appendTo);
 
         internal abstract void SerializeSingle(Utils.BitByBitByteArrayBuilder bitStream_appendTo, byte singleIndex, bool isVelocityBundle = false);
-
-        /// <summary>
-        /// STAGE 2: Gets the value to serialize, applying smart at-rest selection if applicable.
-        ///
-        /// This method should be called by generated SerializeSingle() implementations to get
-        /// the value to serialize, instead of directly using lastKnownValue.
-        ///
-        /// For at-rest bundles (detected via IsValuePendingAtRestBroadcast), applies smart value
-        /// selection to minimize visual snapping artifacts.
-        /// </summary>
-        /// <summary>
-        /// STAGE 2 TODO: Gets the value to serialize, applying smart at-rest selection if applicable.
-        ///
-        /// This method is ready but needs a way to get quantized values for comparison.
-        /// The challenge is that serializers quantize during Serialize(), but we need the
-        /// quantized value BEFORE serialization to decide which value to use.
-        ///
-        /// Possible approaches:
-        /// 1. Add GetQuantizedValue() method to serializer interface
-        /// 2. Do serialize/deserialize roundtrip (complex, performance overhead)
-        /// 3. Use serializer.AreEqualConsideringQuantization() and skip if equal
-        ///
-        /// For now, Stage 2 is deferred. Stage 1 (velocity check) is the critical fix.
-        /// </summary>
-        protected GONetSyncableValue GetValueForSerialization(byte singleIndex)
-        {
-            GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[singleIndex];
-            GONetSyncableValue currentValue = valueChangeSupport.lastKnownValue;
-
-            // TODO STAGE 2: Apply smart at-rest value selection here
-            // if (IsValuePendingAtRestBroadcast(singleIndex))
-            // {
-            //     return GetSmartAtRestValue(singleIndex, quantizedValue);
-            // }
-
-            // For now, always use current value
-            return currentValue;
-        }
 
         public bool TryGetIndexByMemberName(string memberName, out byte index)
         {

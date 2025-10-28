@@ -10165,8 +10165,6 @@ namespace GONet
                 return;
             }
 
-            int lastIndexUsed = 0;
-
             // VELOCITY-AUGMENTED SYNC: Partition changes by velocity magnitude + periodic anchoring
             // - Values within range → VELOCITY bundle (jitter elimination)
             // - Values exceeding range → VALUE bundle (fallback)
@@ -10174,11 +10172,13 @@ namespace GONet
             // Result: Send up to TWO bundles this frame
             long currentTimeMs = elapsedTicksAtCapture / System.TimeSpan.TicksPerMillisecond;
 
-            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> withinRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
-            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> outOfRangeChanges = new List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue>();
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> shouldSendAsVelocity_withinQuantizationRangeChanges = new(); // TODO pool!!!
+            List<AutoMagicalSync_ValueMonitoringSupport_ChangedValue> shouldSendAsValue_outOfQuantizationRangeChanges = new(); // TODO pool!!!
 
             int velocityEligibleCount = 0;
             int nonVelocityEligibleCount = 0;
+
+            bool isAtRestBundle = chosenBundleType == typeof(AutoMagicalSync_ValuesNowAtRest_Message);
 
             // Partition changes based on velocity eligibility, range, and anchor timing
             for (int i = 0; i < countTotal; ++i)
@@ -10193,7 +10193,7 @@ namespace GONet
                 // Only skip if NEEDS_TO_BROADCAST (AT-REST message is queued), NOT if ALREADY_BROADCASTED (past event)
                 // ALREADY_BROADCASTED is the initial state to avoid spam, but we MUST still send regular updates!
                 var changesSupport = change.syncCompanion.valuesChangesSupport[change.index];
-                if (change.syncCompanion.IsValuePendingAtRestBroadcast(change.index))
+                if (!isAtRestBundle && change.syncCompanion.IsValuePendingAtRestBroadcast(change.index))
                 {
                     continue; // Skip - at-rest message will be sent this frame
                 }
@@ -10201,7 +10201,7 @@ namespace GONet
                 // Check if this value is velocity-eligible
                 bool isVelocityEligible = changesSupport.isVelocityEligible;
 
-                if (isVelocityEligible)
+                if (isVelocityEligible && !isAtRestBundle)
                 {
                     velocityEligibleCount++;
 
@@ -10474,19 +10474,19 @@ namespace GONet
                         if (shouldSendQuantizationAnchor)
                         {
                             // Send VALUE anchor (actualValue ≈ quantizedValue = zero visual snap)
-                            outOfRangeChanges.Add(change);
+                            shouldSendAsValue_outOfQuantizationRangeChanges.Add(change);
                             changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
                         }
                         else
                         {
                             // Send VELOCITY bundle (smooth synthesis)
-                            withinRangeChanges.Add(change);
+                            shouldSendAsVelocity_withinQuantizationRangeChanges.Add(change);
                         }
                     }
                     else
                     {
                         // Velocity out of range → VALUE anchor (automatic drift correction)
-                        outOfRangeChanges.Add(change);
+                        shouldSendAsValue_outOfQuantizationRangeChanges.Add(change);
                         changesSupport.lastAnchorTimeTicks = elapsedTicksAtCapture;
                     }
                 }
@@ -10494,26 +10494,26 @@ namespace GONet
                 {
                     nonVelocityEligibleCount++;
                     // Non-velocity-eligible values always go in VALUE bundle
-                    outOfRangeChanges.Add(change);
+                    shouldSendAsValue_outOfQuantizationRangeChanges.Add(change);
                 }
             }
 
             // Send VELOCITY bundle for values within range
-            if (withinRangeChanges.Count > 0)
+            if (shouldSendAsVelocity_withinQuantizationRangeChanges.Count > 0)
             {
                 // DIAGNOSTIC (Oct 2025): Trace velocity bundle split (channel logged in BUNDLE-SEND above)
-                GONetLog.Info($"[VELOCITY-BUNDLE] Count={withinRangeChanges.Count}");
+                GONetLog.Info($"[VELOCITY-BUNDLE] Count={shouldSendAsVelocity_withinQuantizationRangeChanges.Count}, type: {chosenBundleType.Name}");
 
-                SerializeWhole_BundleOfChoice_Internal(withinRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
+                SerializeWhole_BundleOfChoice_Internal(shouldSendAsVelocity_withinQuantizationRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, true, ref bundleFragments);
             }
 
             // Send VALUE bundle for values out of range, forced anchors, and non-velocity-eligible values
-            if (outOfRangeChanges.Count > 0)
+            if (shouldSendAsValue_outOfQuantizationRangeChanges.Count > 0)
             {
                 // DIAGNOSTIC (Oct 2025): Trace value bundle split (channel logged in BUNDLE-SEND above)
-                GONetLog.Info($"[VALUE-BUNDLE] Count={outOfRangeChanges.Count}");
+                GONetLog.Info($"[VALUE-BUNDLE] Count={shouldSendAsValue_outOfQuantizationRangeChanges.Count}, type: {chosenBundleType.Name}");
 
-                SerializeWhole_BundleOfChoice_Internal(outOfRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
+                SerializeWhole_BundleOfChoice_Internal(shouldSendAsValue_outOfQuantizationRangeChanges, byteArrayPool, filterUsingOwnerAuthorityId, elapsedTicksAtCapture, chosenBundleType, false, ref bundleFragments);
             }
         }
 
@@ -11360,6 +11360,35 @@ namespace GONet
                                 // VELOCITY-AUGMENTED SYNC: For ValuesNowAtRest, isVelocityBundle should typically be false
                                 // (resting values don't have velocity), but pass it for bitstream consistency
                                 GONetSyncableValue value = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, isVelocityBundle);
+
+                                GONetLog.Debug($"[AT-REST-BLENDED] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                    $"receivedValue:{value} isVelocityEligible:{syncCompanion.valuesChangesSupport[index].isVelocityEligible}");
+
+                                // STAGE 2: Smart at-rest value selection for velocity-eligible fields (Oct 2025)
+                                // Non-authority compares received quantized value to local extrapolated value.
+                                // If distance < quantization step, keep local value to avoid visual snapping.
+                                // Otherwise, use received value for correction.
+                                if (syncCompanion.valuesChangesSupport[index].isVelocityEligible)
+                                {
+                                    GONetSyncableValue localValue = syncCompanion.GetAutoMagicalSyncValue(index);
+                                    float quantizationStep = syncCompanion.GetQuantizationStepForValue((byte)index);
+                                    float distance = syncCompanion.CalculateDistanceBetweenValues(localValue, value);
+
+                                    if (distance < quantizationStep)
+                                    {
+                                        // Local extrapolation is close enough - keep it to avoid snap
+                                        value = localValue;
+                                        GONetLog.Debug($"[SMART-AT-REST] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                            $"keeping local value (distance={distance:F6} < step={quantizationStep:F6})");
+                                    }
+                                    else
+                                    {
+                                        // Extrapolation was off - use received value to correct
+                                        GONetLog.Debug($"[SMART-AT-REST] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                            $"using received value (distance={distance:F6} >= step={quantizationStep:F6})");
+                                    }
+                                }
+
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest = true;
                                 long assumedInitialRestElapsedTicks = elapsedTicksAtSend - TimeSpan.FromSeconds(syncCompanion.valuesChangesSupport[index].syncAttribute_SyncChangesEverySeconds).Ticks; // need to subtract the sync rate off of this to know when the value actually first arrived at rest value
                                 syncCompanion.valuesChangesSupport[index].hasAwaitingAtRest_assumedInitialRestElapsedTicks = assumedInitialRestElapsedTicks;
@@ -11459,7 +11488,38 @@ namespace GONet
                             {
                                 // VELOCITY-AUGMENTED SYNC: For ValuesNowAtRest (no blending), pass isVelocityBundle
                                 // Should typically be false since resting values don't have velocity
-                                syncCompanion.DeserializeInitSingle(bitStream_headerAlreadyRead, index, elapsedTicksAtSend, isVelocityBundle);
+                                GONetSyncableValue value = syncCompanion.DeserializeInitSingle_ReadOnlyNotApply(bitStream_headerAlreadyRead, index, isVelocityBundle);
+
+                                GONetLog.Debug($"[AT-REST-NONBLENDED] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                    $"receivedValue:{value} isVelocityEligible:{syncCompanion.valuesChangesSupport[index].isVelocityEligible}");
+
+                                // STAGE 2: Smart at-rest value selection for velocity-eligible fields (Oct 2025)
+                                // Non-authority compares received quantized value to local extrapolated value.
+                                // If distance < quantization step, keep local value to avoid visual snapping.
+                                // Otherwise, use received value for correction.
+                                if (syncCompanion.valuesChangesSupport[index].isVelocityEligible)
+                                {
+                                    GONetSyncableValue localValue = syncCompanion.GetAutoMagicalSyncValue(index);
+                                    float quantizationStep = syncCompanion.GetQuantizationStepForValue((byte)index);
+                                    float distance = syncCompanion.CalculateDistanceBetweenValues(localValue, value);
+
+                                    if (distance < quantizationStep)
+                                    {
+                                        // Local extrapolation is close enough - keep it to avoid snap
+                                        value = localValue;
+                                        GONetLog.Debug($"[SMART-AT-REST] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                            $"keeping local value (distance={distance:F6} < step={quantizationStep:F6})");
+                                    }
+                                    else
+                                    {
+                                        // Extrapolation was off - use received value to correct
+                                        GONetLog.Debug($"[SMART-AT-REST] GNP:{gonetParticipant.GONetId} index:{index} " +
+                                            $"using received value (distance={distance:F6} >= step={quantizationStep:F6})");
+                                    }
+                                }
+
+                                // Apply the chosen value (either received quantized OR local extrapolated)
+                                syncCompanion.InitSingle(value, index, elapsedTicksAtSend);
 
                                 // NEW: Immediate physics snap for non-blended physics objects at rest
                                 bool isPhysicsObject = gonetParticipant.IsRigidBodyOwnerOnlyControlled &&
