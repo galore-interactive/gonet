@@ -472,6 +472,7 @@ namespace GONet
                     };
 
                     GONetMain.EventBus.Publish(unloadEvt);
+                    GONetLog.Info($"[SCENE-PUBLISH] SceneUnloadEvent published for '{sceneToUnload}'");
                 }
             }
 
@@ -488,6 +489,7 @@ namespace GONet
             };
 
             GONetMain.EventBus.Publish(evt);
+            GONetLog.Info($"[SCENE-PUBLISH] SceneLoadEvent published for '{sceneName}' (Mode: {mode}, LoadType: {loadType})");
 
             // Notify subscribers
             OnSceneLoadStarted?.Invoke(sceneName, mode);
@@ -536,6 +538,9 @@ namespace GONet
         private void OnSceneLoadEvent(GONetEventEnvelope<SceneLoadEvent> eventEnvelope)
         {
             SceneLoadEvent evt = eventEnvelope.Event;
+
+            // DIAGNOSTIC: Log ALL scene load events, even on server
+            GONetLog.Info($"[SCENE-LOAD-HANDLER] OnSceneLoadEvent called - Scene='{evt.SceneName}', IsServer={GONetMain.IsServer}, IsClient={GONetMain.IsClient}, SourceAuthority={eventEnvelope.SourceAuthorityId}, IsSourceRemote={eventEnvelope.IsSourceRemote}");
 
             // Server already loaded it when publishing the event
             if (GONetMain.IsServer)
@@ -596,6 +601,9 @@ namespace GONet
         private void OnSceneUnloadEvent(GONetEventEnvelope<SceneUnloadEvent> eventEnvelope)
         {
             SceneUnloadEvent evt = eventEnvelope.Event;
+
+            // DIAGNOSTIC: Log ALL scene unload events, even on server
+            GONetLog.Info($"[SCENE-UNLOAD-HANDLER] OnSceneUnloadEvent called - Scene='{evt.SceneName}', IsServer={GONetMain.IsServer}, IsClient={GONetMain.IsClient}, SourceAuthority={eventEnvelope.SourceAuthorityId}, IsSourceRemote={eventEnvelope.IsSourceRemote}");
 
             // Server already unloaded it when publishing the event
             if (GONetMain.IsServer)
