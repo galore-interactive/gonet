@@ -3757,15 +3757,18 @@ namespace GONet.Generation
                 attribute.ShouldBlendBetweenValuesReceived = profile.ShouldBlendBetweenValuesReceived;
                 attribute.ShouldSkipSync_RegistrationId = (int)profile.ShouldSkipSyncRegistrationId;
                 attribute.PhysicsUpdateInterval = profile.PhysicsUpdateInterval;
+                attribute.EnablePhysicsSnapping = profile.EnablePhysicsSnapping;
                 // DEBUG: Log profile application
                 UnityEngine.Debug.Log($"[ProfileApply] memberName={memberName}, profileName={attribute.SettingsProfileTemplateName}, PhysicsUpdateInterval={attribute.PhysicsUpdateInterval}, syncChangesEverySeconds={attribute.SyncChangesEverySeconds}");
 
 
                 // VELOCITY-AUGMENTED SYNC: Copy velocity quantization settings from profile to attribute
                 attribute.IsVelocityEligible = profile.IsVelocityEligible;
+                attribute.AutoCalculateVelocityQuantization = profile.AutoCalculateVelocityQuantization;
                 attribute.VelocityQuantizeLowerBound = profile.VelocityQuantizeLowerBound;
                 attribute.VelocityQuantizeUpperBound = profile.VelocityQuantizeUpperBound;
                 attribute.VelocityQuantizeDownToBitCount = profile.VelocityQuantizeDownToBitCount;
+                attribute.VelocityAnchorIntervalSeconds = profile.VelocityAnchorIntervalSeconds;
 
                 float syncEverySeconds = 0;
                 if (profile.SyncChangesFrequencyOccurrences > 0)

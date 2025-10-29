@@ -1065,6 +1065,36 @@ namespace GONet
         /// </summary>
         internal void TriggerPhysicsSnapToRest(Vector3 quantizedPosition, Quaternion quantizedRotation)
         {
+            // TOGGLE: Check if experimental physics snapping is enabled in ANY position/rotation sync profile (default: false as of Oct 2025)
+            // Stage 2 smart at-rest value selection is now the preferred approach
+            bool enabledInAnyProfile = false;
+
+            var syncCompanion = GetComponent<GONet.Generation.GONetParticipant_AutoMagicalSyncCompanion_Generated>();
+            if (syncCompanion != null)
+            {
+                // Scan all synced values to find position/rotation with physics snapping enabled
+                for (byte i = 0; i < syncCompanion.valuesChangesSupport.Length; i++)
+                {
+                    var valueChangeSupport = syncCompanion.valuesChangesSupport[i];
+
+                    // Check if this is position or rotation by function pointer comparison
+                    // (matches pattern from GONet.cs physics snapping trigger code)
+                    bool isPosition = valueChangeSupport.syncAttribute_ShouldSkipSync == GONetMain.IsPositionNotSyncd;
+                    bool isRotation = valueChangeSupport.syncAttribute_ShouldSkipSync == GONetMain.IsRotationNotSyncd;
+
+                    if ((isPosition || isRotation) && valueChangeSupport.syncAttribute_EnablePhysicsSnapping)
+                    {
+                        enabledInAnyProfile = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!enabledInAnyProfile)
+            {
+                return; // Feature disabled (not enabled in any position/rotation profile)
+            }
+
             if (IsRigidBodyOwnerOnlyControlled && myRigidBody != null && !IsMine)
             {
                 // Start the physics snapping coroutine

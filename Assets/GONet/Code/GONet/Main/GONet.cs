@@ -7792,6 +7792,12 @@ namespace GONet
             /// </summary>
             internal int syncAttribute_PhysicsUpdateInterval;
             /// <summary>
+            /// Matches with <see cref="GONetAutoMagicalSyncSettings_ProfileTemplate.EnablePhysicsSnapping"/>
+            /// Experimental: Enable physics-based precision snapping for at-rest objects.
+            /// Default: false (Stage 2 smart at-rest value selection is preferred).
+            /// </summary>
+            internal bool syncAttribute_EnablePhysicsSnapping;
+            /// <summary>
             /// Type of this syncable value (Vector3, Quaternion, float, etc.).
             /// Used for type-specific velocity calculations and range checking.
             /// </summary>

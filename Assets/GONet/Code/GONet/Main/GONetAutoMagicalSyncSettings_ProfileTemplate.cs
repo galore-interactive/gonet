@@ -277,6 +277,40 @@ namespace GONet
         [Range(1, 4)]
         public int PhysicsUpdateInterval = 1;
 
+        [Tooltip("EXPERIMENTAL CLIENT PHYSICS SNAP: Enable physics-based precision snapping for at-rest objects using this profile.\n\n" +
+                 "⚠️ IMPORTANT: ONLY applies to Transform.position and Transform.rotation sync profiles!\n" +
+                 "⚠️ DEFAULT: false (DISABLED - use Stage 2 smart at-rest value selection instead)\n\n" +
+                 "APPLIES TO:\n" +
+                 "• Transform.position sync profiles ONLY\n" +
+                 "• Transform.rotation sync profiles ONLY\n" +
+                 "• Physics objects (IsRigidBodyOwnerOnlyControlled=true) on non-authority clients\n" +
+                 "• Enabling this on other profiles (health, ammo, etc.) HAS NO EFFECT\n\n" +
+                 "WHAT IT DOES:\n" +
+                 "When at-rest messages are received for physics objects (Rigidbody), temporarily enables\n" +
+                 "physics for ONE FixedUpdate to snap objects from quantized positions (~0.95mm error)\n" +
+                 "to sub-millimeter precision using Unity's collision resolver.\n\n" +
+                 "WHY IT'S DISABLED BY DEFAULT:\n" +
+                 "• Stage 2 smart at-rest value selection (Oct 2025) solves visual snapping issue\n" +
+                 "  by keeping local extrapolated values when within one quantization step\n" +
+                 "• Physics snapping is now OVERKILL - adds complexity without significant benefit\n" +
+                 "• May cause unexpected physics interactions (unwanted impulses, collisions)\n" +
+                 "• Costs 1 FixedUpdate per object (performance overhead)\n\n" +
+                 "WHEN TO ENABLE (RARE):\n" +
+                 "• Testing/comparison with Stage 2 approach\n" +
+                 "• Games requiring sub-millimeter stacking precision (Jenga-style physics puzzles)\n" +
+                 "• Extreme quantization settings where Stage 2 thresholds aren't tight enough\n\n" +
+                 "GRANULAR CONTROL:\n" +
+                 "• Only applies to position/rotation values using THIS sync profile\n" +
+                 "• Cannonball position profile could have it enabled, player position disabled\n" +
+                 "• Physics snap triggers if position OR rotation's profile enables it\n\n" +
+                 "IMPLEMENTATION (commit cff066dd):\n" +
+                 "• GONetParticipant.TriggerPhysicsSnapToRest() - Temporarily sets isKinematic=false\n" +
+                 "• Three trigger points: late-joiner init, early-joiner blended, early-joiner non-blended\n" +
+                 "• Network bandwidth impact: ZERO (uses existing at-rest messages)\n\n" +
+                 "RECOMMENDATION: Leave disabled unless you have a specific need.\n\n" +
+                 "Default: false (disabled)")]
+        public bool EnablePhysicsSnapping = false;
+
         [Space(10)]
         [Tooltip("*If this is left empty, the GONet default serialization will be applied to any/all value types associated with this sync template/profile.\n*If this is populated, then any/all value types included herein will have its corresponding custom serializer applied when preparing to send over the network.\n*NOTE: The Custom Serializer Type needs to be public and implement GONet.IGONetAutoMagicalSync_CustomSerializer.\n*WARNING: Do NOT have multiple entries for the same GONet Value Type or else GONet will get confused.")]
         public SyncType_CustomSerializer_Pair[] SyncValueTypeSerializerOverrides;

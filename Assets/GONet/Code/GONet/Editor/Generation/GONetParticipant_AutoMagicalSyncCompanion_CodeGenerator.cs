@@ -279,6 +279,7 @@ namespace GONet.Editor.Generation
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_Reliability = AutoMagicalSyncReliability.").Append(singleMember.attribute.Reliability).AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_ShouldBlendBetweenValuesReceived = ").Append(singleMember.attribute.ShouldBlendBetweenValuesReceived ? "true" : "false").AppendLine(";");
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_PhysicsUpdateInterval = ").Append(singleMember.attribute.PhysicsUpdateInterval).AppendLine(";");
+                    sb.Append("\t\t\tsupport").Append(iOverall).Append(".syncAttribute_EnablePhysicsSnapping = ").Append(singleMember.attribute.EnablePhysicsSnapping ? "true" : "false").AppendLine(";");
 
                     // VELOCITY-AUGMENTED SYNC: Initialize velocity tracking fields
                     sb.Append("\t\t\tsupport").Append(iOverall).Append(".isVelocityEligible = ").Append(singleMember.attribute.IsVelocityEligible ? "true" : "false").AppendLine(";");

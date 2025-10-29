@@ -166,6 +166,18 @@ namespace GONet
         public int PhysicsUpdateInterval = 1;
 
         /// <summary>
+        /// EXPERIMENTAL CLIENT PHYSICS SNAP: Enable physics-based precision snapping for at-rest objects.
+        /// Default: false (Stage 2 smart at-rest value selection is preferred).
+        ///
+        /// Only applies to physics objects (IsRigidBodyOwnerOnlyControlled=true) on non-authority clients.
+        /// When enabled, temporarily enables physics for ONE FixedUpdate to snap objects from quantized
+        /// positions (~0.95mm error) to sub-millimeter precision using Unity's collision resolver.
+        ///
+        /// NOTE: Copied from profile template's EnablePhysicsSnapping field.
+        /// </summary>
+        public bool EnablePhysicsSnapping = false;
+
+        /// <summary>
         /// VELOCITY-AUGMENTED SYNC: Indicates if this value is eligible for velocity-augmented synchronization.
         /// Automatically set to true for Vector3 and Quaternion types when velocity quantization is configured.
         /// When true, system alternates between sending VALUE (position) and VELOCITY (rate of change) bundles
