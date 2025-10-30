@@ -141,7 +141,7 @@ public class ProjectileSpawner : GONetBehaviour
             if (shouldInstantiateBasedOnInput)
             {
                 // Spawn projectiles in a spread pattern (160 degree arc)
-                const int PROJECTILE_COUNT = 1; // TODO back to 9;
+                const int PROJECTILE_COUNT = 9;
                 const float SPREAD_ANGLE = 160f; // Total spread in degrees
                 const float ANGLE_INCREMENT = PROJECTILE_COUNT > 1 ? SPREAD_ANGLE / (PROJECTILE_COUNT - 1) : 0f;
                 const float START_ANGLE = PROJECTILE_COUNT > 1 ? -SPREAD_ANGLE / 2f : 0f;
@@ -165,8 +165,8 @@ public class ProjectileSpawner : GONetBehaviour
                     // Create rotation that points in the spread direction
                     Quaternion spreadRotation = Quaternion.LookRotation(spreadDirection, transform.up);
                     GONetParticipant gnp = default;
-                    bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 1.5f; // TODO back to 0.5f
-                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.0f; // TODO back to 0.5f
+                    bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 0.5f;
+                    bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.5f;
                     if (shouldClientOwn)
                     {
                         gnp = Instantiate(shouldBeZeroSync ? projectilPrefab_zeroSync : projectilPrefab, transform.position, spreadRotation);
@@ -179,7 +179,7 @@ public class ProjectileSpawner : GONetBehaviour
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
                 }
 
-                const int PHYSICS_CUBE_COUNT = 1; // TODO back to 5;
+                const int PHYSICS_CUBE_COUNT = 5;
                 // Spawn just ONE set of PHYSICS_CUBE_COUNT addressable physics cubes (not per projectile)
                 for (int i = 0; i < PHYSICS_CUBE_COUNT; i++)
                 {
