@@ -30,7 +30,8 @@ MonoBehaviour:
   VelocityQuantizationResultingPrecision: 0.039063 units/sec
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
-  PhysicsUpdateInterval: 3
+  PhysicsUpdateInterval: 1
+  EnablePhysicsSnapping: 0
   SyncValueTypeSerializerOverrides:
   - ValueType: 12
     CustomSerializerType:
@@ -38,5 +39,5 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 12
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetValueBlending_Vector3_HighPerformance, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Vector3_HermiteSpline, Assembly-CSharp
   ShouldSkipSyncRegistrationId: 2

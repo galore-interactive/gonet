@@ -31,6 +31,7 @@ MonoBehaviour:
   ProcessingPriority: 0
   MustRunOnUnityMainThread: 1
   PhysicsUpdateInterval: 1
+  EnablePhysicsSnapping: 0
   SyncValueTypeSerializerOverrides:
   - ValueType: 14
     CustomSerializerType:
@@ -38,5 +39,6 @@ MonoBehaviour:
   SyncValueTypeValueBlendingOverrides:
   - ValueType: 14
     CustomValueBlendingType:
-      _classRef: GONet.PluginAPI.GONetValueBlending_Quaternion_HighPerformance, Assembly-CSharp
+      _classRef: GONet.PluginAPI.GONetValueBlending_Quaternion_ExtrapolateWithLowPassSmoothingFilter,
+        Assembly-CSharp
   ShouldSkipSyncRegistrationId: 1

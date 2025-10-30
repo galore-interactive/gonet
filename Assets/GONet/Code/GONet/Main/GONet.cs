@@ -11309,6 +11309,7 @@ namespace GONet
                                     int recentChangesCount = changesSupport.mostRecentChanges_usedSize;
                                     if (recentChangesCount >= 1)
                                     {
+                                        /* we the critical fix below was made, these calculations are no longer needed:
                                         // Use MOST RECENT snapshot (synthesized or not) as baseline
                                         // We MUST use the most recent to avoid compounding errors when multiple VELOCITY bundles
                                         // arrive before a VALUE bundle (otherwise we'd keep using a stale VALUE from seconds ago)
@@ -11324,6 +11325,7 @@ namespace GONet
                                             lastSnapshot.numericValue,
                                             changesSupport.lastReceivedVelocity,
                                             deltaTime);
+                                        */
 
                                         // CRITICAL FIX: Store RECEIVED VALUE with velocity metadata for smooth extrapolation
                                         // InitSingle stores WITHOUT velocity → blending falls back to standard interpolation
