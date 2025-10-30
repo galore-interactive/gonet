@@ -109,7 +109,7 @@ namespace GONet.Sample
             builder.WriteFloat(initialSpeed);
             builder.WriteFloat(syncedDecayRate);
 
-            GONetLog.Debug($"[Projectile_ZeroSync] Spawner serialized spawn data: pos={spawnPosition}, dir={movementDirection}, speed={initialSpeed:F2}, lifetime={calculatedLifetime:F2}s");
+            // GONetLog.Debug($"[Projectile_ZeroSync] Spawner serialized spawn data: pos={spawnPosition}, dir={movementDirection}, speed={initialSpeed:F2}, lifetime={calculatedLifetime:F2}s");
         }
 
         void IGONetSyncdBehaviourInitializer.Receiver_DeserializeSpawnData(Utils.BitByBitByteArrayBuilder builder)
@@ -134,7 +134,7 @@ namespace GONet.Sample
             calculatedLifetime = 2.0f * initialSpeed;
             isInitialized = true;
 
-            GONetLog.Debug($"[Projectile_ZeroSync] Receiver deserialized spawn data: pos={spawnPosition}, dir={movementDirection}, speed={initialSpeed:F2}, lifetime={calculatedLifetime:F2}s");
+            // GONetLog.Debug($"[Projectile_ZeroSync] Receiver deserialized spawn data: pos={spawnPosition}, dir={movementDirection}, speed={initialSpeed:F2}, lifetime={calculatedLifetime:F2}s");
         }
 
         internal override void UpdateAfterGONetReady()
@@ -156,7 +156,7 @@ namespace GONet.Sample
             {
                 if (GONetParticipant.IsMine)
                 {
-                    GONetLog.Debug($"[Projectile_ZeroSync] Despawning after {elapsedTime:F2}s (lifetime={calculatedLifetime:F2}s)");
+                    // GONetLog.Debug($"[Projectile_ZeroSync] Despawning after {elapsedTime:F2}s (lifetime={calculatedLifetime:F2}s)");
                     Destroy(gameObject);
                 }
                 return;
