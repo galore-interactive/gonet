@@ -626,13 +626,6 @@ namespace GONet
 
                 FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
 
-                int followerCount = 0;
-                foreach (var gnp in gonetParticipantsInLevel)
-                {
-                    if (gnp.name.Contains("Follower")) followerCount++;
-                }
-                GONetLog.Info($"[OnSceneLoaded] Found {gonetParticipantsInLevel.Count} GONetParticipants in scene '{sceneLoaded.name}'. Follower count: {followerCount}");
-
                 GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
 
                 if (GONetMain.IsClientVsServerStatusKnown)

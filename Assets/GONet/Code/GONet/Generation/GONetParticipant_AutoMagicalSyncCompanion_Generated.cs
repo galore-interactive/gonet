@@ -226,16 +226,11 @@ namespace GONet.Generation
                                         GONetSyncableValue calculatedVelocity = CalculateVelocity((byte)i, valueChangeSupport.lastKnownValue, nowElapsedTicks);
                                         bool isVelocityEffectivelyZero = IsVelocityEffectivelyZero(calculatedVelocity, valueChangeSupport);
 
-                                        GONetLog.Debug($"[STAGE1-CHECK] GNP:{gonetParticipant.GONetId} index:{i} name:{valueChangeSupport.memberName} " +
-                                            $"velocity:{calculatedVelocity} isZero:{isVelocityEffectivelyZero} current:{valueChangeSupport.lastKnownValue} " +
-                                            $"previous:{valueChangeSupport.lastKnownValue_previous}");
-
                                         if (!isVelocityEffectivelyZero)
                                         {
                                             // Object is still moving (slow sub-quantization motion)
                                             // Velocity bundles are handling this, don't spam at-rest messages
                                             shouldSendAtRest = false;
-                                            GONetLog.Debug($"[AT-REST-SKIP] GNP:{gonetParticipant.GONetId} Index={i} still has active velocity, skipping at-rest broadcast");
                                         }
                                     }
 
@@ -861,14 +856,6 @@ namespace GONet.Generation
                 if (doesBaselineValueNeedAdjusting[i])
                 {
                     GONetMain.AutoMagicalSync_ValueMonitoringSupport_ChangedValue valueChangeSupport = valuesChangesSupport[i];
-
-                    // DIAGNOSTIC: Log baseline update for position on Follower objects
-                    if (i == 8 && gonetParticipant.name.Contains("Follower"))
-                    {
-                        var oldBaseline = valueChangeSupport.baselineValue_current.UnityEngine_Vector3;
-                        var newBaseline = valueChangeSupport.lastKnownValue.UnityEngine_Vector3;
-                        GONetLog.Debug($"[BASELINE-UPDATE] GONetId={gonetParticipant.GONetId} name={gonetParticipant.name} IsMine={gonetParticipant.IsMine} valueIndex={i} oldBaseline={oldBaseline} newBaseline={newBaseline}");
-                    }
 
                     valueChangeSupport.baselineValue_current = valueChangeSupport.lastKnownValue;
 

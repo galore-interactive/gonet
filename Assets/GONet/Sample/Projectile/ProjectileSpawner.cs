@@ -45,51 +45,6 @@ public class ProjectileSpawner : GONetBehaviour
     /// - Centralized lifecycle management (no per-projectile subscribe/unsubscribe)
     /// </summary>
     private readonly Dictionary<uint, Projectile> projectilesByGONetId = new Dictionary<uint, Projectile>(100);
-    private Subscription<SyncEvent_ValueChangeProcessed> centralizedTransformSubscription;
-
-    /// <summary>
-    /// PERFORMANCE OPTIMIZATION: Initialize centralized event subscription on first projectile spawn.
-    /// This replaces per-projectile subscriptions (N subscriptions) with a single subscription + dispatch pattern.
-    /// </summary>
-    protected override void Start()
-    {
-        base.Start();
-
-        // Subscribe once to ALL transform position sync events
-        // Filter: Only process events from local authority (not remote) for ANY projectile
-        centralizedTransformSubscription = GONetMain.EventBus.Subscribe(
-            SyncEvent_GeneratedTypes.SyncEvent_Transform_position,
-            OnAnyProjectileTransformSync,
-            filter: e => !e.IsSourceRemote // We'll do GONetParticipant check in handler for O(1) lookup
-        );
-    }
-
-    protected override void OnDestroy()
-    {
-        base.OnDestroy();
-     
-        // Clean up centralized subscription
-        centralizedTransformSubscription?.Dispose();
-    }
-
-    /// <summary>
-    /// PERFORMANCE OPTIMIZATION: Centralized handler for ALL projectile transform sync events.
-    /// Instead of each projectile having its own handler, we have one handler that dispatches to the correct projectile.
-    ///
-    /// Cost: O(1) dictionary lookup + delegate call
-    /// Old cost: O(N) event bus loop calling N handlers
-    /// </summary>
-    private void OnAnyProjectileTransformSync(GONetEventEnvelope<SyncEvent_ValueChangeProcessed> eventEnvelope)
-    {
-        uint gonetId = eventEnvelope.Event.GONetId;
-
-        // Fast O(1) lookup: Is this event for one of our tracked projectiles?
-        if (projectilesByGONetId.TryGetValue(gonetId, out Projectile projectile))
-        {
-            // Dispatch to the specific projectile's handler
-            projectile.OnSendingMyTransform(eventEnvelope);
-        }
-    }
 
     public override void OnGONetReady(GONetParticipant gonetParticipant) // NOTE:  OnGONetReady is the recommended approach for v1.5+ (instead of OnGONetParticipantEnabled/Started/Etc..
     {
@@ -185,28 +140,30 @@ public class ProjectileSpawner : GONetBehaviour
             #endregion
             if (shouldInstantiateBasedOnInput)
             {
-                // Spawn 9 projectiles in a spread pattern (160 degree arc)
+                // Spawn projectiles in a spread pattern (160 degree arc)
                 const int PROJECTILE_COUNT = 1; // TODO back to 9;
                 const float SPREAD_ANGLE = 160f; // Total spread in degrees
-                const float ANGLE_INCREMENT = SPREAD_ANGLE / (PROJECTILE_COUNT - 1); // Evenly distributed
-                const float START_ANGLE = -SPREAD_ANGLE / 2f; // Start at -80 degrees
-
+                const float ANGLE_INCREMENT = PROJECTILE_COUNT > 1 ? SPREAD_ANGLE / (PROJECTILE_COUNT - 1) : 0f;
+                const float START_ANGLE = PROJECTILE_COUNT > 1 ? -SPREAD_ANGLE / 2f : 0f;
                 for (int i = 0; i < PROJECTILE_COUNT; i++)
                 {
                     // Calculate angle for this projectile (relative to transform.forward)
                     float angleOffset = START_ANGLE + (i * ANGLE_INCREMENT);
-
                     // Manually calculate direction for vertical spread
                     // Start with forward direction, then rotate up/down using transform's right axis
                     Vector3 baseForward = transform.forward;
                     Vector3 rightAxis = transform.right; // Local X axis
                     Vector3 upComponent = transform.up * Mathf.Sin(angleOffset * Mathf.Deg2Rad);
                     Vector3 forwardComponent = baseForward * Mathf.Cos(angleOffset * Mathf.Deg2Rad);
-                    Vector3 spreadDirection = (forwardComponent + upComponent).normalized;
-
+                    Vector3 spreadDirection = (forwardComponent + upComponent);
+                    // Defensive check: If spread direction is too small, fallback to forward
+                    if (spreadDirection.sqrMagnitude < 0.0001f)
+                    {
+                        spreadDirection = transform.forward;
+                    }
+                    spreadDirection.Normalize();
                     // Create rotation that points in the spread direction
                     Quaternion spreadRotation = Quaternion.LookRotation(spreadDirection, transform.up);
-
                     GONetParticipant gnp = default;
                     bool shouldClientOwn = UnityEngine.Random.Range(0f, 1f) < 1.5f; // TODO back to 0.5f
                     bool shouldBeZeroSync = UnityEngine.Random.Range(0f, 1f) < 0.0f; // TODO back to 0.5f

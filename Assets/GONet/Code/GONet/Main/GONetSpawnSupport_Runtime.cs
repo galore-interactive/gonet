@@ -334,7 +334,6 @@ namespace GONet
 
                 // If not cached, try to load synchronously (this should only happen if prefab wasn't pre-warmed)
                 GONetLog.Warning($"Addressable prefab '{designTimeMetadata.AddressableKey}' not found in cache. Consider pre-warming cache for better performance.");
-                GONetLog.Debug($"Attempting to load addressable with key: '{designTimeMetadata.AddressableKey}' from location: '{designTimeMetadata.Location}'");
                 try
                 {
                     var handle = Addressables.LoadAssetAsync<GameObject>(designTimeMetadata.AddressableKey);

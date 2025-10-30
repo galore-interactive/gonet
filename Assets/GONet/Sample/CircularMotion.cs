@@ -148,7 +148,5 @@ public class CircularMotion : GONetParticipantCompanionBehaviour
             float currentRotationSpeed = GetRotationSpeed();
             transform.Rotate(Vector3.up, currentRotationSpeed * Time.deltaTime);
         }
-
-        GONetLog.Debug($"GNP name: {name}, gonetid: {GONetParticipant.GONetId} (authorityId: {gonetParticipant.OwnerAuthorityId}), mine? {IsMine}");
     }
 }

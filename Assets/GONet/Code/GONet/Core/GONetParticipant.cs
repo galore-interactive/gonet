@@ -127,14 +127,6 @@ namespace GONet
                 ownerAuthorityId = value;
                 OnGONetIdComponentChanged_UpdateAllComponents_IfAppropriate(true, gonetId);
 
-                // DIAGNOSTIC: Track when Follower objects become IsMine=True (enables sync)
-                if (gameObject.name.Contains("Follower") && previous != ownerAuthorityId)
-                {
-                    bool previousIsMine = (previous == GONetMain.MyAuthorityId && previous != GONetMain.OwnerAuthorityId_Unset);
-                    bool nowIsMine = (ownerAuthorityId == GONetMain.MyAuthorityId && ownerAuthorityId != GONetMain.OwnerAuthorityId_Unset);
-                    GONetLog.Info($"[ISMINE-CHANGE] '{gameObject.name}' OwnerAuthorityId changed from {previous} to {ownerAuthorityId} (IsMine: {previousIsMine} → {nowIsMine}, MyAuthorityId={GONetMain.MyAuthorityId}, GONetId={GONetId})");
-                }
-
                 if (ownerAuthorityId == GONetMain.MyAuthorityId)
                 {
                     WasMineAtAnyPoint = true;
@@ -894,29 +886,12 @@ namespace GONet
         {
             if (Application.isPlaying) // now that [ExecuteInEditMode] was added to GONetParticipant for OnDestroy, we have to guard this to only run in play
             {
-                // DIAGNOSTIC: Track Start() for GONetLocal (critical for initialization timeline)
-                bool isGONetLocal = gameObject.GetComponent<GONetLocal>() != null;
-                if (isGONetLocal)
-                {
-                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+3: GONetParticipant.Start() CALLED for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (GONetId={GONetId}, OwnerAuthorityId={OwnerAuthorityId})");
-                }
-
                 if (!WasInstantiated) // NOTE: here in Start is the first point where we know the real/final value of WasInstantiated!
                 {
                     IsOKToStartAutoMagicalProcessing = true;
                 }
 
-                if (isGONetLocal)
-                {
-                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+4: Calling Start_AutoPropagateInstantiation_IfAppropriate for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (will send spawn event to server)");
-                }
-
                 GONetMain.Start_AutoPropagateInstantiation_IfAppropriate(this);
-
-                if (isGONetLocal)
-                {
-                    GONetLog.Info($"[INIT-TIMELINE] CLIENT T+5: Returned from Start_AutoPropagateInstantiation_IfAppropriate for GONetLocal at {GONetMain.Time.ElapsedSeconds:F3}s (spawn event should be sent)");
-                }
 
                 if ((myRigidBody = GetComponent<Rigidbody>()) != null)
                 {
@@ -933,13 +908,6 @@ namespace GONet
                     myRigidbody2DSettingsAtStart.bodyType = myRigidBody2D.bodyType;
 
                     SetRigidBodySettingsConsideringOwner();
-                }
-
-                // DIAGNOSTIC: Track when Start() completes for ALL scene objects (gates OnGONetReady)
-                // This reveals if Unity's Start() execution is delayed system-wide (CRAP pattern)
-                if (!WasInstantiated) // Scene-defined objects only
-                {
-                    GONetLog.Info($"[START-COMPLETE] '{gameObject.name}' Start() completed at time {GONetMain.Time.ElapsedSeconds:F3}s (GONetId={GONetId}, OwnerAuthorityId={OwnerAuthorityId}, WasInstantiated={WasInstantiated})");
                 }
 
                 // LIFECYCLE GATE: Mark Start complete and check if OnGONetReady can fire
@@ -1065,17 +1033,26 @@ namespace GONet
         /// </summary>
         internal void TriggerPhysicsSnapToRest(Vector3 quantizedPosition, Quaternion quantizedRotation)
         {
+            // since this will happen in coroutine, need to check if recently destroyed (i.e., now null) 
+            if (this == null || gameObject == null) return;
+
             // TOGGLE: Check if experimental physics snapping is enabled in ANY position/rotation sync profile (default: false as of Oct 2025)
             // Stage 2 smart at-rest value selection is now the preferred approach
             bool enabledInAnyProfile = false;
 
-            var syncCompanion = GetComponent<GONet.Generation.GONetParticipant_AutoMagicalSyncCompanion_Generated>();
-            if (syncCompanion != null)
+            var syncCompanion = GONetMain.GetSyncCompanionByGNP(this);
+            if (syncCompanion != null && syncCompanion.valuesChangesSupport != null)
             {
                 // Scan all synced values to find position/rotation with physics snapping enabled
                 for (byte i = 0; i < syncCompanion.valuesChangesSupport.Length; i++)
                 {
                     var valueChangeSupport = syncCompanion.valuesChangesSupport[i];
+
+                    // Defensive null check (can be null during teardown/cleanup)
+                    if (valueChangeSupport == null)
+                    {
+                        continue;
+                    }
 
                     // Check if this is position or rotation by function pointer comparison
                     // (matches pattern from GONet.cs physics snapping trigger code)
