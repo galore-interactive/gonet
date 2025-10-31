@@ -79,6 +79,5 @@ Assets/GONet/Sample/Resources/Tests/Results.meta
 *.md
 *.md.meta
 
-# Exceptions: Allow specific .md files for GitHub
-!README.md
-!CLAUDE.md
+# Exception: Allow ONLY root README.md for GitHub
+!/README.md
