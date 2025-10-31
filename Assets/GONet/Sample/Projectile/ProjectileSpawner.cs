@@ -179,6 +179,7 @@ public class ProjectileSpawner : GONetBehaviour
                     //GONetLog.Debug($"Spawned spread projectile #{i} at angle {angleOffset:F1}° - Is Mine? {gnp.IsMine} Is Mine To Remotely Control? {gnp.IsMine_ToRemotelyControl}");
                 }
 
+#if ADDRESSABLES_AVAILABLE
                 const int PHYSICS_CUBE_COUNT = 5;
                 // Spawn just ONE set of PHYSICS_CUBE_COUNT addressable physics cubes (not per projectile)
                 for (int i = 0; i < PHYSICS_CUBE_COUNT; i++)
@@ -193,6 +194,7 @@ public class ProjectileSpawner : GONetBehaviour
 
                     InstantiateAddressablesPrefab(cubeRotation);
                 }
+#endif
             }
         }
 
@@ -210,6 +212,7 @@ public class ProjectileSpawner : GONetBehaviour
     //
     // See Projectile.UpdateAfterGONetReady() for the movement implementation.
 
+#if ADDRESSABLES_AVAILABLE
     private async Task InstantiateAddressablesPrefab(Quaternion rotation)
     {
         const string oohLaLa_addressablesPrefabPath = "Assets/GONet/Sample/Projectile/AddressablesOohLaLa/Physics Cube Projectile.prefab";
@@ -224,6 +227,7 @@ public class ProjectileSpawner : GONetBehaviour
         GONetParticipant addressableInstance =
             GONetMain.Client_InstantiateToBeRemotelyControlledByMe(addressablePrefab, transform.position, rotation);
     }
+#endif
 
     /// <summary>
     /// Server-side cleanup: Destroys addressable projectiles that have traveled too far from spawn origin.

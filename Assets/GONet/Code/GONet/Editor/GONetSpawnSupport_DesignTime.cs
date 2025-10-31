@@ -1606,8 +1606,10 @@ namespace GONet.Editor
 
             static void HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate()
             {
+#if ADDRESSABLES_AVAILABLE
                 // Update the addressable asset paths cache before processing changes
                 UpdateAddressableAssetPathsCache();
+#endif
 
                 IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
                     GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
@@ -1665,7 +1667,13 @@ namespace GONet.Editor
                         }
 
                         // Check if this was an addressable asset in the last build to provide the correct message
-                        bool wasAddressableAsset = WasAddressableInLastBuild(deletedPath, designTimeLocations_gonetParticipants_lastBuild);
+                        bool wasAddressableAsset =
+#if ADDRESSABLES_AVAILABLE
+                            WasAddressableInLastBuild(deletedPath, designTimeLocations_gonetParticipants_lastBuild);
+#else
+                            false;
+#endif
+
                         string messageType = wasAddressableAsset ? "addressable" : "project resources";
 
                         GONetLog.Debug($"Confirmed deletion for {deletedPath}: wasAddressable={wasAddressableAsset}");
