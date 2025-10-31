@@ -78,3 +78,7 @@ Assets/GONet/Sample/Resources/Tests/Results.meta
 # Markdown documentation (local working notes only, not tracked in git)
 *.md
 *.md.meta
+
+# Exceptions: Allow specific .md files for GitHub
+!README.md
+!CLAUDE.md
