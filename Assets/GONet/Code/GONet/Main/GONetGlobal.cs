@@ -450,9 +450,6 @@ namespace GONet
 
             enabledGONetParticipants.Clear();
 
-            // Create persistent status UI
-            CreateStatusUI();
-
             // Start physics sync coroutine (server-only, runs after all physics processing)
             StartCoroutine(PhysicsSync_WaitForFixedUpdate());
 
@@ -486,15 +483,6 @@ namespace GONet
 
                 // NOW capture and sync final physics state (server-only check inside method)
                 GONetMain.PhysicsSync_ProcessASAP();
-            }
-        }
-
-        private void CreateStatusUI()
-        {
-            // Add GONetStatusUI component if it doesn't already exist
-            if (GetComponent<GONet.Sample.GONetStatusUI>() == null)
-            {
-                gameObject.AddComponent<GONet.Sample.GONetStatusUI>();
             }
         }
 
