@@ -233,7 +233,17 @@ namespace GONet.Utils
                     GONetParticipant gonetParticipant = gameObject.GetComponent<GONetParticipant>();
                     if ((object)gonetParticipant == null || (gonetParticipant.GONetIdAtInstantiation != gonetIdAtInstantiation && !GONetMain.WasDefinedInScene(gonetParticipant)))
                     {
-                        GONetLog.Warning("We found the wrong GNP or did not find one at all.  uniqueFullPath: " + uniqueFullPath + " gonetParticipant.GONetIdAtInstantiation: " + ((object)gonetParticipant == null ? "<null>" : gonetParticipant.GONetIdAtInstantiation.ToString()));
+                        // DIAGNOSTIC: Log comprehensive info about the wrong GameObject found
+                        string foundInfo = (object)gonetParticipant == null ? "<null GNP>" :
+                            $"GONetIdAtInstantiation={gonetParticipant.GONetIdAtInstantiation}, GONetId={gonetParticipant.GONetId}, OwnerAuthority={gonetParticipant.OwnerAuthorityId}, Name='{gonetParticipant.gameObject.name}', Scene='{gonetParticipant.gameObject.scene.name}', InstanceID={gonetParticipant.GetInstanceID()}";
+
+                        GONetLog.Warning($"[HIERARCHY-MISMATCH] WRONG GameObject found by path lookup!\n" +
+                                       $"  Searched for path: '{uniqueFullPath}'\n" +
+                                       $"  Expected GONetIdAtInstantiation: {gonetIdAtInstantiation}\n" +
+                                       $"  Found GameObject: {foundInfo}\n" +
+                                       $"  WasDefinedInScene: {((object)gonetParticipant == null ? "N/A" : GONetMain.WasDefinedInScene(gonetParticipant).ToString())}\n" +
+                                       $"  RETURNING NULL to prevent silent data corruption");
+                        return default;
                     }
                 }
             }

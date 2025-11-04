@@ -502,6 +502,22 @@ namespace GONet
         public bool WasInstantiated => wasInstantiatedForce || !GONetMain.WasDefinedInScene(this);
         [SerializeField] internal bool wasInstantiatedForce;
 
+        /// <summary>
+        /// High-resolution timestamp (UtcNowTicks) when Awake() was called.
+        /// Used to distinguish scene-defined objects (created at scene load time) vs
+        /// runtime-spawned objects (created after scene is already loaded).
+        ///
+        /// PRECISION: Sub-millisecond on all platforms via HighResolutionTimeUtils.
+        /// MONOTONIC: Guaranteed never goes backwards (uses Stopwatch internally).
+        /// </summary>
+        internal long awakeTimeTicks = -1;
+
+        /// <summary>
+        /// GONet elapsed ticks when Awake() was called.
+        /// Provides correlation with GONet time system for debugging.
+        /// </summary>
+        internal long awakeTimeElapsedTicks = -1;
+
         ulong endOfLineSentTickCountWhenSet_isOKToStartAutoMagicalProcessing = ulong.MaxValue;
         volatile bool isOKToStartAutoMagicalProcessing = false;
         /// <summary>
@@ -813,6 +829,34 @@ namespace GONet
         {
             if (Application.isPlaying)
             {
+                // CRITICAL: Record timestamps FIRST thing in Awake (before any other processing)
+                // Use HighResolutionTimeUtils for sub-millisecond precision
+                awakeTimeTicks = HighResolutionTimeUtils.UtcNowTicks;
+
+                // Also record GONet elapsed time for correlation (if available)
+                if (GONetMain.Time != null)
+                {
+                    awakeTimeElapsedTicks = GONetMain.Time.ElapsedTicks;
+                }
+
+                // CRITICAL: Detect if this object was instantiated (not scene-defined) by checking if it was
+                // created during or after scene load. Scene-defined objects have wasInstantiatedForce = false
+                // by default, but objects created via Instantiate() need it set to true.
+                // This MUST happen before DesignTimeMetadata is initialized, as that check depends on this flag.
+                // Unity sets hideFlags to HideFlags.None for scene-defined objects, and leaves them unset
+                // (or sets other flags) for instantiated objects. However, this isn't reliable across platforms.
+                // Instead, we rely on the fact that scene-defined objects call Awake() during scene load,
+                // while runtime-instantiated objects call Awake() AFTER scene load (or during Awake of another object).
+                // The wasInstantiatedForce flag will be overridden to true during network spawn processing.
+                if (!wasInstantiatedForce)
+                {
+                    // Check if this is a prefab instance (not placed in scene)
+                    // Scene-defined objects have a scene reference during Awake, prefab instances are in the active scene
+                    // but were NOT placed in the scene by the designer (they were instantiated)
+                    // We'll detect this later once metadata is available - for now, keep default (false)
+                    // The timestamp-based WasInstantiated() check will handle this correctly
+                }
+
                 // EARLIEST LIFECYCLE POINT: Log with InstanceID for correlation (GONetId not yet available)
                 // InstanceID allows correlation between Awake → OnGONetReady events in log analysis
                 //GONetLog.Info($"[GONetParticipant] 🔵 Awake() START - InstanceID: {GetInstanceID()}, GameObject: {gameObject.name}");
