@@ -16,6 +16,7 @@
 using NUnit.Framework;
 using UnityEngine;
 
+#if ADDRESSABLES_AVAILABLE
 namespace GONet
 {
     /// <summary>
@@ -633,3 +634,4 @@ namespace GONet
         #endregion
     }
 }
+#endif // ADDRESSABLES_AVAILABLE

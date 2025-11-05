@@ -13,10 +13,8 @@
  * -The ability to commercialize products built on modified source code, whereas this license must be included if source code provided in said products and whereas the products are interactive multi-player video games and cannot be viewed as a product competitive to GONet
  */
 
-using Assets.GONet.Code.GONet.Editor.Generation;
 using GONet.Editor;
 using GONet.Editor.Generation;
-using GONet.Generation;
 using GONet.PluginAPI;
 using GONet.Utils;
 using MemoryPack;
@@ -41,17 +39,44 @@ using UnityEngine.SceneManagement;
 
 namespace GONet.Generation
 {
+    [InitializeOnLoad]
     public class ProcessBuildHelper : IPreprocessBuildWithReport, IPostprocessBuildWithReport
     {
         private static object _compilationContext;
         private static List<CompilerMessage> _compilationErrorMessages = new List<CompilerMessage>();
         private static bool isBuilding;
+        private static bool wasBuilding;
+        private static double buildEndTime;
+        private static BuildReport lastBuildReport;
         public static bool IsBuilding => isBuilding;
         public int callbackOrder => 1;
+
+        // Static constructor for InitializeOnLoad
+        static ProcessBuildHelper()
+        {
+            EditorApplication.update += OnEditorUpdate;
+        }
+
+        // Fallback mechanism: Detect when build result becomes known or wait for build to finish
+        private static void OnEditorUpdate()
+        {
+            // If we were building but now we're not, and compilation is done
+            if (wasBuilding && !isBuilding && !EditorApplication.isCompiling && lastBuildReport != null)
+            {
+                double timeSinceBuildEnd = EditorApplication.timeSinceStartup - buildEndTime;
+
+                // Unity 6.2 BUG: The result NEVER becomes known, process immediately after compilation
+                OnPostprocessBuild_ProcessDirtyIfAppropriate(lastBuildReport);
+                wasBuilding = false;
+                lastBuildReport = null;
+            }
+        }
 
         public void OnPreprocessBuild(BuildReport report)
         {
             isBuilding = true;
+            wasBuilding = false; // Reset fallback flag
+            lastBuildReport = report;
             GONetSpawnSupport_DesignTime.ClearAllDesignTimeMetadata();
             CompilationPipeline.compilationStarted += CompilationPipelineOnCompilationStarted;
             CompilationPipeline.assemblyCompilationFinished += CompilationPipelineOnAssemblyCompilationFinished;
@@ -76,16 +101,28 @@ namespace GONet.Generation
             if (report == null)
             {
                 GONetLog.Error($"The build report is not available after build is reported as being completed.  GONet will not process things completely.");
+                // Enable fallback mechanism
+                wasBuilding = true;
+                buildEndTime = EditorApplication.timeSinceStartup;
+                lastBuildReport = report;
+                isBuilding = false;
                 return;
             }
 
             if (report.summary.result == BuildResult.Unknown)
             {
-                // delay the call to process this in hopes that unity will have the report status ready to check at that time, which in testing it does!
-                EditorApplication.delayCall += () => OnPostprocessBuild_ProcessDirtyIfAppropriate(report);
+                // Unity 6.2 BUG: Build result stays Unknown even for successful builds
+                // We MUST process immediately because play-mode code generation will trigger
+                // assembly reload which wipes static variables, making any fallback mechanism impossible
+                wasBuilding = false;
+                lastBuildReport = null;
+                OnPostprocessBuild_ProcessDirtyIfAppropriate(report);
             }
             else
             {
+                // Disable fallback mechanism since we got a real result
+                wasBuilding = false;
+                lastBuildReport = null;
                 OnPostprocessBuild_ProcessDirtyIfAppropriate(report);
             }
         }
@@ -93,9 +130,21 @@ namespace GONet.Generation
         private static void OnPostprocessBuild_ProcessDirtyIfAppropriate(BuildReport report)
         {
             GONetLog.Debug($"~~~~~~~~~~~~GEEPs end  BUILD did this!  report.summary.result: {report.summary.result}");
+
+            // Mark that we're done building and processed the callback
             isBuilding = false;
+            wasBuilding = false; // Disable fallback since we got here properly
+            lastBuildReport = null;
+
             if (report.summary.result == BuildResult.Succeeded)
             {
+                GONetSpawnSupport_DesignTime.IndicateGONetDesignTimeNoLongerDirty();
+                GONetSpawnSupport_DesignTime.RecordScenesInSuccessfulBuild();
+            }
+            else if (report.summary.result == BuildResult.Unknown)
+            {
+                // Unity 6.2 BUG: Build result stays Unknown even for successful builds
+                // Assume success and record the build, the play-mode check will validate
                 GONetSpawnSupport_DesignTime.IndicateGONetDesignTimeNoLongerDirty();
                 GONetSpawnSupport_DesignTime.RecordScenesInSuccessfulBuild();
             }
@@ -135,9 +184,18 @@ namespace GONet.Generation
                 foreach (CompilerMessage message in _compilationErrorMessages)
                 {
                     Debug.LogError($"\tERROR.  Message: {message.message}\n\t\tFile: {message.file}, Line: {message.line}, Column: {message.column}");
-                }    
+                }
 
                 GONetParticipant_AutoMagicalSyncCompanion_Generated_Generator.DeleteGeneratedFiles();
+            }
+
+            // CRITICAL: Enable fallback mechanism after compilation finishes during a build
+            // If OnPostprocessBuild wasn't called yet, the fallback in OnEditorUpdate will handle it
+            if (isBuilding && lastBuildReport != null)
+            {
+                wasBuilding = true;
+                buildEndTime = EditorApplication.timeSinceStartup;
+                isBuilding = false;
             }
         }
     }

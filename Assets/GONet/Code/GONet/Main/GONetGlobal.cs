@@ -45,6 +45,22 @@ namespace GONet
         /// </summary>
         public static GONetGlobal Instance => instance;
 
+        /// <summary>
+        /// High-resolution timestamp when GONetGlobal.Awake() was called.
+        /// This represents the START of scene load (first object to Awake in the scene).
+        /// All scene-defined objects will have awakeTimeTicks close to this value.
+        /// Runtime-spawned objects will have awakeTimeTicks significantly AFTER this.
+        /// </summary>
+        private static long gonetGlobalAwakeTicks = -1;
+
+        /// <summary>
+        /// Tracks when each scene started loading (high-resolution ticks).
+        /// Used to distinguish scene-defined objects (created during scene load) vs
+        /// runtime-spawned objects (created after scene finished loading).
+        /// Key: Scene.name, Value: HighResolutionTimeUtils.UtcNowTicks when scene started loading (GONetGlobal.Awake time)
+        /// </summary>
+        private static readonly Dictionary<string, long> sceneLoadTimesTicks = new Dictionary<string, long>();
+
         #region TODO this should be configurable/set elsewhere potentially AFTER loading up and depending on other factors like match making etc...
 
         //public string serverIP;
@@ -359,6 +375,13 @@ namespace GONet
 
         protected override void Awake()
         {
+            // CRITICAL: Record scene load baseline timestamp FIRST
+            // GONetGlobal is the first object to Awake in the scene (ExecutionOrder -32000)
+            // This timestamp represents when the scene started loading
+            // All scene-defined objects will have awakeTimeTicks close to this value
+            // Runtime-spawned objects will have awakeTimeTicks significantly AFTER this
+            gonetGlobalAwakeTicks = HighResolutionTimeUtils.UtcNowTicks;
+
             // PHASE 2 FIX: Force Application.runInBackground = true for multiplayer servers/clients
             // This ensures servers keep processing network traffic even when Unity window loses focus
             // Critical for dedicated servers and multi-instance local testing (editor + builds)
@@ -427,9 +450,6 @@ namespace GONet
 
             enabledGONetParticipants.Clear();
 
-            // Create persistent status UI
-            CreateStatusUI();
-
             // Start physics sync coroutine (server-only, runs after all physics processing)
             StartCoroutine(PhysicsSync_WaitForFixedUpdate());
 
@@ -463,15 +483,6 @@ namespace GONet
 
                 // NOW capture and sync final physics state (server-only check inside method)
                 GONetMain.PhysicsSync_ProcessASAP();
-            }
-        }
-
-        private void CreateStatusUI()
-        {
-            // Add GONetStatusUI component if it doesn't already exist
-            if (GetComponent<GONet.Sample.GONetStatusUI>() == null)
-            {
-                gameObject.AddComponent<GONet.Sample.GONetStatusUI>();
             }
         }
 
@@ -615,71 +626,285 @@ namespace GONet
 
         private void OnSceneLoaded(Scene sceneLoaded, LoadSceneMode loadMode)
         {
-            // DIAGNOSTIC: Log that handler is being called
-            GONetLog.Info($"[OnSceneLoaded] ENTRY - Scene: '{sceneLoaded.name}', LoadMode: {loadMode}, IsServer: {GONetMain.IsServer}, IsClient: {GONetMain.IsClient}, Instance: {(instance == this ? "Singleton" : "OTHER")}, Time: {GONetMain.Time.ElapsedSeconds:F3}s");
+            // CRITICAL: Record scene load baseline at TIME OF THIS CALLBACK
+            // For initial scene (with GONetGlobal): Use GONetGlobal's awake time (more accurate - first object to Awake)
+            // For additive scenes: Use current time (GONetGlobal not in this scene)
+            // For LoadSceneMode.Single: Use current time (GONetGlobal may have been destroyed/recreated)
 
-            { // do auto-assign authority id stuffs for all gonet stuff in scene
-                List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
-                GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
+            long sceneLoadBaseline;
+            if (sceneLoaded.name == gameObject.scene.name && gonetGlobalAwakeTicks > 0)
+            {
+                // This is the scene GONetGlobal is in - use its Awake time as baseline
+                sceneLoadBaseline = gonetGlobalAwakeTicks;
+            }
+            else
+            {
+                // Different scene (additive or new Single mode scene) - use current time
+                sceneLoadBaseline = HighResolutionTimeUtils.UtcNowTicks;
+            }
 
-                GONetLog.Debug($"OnSceneLoaded: '{sceneLoaded.name}' with {sceneObjects.Length} root objects");
+            sceneLoadTimesTicks[sceneLoaded.name] = sceneLoadBaseline;
 
-                FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
+            // DIAGNOSTIC: Log scene load with high-resolution timestamp
+            double sceneLoadSeconds = sceneLoadBaseline * HighResolutionTimeUtils.TICKS_TO_SECONDS;
+            double gonetElapsedSeconds = GONetMain.Time != null ? GONetMain.Time.ElapsedSeconds : 0;
 
-                GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
+            GONetLog.Info($"[OnSceneLoaded] ENTRY - Scene: '{sceneLoaded.name}', LoadMode: {loadMode}, " +
+                          $"IsServer: {GONetMain.IsServer}, IsClient: {GONetMain.IsClient}, " +
+                          $"BaselineTicks: {sceneLoadBaseline}, BaselineSeconds: {sceneLoadSeconds:F6}, " +
+                          $"GONetTime: {gonetElapsedSeconds:F3}s, " +
+                          $"UsedGONetGlobalBaseline: {sceneLoadBaseline == gonetGlobalAwakeTicks}, " +
+                          $"MetadataCached: {GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached}");
 
-                if (GONetMain.IsClientVsServerStatusKnown)
+            // CRITICAL: Defer scene-defined participant filtering until metadata is ready
+            // This ensures Signal #2 (DesignTimeLocation) works reliably on all platforms
+            // On Windows/Mac/iOS/Linux, metadata is synchronous and already ready (exits immediately)
+            // On Android/WebGL, metadata loads asynchronously via UnityWebRequest (~50-200ms)
+            StartCoroutine(ProcessSceneDefinedParticipants_WhenMetadataReady(sceneLoaded, loadMode));
+        }
+
+        /// <summary>
+        /// Waits for DesignTimeMetadata to be cached, then filters scene-defined participants.
+        /// This ensures Signal #2 (DesignTimeLocation) works reliably across all platforms.
+        /// On Windows/Mac/iOS/Linux: Metadata synchronous, exits immediately (zero latency)
+        /// On Android/WebGL: Metadata async (~50-200ms), waits with timeout protection
+        /// </summary>
+        private System.Collections.IEnumerator ProcessSceneDefinedParticipants_WhenMetadataReady(Scene sceneLoaded, LoadSceneMode loadMode)
+        {
+            // Wait for global metadata cache with timeout
+            const float METADATA_TIMEOUT_SECONDS = 5.0f;
+            float startTime = Time.time;
+            float elapsed = 0f;
+
+            while (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached && elapsed < METADATA_TIMEOUT_SECONDS)
+            {
+                yield return null;
+                elapsed = Time.time - startTime;
+            }
+
+            // Log diagnostic info
+            if (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+            {
+                GONetLog.Error($"[OnSceneLoaded] Metadata cache TIMEOUT after {elapsed:F3}s for scene '{sceneLoaded.name}'! " +
+                               $"Falling back to timestamp-only detection (Signal #3/4). This may cause false positives for early instantiations. " +
+                               $"Check that DesignTimeMetadata.json exists in StreamingAssets/GONet/");
+            }
+            else if (elapsed > 0.001f)
+            {
+                // Metadata took more than 1ms - likely Android/WebGL async loading
+                GONetLog.Info($"[OnSceneLoaded] Metadata cache ready for scene '{sceneLoaded.name}' after {elapsed * 1000:F1}ms wait (async load detected - likely Android/WebGL)");
+            }
+            else
+            {
+                // Metadata already ready - Windows/Mac/iOS/Linux synchronous loading
+                GONetLog.Debug($"[OnSceneLoaded] Metadata cache already ready for scene '{sceneLoaded.name}' (synchronous load detected - Windows/Mac/iOS/Linux)");
+            }
+
+            // NOW filter scene-defined participants - metadata ready (or timed out)
+            List<GONetParticipant> gonetParticipantsInLevel = new List<GONetParticipant>();
+            GameObject[] sceneObjects = sceneLoaded.GetRootGameObjects();
+
+            GONetLog.Debug($"OnSceneLoaded: '{sceneLoaded.name}' with {sceneObjects.Length} root objects");
+
+            FindAndAppend(sceneObjects, gonetParticipantsInLevel, (gnp) => !WasInstantiated(gnp)); // IMPORTANT: or else!
+
+            GONetMain.RecordParticipantsAsDefinedInScene(gonetParticipantsInLevel);
+
+            // DIAGNOSTIC: Log which participants were marked as scene-defined
+            GONetLog.Info($"[OnSceneLoaded] Scene '{sceneLoaded.name}' - Marked {gonetParticipantsInLevel.Count} participants as scene-defined:");
+            foreach (var gnp in gonetParticipantsInLevel)
+            {
+                double createdAtSeconds = gnp.awakeTimeTicks * HighResolutionTimeUtils.TICKS_TO_SECONDS;
+                GONetLog.Info($"  - '{gnp.name}' (InstanceID: {gnp.GetInstanceID()}, AwakeTime: {createdAtSeconds:F6}s)");
+            }
+
+            if (GONetMain.IsClientVsServerStatusKnown)
+            {
+                GONetLog.Info($"[OnSceneLoaded] About to call AssignOwnerAuthorityIds_IfAppropriate for {gonetParticipantsInLevel.Count} participants (IsServer: {GONetMain.IsServer})");
+                GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
+
+                // IMPORTANT: If this is the server, initialize scene-defined objects with IGONetSyncdBehaviourInitializer
+                // This must happen EVEN IF no clients are connected (server needs to initialize its own objects)
+                if (GONetMain.IsServer)
                 {
-                    GONetLog.Info($"[OnSceneLoaded] About to call AssignOwnerAuthorityIds_IfAppropriate for {gonetParticipantsInLevel.Count} participants (IsServer: {GONetMain.IsServer})");
-                    GONetMain.AssignOwnerAuthorityIds_IfAppropriate(gonetParticipantsInLevel);
-
-                    // IMPORTANT: If this is the server, initialize scene-defined objects with IGONetSyncdBehaviourInitializer
-                    // This must happen EVEN IF no clients are connected (server needs to initialize its own objects)
-                    if (GONetMain.IsServer)
+                    StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
+                }
+                else if (GONetMain.IsClient)
+                {
+                    // CLIENT: Check if we have buffered GONetId assignments for this scene
+                    // Server sends GONetIds proactively (no round-trip wait), so they may arrive BEFORE scene loads
+                    if (bufferedGONetIdAssignmentsByScene.TryGetValue(sceneLoaded.name, out BufferedGONetIdAssignments buffered))
                     {
-                        StartCoroutine(SyncSceneDefinedObjectIds_WhenReady(sceneLoaded.name, gonetParticipantsInLevel));
+                        double receiveDelay = GONetMain.Time.ElapsedSeconds - buffered.receivedAtTime;
+                        GONetLog.Info($"[GONetId-BUFFER-APPLY] CLIENT applying buffered GONetId assignments for scene '{sceneLoaded.name}' ({buffered.designTimeLocations.Length} objects, received {receiveDelay * 1000:F1}ms ago, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
+
+                        // Apply the buffered assignments now that scene is loaded
+                        ApplyGONetIdAssignments(buffered.sceneName, buffered.designTimeLocations, buffered.gonetIds, buffered.customInitData);
+
+                        // Clear the buffer entry
+                        bufferedGONetIdAssignmentsByScene.Remove(sceneLoaded.name);
+                        GONetLog.Info($"[GONetId-BUFFER-CLEARED] Cleared buffer for scene '{sceneLoaded.name}' (time: {GONetMain.Time.ElapsedSeconds:F3}s)");
                     }
-                    else if (GONetMain.IsClient)
+                    else
                     {
-                        // CLIENT: Check if we have buffered GONetId assignments for this scene
-                        // Server sends GONetIds proactively (no round-trip wait), so they may arrive BEFORE scene loads
-                        if (bufferedGONetIdAssignmentsByScene.TryGetValue(sceneLoaded.name, out BufferedGONetIdAssignments buffered))
-                        {
-                            double receiveDelay = GONetMain.Time.ElapsedSeconds - buffered.receivedAtTime;
-                            GONetLog.Info($"[GONetId-BUFFER-APPLY] CLIENT applying buffered GONetId assignments for scene '{sceneLoaded.name}' ({buffered.designTimeLocations.Length} objects, received {receiveDelay * 1000:F1}ms ago, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
-
-                            // Apply the buffered assignments now that scene is loaded
-                            ApplyGONetIdAssignments(buffered.sceneName, buffered.designTimeLocations, buffered.gonetIds, buffered.customInitData);
-
-                            // Clear the buffer entry
-                            bufferedGONetIdAssignmentsByScene.Remove(sceneLoaded.name);
-                            GONetLog.Info($"[GONetId-BUFFER-CLEARED] Cleared buffer for scene '{sceneLoaded.name}' (time: {GONetMain.Time.ElapsedSeconds:F3}s)");
-                        }
-                        else
-                        {
-                            GONetLog.Info($"[GONetId-BUFFER-CHECK] No buffered GONetId assignments for scene '{sceneLoaded.name}' (will receive via RPC later, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
-                        }
+                        GONetLog.Info($"[GONetId-BUFFER-CHECK] No buffered GONetId assignments for scene '{sceneLoaded.name}' (will receive via RPC later, time: {GONetMain.Time.ElapsedSeconds:F3}s)");
                     }
+                }
+            }
+            else
+            {
+                StartCoroutine(AssignOwnerAuthorityIds_WhenAppropriate(gonetParticipantsInLevel));
+            }
+        }
+
+        /// <summary>
+        /// Determines if a GONetParticipant was runtime-spawned vs scene-defined.
+        /// Uses multiple independent signals for maximum reliability with sub-millisecond precision.
+        /// </summary>
+        bool WasInstantiated(GONetParticipant gnp)
+        {
+                // ==================================================
+                // SIGNAL #1: wasInstantiatedForce (100% reliable for network spawns)
+                // ==================================================
+                if (gnp.wasInstantiatedForce)
+                {
+                    GONetLog.Debug($"[WasInstantiated] TRUE (Signal #1: wasInstantiatedForce) - '{gnp.name}'");
+                    return true;
+                }
+
+                // ==================================================
+                // SIGNAL #2: DesignTimeLocation (with manual lookup fallback)
+                // ==================================================
+                string location = null;
+
+                if (gnp.IsDesignTimeMetadataInitd)
+                {
+                    // BEST CASE: Participant metadata already initialized via its AwakeCoroutine
+                    location = gnp.DesignTimeLocation;
+                }
+                else if (GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+                {
+                    // FALLBACK: Global cache ready, but participant's AwakeCoroutine hasn't completed yet
+                    // This can happen if WasInstantiated() is called before participant coroutines run
+                    // Manually look up metadata from the cached library
+                    location = GONetSpawnSupport_Runtime.GetDesignTimeMetadata_Location(gnp, force: false);
+
+                    if (!string.IsNullOrWhiteSpace(location))
+                    {
+                        GONetLog.Debug($"[WasInstantiated] Signal #2 using manual metadata lookup (participant coroutine not complete yet) - '{gnp.name}'");
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(location))
+                {
+                    // Prefab-based instantiation (resources or addressables)
+                    if (location.StartsWith("resources://") ||
+                        location.StartsWith("addressables://") ||
+                        location.Contains("/Resources/") ||
+                        location.EndsWith(".prefab"))
+                    {
+                        GONetLog.Debug($"[WasInstantiated] TRUE (Signal #2: DesignTimeLocation prefab) - '{gnp.name}', Location: {location}");
+                        return true;
+                    }
+
+                    // Scene hierarchy path (scene-defined)
+                    if (location.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX))
+                    {
+                        GONetLog.Debug($"[WasInstantiated] FALSE (Signal #2: DesignTimeLocation scene_hierarchy) - '{gnp.name}', Location: {location}");
+                        return false;
+                    }
+                }
+                else if (!GONetSpawnSupport_Runtime.IsDesignTimeMetadataCached)
+                {
+                    // Global cache not ready yet - Signal #2 unavailable
+                    // This should be RARE since ProcessSceneDefinedParticipants_WhenMetadataReady waits for cache
+                    // But could happen if WasInstantiated() called from elsewhere (not OnSceneLoaded)
+                    GONetLog.Debug($"[WasInstantiated] Signal #2 unavailable - metadata not cached yet for '{gnp.name}', falling back to timing signals");
                 }
                 else
                 {
-                    StartCoroutine(AssignOwnerAuthorityIds_WhenAppropriate(gonetParticipantsInLevel));
+                    // Metadata cached but lookup returned empty - possible edge case
+                    GONetLog.Debug($"[WasInstantiated] Signal #2 lookup returned empty location for '{gnp.name}', falling back to timing signals");
                 }
-            }
 
-            bool WasInstantiated(GONetParticipant gONetParticipant)
-            {
-                // OLD WAY that no longer applies since this info is not stored on GNP
-                //(gnp) => gnp.DesignTimeLocation.StartsWith(GONetSpawnSupport_Runtime.SCENE_HIERARCHY_PREFIX)); // IMPORTANT: or else!
+                // ==================================================
+                // SIGNAL #3: High-Resolution Timestamp Comparison
+                // ==================================================
+                // Compare object creation time vs scene load time using sub-millisecond precision
+                // Scene-defined objects are created DURING scene load (awakeTime ≈ sceneLoadTime)
+                // Runtime-spawned objects are created AFTER scene load (awakeTime > sceneLoadTime + threshold)
 
-                //string fullUniquePath = DesignTimeMetadata.GetFullUniquePathInScene(gonetParticipant);
-                //return !GONetSpawnSupport_Runtime.AnyDesignTimeMetadata(fullUniquePath);
+                if (gnp.awakeTimeTicks > 0)
+                {
+                    string sceneName = gnp.gameObject.scene.name;
 
-                // TODO FIXME figure out what case exists where all the GNPs in a newly loaded scene do not ALL get considered NOT spawned/instantiated!!!!
+                    // Special case: DontDestroyOnLoad pseudo-scene
+                    if (sceneName == "DontDestroyOnLoad")
+                    {
+                        // Object already moved to DDOL, fall back to recency check (Signal #4)
+                        GONetLog.Debug($"[WasInstantiated] Signal #3 skipped - '{gnp.name}' already in DontDestroyOnLoad, using Signal #4");
+                    }
+                    else if (sceneLoadTimesTicks.TryGetValue(sceneName, out long sceneLoadTicks))
+                    {
+                        // Calculate time delta with sub-millisecond precision
+                        long deltaTicks = gnp.awakeTimeTicks - sceneLoadTicks;
+                        double deltaSeconds = deltaTicks * HighResolutionTimeUtils.TICKS_TO_SECONDS;
 
+                        // Threshold: 50ms (conservative - handles scene load processing variance)
+                        // This accounts for:
+                        // - Multiple objects' Awake() calls during scene load
+                        // - Platform-specific timing variance
+                        // - Coroutine scheduling delays
+                        const double THRESHOLD_SECONDS = 0.050; // 50ms
+
+                        if (deltaSeconds > THRESHOLD_SECONDS)
+                        {
+                            GONetLog.Debug($"[WasInstantiated] TRUE (Signal #3: high-res timestamp) - '{gnp.name}', " +
+                                           $"created {deltaSeconds * 1000:F3}ms after scene load (threshold: {THRESHOLD_SECONDS * 1000:F0}ms)");
+                            return true;
+                        }
+                        else
+                        {
+                            GONetLog.Debug($"[WasInstantiated] FALSE (Signal #3: high-res timestamp) - '{gnp.name}', " +
+                                           $"created {deltaSeconds * 1000:F3}ms after scene load (within threshold)");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        GONetLog.Debug($"[WasInstantiated] Signal #3 unavailable - scene '{sceneName}' load time not tracked, using Signal #4");
+                    }
+                }
+
+                // ==================================================
+                // SIGNAL #4: Absolute Recency Check (LAST RESORT)
+                // ==================================================
+                // If object was created VERY recently (< 20ms ago), it's likely runtime-spawned
+                // This catches objects instantiated BEFORE OnSceneLoaded registered the scene
+
+                if (gnp.awakeTimeTicks > 0)
+                {
+                    long currentTicks = HighResolutionTimeUtils.UtcNowTicks;
+                    long timeSinceAwakeTicks = currentTicks - gnp.awakeTimeTicks;
+                    double timeSinceAwakeSeconds = timeSinceAwakeTicks * HighResolutionTimeUtils.TICKS_TO_SECONDS;
+
+                    // Threshold: 20ms (very conservative - catches brand-new objects only)
+                    const double RECENCY_THRESHOLD_SECONDS = 0.020; // 20ms
+
+                    if (timeSinceAwakeSeconds < RECENCY_THRESHOLD_SECONDS)
+                    {
+                        GONetLog.Debug($"[WasInstantiated] TRUE (Signal #4: recency) - '{gnp.name}', " +
+                                       $"created {timeSinceAwakeSeconds * 1000:F3}ms ago (threshold: {RECENCY_THRESHOLD_SECONDS * 1000:F0}ms)");
+                        return true;
+                    }
+                }
+
+                // ==================================================
+                // DEFAULT: Assume Scene-Defined (Conservative)
+                // ==================================================
+                GONetLog.Debug($"[WasInstantiated] FALSE (default: all signals inconclusive) - '{gnp.name}'");
                 return false;
             }
-        }
 
         private IEnumerator AssignOwnerAuthorityIds_WhenAppropriate(List<GONetParticipant> gonetParticipantsInLevel)
         {

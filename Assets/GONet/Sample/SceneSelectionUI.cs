@@ -369,10 +369,14 @@ namespace GONet.Sample
 
                 if (isAddressable)
                 {
+#if ADDRESSABLES_AVAILABLE
                     GONetMain.SceneManager.RequestLoadAddressablesScene(sceneName, LoadSceneMode.Single);
+#else
+                    GONetLog.Error($"Unable to load Addressable scene {sceneName} until you add precompiler directive to define ADDRESSABLES_AVAILABLE.");
+#endif
                 }
                 else
-                {
+                    {
                     GONetMain.SceneManager.RequestLoadScene(sceneName, LoadSceneMode.Single);
                 }
 
@@ -401,8 +405,12 @@ namespace GONet.Sample
 
             if (isAddressable)
             {
+#if ADDRESSABLES_AVAILABLE
                 GONetLog.Info($"[SceneSelectionUI] Loading scene '{sceneName}' from Addressables");
                 GONetMain.SceneManager.LoadSceneFromAddressables(sceneName, mode);
+#else
+                GONetLog.Error($"Unable to load Addressable scene {sceneName} until you add precompiler directive to define ADDRESSABLES_AVAILABLE.");
+#endif
             }
             else
             {

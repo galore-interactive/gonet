@@ -19,7 +19,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.Build;
 using UnityEditor.Compilation;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -362,18 +361,63 @@ namespace GONet.Editor
             GONetLog.Debug($"Prefab stage closing - setting grace period timestamp: {lastPrefabStageClosedTime}");
         }
 
+        /// <summary>
+        /// Rock-solid solution for Unity 6.2: Check if a successful build was completed after the dirty file was created.
+        /// This is called on play mode entry and is guaranteed to work regardless of callback timing issues.
+        /// </summary>
+        private static bool WasSuccessfulBuildCompletedSinceDirtyFile(string dirtyFilePath)
+        {
+            try
+            {
+                if (!File.Exists(dirtyFilePath))
+                {
+                    return false;
+                }
+
+                DateTime dirtyFileTime = File.GetLastWriteTimeUtc(dirtyFilePath);
+
+                if (TryGetGONetMostRecentSuccessfulBuild(out GONetMostRecentSuccessfulBuild buildRecord))
+                {
+                    DateTime buildTime = buildRecord.DateTimeBuildSucceeded.ToUniversalTime();
+
+                    // If build happened after dirty file was created, we should clean it up
+                    bool buildIsNewer = buildTime > dirtyFileTime;
+                    return buildIsNewer;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                GONetLog.Warning($"Error checking if build completed since dirty file: {ex.Message}");
+                return false;
+            }
+        }
+
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
             // Check when Unity is about to enter play mode (ExitingEditMode)
             if (state == PlayModeStateChange.ExitingEditMode)
             {
+                // CRITICAL: Check if a successful build happened since dirty file was created
+                // This handles Unity 6.2 where OnPostprocessBuild is unreliable
+                string filePath = GetDesignTimeDirtyReasonsFilePath();
+                if (File.Exists(filePath))
+                {
+                    if (WasSuccessfulBuildCompletedSinceDirtyFile(filePath))
+                    {
+                        File.Delete(filePath);
+                    }
+                }
+
                 // IMPORTANT: Check for changes BEFORE checking for dirty file existence
                 // This ensures changes are detected and recorded before the play mode warning check
                 // Uses either traditional or content-based checking depending on configuration
                 CheckForChangesBeforePlayMode();
 
                 bool didPreventEnteringPlaymode = false;
-                string filePath = GetDesignTimeDirtyReasonsFilePath();
                 AddDirtyReasonIfScenesInBuildDiffer(filePath);
 
                 // Check for the existence of the "is dirty" file
@@ -576,7 +620,20 @@ namespace GONet.Editor
         internal static void IndicateGONetDesignTimeNoLongerDirty()
         {
             string filePath = GetDesignTimeDirtyReasonsFilePath();
-            File.Delete(filePath);
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    long fileSize = new FileInfo(filePath).Length;
+                    File.Delete(filePath);
+                }
+                catch (System.Exception ex)
+                {
+                    GONetLog.Error($"EXCEPTION during File.Delete(): {ex.GetType().Name}: {ex.Message}");
+                    GONetLog.Error($"Stack trace: {ex.StackTrace}");
+                }
+            }
 
 #if ADDRESSABLES_AVAILABLE
             // Also clear addressables session tracking when builds succeed
@@ -1606,8 +1663,10 @@ namespace GONet.Editor
 
             static void HandlePotentialChangeInPrefabPreviewMode_ProcessAnyDesignTimeDirty_IfAppropriate()
             {
+#if ADDRESSABLES_AVAILABLE
                 // Update the addressable asset paths cache before processing changes
                 UpdateAddressableAssetPathsCache();
+#endif
 
                 IEnumerable<DesignTimeMetadata> designTimeLocations_gonetParticipants_lastBuild =
                     GONetSpawnSupport_Runtime.LoadDesignTimeMetadataFromPersistence();
@@ -1665,7 +1724,13 @@ namespace GONet.Editor
                         }
 
                         // Check if this was an addressable asset in the last build to provide the correct message
-                        bool wasAddressableAsset = WasAddressableInLastBuild(deletedPath, designTimeLocations_gonetParticipants_lastBuild);
+                        bool wasAddressableAsset =
+#if ADDRESSABLES_AVAILABLE
+                            WasAddressableInLastBuild(deletedPath, designTimeLocations_gonetParticipants_lastBuild);
+#else
+                            false;
+#endif
+
                         string messageType = wasAddressableAsset ? "addressable" : "project resources";
 
                         GONetLog.Debug($"Confirmed deletion for {deletedPath}: wasAddressable={wasAddressableAsset}");

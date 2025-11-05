@@ -1738,20 +1738,34 @@ namespace GONet.Editor.Generation
             float fixedDeltaTime = 0.02f; // Default Unity value (50Hz)
             try
             {
-                var timeManager = UnityEditor.AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TimeManager.asset");
-                if (timeManager != null && timeManager.Length > 0)
+                // Unity 6 Fix: Parse TimeManager.asset directly as text instead of using SerializedProperty
+                // SerializedProperty.floatValue throws "type is not a supported float value" in Unity 6
+                string timeManagerPath = System.IO.Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "TimeManager.asset");
+                if (System.IO.File.Exists(timeManagerPath))
                 {
-                    var serializedObject = new UnityEditor.SerializedObject(timeManager[0]);
-                    var fixedTimestepProperty = serializedObject.FindProperty("Fixed Timestep");
-                    if (fixedTimestepProperty != null)
+                    string[] lines = System.IO.File.ReadAllLines(timeManagerPath);
+                    foreach (string line in lines)
                     {
-                        fixedDeltaTime = fixedTimestepProperty.floatValue;
+                        if (line.Contains("Fixed Timestep:"))
+                        {
+                            // Parse: "  Fixed Timestep: 0.02"
+                            string[] parts = line.Split(':');
+                            if (parts.Length == 2 && float.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsed))
+                            {
+                                fixedDeltaTime = parsed;
+                                break;
+                            }
+                        }
                     }
                 }
+                else
+                {
+                    GONetLog.Warning($"TimeManager.asset not found at {timeManagerPath}. Using default fixed delta time.");
+                }
             }
-            catch
+            catch (System.Exception ex)
             {
-                GONetLog.Error($"Unable to get actual fixed delta time from project settings. Fallback value will be used, but THAT IS DANGEROUS for quality - things WILL NOT BE CALCULATED PERFECTLY!");
+                GONetLog.Error($"Unable to get actual fixed delta time from project settings. Fallback value will be used, but THAT IS DANGEROUS for quality - things WILL NOT BE CALCULATED PERFECTLY! Error: {ex.Message}");
                 // Fallback to default if we can't read project settings
                 fixedDeltaTime = 0.02f;
             }

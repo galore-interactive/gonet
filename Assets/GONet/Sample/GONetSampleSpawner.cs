@@ -14,6 +14,7 @@
  */
 
 using GONet;
+using GONet.Sample;
 using NetcodeIO.NET;
 using System;
 using UnityEngine;
@@ -39,6 +40,14 @@ public class GONetSampleSpawner : MonoBehaviourGONetCallbacks
 
         EventBus.Subscribe<ClientStateChangedEvent>(OnClientStateChanged_LogIt);
         EventBus.Subscribe<RemoteClientStateChangedEvent>(OnRemoteClientStateChanged_LogIt);
+
+        // Add sample status UI component if it doesn't already exist
+        // This is sample code - moved from GONetGlobal to keep core framework clean
+        var gonetGlobal = GetComponent<GONetGlobal>();
+        if (gonetGlobal != null && gonetGlobal.GetComponent<GONetStatusUI>() == null)
+        {
+            gonetGlobal.gameObject.AddComponent<GONetStatusUI>();
+        }
     }
 
     private void OnRemoteClientStateChanged_LogIt(GONetEventEnvelope<RemoteClientStateChangedEvent> eventEnvelope)
