@@ -1,5 +1,4 @@
 using GONet;
-using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
@@ -134,7 +133,7 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
 
     #endregion
 
-    #region TargetRpc Test Methods (72 methods: 9 param counts × 8 variants)
+    #region TargetRpc Test Methods (36 rpc methods: 9 param counts × 4 variants each)
 
     // ========== 0-parameter TargetRpc tests ==========
     [TargetRpc]
@@ -797,9 +796,14 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
 
     #region Test Input Handling
 
-    private void Update()
+    internal override void UpdateAfterGONetReady()
     {
-        if (!IsMine) return;
+        base.UpdateAfterGONetReady();
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////
+        if (!Input.GetKey(KeyCode.LeftShift)) return; // left shift must be down for any of the rest!
+        /////////////////////////////////////////////////////////////////////////////////////////////////
+
 
         // TargetRpc property for routing (needed by TargetRpc system)
         CurrentMessageTargets = new System.Collections.Generic.List<ushort> { GONetMain.OwnerAuthorityId_Server, 1, 2 };
@@ -814,7 +818,6 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
         if (Input.GetKeyDown(KeyCode.K))
         {
             DumpRpcExecutionSummary();
-            return;
         }
 
         // Shift+L: TargetRpc comprehensive test (broadcasts to all machines)

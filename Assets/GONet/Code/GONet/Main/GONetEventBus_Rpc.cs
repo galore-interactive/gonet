@@ -1078,7 +1078,7 @@ namespace GONet
         // ExecuteRpcLocally - 0 parameters
         private void ExecuteRpcLocally(GONetParticipantCompanionBehaviour instance, string methodName)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1096,7 +1096,7 @@ namespace GONet
         // ExecuteRpcLocally - 1 parameters
         private void ExecuteRpcLocally<T1>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1114,7 +1114,7 @@ namespace GONet
         // ExecuteRpcLocally - 2 parameters
         private void ExecuteRpcLocally<T1, T2>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1132,7 +1132,7 @@ namespace GONet
         // ExecuteRpcLocally - 3 parameters
         private void ExecuteRpcLocally<T1, T2, T3>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1150,7 +1150,7 @@ namespace GONet
         // ExecuteRpcLocally - 4 parameters
         private void ExecuteRpcLocally<T1, T2, T3, T4>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1168,7 +1168,7 @@ namespace GONet
         // ExecuteRpcLocally - 5 parameters
         private void ExecuteRpcLocally<T1, T2, T3, T4, T5>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1186,7 +1186,7 @@ namespace GONet
         // ExecuteRpcLocally - 6 parameters
         private void ExecuteRpcLocally<T1, T2, T3, T4, T5, T6>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1204,7 +1204,7 @@ namespace GONet
         // ExecuteRpcLocally - 7 parameters
         private void ExecuteRpcLocally<T1, T2, T3, T4, T5, T6, T7>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
@@ -1222,7 +1222,7 @@ namespace GONet
         // ExecuteRpcLocally - 8 parameters
         private void ExecuteRpcLocally<T1, T2, T3, T4, T5, T6, T7, T8>(GONetParticipantCompanionBehaviour instance, string methodName, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
         {
-            if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+            if (rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
             {
                 var context = new GONetRpcContext(GONetMain.MyAuthorityId, true, instance.GONetParticipant.GONetId);
                 SetCurrentRpcContext(context);
