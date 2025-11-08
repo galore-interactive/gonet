@@ -894,6 +894,13 @@ namespace GONet
 
             int Handle<T>(T @event, ushort remoteSourceAuthorityId, ushort targetClientAuthorityId, bool shouldPublishReliably, int exceptionsThrown, List<EventHandlerAndFilterer> handlersForType) where T : IGONetEvent
             {
+                // DIAGNOSTIC: Log RpcEvent handler lookup
+                bool isRpcEvent = @event is RpcEvent;
+                if (isRpcEvent)
+                {
+                    GONetLog.Debug($"[EVENTBUS-PUBLISH] RpcEvent handler lookup: handlerCount={handlersForType?.Count ?? 0}, targetClientAuthorityId={targetClientAuthorityId}, MyAuthorityId={GONetMain.MyAuthorityId}");
+                }
+
                 if (handlersForType != null)
                 {
                     int handlerCount = handlersForType.Count;
@@ -907,7 +914,16 @@ namespace GONet
                     for (int i = 0; i < handlerCount; ++i)
                     {
                         EventHandlerAndFilterer handlerForType = handlersForType[i];
-                        if (handlerForType.Filterer == null || handlerForType.Filterer(genericEnvelope))
+                        bool hasFilter = handlerForType.Filterer != null;
+                        bool filterPassed = !hasFilter || handlerForType.Filterer(genericEnvelope);
+
+                        // DIAGNOSTIC: Log each handler evaluation for RpcEvent
+                        if (isRpcEvent)
+                        {
+                            GONetLog.Debug($"[EVENTBUS-PUBLISH] RpcEvent handler {i}/{handlerCount}: hasFilter={hasFilter}, filterPassed={filterPassed}, envelope.TargetClientAuthorityId={genericEnvelope.TargetClientAuthorityId}, envelope.SourceAuthorityId={genericEnvelope.SourceAuthorityId}");
+                        }
+
+                        if (filterPassed)
                         {
                             try // try-catch to disallow a single handler blowing things up for the rest of them!
                             {
@@ -929,6 +945,10 @@ namespace GONet
                 }
                 else
                 {
+                    if (isRpcEvent)
+                    {
+                        GONetLog.Debug($"[EVENTBUS-PUBLISH] RpcEvent has NO handlers! targetClientAuthorityId={targetClientAuthorityId}");
+                    }
                     //const string NO_HANDLERS = "Event received, but no handlers to process it.";
                     //GONetLog.Info(NO_HANDLERS);
                 }

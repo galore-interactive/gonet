@@ -203,32 +203,59 @@ namespace GONet
     /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true, validationMethod: nameof(ValidateTeamMessage))]
     /// void SendToTeam(string message) { }
     /// 
-    /// // Validation method signatures:
-    /// 
-    /// // Option 1: Simple bool validator (single target)
-    /// private bool ValidateTeamMessage(ushort sourceAuthority, ushort targetAuthority)
+    /// // Validation method signatures (MUST match RPC parameters):
+    ///
+    /// // Synchronous validator (with ref parameters for modification)
+    /// private RpcValidationResult ValidateTeamMessage(ref string message)
     /// {
-    ///     return IsTeamMember(targetAuthority);
-    /// }
-    /// 
-    /// // Option 2: Full validation with filtering and transformation
-    /// private RpcValidationResult ValidateTeamMessage(ushort sourceAuthority, ushort[] targets, int count, byte[] messageData)
-    /// {
-    ///     // Filter targets
-    ///     var allowed = targets.Where(t => IsTeamMember(t)).ToArray();
-    ///     
-    ///     // Optionally modify message
-    ///     var modifiedData = TransformMessage(messageData);
-    ///     
-    ///     return new RpcValidationResult
+    ///     // Get validation context
+    ///     var context = GONetMain.EventBus.GetValidationContext();
+    ///     if (!context.HasValue)
     ///     {
-    ///         AllowedTargets = allowed,
-    ///         AllowedCount = allowed.Length,
-    ///         DeniedTargets = targets.Except(allowed).ToArray(),
-    ///         DeniedCount = targets.Length - allowed.Length,
-    ///         DenialReason = "Target is not a team member",
-    ///         ModifiedData = modifiedData  // Optional
-    ///     };
+    ///         var result = RpcValidationResult.CreatePreAllocated(1);
+    ///         result.AllowAll();
+    ///         return result;
+    ///     }
+    ///
+    ///     var result = context.Value.GetValidationResult();
+    ///
+    ///     // Filter targets based on team membership
+    ///     for (int i = 0; i < context.Value.TargetCount; i++)
+    ///     {
+    ///         ushort target = context.Value.TargetAuthorityIds[i];
+    ///         result.AllowedTargets[i] = IsTeamMember(target);
+    ///     }
+    ///
+    ///     // Optionally modify message content
+    ///     message = FilterProfanity(message);
+    ///     result.WasModified = true; // Set if you modify ref parameters
+    ///
+    ///     return result;
+    /// }
+    ///
+    /// // Async validator (NO ref keyword, use SetValidatedOverride for modification)
+    /// private async Task&lt;RpcValidationResult&gt; ValidateTeamMessageAsync(string message)
+    /// {
+    ///     var context = GONetMain.EventBus.GetValidationContext();
+    ///     if (!context.HasValue)
+    ///     {
+    ///         var result = RpcValidationResult.CreatePreAllocated(1);
+    ///         result.AllowAll();
+    ///         return result;
+    ///     }
+    ///
+    ///     var result = context.Value.GetValidationResult();
+    ///
+    ///     // Async operations allowed here (web API calls, database lookups, etc.)
+    ///     string filtered = await FilterProfanityAsync(message);
+    ///
+    ///     if (filtered != message)
+    ///     {
+    ///         result.SetValidatedOverride(0, filtered); // Parameter index 0 = message
+    ///     }
+    ///
+    ///     result.AllowAll(); // Or filter targets as needed
+    ///     return result;
     /// }
     /// </code>
     /// 
@@ -302,9 +329,10 @@ namespace GONet
         public bool IsMultipleTargets { get; }
         public string ValidationMethodName { get; }
 
-        public TargetRpcAttribute(RpcTarget target = RpcTarget.All)
+        public TargetRpcAttribute(RpcTarget target = RpcTarget.All, string validationMethod = null)
         {
             Target = target;
+            ValidationMethodName = validationMethod;
         }
 
         // Single constructor for property-based targeting
@@ -849,6 +877,8 @@ namespace GONet
         public byte[] Data { get; set; }
         public long CorrelationId { get; set; } // For request-response
         public bool IsSingularRecipientOnly { get; set; }
+        public ushort OriginatorAuthorityId { get; set; } // Authority that initiated the RPC call
+        public bool HasValidation { get; set; } // Whether this RPC has a validation method
 
         internal static RpcEvent Borrow()
         {
@@ -930,6 +960,9 @@ namespace GONet
         public int TargetCount { get; set; }
         public byte[] Data { get; set; }
         public long CorrelationId { get; set; }
+        public ushort OriginatorAuthorityId { get; set; } // Authority that initiated the RPC call
+        public bool HasValidation { get; set; } // Whether this RPC has a validation method
+        public bool ShouldExpandToAllClients { get; set; } // Server should expand target list to include all connected clients
 
         internal static RoutedRpcEvent Borrow()
         {

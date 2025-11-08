@@ -1339,6 +1339,26 @@ namespace GONet
         {
             var rpcEvent = envelope.Event;
 
+            GONetLog.Debug($"[TARGETRPC-HANDLER] HandleRpcForMe called: RpcId={rpcEvent.RpcId}, OriginatorId={rpcEvent.OriginatorAuthorityId}, MyId={GONetMain.MyAuthorityId}, HasValidation={rpcEvent.HasValidation}");
+
+            // CRITICAL: Prevent double-execution for non-validated TargetRPCs
+            // If this RPC:
+            //   1. Was originated by us (we called it locally)
+            //   2. AND has no validation (no server approval needed)
+            // Then we ALREADY executed it locally - skip execution here to avoid duplicate
+            bool isOriginator = rpcEvent.OriginatorAuthorityId == GONetMain.MyAuthorityId;
+            bool hasNoValidation = !rpcEvent.HasValidation;
+            bool shouldSkip = isOriginator && hasNoValidation;
+
+            GONetLog.Debug($"[TARGETRPC-HANDLER] Double-exec check: isOriginator={isOriginator} ({rpcEvent.OriginatorAuthorityId}=={GONetMain.MyAuthorityId}), hasNoValidation={hasNoValidation}, shouldSkip={shouldSkip}");
+
+            if (shouldSkip)
+            {
+                GONetLog.Debug($"[TARGETRPC-HANDLER] SKIPPING execution (already executed locally as originator)");
+                // We already executed this locally when we called it - don't execute again
+                return;
+            }
+
             // Check if GONetParticipant exists - if not, defer processing
             var targetParticipant = GONetMain.GetGONetParticipantById(rpcEvent.GONetId);
             bool participantExists = targetParticipant != null;
@@ -1519,9 +1539,12 @@ namespace GONet
                 int targetCount = evt.TargetCount;
                 ushort[] targets = new ushort[targetCount];
                 Array.Copy(evt.TargetAuthorities, targets, targetCount);
+                ushort originatorAuthorityId = evt.OriginatorAuthorityId;
+                bool hasValidation = evt.HasValidation;
+                bool shouldExpandToAllClients = evt.ShouldExpandToAllClients;
 
                 // Fire and forget - async handler will route after validation completes
-                _ = Server_HandleRoutedRpcFromClientAsync(rpcId, gonetId, eventData, targets, targetCount, sourceAuthority, componentType, component, methodName, rpcMeta);
+                _ = Server_HandleRoutedRpcFromClientAsync(rpcId, gonetId, eventData, targets, targetCount, sourceAuthority, componentType, component, methodName, rpcMeta, originatorAuthorityId, hasValidation, shouldExpandToAllClients);
                 return;
             }
 
@@ -1530,6 +1553,35 @@ namespace GONet
             try
             {
                 Array.Copy(evt.TargetAuthorities, targetBuffer, evt.TargetCount);
+                int targetCount = evt.TargetCount;
+                int originalTargetCount = targetCount;
+
+                GONetLog.Debug($"[TARGETRPC-SERVER] Received RoutedRpc: Method={methodName}, OriginalTargetCount={originalTargetCount}, OriginalTargets=[{string.Join(",", targetBuffer.Take(originalTargetCount))}], ShouldExpand={evt.ShouldExpandToAllClients}, OriginatorId={evt.OriginatorAuthorityId}");
+
+                // Expand target list if this was RpcTarget.All or RpcTarget.Others
+                if (evt.ShouldExpandToAllClients)
+                {
+                    // Add all connected clients that aren't already in the list
+                    foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
+                    {
+                        ushort clientId = client.ConnectionToClient.OwnerAuthorityId;
+                        bool alreadyInList = false;
+                        for (int i = 0; i < targetCount; i++)
+                        {
+                            if (targetBuffer[i] == clientId)
+                            {
+                                alreadyInList = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyInList && targetCount < MAX_RPC_TARGETS)
+                        {
+                            targetBuffer[targetCount++] = clientId;
+                        }
+                    }
+
+                    GONetLog.Debug($"[TARGETRPC-SERVER] After expansion: ExpandedTargetCount={targetCount}, ExpandedTargets=[{string.Join(",", targetBuffer.Take(targetCount))}]");
+                }
 
                 // Use enhanced validation system for profanity filtering and other validation
                 RpcValidationResult validationResult;
@@ -1538,14 +1590,14 @@ namespace GONet
                     validatorParameterCounts.TryGetValue(componentType, out var paramCounts) &&
                     paramCounts.TryGetValue(methodName, out var paramCount))
                 {
-                    // Invoke enhanced validator (with profanity filtering)
-                    validationResult = InvokeValidator(validatorObj, paramCount, component, sourceAuthority, targetBuffer, evt.TargetCount, evt.Data);
+                    // Invoke enhanced validator (with profanity filtering) - use EXPANDED targetCount
+                    validationResult = InvokeValidator(validatorObj, paramCount, component, sourceAuthority, targetBuffer, targetCount, evt.Data);
                 }
                 else
                 {
-                    // Fallback to basic connection validation
-                    validationResult = RpcValidationResult.CreatePreAllocated(evt.TargetCount);
-                    for (int i = 0; i < evt.TargetCount; i++)
+                    // Fallback to basic connection validation - use EXPANDED targetCount
+                    validationResult = RpcValidationResult.CreatePreAllocated(targetCount);
+                    for (int i = 0; i < targetCount; i++)
                     {
                         validationResult.AllowedTargets[i] = (targetBuffer[i] == GONetMain.MyAuthorityId || IsValidConnectedClient(targetBuffer[i]));
                     }
@@ -1559,12 +1611,24 @@ namespace GONet
                 {
                     if (validationResult.AllowedTargets[i])
                     {
+                        // Skip sending back to originator if no validation (they already executed locally)
+                        bool hasValidation = evt.HasValidation;
+                        if (!hasValidation && targetBuffer[i] == evt.OriginatorAuthorityId)
+                        {
+                            GONetLog.Debug($"[TARGETRPC-SERVER] Skipping originator: TargetId={targetBuffer[i]}, OriginatorId={evt.OriginatorAuthorityId}, HasValidation={hasValidation}");
+                            continue; // Originator already executed locally - don't echo back
+                        }
+
                         var rpcEvent = RpcEvent.Borrow();
                         rpcEvent.RpcId = evt.RpcId;
                         rpcEvent.GONetId = evt.GONetId;
                         rpcEvent.Data = dataToUse;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
+                        rpcEvent.OriginatorAuthorityId = evt.OriginatorAuthorityId;
+                        rpcEvent.HasValidation = evt.HasValidation;
+
+                        GONetLog.Debug($"[TARGETRPC-SERVER] Routing RpcEvent to target: TargetId={targetBuffer[i]}, IsServer={targetBuffer[i] == GONetMain.MyAuthorityId}, Method={methodName}");
 
                         Publish(
                             rpcEvent,
@@ -1600,12 +1664,38 @@ namespace GONet
             Type componentType,
             GONetParticipantCompanionBehaviour component,
             string methodName,
-            RpcMetadata rpcMeta)
+            RpcMetadata rpcMeta,
+            ushort originatorAuthorityId,
+            bool hasValidation,
+            bool shouldExpandToAllClients)
         {
             var targetBuffer = targetAuthorityArrayPool.Borrow(MAX_RPC_TARGETS);
             try
             {
                 Array.Copy(targetAuthorities, targetBuffer, targetCount);
+
+                // Expand target list if this was RpcTarget.All or RpcTarget.Others
+                if (shouldExpandToAllClients)
+                {
+                    // Add all connected clients that aren't already in the list
+                    foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
+                    {
+                        ushort clientId = client.ConnectionToClient.OwnerAuthorityId;
+                        bool alreadyInList = false;
+                        for (int i = 0; i < targetCount; i++)
+                        {
+                            if (targetBuffer[i] == clientId)
+                            {
+                                alreadyInList = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyInList && targetCount < MAX_RPC_TARGETS)
+                        {
+                            targetBuffer[targetCount++] = clientId;
+                        }
+                    }
+                }
 
                 // Deserialize parameters using generated typed delegate
                 object[] parameters = DeserializeRpcParameters(componentType, methodName, eventData);
@@ -1643,12 +1733,20 @@ namespace GONet
                 {
                     if (validationResult.AllowedTargets[i])
                     {
+                        // Skip sending back to originator if no validation (they already executed locally)
+                        if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                        {
+                            continue; // Originator already executed locally - don't echo back
+                        }
+
                         var rpcEvent = RpcEvent.Borrow();
                         rpcEvent.RpcId = rpcId;
                         rpcEvent.GONetId = gonetId;
                         rpcEvent.Data = dataToUse;
                         rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         rpcEvent.IsSingularRecipientOnly = true;
+                        rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                        rpcEvent.HasValidation = hasValidation;
 
                         Publish(
                             rpcEvent,
@@ -2769,8 +2867,12 @@ namespace GONet
                         case RpcTarget.All:
                             targetBuffer[0] = GONetMain.MyAuthorityId;
                             targetCount = 1;
+
+                            GONetLog.Debug($"[TARGETRPC-TARGET-BUILD] RpcTarget.All: MyId={GONetMain.MyAuthorityId}, IsServer={GONetMain.IsServer}, OwnerAuthorityId_Server={GONetMain.OwnerAuthorityId_Server}");
+
                             if (GONetMain.IsServer)
                             {
+                                GONetLog.Debug($"[TARGETRPC-TARGET-BUILD] IsServer branch: Adding connected clients");
                                 foreach (GONetRemoteClient client in GONetMain.gonetServer.remoteClients)
                                 {
                                     if (targetCount < MAX_RPC_TARGETS)
@@ -2779,6 +2881,14 @@ namespace GONet
                                     }
                                 }
                             }
+                            else
+                            {
+                                GONetLog.Debug($"[TARGETRPC-TARGET-BUILD] Else branch: Adding server {GONetMain.OwnerAuthorityId_Server} to target list");
+                                // Pure client: add server to target list so server can execute and route to other clients
+                                targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                            }
+
+                            GONetLog.Debug($"[TARGETRPC-TARGET-BUILD] Final targetCount={targetCount}, targets=[{string.Join(",", targetBuffer.Take(targetCount))}]");
                             break;
 
                         case RpcTarget.Others:
@@ -2807,8 +2917,8 @@ namespace GONet
                     }
                 }
 
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     if (IsSuitableForPersistence(metadata))
                     {
@@ -2832,18 +2942,29 @@ namespace GONet
                         routedRpc.TargetCount = targetCount;
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
 
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
 
-                    // Execute locally if we're a target
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName);
                     }
                     return;
                 }
@@ -2901,11 +3022,27 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName);
                     }
 
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId; // Default to server if server called it
+
+                    // Check RpcContext to see if this came from a client
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets (no data for 0-param)
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            // Skip sending back to originator if no validation (they already executed locally)
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue; // Originator already executed locally - don't echo back
+                            }
+
                             if (IsSuitableForPersistence(metadata))
                             {
                                 var persistentRpcEvent = new PersistentRpcEvent();
@@ -2924,6 +3061,8 @@ namespace GONet
                                 rpcEvent.GONetId = instance.GONetParticipant.GONetId;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -3034,6 +3173,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
 
                             case RpcTarget.Others:
@@ -3062,9 +3206,22 @@ namespace GONet
                     }
                 }
 
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
+
+                    // Check if caller is in target list
+                    for (int i = 0; i < targetCount; i++)
+                    {
+                        if (targetBuffer[i] == GONetMain.MyAuthorityId)
+                        {
+                            callerIsTarget = true;
+                            break;
+                        }
+                    }
+
                     var data = new RpcData1<T1> { Arg1 = arg1 };
                     int bytesUsed;
                     bool needsReturn;
@@ -3104,18 +3261,17 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = hasValidation;
 
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
 
-                    // Execute locally if we're a target
-                    for (int i = 0; i < targetCount; i++)
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    // If validation required, wait for server validation before executing
+                    if (callerIsTarget && !hasValidation)
                     {
-                        if (targetBuffer[i] == GONetMain.MyAuthorityId)
-                        {
-                            ExecuteRpcLocally(instance, methodName, arg1);
-                            break;
-                        }
+                        ExecuteRpcLocally(instance, methodName, arg1);
                     }
                     return;
                 }
@@ -3183,11 +3339,27 @@ namespace GONet
                         ExecuteRpcLocally(instance, methodName, arg1);
                     }
 
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId; // Default to server if server called it
+
+                    // Check RpcContext to see if this came from a client
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            // Skip sending back to originator if no validation (they already executed locally)
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue; // Originator already executed locally - don't echo back
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -3211,6 +3383,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -3324,6 +3498,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -3349,9 +3528,22 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
+
+                    // Check if caller is in target list
+                    for (int i = 0; i < targetCount; i++)
+                    {
+                        if (targetBuffer[i] == GONetMain.MyAuthorityId)
+                        {
+                            callerIsTarget = true;
+                            break;
+                        }
+                    }
+
                     var data = new RpcData2<T1, T2> { Arg1 = arg1, Arg2 = arg2 };
                     int bytesUsed;
                     bool needsReturn;
@@ -3363,15 +3555,15 @@ namespace GONet
                     Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                     routedRpc.Data = serialized;
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                    routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                    routedRpc.HasValidation = hasValidation;
+
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
-                    // Execute locally if we're a target
-                    for (int i = 0; i < targetCount; i++)
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    if (callerIsTarget && !hasValidation)
                     {
-                        if (targetBuffer[i] == GONetMain.MyAuthorityId)
-                        {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2);
-                            break;
-                        }
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2);
                     }
                     return;
                 }
@@ -3429,11 +3621,26 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2);
                     }
+
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -3457,6 +3664,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -3569,6 +3778,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -3594,8 +3808,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData3<T1, T2, T3> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3 };
                     int bytesUsed;
@@ -3636,16 +3850,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3);
                     }
                     return;
                 }
@@ -3703,11 +3930,25 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3);
                     }
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -3731,6 +3972,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -3843,6 +4086,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -3868,8 +4116,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData4<T1, T2, T3, T4> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4 };
                     int bytesUsed;
@@ -3910,16 +4158,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4);
                     }
                     return;
                 }
@@ -3977,11 +4238,25 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4);
                     }
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -4005,6 +4280,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -4117,6 +4394,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -4142,8 +4424,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData5<T1, T2, T3, T4, T5> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5 };
                     int bytesUsed;
@@ -4184,16 +4466,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5);
                     }
                     return;
                 }
@@ -4251,11 +4546,27 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5);
                     }
+
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            // Skip sending back to originator if no validation
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -4279,6 +4590,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -4391,6 +4704,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -4416,8 +4734,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData6<T1, T2, T3, T4, T5, T6> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6 };
                     int bytesUsed;
@@ -4458,16 +4776,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
                     }
                     return;
                 }
@@ -4525,11 +4856,25 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
                     }
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -4553,6 +4898,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -4665,6 +5012,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -4690,8 +5042,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData7<T1, T2, T3, T4, T5, T6, T7> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7 };
                     int bytesUsed;
@@ -4732,16 +5084,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
                     }
                     return;
                 }
@@ -4799,11 +5164,25 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
                     }
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -4827,6 +5206,8 @@ namespace GONet
                                 rpcEvent.Data = serializedCopy;
                                 rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                                 rpcEvent.IsSingularRecipientOnly = true;
+                                rpcEvent.OriginatorAuthorityId = originatorAuthorityId;
+                                rpcEvent.HasValidation = hasValidation;
                                 Publish(rpcEvent, targetClientAuthorityId: targetBuffer[i], shouldPublishReliably: metadata.IsReliable);
                             }
                         }
@@ -4939,6 +5320,11 @@ namespace GONet
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    // Pure client: add server to target list so server can execute and route to other clients
+                                    targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
+                                }
                                 break;
                             case RpcTarget.Others:
                                 var ownerId = instance.GONetParticipant.OwnerAuthorityId;
@@ -4964,8 +5350,8 @@ namespace GONet
                         }
                     }
                 }
-                // Client sends to server for routing
-                if (GONetMain.IsClient && !GONetMain.IsServer)
+                // Non-authoritative clients send to authoritative server for routing
+                if (GONetMain.MyAuthorityId != GONetMain.OwnerAuthorityId_Server)
                 {
                     var data = new RpcData8<T1, T2, T3, T4, T5, T6, T7, T8> { Arg1 = arg1, Arg2 = arg2, Arg3 = arg3, Arg4 = arg4, Arg5 = arg5, Arg6 = arg6, Arg7 = arg7, Arg8 = arg8 };
                     int bytesUsed;
@@ -5006,16 +5392,29 @@ namespace GONet
                         Array.Copy(targetBuffer, routedRpc.TargetAuthorities, targetCount);
                         routedRpc.Data = serialized;
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
+                        routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
+                        routedRpc.HasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
+
+                        GONetLog.Debug($"[TARGETRPC-CLIENT] Publishing RoutedRpc: Method={methodName}, TargetCount={targetCount}, Targets=[{string.Join(",", targetBuffer.Take(targetCount))}], ShouldExpand={routedRpc.ShouldExpandToAllClients}");
+
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
-                    // Execute locally if we're a target
+
+                    // Execute locally NOW only if: (1) we're a target AND (2) no validation required
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    bool callerIsTarget = false;
                     for (int i = 0; i < targetCount; i++)
                     {
                         if (targetBuffer[i] == GONetMain.MyAuthorityId)
                         {
-                            ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                            callerIsTarget = true;
                             break;
                         }
+                    }
+                    if (callerIsTarget && !hasValidation)
+                    {
+                        ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
                     }
                     return;
                 }
@@ -5073,11 +5472,25 @@ namespace GONet
                     {
                         ExecuteRpcLocally(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
                     }
+                    // Determine originator (the authority that initiated this RPC)
+                    bool hasValidation = !string.IsNullOrEmpty(metadata.ValidationMethodName);
+                    ushort originatorAuthorityId = GONetMain.MyAuthorityId;
+
+                    if (currentRpcContext.HasValue && currentRpcContext.Value.SourceAuthorityId != GONetMain.MyAuthorityId)
+                    {
+                        originatorAuthorityId = currentRpcContext.Value.SourceAuthorityId;
+                    }
+
                     // Send to allowed targets
                     for (int i = 0; i < validationResult.TargetCount; i++)
                     {
                         if (validationResult.AllowedTargets[i] && targetBuffer[i] != GONetMain.MyAuthorityId)
                         {
+                            if (!hasValidation && targetBuffer[i] == originatorAuthorityId)
+                            {
+                                continue;
+                            }
+
                             byte[] serializedCopy = SerializationUtils.BorrowByteArray(bytesUsed);
                             Buffer.BlockCopy(dataToSend, 0, serializedCopy, 0, bytesUsed);
 
@@ -8233,6 +8646,11 @@ namespace GONet
                                     targetBuffer[targetCount++] = client.ConnectionToClient.OwnerAuthorityId;
                                 }
                             }
+                        }
+                        else
+                        {
+                            // Pure client: add server to target list so server can execute and route to other clients
+                            targetBuffer[targetCount++] = GONetMain.OwnerAuthorityId_Server;
                         }
                         break;
                     case RpcTarget.Others:

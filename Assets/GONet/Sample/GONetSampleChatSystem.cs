@@ -42,6 +42,125 @@ using System.Runtime.CompilerServices;
 [RequireComponent(typeof(GONetParticipant))]
 public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 {
+    #region RPC Execution Tracker (for testing)
+
+    private static readonly System.Collections.Concurrent.ConcurrentBag<string> rpcExecutionLog = new System.Collections.Concurrent.ConcurrentBag<string>();
+    private static int currentTestId = -1;
+
+    /// <summary>
+    /// Record an RPC execution for later summary output (avoids log interleaving issues).
+    /// Extracts test ID from the RPC message parameter if available.
+    /// </summary>
+    private static void LogRpcExecution(string rpcVariant, string messageWithTestId = null)
+    {
+        // Try to extract test ID from message first (format: "537-1p-nvs message...")
+        int testId = ExtractTestIdFromMessage(messageWithTestId);
+
+        // If no message or couldn't extract, use currentTestId
+        if (testId == -1)
+        {
+            testId = currentTestId;
+        }
+
+        // If still no test ID, can't log
+        if (testId == -1) return;
+
+        // Auto-set currentTestId from first message we see (enables tracking even if we didn't initiate)
+        if (currentTestId == -1)
+        {
+            currentTestId = testId;
+        }
+
+        string machine = GONetMain.IsServer ? "Server" : (GONetMain.MyAuthorityId == 1 ? "Client:1" : "Client:2");
+        rpcExecutionLog.Add($"{testId}-{rpcVariant}|{machine}");
+    }
+
+    /// <summary>
+    /// Extracts test ID from message like "537-1p-nvs message..." or "340-2p-Vs message...".
+    /// Returns -1 if no test ID found.
+    /// </summary>
+    private static int ExtractTestIdFromMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return -1;
+
+        // Find first dash (test ID ends there)
+        int dashIndex = message.IndexOf('-');
+        if (dashIndex == -1 || dashIndex == 0) return -1;
+
+        string testIdStr = message.Substring(0, dashIndex);
+        if (int.TryParse(testIdStr, out int testId))
+        {
+            return testId;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Dump all collected RPC executions in one log entry (prevents interleaving)
+    /// Call this with Shift+K after test completes
+    /// </summary>
+    private static void DumpRpcExecutionSummary()
+    {
+        if (rpcExecutionLog.Count == 0)
+        {
+            GONetLog.Info("No RPC executions recorded");
+            return;
+        }
+
+        var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
+                                      .OrderBy(g => g.Key);
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        sb.AppendLine("========== RPC EXECUTION SUMMARY ==========");
+
+        foreach (var group in grouped)
+        {
+            string variant = group.Key;
+            var machines = group.Select(entry => entry.Split('|')[1]).Distinct().OrderBy(m => m).ToList();
+            int count = group.Count();
+            sb.AppendLine($"{variant}: {count} executions on [{string.Join(", ", machines)}]");
+        }
+
+        sb.AppendLine($"Total executions: {rpcExecutionLog.Count}");
+        sb.AppendLine("==========================================");
+
+        // Log to machine-specific file
+        string profileName = GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}";
+        GONetLog.Info(sb.ToString(), profileName);
+
+        // FIX: DON'T reset currentTestId to -1!
+        // Each machine sets currentTestId when THEY initiate their test, but they need to
+        // keep tracking RPCs from OTHER machines' tests too. If we reset to -1 after dumping,
+        // the machine stops tracking all subsequent RPC executions.
+        //
+        // Example bug scenario (with reset):
+        //   Server initiates test 340 → sets currentTestId=340
+        //   Server completes → dumps summary → resets currentTestId=-1
+        //   Client:1 initiates test 537 → Client:1 sets their currentTestId=537
+        //   Client:1's RPCs arrive at Server → Server's currentTestId=-1 → NOT LOGGED!
+        //
+        // FIX: Don't clear currentTestId. Let it persist across all tests.
+        //      All machines use the FIRST test ID they see for tracking ALL RPCs.
+        //
+        // OLD: currentTestId = -1;  ← BUG! Stopped tracking after dump
+        // NEW: (don't reset)        ← Keep tracking enabled permanently
+    }
+
+    private void Start()
+    {
+        // Register a separate log file per machine to avoid log interleaving
+        string profileName = GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}";
+        GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(profileName, outputToSeparateFile: true));
+    }
+
+    private void OnApplicationQuit()
+    {
+        DumpRpcExecutionSummary();
+    }
+
+    #endregion
+
     #region Data Structures
 
     public enum ChatType
@@ -822,11 +941,16 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     internal RpcValidationResult ValidateMessage_TEST_EMPTY()
     {
-        // Get the pre-allocated validation result and allow all targets
-        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
-        var result = validationContext.GetValidationResult();
-        result.AllowAll();
-        return result;
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
     }
 
     [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY_VOID))]
@@ -836,11 +960,16 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     internal RpcValidationResult ValidateMessage_TEST_EMPTY_VOID()
     {
-        // Get the pre-allocated validation result and allow all targets
-        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
-        var result = validationContext.GetValidationResult();
-        result.AllowAll();
-        return result;
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
     }
 
     void OnReceiveMessage(ChatMessage message)
@@ -1218,6 +1347,597 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         {
             GONetLog.Warning($"[Server] Profanity.dev async exception: {ex.Message}");
             return null;
+        }
+    }
+
+    #endregion
+
+    #region RPCs to make sure we cover all cases
+
+    [ClientRpc]
+    internal void LogOnAllClients(string message)
+    {
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), ' ', message));
+    }
+
+    [ServerRpc]
+    internal void LogOnServerOnly(string message)
+    {
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), ' ', message));
+    }
+
+    // ========== 0-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_0Params_NotValidated()
+    {
+        LogRpcExecution("0p-nvs");
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (not validated)"));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_0Params))]
+    internal void LogOnAllMachines_0Params_Validated()
+    {
+        LogRpcExecution("0p-Vs");
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (validated)"));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_0Params_NotValidatedAsync()
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("0p-nvA");
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (not validated async)"));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_0Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_0Params_ValidatedAsync()
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("0p-VA");
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (validated async)"));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_0Params()
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 1-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_NotValidated(string message)
+    {
+        LogRpcExecution("1p-nvs", message);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), ' ', message));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator))]
+    internal void LogOnAllMachines_Validated(string message)
+    {
+        LogRpcExecution("1p-Vs", message);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), ' ', message));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_NotValidatedAsync(string message)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("1p-nvA", message);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), ' ', message));
+
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_ValidatedAsync(string message)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("1p-VA", message);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), ' ', message));
+
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator(ref string message)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 2-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_2Params_NotValidated(string msg, int value)
+    {
+        LogRpcExecution("2p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 2-params: ", msg, ", ", value));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_2Params))]
+    internal void LogOnAllMachines_2Params_Validated(string msg, int value)
+    {
+        LogRpcExecution("2p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 2-params (validated): ", msg, ", ", value));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_2Params_NotValidatedAsync(string msg, int value)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("2p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 2-params (async): ", msg, ", ", value));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_2Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_2Params_ValidatedAsync(string msg, int value)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("2p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 2-params (validated async): ", msg, ", ", value));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_2Params(ref string msg, ref int value)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 3-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_3Params_NotValidated(string msg, int value, float f)
+    {
+        LogRpcExecution("3p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 3-params: ", msg, ", ", value, ", ", f));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_3Params))]
+    internal void LogOnAllMachines_3Params_Validated(string msg, int value, float f)
+    {
+        LogRpcExecution("3p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 3-params (validated): ", msg, ", ", value, ", ", f));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_3Params_NotValidatedAsync(string msg, int value, float f)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("3p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 3-params (async): ", msg, ", ", value, ", ", f));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_3Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_3Params_ValidatedAsync(string msg, int value, float f)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("3p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 3-params (validated async): ", msg, ", ", value, ", ", f));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_3Params(ref string msg, ref int value, ref float f)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 4-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_4Params_NotValidated(string msg, int v1, float f, bool b)
+    {
+        LogRpcExecution("4p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 4-params: ", msg, ", ", v1, ", ", f, ", ", b));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_4Params))]
+    internal void LogOnAllMachines_4Params_Validated(string msg, int v1, float f, bool b)
+    {
+        LogRpcExecution("4p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 4-params (validated): ", msg, ", ", v1, ", ", f, ", ", b));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_4Params_NotValidatedAsync(string msg, int v1, float f, bool b)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("4p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 4-params (async): ", msg, ", ", v1, ", ", f, ", ", b));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_4Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_4Params_ValidatedAsync(string msg, int v1, float f, bool b)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("4p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 4-params (validated async): ", msg, ", ", v1, ", ", f, ", ", b));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_4Params(ref string msg, ref int v1, ref float f, ref bool b)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 5-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_5Params_NotValidated(string msg, int v1, float f, bool b, double d)
+    {
+        LogRpcExecution("5p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 5-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_5Params))]
+    internal void LogOnAllMachines_5Params_Validated(string msg, int v1, float f, bool b, double d)
+    {
+        LogRpcExecution("5p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 5-params (validated): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_5Params_NotValidatedAsync(string msg, int v1, float f, bool b, double d)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("5p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 5-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_5Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_5Params_ValidatedAsync(string msg, int v1, float f, bool b, double d)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("5p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 5-params (validated async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_5Params(ref string msg, ref int v1, ref float f, ref bool b, ref double d)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 6-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_6Params_NotValidated(string msg, int v1, float f, bool b, double d, long l)
+    {
+        LogRpcExecution("6p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 6-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_6Params))]
+    internal void LogOnAllMachines_6Params_Validated(string msg, int v1, float f, bool b, double d, long l)
+    {
+        LogRpcExecution("6p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 6-params (validated): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_6Params_NotValidatedAsync(string msg, int v1, float f, bool b, double d, long l)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("6p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 6-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_6Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_6Params_ValidatedAsync(string msg, int v1, float f, bool b, double d, long l)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("6p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 6-params (validated async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_6Params(ref string msg, ref int v1, ref float f, ref bool b, ref double d, ref long l)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 7-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_7Params_NotValidated(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        LogRpcExecution("7p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 7-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_7Params))]
+    internal void LogOnAllMachines_7Params_Validated(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        LogRpcExecution("7p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 7-params (validated): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_7Params_NotValidatedAsync(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("7p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 7-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_7Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_7Params_ValidatedAsync(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("7p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 7-params (validated async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_7Params(ref string msg, ref int v1, ref float f, ref bool b, ref double d, ref long l, ref byte bt)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    // ========== 8-parameter TargetRpc tests ==========
+    [TargetRpc]
+    internal void LogOnAllMachines_8Params_NotValidated(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        LogRpcExecution("8p-nvs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 8-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s));
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_8Params))]
+    internal void LogOnAllMachines_8Params_Validated(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        LogRpcExecution("8p-Vs", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 8-params (validated): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s));
+    }
+
+    [TargetRpc]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_8Params_NotValidatedAsync(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("8p-nvA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 8-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s));
+        return default;
+    }
+
+    [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_8Params))]
+    internal async Task<RpcDeliveryReport> LogOnAllMachines_8Params_ValidatedAsync(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("8p-VA", msg);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 8-params (validated async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s));
+        return default;
+    }
+
+    internal RpcValidationResult AlwaysAllowValidator_8Params(ref string msg, ref int v1, ref float f, ref bool b, ref double d, ref long l, ref byte bt, ref short s)
+    {
+        var context = GONetMain.EventBus.GetValidationContext();
+        if (!context.HasValue)
+        {
+            var result = RpcValidationResult.CreatePreAllocated(1);
+            result.AllowAll();
+            return result;
+        }
+        var validationResult = context.Value.GetValidationResult();
+        validationResult.AllowAll();
+        return validationResult;
+    }
+
+    internal override void UpdateAfterGONetReady()
+    {
+        base.UpdateAfterGONetReady();
+
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            const string INIT = "INITIATOR DREETSi"; // will be searching for "DREETSi" in the consolidated log to see all this
+            const string ASYNC_DONE = "ASYNC DONE DREETSi"; // will be searching for "DREETSi" in the consolidated log to see all this
+            int correlationId = UnityEngine.Random.Range(111, 666); // used for correlation in logs
+
+            // Shift+K: Dump RPC execution summary
+            if (Input.GetKeyDown(KeyCode.K))
+            {
+                DumpRpcExecutionSummary();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.L))
+            {
+                // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
+                if (currentTestId == -1)
+                {
+                    currentTestId = correlationId;
+                }
+                GONetLog.Debug(string.Concat(correlationId, ' ', INIT));
+
+                const string MSG = "DREETSi Paul Blart logged everywhere via default TargetRpc setting of RpcTarget.All";
+
+                // ========== 1-parameter tests (FIRST so remote machines can extract test ID and auto-set currentTestId) ==========
+                CallRpc(nameof(LogOnAllMachines_NotValidated), string.Concat(correlationId, "-1p-nvs", ' ', MSG));
+                CallRpc(nameof(LogOnAllMachines_Validated), string.Concat(correlationId, "-1p-Vs", ' ', MSG));
+                CallRpcAsync<RpcDeliveryReport, string>(
+                    nameof(LogOnAllMachines_NotValidatedAsync),
+                    string.Concat(correlationId, "-1p-nvA", ' ', MSG))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-1p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string>(
+                    nameof(LogOnAllMachines_ValidatedAsync),
+                    string.Concat(correlationId, "-1p-VA", ' ', MSG))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-1p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 2-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_2Params_NotValidated), string.Concat(correlationId, "-2p", ' ', MSG), 42);
+                CallRpc(nameof(LogOnAllMachines_2Params_Validated), string.Concat(correlationId, "-2p", ' ', MSG), 42);
+                CallRpcAsync<RpcDeliveryReport, string, int>(
+                    nameof(LogOnAllMachines_2Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-2p-nvA", ' ', MSG), 42)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-2p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int>(
+                    nameof(LogOnAllMachines_2Params_ValidatedAsync),
+                    string.Concat(correlationId, "-2p-VA", ' ', MSG), 42)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-2p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 3-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_3Params_NotValidated), string.Concat(correlationId, "-3p", ' ', MSG), 42, 3.14f);
+                CallRpc(nameof(LogOnAllMachines_3Params_Validated), string.Concat(correlationId, "-3p", ' ', MSG), 42, 3.14f);
+                CallRpcAsync<RpcDeliveryReport, string, int, float>(
+                    nameof(LogOnAllMachines_3Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-3p-nvA", ' ', MSG), 42, 3.14f)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-3p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float>(
+                    nameof(LogOnAllMachines_3Params_ValidatedAsync),
+                    string.Concat(correlationId, "-3p-VA", ' ', MSG), 42, 3.14f)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-3p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 4-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_4Params_NotValidated), string.Concat(correlationId, "-4p", ' ', MSG), 42, 3.14f, true);
+                CallRpc(nameof(LogOnAllMachines_4Params_Validated), string.Concat(correlationId, "-4p", ' ', MSG), 42, 3.14f, true);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool>(
+                    nameof(LogOnAllMachines_4Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-4p-nvA", ' ', MSG), 42, 3.14f, true)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-4p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool>(
+                    nameof(LogOnAllMachines_4Params_ValidatedAsync),
+                    string.Concat(correlationId, "-4p-VA", ' ', MSG), 42, 3.14f, true)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-4p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 5-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_5Params_NotValidated), string.Concat(correlationId, "-5p", ' ', MSG), 42, 3.14f, true, 2.718);
+                CallRpc(nameof(LogOnAllMachines_5Params_Validated), string.Concat(correlationId, "-5p", ' ', MSG), 42, 3.14f, true, 2.718);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double>(
+                    nameof(LogOnAllMachines_5Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-5p-nvA", ' ', MSG), 42, 3.14f, true, 2.718)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-5p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double>(
+                    nameof(LogOnAllMachines_5Params_ValidatedAsync),
+                    string.Concat(correlationId, "-5p-VA", ' ', MSG), 42, 3.14f, true, 2.718)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-5p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 6-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_6Params_NotValidated), string.Concat(correlationId, "-6p", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+                CallRpc(nameof(LogOnAllMachines_6Params_Validated), string.Concat(correlationId, "-6p", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long>(
+                    nameof(LogOnAllMachines_6Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-6p-nvA", ' ', MSG), 42, 3.14f, true, 2.718, 999L)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-6p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long>(
+                    nameof(LogOnAllMachines_6Params_ValidatedAsync),
+                    string.Concat(correlationId, "-6p-VA", ' ', MSG), 42, 3.14f, true, 2.718, 999L)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-6p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 7-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_7Params_NotValidated), string.Concat(correlationId, "-7p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+                CallRpc(nameof(LogOnAllMachines_7Params_Validated), string.Concat(correlationId, "-7p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte>(
+                    nameof(LogOnAllMachines_7Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-7p-nvA", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-7p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte>(
+                    nameof(LogOnAllMachines_7Params_ValidatedAsync),
+                    string.Concat(correlationId, "-7p-VA", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-7p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 8-parameter tests ==========
+                CallRpc(nameof(LogOnAllMachines_8Params_NotValidated), string.Concat(correlationId, "-8p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+                CallRpc(nameof(LogOnAllMachines_8Params_Validated), string.Concat(correlationId, "-8p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte, short>(
+                    nameof(LogOnAllMachines_8Params_NotValidatedAsync),
+                    string.Concat(correlationId, "-8p-nvA", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-8p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte, short>(
+                    nameof(LogOnAllMachines_8Params_ValidatedAsync),
+                    string.Concat(correlationId, "-8p-VA", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-8p-VA", ' ', ASYNC_DONE)));
+
+                // ========== 0-parameter tests (LAST so currentTestId is already set from 1-param RPCs above) ==========
+                CallRpc(nameof(LogOnAllMachines_0Params_NotValidated));
+                CallRpc(nameof(LogOnAllMachines_0Params_Validated));
+                CallRpcAsync<RpcDeliveryReport>(nameof(LogOnAllMachines_0Params_NotValidatedAsync))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-nvA", ' ', ASYNC_DONE)));
+                CallRpcAsync<RpcDeliveryReport>(nameof(LogOnAllMachines_0Params_ValidatedAsync))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-VA", ' ', ASYNC_DONE)));
+            }
+
+            const string GENERIC_MSG = "DREETSi something";
+            if (IsClient && Input.GetKeyDown(KeyCode.C))
+            {
+                GONetLog.Debug(string.Concat(correlationId, ' ', INIT));
+
+                CallRpc(nameof(LogOnServerOnly), string.Concat(correlationId, ' ', GENERIC_MSG));
+            }
+
+            if (IsServer && Input.GetKeyDown(KeyCode.S))
+            {
+                GONetLog.Debug(string.Concat(correlationId, ' ', INIT));
+
+                CallRpc(nameof(LogOnAllClients), string.Concat(correlationId, ' ', GENERIC_MSG));
+            }
         }
     }
 
