@@ -136,6 +136,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\DefaultVelocityBlending_Quaternion.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\TypeUtils.cs" />
     <Compile Include="Assets\GONet\Sample\GONetSampleInputSync.cs" />
+    <Compile Include="Assets\GONet\Sample\GONetRpcComprehensiveTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\Compression.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\Defines.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\IGONetSyncdBehaviourInitializer.cs" />

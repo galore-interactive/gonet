@@ -38,7 +38,6 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44402242, g: 0.49316543, b: 0.5722324, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -2348,8 +2347,33 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3678359900500079001, guid: ea52ea1982dc2aa4594ed812a41e15e9,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8062623678048311876}
   m_SourcePrefab: {fileID: 100100000, guid: ea52ea1982dc2aa4594ed812a41e15e9, type: 3}
+--- !u!1 &8062623678048311875 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3678359900500079001, guid: ea52ea1982dc2aa4594ed812a41e15e9,
+    type: 3}
+  m_PrefabInstance: {fileID: 8062623678048311874}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8062623678048311876
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8062623678048311875}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c80aba648ebbf6418b56c10769fb6f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  componentTypeName: GONetRpcComprehensiveTests, Assembly-CSharp, Version=0.0.0.0,
+    Culture=neutral, PublicKeyToken=null
+  removeOnSceneUnload: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
