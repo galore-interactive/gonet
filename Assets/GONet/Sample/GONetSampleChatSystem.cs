@@ -1356,12 +1356,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     #region RPCs to make sure we cover all cases
 
-    [ClientRpc]
-    internal void LogOnAllClients(string message)
-    {
-        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), ' ', message));
-    }
-
     // ========== ServerRpc Tests: 0-parameter ==========
     [ServerRpc]
     internal void ServerRpc_0Params_Sync()
@@ -1525,7 +1519,77 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         return default;
     }
 
+    // ========== ClientRpc Tests: 0-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_0Params()
+    {
+        LogRpcExecution("CRpc-0p");
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 0-params"), myRpcLogTelemetryProfile);
+    }
 
+    // ========== ClientRpc Tests: 1-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_1Param(string message)
+    {
+        LogRpcExecution("CRpc-1p", message);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 1-param: ", message), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 2-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_2Params(string msg, int value)
+    {
+        LogRpcExecution("CRpc-2p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 2-params: ", msg, ", ", value), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 3-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_3Params(string msg, int value, float f)
+    {
+        LogRpcExecution("CRpc-3p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 3-params: ", msg, ", ", value, ", ", f), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 4-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_4Params(string msg, int value, float f, bool b)
+    {
+        LogRpcExecution("CRpc-4p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 4-params: ", msg, ", ", value, ", ", f, ", ", b), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 5-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_5Params(string msg, int value, float f, bool b, double d)
+    {
+        LogRpcExecution("CRpc-5p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 5-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 6-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_6Params(string msg, int value, float f, bool b, double d, long l)
+    {
+        LogRpcExecution("CRpc-6p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 6-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d, ", ", l), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 7-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_7Params(string msg, int value, float f, bool b, double d, long l, byte bt)
+    {
+        LogRpcExecution("CRpc-7p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 7-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt), myRpcLogTelemetryProfile);
+    }
+
+    // ========== ClientRpc Tests: 8-parameter ==========
+    [ClientRpc]
+    internal void ClientRpc_8Params(string msg, int value, float f, bool b, double d, long l, byte bt, short s)
+    {
+        LogRpcExecution("CRpc-8p", msg);
+        GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), " 8-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s), myRpcLogTelemetryProfile);
+    }
 
     // ========== 0-parameter TargetRpc tests ==========
     [TargetRpc]
@@ -2174,12 +2238,44 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                     .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-0p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
             }
 
-            const string GENERIC_MSG = "DREETSi something";
+            // Shift+S: ClientRpc comprehensive test (_S_erver broadcasts to all clients)
             if (IsServer && Input.GetKeyDown(KeyCode.S))
             {
-                GONetLog.Debug(string.Concat(correlationId, ' ', INIT), myRpcLogTelemetryProfile);
+                // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
+                if (currentTestId == -1)
+                {
+                    currentTestId = correlationId;
+                }
+                GONetLog.Debug(string.Concat(correlationId, " INITIATOR ClientRpc Test"), myRpcLogTelemetryProfile);
 
-                CallRpc(nameof(LogOnAllClients), string.Concat(correlationId, ' ', GENERIC_MSG));
+                const string MSG = "ClientRpc test message from server to all clients";
+
+                // ========== 1-parameter test ==========
+                CallRpc(nameof(ClientRpc_1Param), string.Concat(correlationId, "-CRpc-1p", ' ', MSG));
+
+                // ========== 2-parameter test ==========
+                CallRpc(nameof(ClientRpc_2Params), string.Concat(correlationId, "-CRpc-2p", ' ', MSG), 42);
+
+                // ========== 3-parameter test ==========
+                CallRpc(nameof(ClientRpc_3Params), string.Concat(correlationId, "-CRpc-3p", ' ', MSG), 42, 3.14f);
+
+                // ========== 4-parameter test ==========
+                CallRpc(nameof(ClientRpc_4Params), string.Concat(correlationId, "-CRpc-4p", ' ', MSG), 42, 3.14f, true);
+
+                // ========== 5-parameter test ==========
+                CallRpc(nameof(ClientRpc_5Params), string.Concat(correlationId, "-CRpc-5p", ' ', MSG), 42, 3.14f, true, 2.718);
+
+                // ========== 6-parameter test ==========
+                CallRpc(nameof(ClientRpc_6Params), string.Concat(correlationId, "-CRpc-6p", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+
+                // ========== 7-parameter test ==========
+                CallRpc(nameof(ClientRpc_7Params), string.Concat(correlationId, "-CRpc-7p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+
+                // ========== 8-parameter test ==========
+                CallRpc(nameof(ClientRpc_8Params), string.Concat(correlationId, "-CRpc-8p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+
+                // ========== 0-parameter test (LAST so currentTestId is already set from 1-param RPCs above) ==========
+                CallRpc(nameof(ClientRpc_0Params));
             }
         }
     }
