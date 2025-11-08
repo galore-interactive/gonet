@@ -3263,6 +3263,7 @@ namespace GONet
                         routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                         routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
                         routedRpc.HasValidation = hasValidation;
+                        routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
 
                         Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
                     }
@@ -3557,6 +3558,7 @@ namespace GONet
                     routedRpc.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
                     routedRpc.OriginatorAuthorityId = GONetMain.MyAuthorityId;
                     routedRpc.HasValidation = hasValidation;
+                    routedRpc.ShouldExpandToAllClients = (metadata.Target == RpcTarget.All || metadata.Target == RpcTarget.Others);
 
                     Publish(routedRpc, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: metadata.IsReliable);
 
