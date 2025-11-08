@@ -42,125 +42,6 @@ using System.Runtime.CompilerServices;
 [RequireComponent(typeof(GONetParticipant))]
 public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 {
-    #region RPC Execution Tracker (for testing)
-
-    private static readonly System.Collections.Concurrent.ConcurrentBag<string> rpcExecutionLog = new System.Collections.Concurrent.ConcurrentBag<string>();
-    private static int currentTestId = -1;
-
-    /// <summary>
-    /// Record an RPC execution for later summary output (avoids log interleaving issues).
-    /// Extracts test ID from the RPC message parameter if available.
-    /// </summary>
-    private static void LogRpcExecution(string rpcVariant, string messageWithTestId = null)
-    {
-        // Try to extract test ID from message first (format: "537-1p-nvs message...")
-        int testId = ExtractTestIdFromMessage(messageWithTestId);
-
-        // If no message or couldn't extract, use currentTestId
-        if (testId == -1)
-        {
-            testId = currentTestId;
-        }
-
-        // If still no test ID, can't log
-        if (testId == -1) return;
-
-        // Auto-set currentTestId from first message we see (enables tracking even if we didn't initiate)
-        if (currentTestId == -1)
-        {
-            currentTestId = testId;
-        }
-
-        string machine = GONetMain.IsServer ? "Server" : (GONetMain.MyAuthorityId == 1 ? "Client:1" : "Client:2");
-        rpcExecutionLog.Add($"{testId}-{rpcVariant}|{machine}");
-    }
-
-    /// <summary>
-    /// Extracts test ID from message like "537-1p-nvs message..." or "340-2p-Vs message...".
-    /// Returns -1 if no test ID found.
-    /// </summary>
-    private static int ExtractTestIdFromMessage(string message)
-    {
-        if (string.IsNullOrEmpty(message)) return -1;
-
-        // Find first dash (test ID ends there)
-        int dashIndex = message.IndexOf('-');
-        if (dashIndex == -1 || dashIndex == 0) return -1;
-
-        string testIdStr = message.Substring(0, dashIndex);
-        if (int.TryParse(testIdStr, out int testId))
-        {
-            return testId;
-        }
-
-        return -1;
-    }
-
-    /// <summary>
-    /// Dump all collected RPC executions in one log entry (prevents interleaving)
-    /// Call this with Shift+K after test completes
-    /// </summary>
-    private void DumpRpcExecutionSummary()
-    {
-        if (rpcExecutionLog.Count == 0)
-        {
-            GONetLog.Info("No RPC executions recorded");
-            return;
-        }
-
-        var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
-                                      .OrderBy(g => g.Key);
-
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-        sb.AppendLine("========== RPC EXECUTION SUMMARY ==========");
-
-        foreach (var group in grouped)
-        {
-            string variant = group.Key;
-            var machines = group.Select(entry => entry.Split('|')[1]).Distinct().OrderBy(m => m).ToList();
-            int count = group.Count();
-            sb.AppendLine($"{variant}: {count} executions on [{string.Join(", ", machines)}]");
-        }
-
-        sb.AppendLine($"Total executions: {rpcExecutionLog.Count}");
-        sb.AppendLine("==========================================");
-
-        // Log to machine-specific file
-        GONetLog.Info(sb.ToString(), myRpcLogTelemetryProfile);
-
-        // FIX: DON'T reset currentTestId to -1!
-        // Each machine sets currentTestId when THEY initiate their test, but they need to
-        // keep tracking RPCs from OTHER machines' tests too. If we reset to -1 after dumping,
-        // the machine stops tracking all subsequent RPC executions.
-        //
-        // Example bug scenario (with reset):
-        //   Server initiates test 340 → sets currentTestId=340
-        //   Server completes → dumps summary → resets currentTestId=-1
-        //   Client:1 initiates test 537 → Client:1 sets their currentTestId=537
-        //   Client:1's RPCs arrive at Server → Server's currentTestId=-1 → NOT LOGGED!
-        //
-        // FIX: Don't clear currentTestId. Let it persist across all tests.
-        //      All machines use the FIRST test ID they see for tracking ALL RPCs.
-        //
-        // OLD: currentTestId = -1;  ← BUG! Stopped tracking after dump
-        // NEW: (don't reset)        ← Keep tracking enabled permanently
-    }
-
-    string myRpcLogTelemetryProfile;
-    private void InitTelemetryLogging()
-    {
-        // Register a separate log file per machine to avoid log interleaving
-        myRpcLogTelemetryProfile = string.Concat("RpcTelemetry-", GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}");
-        GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
-    }
-
-    private void OnApplicationQuit()
-    {
-        DumpRpcExecutionSummary();
-    }
-
-    #endregion
-
     #region Data Structures
 
     public enum ChatType
@@ -1354,6 +1235,125 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
     #endregion
 
+    #region RPC Execution Tracker (for testing)
+
+    private static readonly System.Collections.Concurrent.ConcurrentBag<string> rpcExecutionLog = new System.Collections.Concurrent.ConcurrentBag<string>();
+    private static int currentTestId = -1;
+
+    /// <summary>
+    /// Record an RPC execution for later summary output (avoids log interleaving issues).
+    /// Extracts test ID from the RPC message parameter if available.
+    /// </summary>
+    private static void LogRpcExecution(string rpcVariant, string messageWithTestId = null)
+    {
+        // Try to extract test ID from message first (format: "537-1p-nvs message...")
+        int testId = ExtractTestIdFromMessage(messageWithTestId);
+
+        // If no message or couldn't extract, use currentTestId
+        if (testId == -1)
+        {
+            testId = currentTestId;
+        }
+
+        // If still no test ID, can't log
+        if (testId == -1) return;
+
+        // Auto-set currentTestId from first message we see (enables tracking even if we didn't initiate)
+        if (currentTestId == -1)
+        {
+            currentTestId = testId;
+        }
+
+        string machine = GONetMain.IsServer ? "Server" : (GONetMain.MyAuthorityId == 1 ? "Client:1" : "Client:2");
+        rpcExecutionLog.Add($"{testId}-{rpcVariant}|{machine}");
+    }
+
+    /// <summary>
+    /// Extracts test ID from message like "537-1p-nvs message..." or "340-2p-Vs message...".
+    /// Returns -1 if no test ID found.
+    /// </summary>
+    private static int ExtractTestIdFromMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return -1;
+
+        // Find first dash (test ID ends there)
+        int dashIndex = message.IndexOf('-');
+        if (dashIndex == -1 || dashIndex == 0) return -1;
+
+        string testIdStr = message.Substring(0, dashIndex);
+        if (int.TryParse(testIdStr, out int testId))
+        {
+            return testId;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Dump all collected RPC executions in one log entry (prevents interleaving)
+    /// Call this with Shift+K after test completes
+    /// </summary>
+    private void DumpRpcExecutionSummary()
+    {
+        if (rpcExecutionLog.Count == 0)
+        {
+            GONetLog.Info("No RPC executions recorded");
+            return;
+        }
+
+        var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
+                                      .OrderBy(g => g.Key);
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        sb.AppendLine("========== RPC EXECUTION SUMMARY ==========");
+
+        foreach (var group in grouped)
+        {
+            string variant = group.Key;
+            var machines = group.Select(entry => entry.Split('|')[1]).Distinct().OrderBy(m => m).ToList();
+            int count = group.Count();
+            sb.AppendLine($"{variant}: {count} executions on [{string.Join(", ", machines)}]");
+        }
+
+        sb.AppendLine($"Total executions: {rpcExecutionLog.Count}");
+        sb.AppendLine("==========================================");
+
+        // Log to machine-specific file
+        GONetLog.Info(sb.ToString(), myRpcLogTelemetryProfile);
+
+        // FIX: DON'T reset currentTestId to -1!
+        // Each machine sets currentTestId when THEY initiate their test, but they need to
+        // keep tracking RPCs from OTHER machines' tests too. If we reset to -1 after dumping,
+        // the machine stops tracking all subsequent RPC executions.
+        //
+        // Example bug scenario (with reset):
+        //   Server initiates test 340 → sets currentTestId=340
+        //   Server completes → dumps summary → resets currentTestId=-1
+        //   Client:1 initiates test 537 → Client:1 sets their currentTestId=537
+        //   Client:1's RPCs arrive at Server → Server's currentTestId=-1 → NOT LOGGED!
+        //
+        // FIX: Don't clear currentTestId. Let it persist across all tests.
+        //      All machines use the FIRST test ID they see for tracking ALL RPCs.
+        //
+        // OLD: currentTestId = -1;  ← BUG! Stopped tracking after dump
+        // NEW: (don't reset)        ← Keep tracking enabled permanently
+    }
+
+    string myRpcLogTelemetryProfile;
+    private void InitTelemetryLogging()
+    {
+        // Register a separate log file per machine to avoid log interleaving
+        myRpcLogTelemetryProfile = string.Concat("RpcTelemetry-", GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}");
+        GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+    }
+
+    private void OnApplicationQuit()
+    {
+        DumpRpcExecutionSummary();
+    }
+
+    #endregion
+
     #region RPCs to make sure we cover all cases
 
     [ClientRpc]
@@ -1362,18 +1362,177 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         GONetLog.Debug(string.Concat(nameof(ClientRpcAttribute), ' ', message));
     }
 
+    // ========== ServerRpc Tests: 0-parameter ==========
     [ServerRpc]
-    internal void LogOnServerOnly(string message)
+    internal void ServerRpc_0Params_Sync()
     {
-        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), ' ', message));
+        LogRpcExecution("SRpc-0p-s");
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 0-params (sync)"), myRpcLogTelemetryProfile);
     }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_0Params_Async()
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-0p-A");
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 0-params (async)"), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+    // ========== ServerRpc Tests: 1-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_1Param_Sync(string message)
+    {
+        LogRpcExecution("SRpc-1p-s", message);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 1-param (sync): ", message), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_1Param_Async(string message)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-1p-A", message);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 1-param (async): ", message), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+    // ========== ServerRpc Tests: 2-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_2Params_Sync(string msg, int value)
+    {
+        LogRpcExecution("SRpc-2p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 2-params (sync): ", msg, ", ", value), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_2Params_Async(string msg, int value)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-2p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 2-params (async): ", msg, ", ", value), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+    // ========== ServerRpc Tests: 3-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_3Params_Sync(string msg, int value, float f)
+    {
+        LogRpcExecution("SRpc-3p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 3-params: ", msg, ", ", value, ", ", f), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_3Params_Async(string msg, int value, float f)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-3p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 3-params (async): ", msg, ", ", value, ", ", f), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
+
+    // ========== ServerRpc Tests: 4-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_4Params_Sync(string msg, int value, float f, bool b)
+    {
+        LogRpcExecution("SRpc-4p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 4-params: ", msg, ", ", value, ", ", f, ", ", b), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_4Params_Async(string msg, int value, float f, bool b)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-4p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 4-params (async): ", msg, ", ", value, ", ", f, ", ", b), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
+
+    // ========== ServerRpc Tests: 5-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_5Params_Sync(string msg, int value, float f, bool b, double d)
+    {
+        LogRpcExecution("SRpc-5p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 5-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_5Params_Async(string msg, int value, float f, bool b, double d)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-5p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 5-params (async): ", msg, ", ", value, ", ", f, ", ", b, ", ", d), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
+
+    // ========== ServerRpc Tests: 6-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_6Params_Sync(string msg, int value, float f, bool b, double d, long l)
+    {
+        LogRpcExecution("SRpc-6p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 6-params: ", msg, ", ", value, ", ", f, ", ", b, ", ", d, ", ", l), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_6Params_Async(string msg, int value, float f, bool b, double d, long l)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-6p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 6-params (async): ", msg, ", ", value, ", ", f, ", ", b, ", ", d, ", ", l), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
+
+    // ========== ServerRpc Tests: 7-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_7Params_Sync(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        LogRpcExecution("SRpc-7p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 7-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_7Params_Async(string msg, int v1, float f, bool b, double d, long l, byte bt)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-7p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 7-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
+
+    // ========== ServerRpc Tests: 8-parameter ==========
+    [ServerRpc]
+    internal void ServerRpc_8Params_Sync(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        LogRpcExecution("SRpc-8p-s", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 8-params: ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s), myRpcLogTelemetryProfile);
+    }
+
+    [ServerRpc]
+    internal async Task<RpcDeliveryReport> ServerRpc_8Params_Async(string msg, int v1, float f, bool b, double d, long l, byte bt, short s)
+    {
+        await Task.CompletedTask;
+        LogRpcExecution("SRpc-8p-A", msg);
+        GONetLog.Debug(string.Concat(nameof(ServerRpcAttribute), " 8-params (async): ", msg, ", ", v1, ", ", f, ", ", b, ", ", d, ", ", l, ", ", bt, ", ", s), myRpcLogTelemetryProfile);
+        return default;
+    }
+
+
 
     // ========== 0-parameter TargetRpc tests ==========
     [TargetRpc]
     internal void LogOnAllMachines_0Params_NotValidated()
     {
         LogRpcExecution("0p-nvs");
-        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (not validated)"), myRpcLogTelemetryProfile);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (sync)"), myRpcLogTelemetryProfile);
     }
 
     [TargetRpc(validationMethod: nameof(AlwaysAllowValidator_0Params))]
@@ -1388,7 +1547,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         await Task.CompletedTask;
         LogRpcExecution("0p-nvA");
-        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (not validated async)"), myRpcLogTelemetryProfile);
+        GONetLog.Debug(string.Concat(nameof(TargetRpcAttribute), " 0-params (async)"), myRpcLogTelemetryProfile);
         return default;
     }
 
@@ -1926,14 +2085,96 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                     .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-VA", ' ', ASYNC_DONE), myRpcLogTelemetryProfile));
             }
 
-            const string GENERIC_MSG = "DREETSi something";
+            // Shift+C: ServerRpc comprehensive test (_C_lients invoke, only server executes)
             if (IsClient && Input.GetKeyDown(KeyCode.C))
             {
-                GONetLog.Debug(string.Concat(correlationId, ' ', INIT), myRpcLogTelemetryProfile);
+                // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
+                if (currentTestId == -1)
+                {
+                    currentTestId = correlationId;
+                }
+                GONetLog.Debug(string.Concat(correlationId, " INITIATOR ServerRpc Test"), myRpcLogTelemetryProfile);
 
-                CallRpc(nameof(LogOnServerOnly), string.Concat(correlationId, ' ', GENERIC_MSG));
+                const string MSG = "ServerRpc test message from client to server";
+
+                // ========== 1-parameter tests (FIRST so server can extract test ID and auto-set currentTestId) ==========
+                CallRpc(nameof(ServerRpc_1Param_Sync), string.Concat(correlationId, "-SRpc-1p-nvs", ' ', MSG));
+                CallRpc(nameof(ServerRpc_1Param_Sync), string.Concat(correlationId, "-SRpc-1p-Vs", ' ', MSG));
+                CallRpcAsync<RpcDeliveryReport, string>(
+                    nameof(ServerRpc_1Param_Async),
+                    string.Concat(correlationId, "-SRpc-1p-nvA", ' ', MSG))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-1p-nvA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+                CallRpcAsync<RpcDeliveryReport, string>(
+                    nameof(ServerRpc_1Param_Async),
+                    string.Concat(correlationId, "-SRpc-1p-VA", ' ', MSG))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-1p-VA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 2-parameter tests ==========
+                CallRpc(nameof(ServerRpc_2Params_Sync), string.Concat(correlationId, "-SRpc-2p-nvs", ' ', MSG), 42);
+                CallRpc(nameof(ServerRpc_2Params_Sync), string.Concat(correlationId, "-SRpc-2p-Vs", ' ', MSG), 42);
+                CallRpcAsync<RpcDeliveryReport, string, int>(
+                    nameof(ServerRpc_2Params_Async),
+                    string.Concat(correlationId, "-SRpc-2p-nvA", ' ', MSG), 42)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-2p-nvA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+                CallRpcAsync<RpcDeliveryReport, string, int>(
+                    nameof(ServerRpc_2Params_Async),
+                    string.Concat(correlationId, "-SRpc-2p-VA", ' ', MSG), 42)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-2p-VA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 3-parameter tests ==========
+                CallRpc(nameof(ServerRpc_3Params_Sync), string.Concat(correlationId, "-SRpc-3p-nvs", ' ', MSG), 42, 3.14f);
+                CallRpc(nameof(ServerRpc_3Params_Sync), string.Concat(correlationId, "-SRpc-3p-Vs", ' ', MSG), 42, 3.14f);
+                CallRpcAsync<RpcDeliveryReport, string, int, float>(
+                    nameof(ServerRpc_3Params_Async),
+                    string.Concat(correlationId, "-SRpc-3p-nvA", ' ', MSG), 42, 3.14f)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-3p-nvA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+                CallRpcAsync<RpcDeliveryReport, string, int, float>(
+                    nameof(ServerRpc_3Params_Async),
+                    string.Concat(correlationId, "-SRpc-3p-VA", ' ', MSG), 42, 3.14f)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-3p-VA", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 4-parameter tests ==========
+                CallRpc(nameof(ServerRpc_4Params_Sync), string.Concat(correlationId, "-SRpc-4p-s", ' ', MSG), 42, 3.14f, true);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool>(
+                    nameof(ServerRpc_4Params_Async),
+                    string.Concat(correlationId, "-SRpc-4p-A", ' ', MSG), 42, 3.14f, true)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-4p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 5-parameter tests ==========
+                CallRpc(nameof(ServerRpc_5Params_Sync), string.Concat(correlationId, "-SRpc-5p-s", ' ', MSG), 42, 3.14f, true, 2.718);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double>(
+                    nameof(ServerRpc_5Params_Async),
+                    string.Concat(correlationId, "-SRpc-5p-A", ' ', MSG), 42, 3.14f, true, 2.718)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-5p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 6-parameter tests ==========
+                CallRpc(nameof(ServerRpc_6Params_Sync), string.Concat(correlationId, "-SRpc-6p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long>(
+                    nameof(ServerRpc_6Params_Async),
+                    string.Concat(correlationId, "-SRpc-6p-A", ' ', MSG), 42, 3.14f, true, 2.718, 999L)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-6p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 7-parameter tests ==========
+                CallRpc(nameof(ServerRpc_7Params_Sync), string.Concat(correlationId, "-SRpc-7p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte>(
+                    nameof(ServerRpc_7Params_Async),
+                    string.Concat(correlationId, "-SRpc-7p-A", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-7p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 8-parameter tests ==========
+                CallRpc(nameof(ServerRpc_8Params_Sync), string.Concat(correlationId, "-SRpc-8p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+                CallRpcAsync<RpcDeliveryReport, string, int, float, bool, double, long, byte, short>(
+                    nameof(ServerRpc_8Params_Async),
+                    string.Concat(correlationId, "-SRpc-8p-A", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767)
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-8p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
+
+                // ========== 0-parameter tests (LAST so currentTestId is already set from 1-param RPCs above) ==========
+                CallRpc(nameof(ServerRpc_0Params_Sync));
+                CallRpcAsync<RpcDeliveryReport>(nameof(ServerRpc_0Params_Async))
+                    .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-0p-A", " ASYNC DONE"), myRpcLogTelemetryProfile));
             }
 
+            const string GENERIC_MSG = "DREETSi something";
             if (IsServer && Input.GetKeyDown(KeyCode.S))
             {
                 GONetLog.Debug(string.Concat(correlationId, ' ', INIT), myRpcLogTelemetryProfile);

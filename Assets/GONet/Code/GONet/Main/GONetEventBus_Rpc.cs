@@ -1341,6 +1341,22 @@ namespace GONet
 
             GONetLog.Debug($"[TARGETRPC-HANDLER] HandleRpcForMe called: RpcId={rpcEvent.RpcId}, OriginatorId={rpcEvent.OriginatorAuthorityId}, MyId={GONetMain.MyAuthorityId}, HasValidation={rpcEvent.HasValidation}");
 
+            // CRITICAL: ServerRpc should ONLY execute on the server, never on clients
+            // Check if this is a ServerRpc by looking up its metadata
+            if (componentTypeByRpcId.TryGetValue(rpcEvent.RpcId, out var componentType) &&
+                rpcMetadataByType.TryGetValue(componentType, out var typeMetadata))
+            {
+                string methodName = GetMethodNameFromRpcId(rpcEvent.RpcId);
+                if (methodName != null && typeMetadata.TryGetValue(methodName, out var metadata))
+                {
+                    if (metadata.Type == RpcType.ServerRpc && !GONetMain.IsServer)
+                    {
+                        GONetLog.Debug($"[SERVERRPC-HANDLER] SKIPPING ServerRpc execution on client (should only execute on server)");
+                        return;
+                    }
+                }
+            }
+
             // CRITICAL: Prevent double-execution for non-validated TargetRPCs
             // If this RPC:
             //   1. Was originated by us (we called it locally)
@@ -1779,11 +1795,27 @@ namespace GONet
         {
             var rpcEvent = envelope.Event;
 
+            //GONetLog.Debug($"This just in: persistent RPC ID: 0x{rpcEvent.RpcId:X8}, for gonetId: {rpcEvent.GONetId}, exists yet? {participantExists}");
+
+            // CRITICAL: ServerRpc should ONLY execute on the server, never on clients
+            // Check if this is a ServerRpc by looking up its metadata
+            if (componentTypeByRpcId.TryGetValue(rpcEvent.RpcId, out var componentType) &&
+                rpcMetadataByType.TryGetValue(componentType, out var typeMetadata))
+            {
+                string methodName = GetMethodNameFromRpcId(rpcEvent.RpcId);
+                if (methodName != null && typeMetadata.TryGetValue(methodName, out var metadata))
+                {
+                    if (metadata.Type == RpcType.ServerRpc && !GONetMain.IsServer)
+                    {
+                        GONetLog.Debug($"[SERVERRPC-HANDLER] SKIPPING persistent ServerRpc execution on client (should only execute on server)");
+                        return;
+                    }
+                }
+            }
+
             // Check if GONetParticipant exists - if not, defer processing
             var targetParticipant = GONetMain.GetGONetParticipantById(rpcEvent.GONetId);
             bool participantExists = targetParticipant != null;
-
-            //GONetLog.Debug($"This just in: persistent RPC ID: 0x{rpcEvent.RpcId:X8}, for gonetId: {rpcEvent.GONetId}, exists yet? {participantExists}");
 
             if (!participantExists)
             {
@@ -5567,7 +5599,7 @@ namespace GONet
             rpcEvent.RpcId = rpcId;
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         private void SendRpc1<T1>(GONetParticipantCompanionBehaviour instance, string methodName, bool isReliable, T1 arg1)
@@ -5583,7 +5615,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc2
@@ -5600,7 +5632,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc3
@@ -5617,7 +5649,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc4
@@ -5634,7 +5666,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc5
@@ -5651,7 +5683,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc6
@@ -5668,7 +5700,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc7
@@ -5685,7 +5717,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // SendRpc8
@@ -5702,7 +5734,7 @@ namespace GONet
             rpcEvent.GONetId = instance.GONetParticipant.GONetId;
             rpcEvent.OccurredAtElapsedTicks = GONetMain.Time.ElapsedTicks;
             rpcEvent.Data = serialized;
-            Publish(rpcEvent, shouldPublishReliably: isReliable);
+            Publish(rpcEvent, targetClientAuthorityId: GONetMain.OwnerAuthorityId_Server, shouldPublishReliably: isReliable);
         }
 
         // 0 parameters
