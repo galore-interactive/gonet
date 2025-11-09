@@ -9,9 +9,10 @@ using UnityEngine;
 /// Tests all three RPC types (TargetRpc, ServerRpc, ClientRpc) across all parameter counts (0-8).
 ///
 /// Test Triggers:
+/// - Shift+A: Run ALL tests applicable to this machine (auto-detect)
 /// - Shift+L: TargetRpc tests (broadcast to all machines)
-/// - Shift+C: ServerRpc tests (clients → server only)
-/// - Shift+S: ClientRpc tests (server → all clients only)
+/// - Shift+C: ServerRpc tests (clients → server only, CLIENT ONLY)
+/// - Shift+S: ClientRpc tests (server → all clients only, SERVER ONLY)
 /// - Shift+K: Dump execution summary
 ///
 /// Expected Results:
@@ -129,6 +130,7 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
     private void Start()
     {
         InitTelemetryLogging();
+        RegisterTestsWithUI();
     }
 
     #endregion
@@ -820,6 +822,30 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
             DumpRpcExecutionSummary();
         }
 
+        // Shift+A: Run ALL tests applicable to this machine (auto-detect)
+        if (Input.GetKeyDown(KeyCode.A))
+        {
+            GONetLog.Info("[GONetRpcComprehensiveTests] Running ALL applicable tests (Shift+A)...", myRpcLogTelemetryProfile);
+
+            // TargetRpc tests (applicable to ALL machines)
+            InvokeTest_TargetRpc_AllParamCounts();
+
+            // ServerRpc tests (CLIENT ONLY - only clients can invoke ServerRpc)
+            if (IsClient)
+            {
+                InvokeTest_ServerRpc_AllParamCounts();
+            }
+
+            // ClientRpc tests (SERVER ONLY - only server can invoke ClientRpc)
+            if (IsServer)
+            {
+                InvokeTest_ClientRpc_AllParamCounts();
+            }
+
+            GONetLog.Info("[GONetRpcComprehensiveTests] Completed ALL applicable tests. Press Shift+K to dump summary.", myRpcLogTelemetryProfile);
+            return; // Early exit to prevent duplicate execution if L/C/S also pressed
+        }
+
         // Shift+L: TargetRpc comprehensive test (broadcasts to all machines)
         if (Input.GetKeyDown(KeyCode.L))
         {
@@ -1069,6 +1095,204 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
 
     // TargetRpc property (required for TargetRpc routing)
     public System.Collections.Generic.List<ushort> CurrentMessageTargets { get; set; } = new System.Collections.Generic.List<ushort>();
+
+    #endregion
+
+    #region UI Test Registration (NEW - for RpcTestRunnerUI)
+
+    private void RegisterTestsWithUI()
+    {
+        // Register TargetRpc comprehensive test (all param counts with RpcTarget.All)
+        GONet.Sample.RpcTests.RpcTestRegistry.RegisterTest(
+            GONet.Sample.RpcTests.RpcTestRegistry.TestCategory.TargetRpc_Targeting,
+            new GONet.Sample.RpcTests.RpcTestRegistry.TestDescriptor
+            {
+                Name = "TargetRpc - All Param Counts (Comprehensive)",
+                Description = "Tests TargetRpc with RpcTarget.All (default) across all parameter counts (0-8).\n\n" +
+                             "Includes 4 variants per param count:\n" +
+                             "• NotValidated (sync)\n" +
+                             "• Validated (sync with AlwaysAllow validator)\n" +
+                             "• NotValidatedAsync (async RpcDeliveryReport)\n" +
+                             "• ValidatedAsync (async RpcDeliveryReport)\n\n" +
+                             "Total: 36 RPC methods executed.",
+                ExpectedResult = "All machines execute all TargetRpc calls (36 total).\n\n" +
+                                "Each machine should log execution for:\n" +
+                                "• 0-8 param counts\n" +
+                                "• All 4 variants per count\n" +
+                                "• Total 36 executions per machine",
+                ApplicableMachines = GONet.Sample.RpcTests.RpcTestRegistry.MachineRequirement.All,
+                InvokeTest = InvokeTest_TargetRpc_AllParamCounts
+            }
+        );
+
+        // Register ServerRpc comprehensive test (all param counts, RelayMode.None)
+        GONet.Sample.RpcTests.RpcTestRegistry.RegisterTest(
+            GONet.Sample.RpcTests.RpcTestRegistry.TestCategory.ServerRpc_Relay,
+            new GONet.Sample.RpcTests.RpcTestRegistry.TestDescriptor
+            {
+                Name = "ServerRpc - All Param Counts (No Relay)",
+                Description = "Tests ServerRpc with RelayMode.None (default) across all parameter counts (0-8).\n\n" +
+                             "Includes 2 variants per param count:\n" +
+                             "• Sync (void return)\n" +
+                             "• Async (Task<RpcDeliveryReport> return)\n\n" +
+                             "Total: 18 RPC methods executed.\n\n" +
+                             "NOTE: Only clients can call ServerRpc.",
+                ExpectedResult = "Server executes all ServerRpc calls (18 total).\n" +
+                                "Clients do NOT execute locally (ServerRpc runs on server only).\n\n" +
+                                "Clients receive async responses for async variants.",
+                ApplicableMachines = GONet.Sample.RpcTests.RpcTestRegistry.MachineRequirement.ClientOnly,
+                InvokeTest = InvokeTest_ServerRpc_AllParamCounts
+            }
+        );
+
+        // Register ClientRpc comprehensive test (all param counts)
+        GONet.Sample.RpcTests.RpcTestRegistry.RegisterTest(
+            GONet.Sample.RpcTests.RpcTestRegistry.TestCategory.TargetRpc_Targeting,
+            new GONet.Sample.RpcTests.RpcTestRegistry.TestDescriptor
+            {
+                Name = "ClientRpc - All Param Counts",
+                Description = "Tests ClientRpc across all parameter counts (0-8).\n\n" +
+                             "Server broadcasts to all clients.\n" +
+                             "Total: 9 RPC methods executed.\n\n" +
+                             "NOTE: Only server can call ClientRpc.",
+                ExpectedResult = "All clients execute ClientRpc calls (9 total).\n" +
+                                "Server does NOT execute locally in dedicated server mode.\n\n" +
+                                "Each client should log 9 executions (0-8 param counts).",
+                ApplicableMachines = GONet.Sample.RpcTests.RpcTestRegistry.MachineRequirement.ServerOnly,
+                InvokeTest = InvokeTest_ClientRpc_AllParamCounts
+            }
+        );
+    }
+
+    /// <summary>
+    /// UI wrapper for TargetRpc comprehensive test (Shift+L equivalent).
+    /// </summary>
+    private void InvokeTest_TargetRpc_AllParamCounts()
+    {
+        // Setup
+        CurrentMessageTargets = new System.Collections.Generic.List<ushort> { GONetMain.OwnerAuthorityId_Server, 1, 2 };
+        int correlationId = UnityEngine.Random.Range(111, 666);
+        if (currentTestId == -1) currentTestId = correlationId;
+
+        GONetLog.Info($"[UI TEST START] TargetRpc All Param Counts (ID: {correlationId})", myRpcLogTelemetryProfile);
+
+        const string MSG = "UI-invoked TargetRpc test (RpcTarget.All)";
+
+        // Execute same logic as Shift+L (copy from UpdateAfterGONetReady)
+        // ========== 1-parameter tests (FIRST so remote machines can extract test ID) ==========
+        CallRpc(nameof(LogOnAllMachines_NotValidated), string.Concat(correlationId, "-1p-nvs", ' ', MSG));
+        CallRpc(nameof(LogOnAllMachines_Validated), string.Concat(correlationId, "-1p-Vs", ' ', MSG));
+        CallRpcAsync<RpcDeliveryReport, string>(
+            nameof(LogOnAllMachines_NotValidatedAsync),
+            string.Concat(correlationId, "-1p-nvA", ' ', MSG))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-1p-nvA ASYNC DONE"), myRpcLogTelemetryProfile));
+        CallRpcAsync<RpcDeliveryReport, string>(
+            nameof(LogOnAllMachines_ValidatedAsync),
+            string.Concat(correlationId, "-1p-VA", ' ', MSG))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-1p-VA ASYNC DONE"), myRpcLogTelemetryProfile));
+
+        // ========== 2-parameter tests ==========
+        CallRpc(nameof(LogOnAllMachines_2Params_NotValidated), string.Concat(correlationId, "-2p", ' ', MSG), 42);
+        CallRpc(nameof(LogOnAllMachines_2Params_Validated), string.Concat(correlationId, "-2p", ' ', MSG), 42);
+        CallRpcAsync<RpcDeliveryReport, string, int>(
+            nameof(LogOnAllMachines_2Params_NotValidatedAsync),
+            string.Concat(correlationId, "-2p-nvA", ' ', MSG), 42)
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-2p-nvA ASYNC DONE"), myRpcLogTelemetryProfile));
+        CallRpcAsync<RpcDeliveryReport, string, int>(
+            nameof(LogOnAllMachines_2Params_ValidatedAsync),
+            string.Concat(correlationId, "-2p-VA", ' ', MSG), 42)
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-2p-VA ASYNC DONE"), myRpcLogTelemetryProfile));
+
+        // Continue with remaining param counts (3-8)...
+        CallRpc(nameof(LogOnAllMachines_3Params_NotValidated), string.Concat(correlationId, "-3p", ' ', MSG), 42, 3.14f);
+        CallRpc(nameof(LogOnAllMachines_4Params_NotValidated), string.Concat(correlationId, "-4p", ' ', MSG), 42, 3.14f, true);
+        CallRpc(nameof(LogOnAllMachines_5Params_NotValidated), string.Concat(correlationId, "-5p", ' ', MSG), 42, 3.14f, true, 2.718);
+        CallRpc(nameof(LogOnAllMachines_6Params_NotValidated), string.Concat(correlationId, "-6p", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+        CallRpc(nameof(LogOnAllMachines_7Params_NotValidated), string.Concat(correlationId, "-7p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+        CallRpc(nameof(LogOnAllMachines_8Params_NotValidated), string.Concat(correlationId, "-8p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+
+        // ========== 0-parameter tests (LAST) ==========
+        CallRpc(nameof(LogOnAllMachines_0Params_NotValidated));
+        CallRpc(nameof(LogOnAllMachines_0Params_Validated));
+        CallRpcAsync<RpcDeliveryReport>(nameof(LogOnAllMachines_0Params_NotValidatedAsync))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-nvA ASYNC DONE"), myRpcLogTelemetryProfile));
+        CallRpcAsync<RpcDeliveryReport>(nameof(LogOnAllMachines_0Params_ValidatedAsync))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-VA ASYNC DONE"), myRpcLogTelemetryProfile));
+
+        GONetLog.Info($"[UI TEST END] TargetRpc All Param Counts invoked. Check logs (Shift+K for summary).", myRpcLogTelemetryProfile);
+    }
+
+    /// <summary>
+    /// UI wrapper for ServerRpc comprehensive test (Shift+C equivalent).
+    /// </summary>
+    private void InvokeTest_ServerRpc_AllParamCounts()
+    {
+        if (!IsClient)
+        {
+            GONetLog.Warning("[UI TEST] ServerRpc tests can only be invoked from clients");
+            return;
+        }
+
+        int correlationId = UnityEngine.Random.Range(111, 666);
+        if (currentTestId == -1) currentTestId = correlationId;
+
+        GONetLog.Info($"[UI TEST START] ServerRpc All Param Counts (ID: {correlationId})", myRpcLogTelemetryProfile);
+
+        const string MSG = "UI-invoked ServerRpc test";
+
+        // Execute same logic as Shift+C
+        CallRpc(nameof(ServerRpc_1Param_Sync), string.Concat(correlationId, "-SRpc-1p-s", ' ', MSG));
+        CallRpcAsync<RpcDeliveryReport, string>(
+            nameof(ServerRpc_1Param_Async),
+            string.Concat(correlationId, "-SRpc-1p-A", ' ', MSG))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-1p-A ASYNC DONE"), myRpcLogTelemetryProfile));
+
+        CallRpc(nameof(ServerRpc_2Params_Sync), string.Concat(correlationId, "-SRpc-2p-s", ' ', MSG), 42);
+        CallRpc(nameof(ServerRpc_3Params_Sync), string.Concat(correlationId, "-SRpc-3p-s", ' ', MSG), 42, 3.14f);
+        CallRpc(nameof(ServerRpc_4Params_Sync), string.Concat(correlationId, "-SRpc-4p-s", ' ', MSG), 42, 3.14f, true);
+        CallRpc(nameof(ServerRpc_5Params_Sync), string.Concat(correlationId, "-SRpc-5p-s", ' ', MSG), 42, 3.14f, true, 2.718);
+        CallRpc(nameof(ServerRpc_6Params_Sync), string.Concat(correlationId, "-SRpc-6p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+        CallRpc(nameof(ServerRpc_7Params_Sync), string.Concat(correlationId, "-SRpc-7p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+        CallRpc(nameof(ServerRpc_8Params_Sync), string.Concat(correlationId, "-SRpc-8p-s", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+
+        CallRpc(nameof(ServerRpc_0Params_Sync));
+        CallRpcAsync<RpcDeliveryReport>(nameof(ServerRpc_0Params_Async))
+            .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-SRpc-0p-A ASYNC DONE"), myRpcLogTelemetryProfile));
+
+        GONetLog.Info($"[UI TEST END] ServerRpc All Param Counts invoked. Server should execute all RPCs.", myRpcLogTelemetryProfile);
+    }
+
+    /// <summary>
+    /// UI wrapper for ClientRpc comprehensive test (Shift+S equivalent).
+    /// </summary>
+    private void InvokeTest_ClientRpc_AllParamCounts()
+    {
+        if (!IsServer)
+        {
+            GONetLog.Warning("[UI TEST] ClientRpc tests can only be invoked from server");
+            return;
+        }
+
+        int correlationId = UnityEngine.Random.Range(111, 666);
+        if (currentTestId == -1) currentTestId = correlationId;
+
+        GONetLog.Info($"[UI TEST START] ClientRpc All Param Counts (ID: {correlationId})", myRpcLogTelemetryProfile);
+
+        const string MSG = "UI-invoked ClientRpc test";
+
+        // Execute same logic as Shift+S
+        CallRpc(nameof(ClientRpc_1Param), string.Concat(correlationId, "-CRpc-1p", ' ', MSG));
+        CallRpc(nameof(ClientRpc_2Params), string.Concat(correlationId, "-CRpc-2p", ' ', MSG), 42);
+        CallRpc(nameof(ClientRpc_3Params), string.Concat(correlationId, "-CRpc-3p", ' ', MSG), 42, 3.14f);
+        CallRpc(nameof(ClientRpc_4Params), string.Concat(correlationId, "-CRpc-4p", ' ', MSG), 42, 3.14f, true);
+        CallRpc(nameof(ClientRpc_5Params), string.Concat(correlationId, "-CRpc-5p", ' ', MSG), 42, 3.14f, true, 2.718);
+        CallRpc(nameof(ClientRpc_6Params), string.Concat(correlationId, "-CRpc-6p", ' ', MSG), 42, 3.14f, true, 2.718, 999L);
+        CallRpc(nameof(ClientRpc_7Params), string.Concat(correlationId, "-CRpc-7p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255);
+        CallRpc(nameof(ClientRpc_8Params), string.Concat(correlationId, "-CRpc-8p", ' ', MSG), 42, 3.14f, true, 2.718, 999L, (byte)255, (short)32767);
+        CallRpc(nameof(ClientRpc_0Params));
+
+        GONetLog.Info($"[UI TEST END] ClientRpc All Param Counts invoked. Clients should execute all RPCs.", myRpcLogTelemetryProfile);
+    }
 
     #endregion
 }
