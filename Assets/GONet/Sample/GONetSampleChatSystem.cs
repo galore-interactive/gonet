@@ -813,46 +813,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         return default;
     }
 
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY))]
-    internal async Task<RpcDeliveryReport> SendMessage_TEST()
-    {
-        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
-        return default;
-    }
-
-    internal RpcValidationResult ValidateMessage_TEST_EMPTY()
-    {
-        var context = GONetMain.EventBus.GetValidationContext();
-        if (!context.HasValue)
-        {
-            var result = RpcValidationResult.CreatePreAllocated(1);
-            result.AllowAll();
-            return result;
-        }
-        var validationResult = context.Value.GetValidationResult();
-        validationResult.AllowAll();
-        return validationResult;
-    }
-
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY_VOID))]
-    internal void SendMessage_TEST_VOID()
-    {
-    }
-
-    internal RpcValidationResult ValidateMessage_TEST_EMPTY_VOID()
-    {
-        var context = GONetMain.EventBus.GetValidationContext();
-        if (!context.HasValue)
-        {
-            var result = RpcValidationResult.CreatePreAllocated(1);
-            result.AllowAll();
-            return result;
-        }
-        var validationResult = context.Value.GetValidationResult();
-        validationResult.AllowAll();
-        return validationResult;
-    }
-
     void OnReceiveMessage(ChatMessage message)
     {
         // Store ALL messages regardless of current view - filtering happens during display
