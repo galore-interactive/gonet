@@ -5,6 +5,40 @@ using UnityEngine;
 
 namespace GONet.Sample.RpcTests
 {
+    #region Custom Types for Testing (MUST be at namespace level for MemoryPack)
+
+    public enum TestEnum : byte
+    {
+        ValueA = 0,
+        ValueB = 1,
+        ValueC = 2
+    }
+
+    [MemoryPackable]
+    public partial struct TestStruct
+    {
+        public int id;
+        public float value;
+        public string name;
+    }
+
+    [MemoryPackable]
+    public partial struct NestedStruct
+    {
+        public TestStruct inner;
+        public Vector3 position;
+        public TestEnum enumValue;
+    }
+
+    // Non-MemoryPackable struct (should FAIL)
+    public struct NonMemoryPackableStruct
+    {
+        public int id;
+        public float value;
+    }
+
+    #endregion
+
     /// <summary>
     /// TEST FILE: Validates which types are supported by GONet RPC MemoryPack serialization.
     ///
@@ -22,48 +56,17 @@ namespace GONet.Sample.RpcTests
     /// EXPECTED RESULTS:
     /// - Built-in types (primitives, string, Vector3, Quaternion): ✅ Should work
     /// - Enums: ✅ Should work (MemoryPack supports enums)
-    /// - Custom [MemoryPackable] structs: ✅ Should work
+    /// - Custom [MemoryPackable] structs: ✅ Should work (MUST be at namespace level, not nested)
     /// - Arrays: ✅ Should work (MemoryPack supports arrays)
     /// - Lists/Dictionaries: ✅ Should work (MemoryPack supports collections)
     /// - Color: ❓ Need to test (Unity type, not in GONetSyncableValueTypes)
     /// - Non-MemoryPackable custom types: ❌ Should fail
+    ///
+    /// IMPORTANT: MemoryPackable types MUST NOT be nested inside classes (MEMPACK002 error)
     /// </summary>
     [RequireComponent(typeof(GONetParticipant))]
     public class GONetRpcMemoryPackTypesTest : GONetParticipantCompanionBehaviour
     {
-        #region Custom Types for Testing
-
-        public enum TestEnum : byte
-        {
-            ValueA = 0,
-            ValueB = 1,
-            ValueC = 2
-        }
-
-        [MemoryPackable]
-        public partial struct TestStruct
-        {
-            public int id;
-            public float value;
-            public string name;
-        }
-
-        [MemoryPackable]
-        public partial struct NestedStruct
-        {
-            public TestStruct inner;
-            public Vector3 position;
-            public TestEnum enumValue;
-        }
-
-        // Non-MemoryPackable struct (should FAIL)
-        public struct NonMemoryPackableStruct
-        {
-            public int id;
-            public float value;
-        }
-
-        #endregion
 
         #region Test Results Tracking
 
