@@ -31,6 +31,45 @@ namespace GONet
     /// <item><description><b>IsReliable</b>: Whether the RPC uses reliable UDP transmission (guaranteed delivery)</description></item>
     /// <item><description><b>IsPersistent</b>: Whether the RPC is stored and sent to late-joining clients</description></item>
     /// </list>
+    ///
+    /// <para><b>Supported RPC Parameter Types:</b></para>
+    /// <para>
+    /// GONet RPCs only support types defined in <see cref="GONetSyncableValueTypes"/> plus string:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description><b>Primitive Types:</b> bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double</description></item>
+    /// <item><description><b>String:</b> string (reference type, supported)</description></item>
+    /// <item><description><b>Unity Math Types:</b> Vector2, Vector3, Vector4, Quaternion</description></item>
+    /// <item><description><b>NOT Supported:</b> Custom structs, enums, Color, arrays, lists, dictionaries, or any MemoryPackable types</description></item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>Why this limitation?</b> GONet uses the same serialization mechanism for RPCs as it does for
+    /// Auto-Magical Sync. This ensures consistency, performance, and reliability across the networking layer.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Workarounds for unsupported types:</b>
+    /// </para>
+    /// <code>
+    /// // ❌ WRONG - Custom struct not supported
+    /// [ServerRpc]
+    /// void SendData(MyCustomStruct data) { }
+    ///
+    /// // ✅ CORRECT - Break into primitives
+    /// [ServerRpc]
+    /// void SendData(int id, float value, string name) { }
+    ///
+    /// // ❌ WRONG - Arrays not supported
+    /// [ServerRpc]
+    /// void SendPositions(Vector3[] positions) { }
+    ///
+    /// // ✅ CORRECT - Send one at a time or use separate sync mechanism
+    /// [ServerRpc]
+    /// void SendPosition(Vector3 position, int index) { }
+    /// </code>
+    ///
+    /// <para><b>RPC Parameter Count Limit:</b> Maximum 8 parameters per RPC method.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public abstract class GONetRpcAttribute : Attribute
