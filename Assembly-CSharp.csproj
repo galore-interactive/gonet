@@ -77,6 +77,7 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\DateTimeEx.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodePacket.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\ByteBuffer.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcMemoryPackTypesTest.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\LockFreeQueue.cs" />
     <Compile Include="Assets\GONet\Sample\TestInstructionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetServer.cs" />
@@ -118,7 +119,6 @@
     <Compile Include="Assets\GONet\Sample\Projectile\SmoothingValuesModifiersUI.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\ByteArrayReader.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\SpawnTestController.cs" />
-    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcComplexTypesTests.cs" />
     <Compile Include="Assets\GONet\Sample\RandomMoveToTarget.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\GONetSyncableValues.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\GONetParticipant.cs" />

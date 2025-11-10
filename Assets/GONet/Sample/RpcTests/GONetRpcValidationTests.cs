@@ -144,7 +144,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] AllowAll RPC executed: {message}", myRpcLogTelemetryProfile);
         }
 
-        internal RpcValidationResult Validate_AllowAll()
+        internal RpcValidationResult Validate_AllowAll(ref string message)
         {
             var context = GONetMain.EventBus.GetValidationContext();
             if (!context.HasValue)
@@ -178,7 +178,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] DenyAll RPC executed (should NOT happen): {message}", myRpcLogTelemetryProfile);
         }
 
-        internal RpcValidationResult Validate_DenyAll()
+        internal RpcValidationResult Validate_DenyAll(ref string message)
         {
             var context = GONetMain.EventBus.GetValidationContext();
             if (!context.HasValue)
@@ -213,7 +213,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] AllowClient1Only RPC executed: {message}", myRpcLogTelemetryProfile);
         }
 
-        internal RpcValidationResult Validate_AllowClient1Only()
+        internal RpcValidationResult Validate_AllowClient1Only(ref string message)
         {
             var context = GONetMain.EventBus.GetValidationContext();
             if (!context.HasValue)
@@ -247,7 +247,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] Async AllowAll RPC executed: {message}", myRpcLogTelemetryProfile);
         }
 
-        internal async Task<RpcValidationResult> ValidateAsync_AllowAll()
+        internal async Task<RpcValidationResult> ValidateAsync_AllowAll(string message)
         {
             await Task.Delay(10); // Simulate async work (e.g., database lookup)
 
@@ -283,7 +283,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] Async DenyAll RPC executed (should NOT happen): {message}", myRpcLogTelemetryProfile);
         }
 
-        internal async Task<RpcValidationResult> ValidateAsync_DenyAll()
+        internal async Task<RpcValidationResult> ValidateAsync_DenyAll(string message)
         {
             await Task.Delay(10); // Simulate async work (e.g., profanity check API)
 
@@ -320,7 +320,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] Modified RPC executed: {message}, value={value}", myRpcLogTelemetryProfile);
         }
 
-        internal RpcValidationResult Validate_ModifyParameter(string message, int value)
+        internal RpcValidationResult Validate_ModifyParameter(ref string message, ref int value)
         {
             var context = GONetMain.EventBus.GetValidationContext();
             if (!context.HasValue)
@@ -369,7 +369,7 @@ namespace GONet.Sample.RpcTests
             GONetLog.Debug($"[RpcValidation] Selective RPC executed: {message}", myRpcLogTelemetryProfile);
         }
 
-        internal RpcValidationResult Validate_SelectiveTargeting()
+        internal RpcValidationResult Validate_SelectiveTargeting(ref string message)
         {
             var context = GONetMain.EventBus.GetValidationContext();
             if (!context.HasValue)

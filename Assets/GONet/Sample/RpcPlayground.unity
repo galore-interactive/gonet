@@ -2454,6 +2454,21 @@ MonoBehaviour:
   componentTypeName: GONet.Sample.RpcTests.GONetRpcPersistenceTests, Assembly-CSharp,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   removeOnSceneUnload: 1
+--- !u!114 &8062623678048311882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8062623678048311875}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c80aba648ebbf6418b56c10769fb6f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  componentTypeName: GONet.Sample.RpcTests.GONetRpcMemoryPackTypesTest, Assembly-CSharp,
+    Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+  removeOnSceneUnload: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
