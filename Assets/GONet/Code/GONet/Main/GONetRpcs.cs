@@ -32,44 +32,66 @@ namespace GONet
     /// <item><description><b>IsPersistent</b>: Whether the RPC is stored and sent to late-joining clients</description></item>
     /// </list>
     ///
-    /// <para><b>Supported RPC Parameter Types:</b></para>
+    /// <para><b>Supported RPC Parameter Types (RUNTIME VALIDATED):</b></para>
     /// <para>
-    /// GONet RPCs only support types defined in <see cref="GONetSyncableValueTypes"/> plus string:
+    /// GONet RPCs use MemoryPack serialization. The following types are fully supported:
     /// </para>
     /// <list type="bullet">
-    /// <item><description><b>Primitive Types:</b> bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double</description></item>
-    /// <item><description><b>String:</b> string (reference type, supported)</description></item>
-    /// <item><description><b>Unity Math Types:</b> Vector2, Vector3, Vector4, Quaternion</description></item>
-    /// <item><description><b>NOT Supported:</b> Custom structs, enums, Color, arrays, lists, dictionaries, or any MemoryPackable types</description></item>
+    /// <item><description><b>Primitives:</b> bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double</description></item>
+    /// <item><description><b>String:</b> string (reference type)</description></item>
+    /// <item><description><b>Unity Math:</b> Vector2, Vector3, Quaternion</description></item>
+    /// <item><description><b>Enums:</b> All enum types (serialized as underlying type)</description></item>
+    /// <item><description><b>Custom Types:</b> [MemoryPackable] partial struct/class (MUST be at namespace level, not nested)</description></item>
+    /// <item><description><b>Arrays:</b> T[] for any supported type T (int[], Vector3[], string[], custom struct arrays)</description></item>
+    /// <item><description><b>Collections:</b> List&lt;T&gt;, Dictionary&lt;K,V&gt; for any supported K,V</description></item>
+    /// </list>
+    ///
+    /// <para><b>NOT Supported (Unity Types Not Recognized by MemoryPack):</b></para>
+    /// <list type="bullet">
+    /// <item><description><b>UnityEngine.Vector4</b> - Use 4 float parameters (x, y, z, w)</description></item>
+    /// <item><description><b>UnityEngine.Color</b> - Use 4 float parameters (r, g, b, a)</description></item>
+    /// <item><description><b>UnityEngine.Color32</b> - Use 4 byte parameters (r, g, b, a)</description></item>
     /// </list>
     ///
     /// <para>
-    /// <b>Why this limitation?</b> GONet uses the same serialization mechanism for RPCs as it does for
-    /// Auto-Magical Sync. This ensures consistency, performance, and reliability across the networking layer.
+    /// <b>MemoryPack Restrictions:</b>
     /// </para>
+    /// <list type="bullet">
+    /// <item><description>[MemoryPackable] types MUST be at namespace level (not nested inside classes) - causes MEMPACK002 error</description></item>
+    /// <item><description>[MemoryPackable] types MUST be declared 'partial'</description></item>
+    /// </list>
     ///
     /// <para>
-    /// <b>Workarounds for unsupported types:</b>
+    /// <b>Example Workarounds:</b>
     /// </para>
     /// <code>
-    /// // ❌ WRONG - Custom struct not supported
-    /// [ServerRpc]
-    /// void SendData(MyCustomStruct data) { }
+    /// // ✅ VALID - Custom MemoryPackable struct (at namespace level)
+    /// [MemoryPackable]
+    /// public partial struct PlayerData { public int id; public float health; }
     ///
-    /// // ✅ CORRECT - Break into primitives
     /// [ServerRpc]
-    /// void SendData(int id, float value, string name) { }
+    /// void UpdatePlayer(PlayerData data) { } // Works!
     ///
-    /// // ❌ WRONG - Arrays not supported
+    /// // ✅ VALID - Arrays and collections
     /// [ServerRpc]
-    /// void SendPositions(Vector3[] positions) { }
+    /// void SendPositions(Vector3[] positions) { } // Works!
     ///
-    /// // ✅ CORRECT - Send one at a time or use separate sync mechanism
     /// [ServerRpc]
-    /// void SendPosition(Vector3 position, int index) { }
+    /// void SendData(List&lt;int&gt; values) { } // Works!
+    ///
+    /// // ❌ INVALID - Color not supported
+    /// [ServerRpc]
+    /// void SetColor(Color color) { } // FAILS
+    ///
+    /// // ✅ CORRECT - Break Color into RGBA components
+    /// [ServerRpc]
+    /// void SetColor(float r, float g, float b, float a) { }
+    ///
+    /// // Usage: CallRpc(nameof(SetColor), color.r, color.g, color.b, color.a);
     /// </code>
     ///
     /// <para><b>RPC Parameter Count Limit:</b> Maximum 8 parameters per RPC method.</para>
+    /// <para><b>Validation:</b> See GONetRpcMemoryPackTypesTest.cs for comprehensive runtime-validated examples.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public abstract class GONetRpcAttribute : Attribute
