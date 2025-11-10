@@ -6289,22 +6289,58 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, System.Array.Empty<object>());
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync0<TResult>(instance, methodName);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6366,22 +6402,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync1<TResult, T1>(instance, methodName, arg1);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6446,22 +6521,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync2<TResult, T1, T2>(instance, methodName, arg1, arg2);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6523,22 +6637,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync3<TResult, T1, T2, T3>(instance, methodName, arg1, arg2, arg3);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6600,22 +6753,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3, arg4 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync4<TResult, T1, T2, T3, T4>(instance, methodName, arg1, arg2, arg3, arg4);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6677,22 +6869,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3, arg4, arg5 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync5<TResult, T1, T2, T3, T4, T5>(instance, methodName, arg1, arg2, arg3, arg4, arg5);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6754,22 +6985,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3, arg4, arg5, arg6 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync6<TResult, T1, T2, T3, T4, T5, T6>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6831,22 +7101,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync7<TResult, T1, T2, T3, T4, T5, T6, T7>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {
@@ -6908,22 +7217,61 @@ namespace GONet
                 case RpcType.ServerRpc:
                     if (GONetMain.IsServer)
                     {
-                        // Server executes ServerRpc locally
-                        if (GONetMain.IsClient && rpcDispatchers.TryGetValue(instance.GetType(), out var dispatcher))
+                        // Server executes ServerRpc locally (RunLocally behavior)
+                        var method = instance.GetType().GetMethod(methodName,
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic,
+                            null,
+                            new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7), typeof(T8) },
+                            null);
+
+                        if (method == null)
                         {
-                            var context = new GONetRpcContext(GONetMain.MyAuthorityId, metadata.IsReliable, instance.GONetParticipant.GONetId);
-                            SetCurrentRpcContext(context);
-                            try
+                            GONetLog.Error($"ServerRpc method not found: {instance.GetType().Name}.{methodName}");
+                            return default(TResult);
+                        }
+
+                        var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
+                        bool runLocally = serverRpcAttr?.RunLocally ?? true;
+
+                        if (!runLocally)
+                        {
+                            throw new System.InvalidOperationException(
+                                $"ServerRpc '{methodName}' called on server with RunLocally=false. " +
+                                $"This ServerRpc can only be called by clients.");
+                        }
+
+                        // Execute locally with synthetic RpcContext
+                        var context = new GONetRpcContext(
+                            GONetMain.MyAuthorityId, // Server's own authority
+                            metadata.IsReliable,
+                            instance.GONetParticipant.GONetId,
+                            isSourceRemote: false); // Local call
+
+                        SetCurrentRpcContext(context);
+                        try
+                        {
+                            var result = method.Invoke(instance, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 });
+
+                            if (result is Task<TResult> taskResult)
                             {
-                                return await dispatcher.DispatchAsync8<TResult, T1, T2, T3, T4, T5, T6, T7, T8>(instance, methodName, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                                return await taskResult;
                             }
-                            finally
+                            else if (result is Task task)
                             {
-                                SetCurrentRpcContext(null);
+                                await task;
+                                return default(TResult);
+                            }
+                            else
+                            {
+                                return (TResult)result;
                             }
                         }
-                        GONetLog.Warning($"No dispatcher found for {instance.GetType().Name}.{methodName}");
-                        return default(TResult);
+                        finally
+                        {
+                            SetCurrentRpcContext(null);
+                        }
                     }
                     else
                     {

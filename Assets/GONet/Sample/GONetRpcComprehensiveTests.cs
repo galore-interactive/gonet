@@ -11,7 +11,7 @@ using UnityEngine;
 /// Test Triggers:
 /// - Shift+A: Run ALL tests applicable to this machine (auto-detect)
 /// - Shift+L: TargetRpc tests (broadcast to all machines)
-/// - Shift+C: ServerRpc tests (clients → server only, CLIENT ONLY)
+/// - Shift+C: ServerRpc tests (RunLocally=true allows server and clients to invoke)
 /// - Shift+S: ClientRpc tests (server → all clients only, SERVER ONLY)
 /// - Shift+K: Dump execution summary
 ///
@@ -830,11 +830,8 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
             // TargetRpc tests (applicable to ALL machines)
             InvokeTest_TargetRpc_AllParamCounts();
 
-            // ServerRpc tests (CLIENT ONLY - only clients can invoke ServerRpc)
-            if (IsClient)
-            {
-                InvokeTest_ServerRpc_AllParamCounts();
-            }
+            // ServerRpc tests (RunLocally=true allows server and clients to invoke)
+            InvokeTest_ServerRpc_AllParamCounts();
 
             // ClientRpc tests (SERVER ONLY - only server can invoke ClientRpc)
             if (IsServer)
@@ -963,8 +960,8 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
                 .ContinueWith(task => GONetLog.Debug(string.Concat(correlationId, "-0p-VA", ' ', ASYNC_DONE), myRpcLogTelemetryProfile));
         }
 
-        // Shift+C: ServerRpc comprehensive test (clients invoke, only server executes)
-        if (IsClient && Input.GetKeyDown(KeyCode.C))
+        // Shift+C: ServerRpc comprehensive test (RunLocally=true allows server and clients to invoke)
+        if (Input.GetKeyDown(KeyCode.C))
         {
             // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
             if (currentTestId == -1)
@@ -1125,22 +1122,24 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
             }
         );
 
-        // Register ServerRpc comprehensive test (all param counts, RelayMode.None)
+        // Register ServerRpc comprehensive test (all param counts, RunLocally=true default)
         GONet.Sample.RpcTests.RpcTestRegistry.RegisterTest(
-            GONet.Sample.RpcTests.RpcTestRegistry.TestCategory.ServerRpc_Relay,
+            GONet.Sample.RpcTests.RpcTestRegistry.TestCategory.ServerRpc_Execution,
             new GONet.Sample.RpcTests.RpcTestRegistry.TestDescriptor
             {
-                Name = "ServerRpc - All Param Counts (No Relay)",
-                Description = "Tests ServerRpc with RelayMode.None (default) across all parameter counts (0-8).\n\n" +
+                Name = "ServerRpc - All Param Counts (RunLocally=true)",
+                Description = "Tests ServerRpc with RunLocally=true (default) across all parameter counts (0-8).\n\n" +
                              "Includes 2 variants per param count:\n" +
                              "• Sync (void return)\n" +
                              "• Async (Task<RpcDeliveryReport> return)\n\n" +
                              "Total: 18 RPC methods executed.\n\n" +
-                             "NOTE: Only clients can call ServerRpc.",
+                             "NOTE: Server executes ServerRpc locally using reflection when called on server.\n" +
+                             "Clients send ServerRpc to server via network.",
                 ExpectedResult = "Server executes all ServerRpc calls (18 total).\n" +
-                                "Clients do NOT execute locally (ServerRpc runs on server only).\n\n" +
+                                "When called on server: Executes locally via reflection.\n" +
+                                "When called on client: Routes to server, server executes.\n\n" +
                                 "Clients receive async responses for async variants.",
-                ApplicableMachines = GONet.Sample.RpcTests.RpcTestRegistry.MachineRequirement.ClientOnly,
+                ApplicableMachines = GONet.Sample.RpcTests.RpcTestRegistry.MachineRequirement.All,
                 InvokeTest = InvokeTest_ServerRpc_AllParamCounts
             }
         );
@@ -1224,15 +1223,10 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
 
     /// <summary>
     /// UI wrapper for ServerRpc comprehensive test (Shift+C equivalent).
+    /// Tests ServerRpc with RunLocally=true (default) - can be invoked from clients OR server.
     /// </summary>
     private void InvokeTest_ServerRpc_AllParamCounts()
     {
-        if (!IsClient)
-        {
-            GONetLog.Warning("[UI TEST] ServerRpc tests can only be invoked from clients");
-            return;
-        }
-
         int correlationId = UnityEngine.Random.Range(111, 666);
         if (currentTestId == -1) currentTestId = correlationId;
 

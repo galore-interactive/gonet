@@ -118,17 +118,20 @@
     <Compile Include="Assets\GONet\Sample\Projectile\SmoothingValuesModifiersUI.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\IO\ByteArrayReader.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\SpawnTestController.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcComplexTypesTests.cs" />
     <Compile Include="Assets\GONet\Sample\RandomMoveToTarget.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\GONetSyncableValues.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\GONetParticipant.cs" />
     <Compile Include="Assets\GONet\Code\ClassTypeReference\ClassTypeConstraintAttribute.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe32.Dirty.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\RpcTestRunnerUI.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.Unsafe64.Dirty.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\Projectile_ZeroSync.cs" />
     <Compile Include="Assets\GONet\Sample\SceneSelectionUI.cs" />
     <Compile Include="Assets\GONet\Sample\TestSelectionUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetAddressablesHelper.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Public\Tests.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcValidationTests.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\CRC32.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\SequenceBuffer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetRpcs.cs" />
@@ -162,6 +165,7 @@
     <Compile Include="Assets\GONet\Code\GONet\Core\Analysis\ValueBlendingAnalyzerBehavior.cs" />
     <Compile Include="Assets\GONet\Sample\SQUAD\SQUADManager.cs" />
     <Compile Include="Assets\GONet\Code\MessagePack\LZ4\LZ4Codec.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\RpcTestResultLogger.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\ReliableEndpointTelemetry.cs" />
     <Compile Include="Assets\GONet\Sample\GONetStatusUI.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\DefaultVelocityBlending_Float.cs" />
@@ -169,6 +173,7 @@
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\NetcodeLogLevel.cs" />
     <Compile Include="Assets\GONet\Sample\ClaimableObjectViaRpcs.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetClient.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\RpcTestRegistry.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\PluginAPI\IGONetAutoMagicalSync_CustomVelocityBlending.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\PacketHeader.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Core\ConnectTokenData.cs" />
@@ -194,6 +199,8 @@
     <Compile Include="Assets\GONet\Code\ReliableNetcode\MessageChannel.cs" />
     <Compile Include="Assets\GONet\Sample\Projectile\ProjectileSceneUI.cs" />
     <Compile Include="Assets\GONet\Sample\GONetTestScript.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcPersistenceTests.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcTargetingTests.cs" />
     <Compile Include="Assets\GONet\Code\ReliableNetcode\Utils\BufferPool.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\SerializationUtils.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Core\Utils\ArrayPool.cs" />
@@ -206,6 +213,7 @@
   <ItemGroup>
     <None Include="Assets\Amazon\Plugins\System.Collections.Immutable.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
+    <None Include="Assets\AddressableAssetsData\link.xml" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Overlay.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap.shader" />
     <None Include="Assets\GONet\Code\Plugins\System.Runtime.CompilerServices.Unsafe.dll" />

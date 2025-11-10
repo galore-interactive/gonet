@@ -58,56 +58,93 @@ namespace GONet
     }
 
     /// <summary>
-    /// Marks a method as a Server RPC that can be called by clients to execute on the server.
-    /// Optionally supports relaying the call to other clients after server processing.
+    /// Marks a method as a Server RPC that executes on the server.
+    /// Can be called by clients (via network) or by the server itself (direct execution with RunLocally=true).
     /// </summary>
     /// <remarks>
-    /// <para><b>Basic Server RPC (Client → Server only):</b></para>
+    /// <para><b>Basic Server RPC Usage (Client → Server):</b></para>
     /// <code>
     /// [ServerRpc]
-    /// void RequestPickupItem(int itemId)
+    /// async Task&lt;ClaimResult&gt; RequestClaim()
     /// {
-    ///     // This runs on the server when called by a client
-    ///     if (CanPickupItem(itemId))
-    ///     {
-    ///         GiveItemToPlayer(itemId);
-    ///     }
+    ///     // Runs on server (called by client OR server itself)
+    ///     var context = GONetEventBus.GetCurrentRpcContext();
+    ///
+    ///     // Manual validation in method body
+    ///     if (IsAlreadyClaimed)
+    ///         return new ClaimResult { Success = false };
+    ///
+    ///     ClaimedBy = context.SourceAuthorityId;
+    ///
+    ///     // Broadcast result to all clients
+    ///     BroadcastClaimChanged();
+    ///
+    ///     return new ClaimResult { Success = true };
+    /// }
+    ///
+    /// [ClientRpc]
+    /// void BroadcastClaimChanged()
+    /// {
+    ///     UpdateVisuals(); // Runs on all clients
     /// }
     /// </code>
     ///
-    /// <para><b>Server RPC with Relay (Client → Server → All Clients):</b></para>
+    /// <para><b>Server-Side Execution (RunLocally = true, default):</b></para>
     /// <code>
-    /// [ServerRpc(Relay = RelayMode.All)]
-    /// void BroadcastPlayerAction(string action)
+    /// // Server can call ServerRpc directly (no network overhead)
+    /// void OnServerStartup()
     /// {
-    ///     // Server validates, then relays to all clients
-    ///     if (IsValidAction(action))
+    ///     if (GONetMain.IsServer)
     ///     {
-    ///         // This will be sent to all clients after server processing
+    ///         // Executes locally on server (no RPC sent)
+    ///         var result = await CallRpcAsync&lt;ClaimResult&gt;(nameof(RequestClaim));
     ///     }
     /// }
     /// </code>
     ///
-    /// <para><b>Security Note:</b></para>
-    /// <para>ServerRpcs have <c>IsMineRequired = true</c> by default for security.
-    /// Clients can only call ServerRpcs on objects they own unless explicitly disabled.</para>
+    /// <para><b>Validation:</b></para>
+    /// <para>ServerRpc does NOT have a built-in validation pipeline. For validation with parameter
+    /// modification and selective targeting, use <see cref="TargetRpcAttribute"/> instead, which
+    /// supports the <c>validationMethod</c> parameter.</para>
+    ///
+    /// <para><b>Broadcasting to Clients:</b></para>
+    /// <para>To notify other clients about ServerRpc results, manually call <see cref="ClientRpcAttribute"/>
+    /// or <see cref="TargetRpcAttribute"/> from within your ServerRpc method. This is the industry-standard
+    /// pattern used by Mirror, Fish-Net, and Unity Netcode for GameObjects.</para>
+    ///
+    /// <para><b>Security:</b></para>
+    /// <para>ServerRpcs have <c>IsMineRequired = true</c> by default. Clients can only call ServerRpcs
+    /// on objects they own unless explicitly set to <c>false</c>.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ServerRpcAttribute : GONetRpcAttribute
     {
         /// <summary>
-        /// Gets or sets whether the server should relay this RPC to other clients after processing.
-        /// Default: RelayMode.None (server only, no relay to clients)
+        /// Gets or sets whether the server should execute this RPC locally when called on the server.
+        /// Default: true (matches Unity Netcode for GameObjects behavior).
+        ///
+        /// When true:
+        /// - Server calls to this ServerRpc execute directly (no network overhead)
+        /// - Client calls to this ServerRpc route via network as normal
+        ///
+        /// When false:
+        /// - Server calls will throw InvalidOperationException (strict client-to-server only)
+        /// - Client calls route via network as normal
+        ///
+        /// Set to false only if you want to enforce strict client-to-server semantics
+        /// (preventing server from accidentally calling its own ServerRpcs).
         /// </summary>
-        public RelayMode Relay { get; set; } = RelayMode.None;
+        public bool RunLocally { get; set; } = true;
 
         /// <summary>
         /// Initializes a new ServerRpcAttribute with secure defaults.
         /// Sets IsMineRequired = true to prevent unauthorized access to other players' objects.
+        /// Sets RunLocally = true to allow server-side execution (matches industry standard).
         /// </summary>
         public ServerRpcAttribute()
         {
             IsMineRequired = true; // Safe default - clients can only call on objects they own
+            RunLocally = true; // Allow server to call directly without network overhead
         }
     }
 
@@ -161,16 +198,30 @@ namespace GONet
     /// <item><description>Ideal for visual effects, UI updates, and state synchronization</description></item>
     /// <item><description>Uses reliable transmission by default (IsReliable = true)</description></item>
     /// <item><description>Set IsPersistent = true to automatically deliver to late-joining clients</description></item>
+    /// <item><description>Does NOT support validation - use <see cref="TargetRpcAttribute"/> if you need validation</description></item>
     /// </list>
+    ///
+    /// <para><b>For Selective Targeting or Validation:</b></para>
+    /// <para>If you need to target specific clients or validate messages before delivery, use
+    /// <see cref="TargetRpcAttribute"/> instead, which supports validation methods and flexible targeting.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
     /// <summary>
     /// Marks a method as a Target RPC that can be called from client or server to route messages to specific recipients.
-    /// Target RPCs support validation, message transformation, and optional delivery confirmation.
+    /// Target RPCs are the ONLY RPC type that supports validation, message transformation, and selective targeting.
+    /// Use TargetRpc when you need server-side validation or want to control which clients receive the message.
     /// </summary>
     /// <remarks>
+    /// <para><b>When to Use TargetRpc:</b></para>
+    /// <list type="bullet">
+    /// <item><description><b>Validation Required:</b> TargetRpc is the ONLY RPC type with validation support</description></item>
+    /// <item><description><b>Parameter Modification:</b> Validate and sanitize parameters (e.g., profanity filtering)</description></item>
+    /// <item><description><b>Selective Targeting:</b> Control exactly who receives the message</description></item>
+    /// <item><description><b>Security-Critical:</b> Server validates senders and receivers</description></item>
+    /// </list>
+    ///
     /// <para><b>Basic Usage:</b></para>
     /// <code>
     /// [TargetRpc(RpcTarget.Owner)]
@@ -345,7 +396,6 @@ namespace GONet
         }
     }
 
-    public enum RelayMode { None, Others, All, Owner }
     public enum RpcType
     {
         ServerRpc,
@@ -1210,6 +1260,18 @@ namespace GONet
             SourceAuthorityId = sourceAuthorityId;
             IsSourceRemote = false;
             IsFromMe = true;
+            IsReliable = isReliable;
+            GONetParticipantId = gonetParticipantId;
+            ValidationContext = default;
+        }
+
+        // Constructor for synthetic execution context (e.g., server-side ServerRpc with RunLocally=true)
+        internal GONetRpcContext(ushort sourceAuthorityId, bool isReliable, uint gonetParticipantId, bool isSourceRemote)
+        {
+            Envelope = null;
+            SourceAuthorityId = sourceAuthorityId;
+            IsSourceRemote = isSourceRemote;
+            IsFromMe = !isSourceRemote; // If remote, not from me; if local, from me
             IsReliable = isReliable;
             GONetParticipantId = gonetParticipantId;
             ValidationContext = default;

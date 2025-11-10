@@ -17,7 +17,7 @@ namespace GONet.Sample.RpcTests
         {
             TargetRpc_Targeting,     // RpcTarget.Owner, Others, SpecificAuthority, etc.
             TargetRpc_Validation,    // Validators, parameter modification, async validation
-            ServerRpc_Relay,         // RelayMode.None, All, Others, Owner
+            ServerRpc_Execution,     // RunLocally behavior, parameter counts, async/sync variants
             Persistence,             // IsPersistent, late-joiner delivery
             ComplexTypes,            // Unity types (Vector3, Quaternion), structs, collections
             Lifecycle,               // Deferred execution, handler registration timing
@@ -174,8 +174,8 @@ namespace GONet.Sample.RpcTests
                     return "TargetRpc - Targeting Modes";
                 case TestCategory.TargetRpc_Validation:
                     return "TargetRpc - Validation";
-                case TestCategory.ServerRpc_Relay:
-                    return "ServerRpc - Relay Modes";
+                case TestCategory.ServerRpc_Execution:
+                    return "ServerRpc - Execution";
                 case TestCategory.Persistence:
                     return "Persistence & Late-Joiners";
                 case TestCategory.ComplexTypes:
