@@ -128,11 +128,12 @@ namespace GONet.Sample.RpcTests
             LogTestResult("Vector2", true, $"uv={uv}");
         }
 
-        [ServerRpc]
-        void Test_Vector4(Vector4 plane)
-        {
-            LogTestResult("Vector4", true, $"plane={plane}");
-        }
+        // Vector4 - NOT SUPPORTED by MemoryPack (validation error)
+        // [ServerRpc]
+        // void Test_Vector4(Vector4 plane)
+        // {
+        //     LogTestResult("Vector4", true, $"plane={plane}");
+        // }
 
         #endregion
 
@@ -153,18 +154,32 @@ namespace GONet.Sample.RpcTests
 
         #endregion
 
-        #region Color (Expected: ❓ Need to test)
+        #region Color (Result: ❌ NOT SUPPORTED by MemoryPack)
 
-        [ServerRpc]
-        void Test_Color(Color color)
-        {
-            LogTestResult("Color", true, $"color={color}");
-        }
+        // Color - NOT SUPPORTED by MemoryPack (validation error)
+        // ERROR: parameter 'color' type 'UnityEngine.Color' not serializable
+        // WORKAROUND: Break into RGBA floats
+        // [ServerRpc]
+        // void Test_Color(Color color)
+        // {
+        //     LogTestResult("Color", true, $"color={color}");
+        // }
 
+        // Color32 - NOT SUPPORTED by MemoryPack (validation error)
+        // ERROR: parameter 'color32' type 'UnityEngine.Color32' not serializable
+        // WORKAROUND: Break into RGBA bytes
+        // [ServerRpc]
+        // void Test_Color32(Color32 color32)
+        // {
+        //     LogTestResult("Color32", true, $"color32={color32}");
+        // }
+
+        // Workaround: Send Color as separate RGBA components
         [ServerRpc]
-        void Test_Color32(Color32 color32)
+        void Test_ColorAsFloats(float r, float g, float b, float a)
         {
-            LogTestResult("Color32", true, $"color32={color32}");
+            Color reconstructed = new Color(r, g, b, a);
+            LogTestResult("Color as RGBA floats (workaround)", true, $"color={reconstructed}");
         }
 
         #endregion
@@ -278,15 +293,15 @@ namespace GONet.Sample.RpcTests
                 CallRpc(nameof(Test_Vector3), new Vector3(1, 2, 3));
                 CallRpc(nameof(Test_Quaternion), Quaternion.Euler(45, 90, 180));
                 CallRpc(nameof(Test_Vector2), new Vector2(0.5f, 0.75f));
-                CallRpc(nameof(Test_Vector4), new Vector4(1, 2, 3, 4));
+                // Vector4 NOT supported - commented out
 
                 // Enums
                 CallRpc(nameof(Test_Enum), TestEnum.ValueB);
                 CallRpc(nameof(Test_EnumAsInt), (int)TestEnum.ValueC);
 
-                // Color
-                CallRpc(nameof(Test_Color), Color.red);
-                CallRpc(nameof(Test_Color32), new Color32(128, 64, 32, 255));
+                // Color workaround (Color/Color32 NOT supported directly)
+                Color testColor = Color.red;
+                CallRpc(nameof(Test_ColorAsFloats), testColor.r, testColor.g, testColor.b, testColor.a);
 
                 // Custom structs
                 var testStruct = new TestStruct { id = 100, value = 99.9f, name = "Test" };
