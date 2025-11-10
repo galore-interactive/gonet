@@ -31,6 +31,67 @@ namespace GONet
     /// <item><description><b>IsReliable</b>: Whether the RPC uses reliable UDP transmission (guaranteed delivery)</description></item>
     /// <item><description><b>IsPersistent</b>: Whether the RPC is stored and sent to late-joining clients</description></item>
     /// </list>
+    ///
+    /// <para><b>Supported RPC Parameter Types (RUNTIME VALIDATED):</b></para>
+    /// <para>
+    /// GONet RPCs use MemoryPack serialization. The following types are fully supported:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description><b>Primitives:</b> bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double</description></item>
+    /// <item><description><b>String:</b> string (reference type)</description></item>
+    /// <item><description><b>Unity Math:</b> Vector2, Vector3, Quaternion</description></item>
+    /// <item><description><b>Enums:</b> All enum types (serialized as underlying type)</description></item>
+    /// <item><description><b>Custom Types:</b> [MemoryPackable] partial struct/class (MUST be at namespace level, not nested)</description></item>
+    /// <item><description><b>Arrays:</b> T[] for any supported type T (int[], Vector3[], string[], custom struct arrays)</description></item>
+    /// <item><description><b>Collections:</b> List&lt;T&gt;, Dictionary&lt;K,V&gt; for any supported K,V</description></item>
+    /// </list>
+    ///
+    /// <para><b>NOT Supported (Unity Types Not Recognized by MemoryPack):</b></para>
+    /// <list type="bullet">
+    /// <item><description><b>UnityEngine.Vector4</b> - Use 4 float parameters (x, y, z, w)</description></item>
+    /// <item><description><b>UnityEngine.Color</b> - Use 4 float parameters (r, g, b, a)</description></item>
+    /// <item><description><b>UnityEngine.Color32</b> - Use 4 byte parameters (r, g, b, a)</description></item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>MemoryPack Restrictions:</b>
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>[MemoryPackable] types MUST be at namespace level (not nested inside classes) - causes MEMPACK002 error</description></item>
+    /// <item><description>[MemoryPackable] types MUST be declared 'partial'</description></item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>Example Workarounds:</b>
+    /// </para>
+    /// <code>
+    /// // ✅ VALID - Custom MemoryPackable struct (at namespace level)
+    /// [MemoryPackable]
+    /// public partial struct PlayerData { public int id; public float health; }
+    ///
+    /// [ServerRpc]
+    /// void UpdatePlayer(PlayerData data) { } // Works!
+    ///
+    /// // ✅ VALID - Arrays and collections
+    /// [ServerRpc]
+    /// void SendPositions(Vector3[] positions) { } // Works!
+    ///
+    /// [ServerRpc]
+    /// void SendData(List&lt;int&gt; values) { } // Works!
+    ///
+    /// // ❌ INVALID - Color not supported
+    /// [ServerRpc]
+    /// void SetColor(Color color) { } // FAILS
+    ///
+    /// // ✅ CORRECT - Break Color into RGBA components
+    /// [ServerRpc]
+    /// void SetColor(float r, float g, float b, float a) { }
+    ///
+    /// // Usage: CallRpc(nameof(SetColor), color.r, color.g, color.b, color.a);
+    /// </code>
+    ///
+    /// <para><b>RPC Parameter Count Limit:</b> Maximum 8 parameters per RPC method.</para>
+    /// <para><b>Validation:</b> See GONetRpcMemoryPackTypesTest.cs for comprehensive runtime-validated examples.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public abstract class GONetRpcAttribute : Attribute
@@ -58,56 +119,93 @@ namespace GONet
     }
 
     /// <summary>
-    /// Marks a method as a Server RPC that can be called by clients to execute on the server.
-    /// Optionally supports relaying the call to other clients after server processing.
+    /// Marks a method as a Server RPC that executes on the server.
+    /// Can be called by clients (via network) or by the server itself (direct execution with RunLocally=true).
     /// </summary>
     /// <remarks>
-    /// <para><b>Basic Server RPC (Client → Server only):</b></para>
+    /// <para><b>Basic Server RPC Usage (Client → Server):</b></para>
     /// <code>
     /// [ServerRpc]
-    /// void RequestPickupItem(int itemId)
+    /// async Task&lt;ClaimResult&gt; RequestClaim()
     /// {
-    ///     // This runs on the server when called by a client
-    ///     if (CanPickupItem(itemId))
-    ///     {
-    ///         GiveItemToPlayer(itemId);
-    ///     }
+    ///     // Runs on server (called by client OR server itself)
+    ///     var context = GONetEventBus.GetCurrentRpcContext();
+    ///
+    ///     // Manual validation in method body
+    ///     if (IsAlreadyClaimed)
+    ///         return new ClaimResult { Success = false };
+    ///
+    ///     ClaimedBy = context.SourceAuthorityId;
+    ///
+    ///     // Broadcast result to all clients
+    ///     BroadcastClaimChanged();
+    ///
+    ///     return new ClaimResult { Success = true };
+    /// }
+    ///
+    /// [ClientRpc]
+    /// void BroadcastClaimChanged()
+    /// {
+    ///     UpdateVisuals(); // Runs on all clients
     /// }
     /// </code>
     ///
-    /// <para><b>Server RPC with Relay (Client → Server → All Clients):</b></para>
+    /// <para><b>Server-Side Execution (RunLocally = true, default):</b></para>
     /// <code>
-    /// [ServerRpc(Relay = RelayMode.All)]
-    /// void BroadcastPlayerAction(string action)
+    /// // Server can call ServerRpc directly (no network overhead)
+    /// void OnServerStartup()
     /// {
-    ///     // Server validates, then relays to all clients
-    ///     if (IsValidAction(action))
+    ///     if (GONetMain.IsServer)
     ///     {
-    ///         // This will be sent to all clients after server processing
+    ///         // Executes locally on server (no RPC sent)
+    ///         var result = await CallRpcAsync&lt;ClaimResult&gt;(nameof(RequestClaim));
     ///     }
     /// }
     /// </code>
     ///
-    /// <para><b>Security Note:</b></para>
-    /// <para>ServerRpcs have <c>IsMineRequired = true</c> by default for security.
-    /// Clients can only call ServerRpcs on objects they own unless explicitly disabled.</para>
+    /// <para><b>Validation:</b></para>
+    /// <para>ServerRpc does NOT have a built-in validation pipeline. For validation with parameter
+    /// modification and selective targeting, use <see cref="TargetRpcAttribute"/> instead, which
+    /// supports the <c>validationMethod</c> parameter.</para>
+    ///
+    /// <para><b>Broadcasting to Clients:</b></para>
+    /// <para>To notify other clients about ServerRpc results, manually call <see cref="ClientRpcAttribute"/>
+    /// or <see cref="TargetRpcAttribute"/> from within your ServerRpc method. This is the industry-standard
+    /// pattern used by Mirror, Fish-Net, and Unity Netcode for GameObjects.</para>
+    ///
+    /// <para><b>Security:</b></para>
+    /// <para>ServerRpcs have <c>IsMineRequired = true</c> by default. Clients can only call ServerRpcs
+    /// on objects they own unless explicitly set to <c>false</c>.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ServerRpcAttribute : GONetRpcAttribute
     {
         /// <summary>
-        /// Gets or sets whether the server should relay this RPC to other clients after processing.
-        /// Default: RelayMode.None (server only, no relay to clients)
+        /// Gets or sets whether the server should execute this RPC locally when called on the server.
+        /// Default: true (matches Unity Netcode for GameObjects behavior).
+        ///
+        /// When true:
+        /// - Server calls to this ServerRpc execute directly (no network overhead)
+        /// - Client calls to this ServerRpc route via network as normal
+        ///
+        /// When false:
+        /// - Server calls will throw InvalidOperationException (strict client-to-server only)
+        /// - Client calls route via network as normal
+        ///
+        /// Set to false only if you want to enforce strict client-to-server semantics
+        /// (preventing server from accidentally calling its own ServerRpcs).
         /// </summary>
-        public RelayMode Relay { get; set; } = RelayMode.None;
+        public bool RunLocally { get; set; } = true;
 
         /// <summary>
         /// Initializes a new ServerRpcAttribute with secure defaults.
         /// Sets IsMineRequired = true to prevent unauthorized access to other players' objects.
+        /// Sets RunLocally = true to allow server-side execution (matches industry standard).
         /// </summary>
         public ServerRpcAttribute()
         {
             IsMineRequired = true; // Safe default - clients can only call on objects they own
+            RunLocally = true; // Allow server to call directly without network overhead
         }
     }
 
@@ -161,138 +259,81 @@ namespace GONet
     /// <item><description>Ideal for visual effects, UI updates, and state synchronization</description></item>
     /// <item><description>Uses reliable transmission by default (IsReliable = true)</description></item>
     /// <item><description>Set IsPersistent = true to automatically deliver to late-joining clients</description></item>
+    /// <item><description>Does NOT support validation - use <see cref="TargetRpcAttribute"/> if you need validation</description></item>
     /// </list>
+    ///
+    /// <para><b>For Selective Targeting or Validation:</b></para>
+    /// <para>If you need to target specific clients or validate messages before delivery, use
+    /// <see cref="TargetRpcAttribute"/> instead, which supports validation methods and flexible targeting.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class ClientRpcAttribute : GONetRpcAttribute { }
 
     /// <summary>
-    /// Marks a method as a Target RPC that can be called from client or server to route messages to specific recipients.
-    /// Target RPCs support validation, message transformation, and optional delivery confirmation.
+    /// Marks a method as a Target RPC that routes messages to specific recipients with optional server-side validation.
+    /// TargetRpc is the ONLY RPC type with validation support for message filtering and parameter modification.
     /// </summary>
     /// <remarks>
-    /// <para><b>Basic Usage:</b></para>
+    /// <para><b>Basic Targeting:</b></para>
     /// <code>
-    /// [TargetRpc(RpcTarget.Owner)]
-    /// void NotifyOwner(string message) { }
-    /// 
     /// [TargetRpc(RpcTarget.All)]
-    /// void BroadcastToAll(string message) { }
-    /// </code>
-    /// 
-    /// <para><b>Property-based Targeting:</b></para>
-    /// <para>Target specific authorities using a property value:</para>
-    /// <code>
-    /// public ushort TargetPlayerId { get; set; }
-    /// 
+    /// void BroadcastMessage(string msg) { }
+    ///
+    /// [TargetRpc(RpcTarget.Owner)]
+    /// void NotifyOwner(string msg) { }
+    ///
+    /// // Property-based targeting
+    /// public ushort TargetPlayerId;
     /// [TargetRpc(nameof(TargetPlayerId))]
-    /// void SendToSpecificPlayer(string message) { }
-    /// </code>
-    /// 
-    /// <para><b>Multiple Targets:</b></para>
-    /// <code>
-    /// public List&lt;ushort&gt; TeamMembers { get; set; }
-    /// 
+    /// void SendToPlayer(string msg) { }
+    ///
+    /// // Multiple targets
+    /// public List&lt;ushort&gt; TeamMembers;
     /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true)]
-    /// void SendToTeam(string message) { }
+    /// void SendToTeam(string msg) { }
     /// </code>
-    /// 
-    /// <para><b>Validation Methods:</b></para>
-    /// <para>Add server-side validation to filter recipients and optionally transform messages:</para>
+    ///
+    /// <para><b>Validation (Profanity Filtering, Access Control, etc.):</b></para>
     /// <code>
-    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true, validationMethod: nameof(ValidateTeamMessage))]
-    /// void SendToTeam(string message) { }
-    /// 
-    /// // Validation method signatures:
-    /// 
-    /// // Option 1: Simple bool validator (single target)
-    /// private bool ValidateTeamMessage(ushort sourceAuthority, ushort targetAuthority)
+    /// [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateMessage))]
+    /// void Chat(string message) { }
+    ///
+    /// // Sync validator (use ref for parameter modification)
+    /// RpcValidationResult ValidateMessage(ref string message)
     /// {
-    ///     return IsTeamMember(targetAuthority);
+    ///     var ctx = GONetMain.EventBus.GetValidationContext();
+    ///     var result = ctx.HasValue ? ctx.Value.GetValidationResult() : RpcValidationResult.CreatePreAllocated(1);
+    ///     message = FilterProfanity(message); // Modify ref parameter
+    ///     result.AllowAll(); // Or filter targets: result.AllowTarget(authorityId)
+    ///     return result;
     /// }
-    /// 
-    /// // Option 2: Full validation with filtering and transformation
-    /// private RpcValidationResult ValidateTeamMessage(ushort sourceAuthority, ushort[] targets, int count, byte[] messageData)
+    ///
+    /// // Async validator (NO ref - use SetValidatedOverride)
+    /// async Task&lt;RpcValidationResult&gt; ValidateAsync(string message)
     /// {
-    ///     // Filter targets
-    ///     var allowed = targets.Where(t => IsTeamMember(t)).ToArray();
-    ///     
-    ///     // Optionally modify message
-    ///     var modifiedData = TransformMessage(messageData);
-    ///     
-    ///     return new RpcValidationResult
-    ///     {
-    ///         AllowedTargets = allowed,
-    ///         AllowedCount = allowed.Length,
-    ///         DeniedTargets = targets.Except(allowed).ToArray(),
-    ///         DeniedCount = targets.Length - allowed.Length,
-    ///         DenialReason = "Target is not a team member",
-    ///         ModifiedData = modifiedData  // Optional
-    ///     };
+    ///     var filtered = await WebAPI.FilterProfanity(message);
+    ///     var result = GetValidationResult();
+    ///     if (filtered != message) result.SetValidatedOverride(0, filtered);
+    ///     return result;
     /// }
     /// </code>
-    /// 
+    ///
     /// <para><b>Delivery Confirmation:</b></para>
-    /// <para>Get confirmation of who received the RPC by using Task&lt;RpcDeliveryReport&gt; return type:</para>
     /// <code>
-    /// [TargetRpc(nameof(TeamMembers), isMultipleTargets: true, validationMethod: nameof(ValidateTeam))]
-    /// async Task&lt;RpcDeliveryReport&gt; SendToTeamConfirmed(string message)
+    /// [TargetRpc(RpcTarget.All)]
+    /// async Task&lt;RpcDeliveryReport&gt; SendConfirmed(string msg)
     /// {
-    ///     DisplayMessage(message);
-    ///     return await Task.CompletedTask; // Framework handles the actual report
+    ///     // Framework populates report with delivery results
+    ///     return await Task.CompletedTask;
     /// }
-    /// 
-    /// // Usage:
-    /// var report = await SendToTeamConfirmed("Hello team!");
+    ///
+    /// var report = await SendConfirmed("Hello");
     /// if (report.FailedDelivery?.Length > 0)
-    /// {
-    ///     Debug.Log($"Failed to deliver to: {string.Join(", ", report.FailedDelivery)}");
-    ///     Debug.Log($"Reason: {report.FailureReason}");
-    ///     
-    ///     // Optionally get full validation details
-    ///     if (report.ValidationReportId != 0)
-    ///     {
-    ///         var fullReport = await GetFullRpcValidationReport(report.ValidationReportId);
-    ///     }
-    /// }
-    /// </code>
-    /// 
-    /// <para><b>Parameter-based Targeting:</b></para>
-    /// <para>Pass target as first parameter instead of using property:</para>
-    /// <code>
-    /// [TargetRpc(RpcTarget.SpecificAuthority)]
-    /// void SendToPlayer(ushort targetPlayerId, string message) { }
-    ///
-    /// [TargetRpc(RpcTarget.MultipleAuthorities)]
-    /// void SendToPlayers(List&lt;ushort&gt; targetPlayerIds, string message) { }
+    ///     Debug.Log($"Failed: {report.FailureReason}");
     /// </code>
     ///
-    /// <para><b>Persistent Target RPCs - ⚠️ IMPORTANT LIMITATIONS:</b></para>
-    /// <para>Persistent TargetRPCs store original recipient authority IDs. Late-joining clients may not receive them if their ID wasn't in the original target list.</para>
-    /// <code>
-    /// // ✅ GOOD - All clients receive persistent state
-    /// [TargetRpc(RpcTarget.All, IsPersistent = true)]
-    /// void AnnounceGamePhaseChange(GamePhase newPhase)
-    /// {
-    ///     // Late-joiners will receive this persistent state update
-    ///     currentGamePhase = newPhase;
-    /// }
-    ///
-    /// // ❌ PROBLEMATIC - Late-joiners may be excluded
-    /// [TargetRpc(nameof(ActivePlayerIds), isMultipleTargets: true, IsPersistent = true)]
-    /// void SendRoundResults(ScoreData scores)
-    /// {
-    ///     // Late-joiners won't be in the original ActivePlayerIds list!
-    /// }
-    ///
-    /// // ⚠️ USE WITH CAUTION - Depends on property logic
-    /// [TargetRpc(nameof(TeamLeaderId), IsPersistent = true)]
-    /// void NotifyTeamLeader(string message)
-    /// {
-    ///     // Only works if TeamLeaderId property includes late-joiners appropriately
-    /// }
-    /// </code>
-    /// <para><b>Recommendation:</b> For persistent TargetRPCs, prefer RpcTarget.All or ensure your targeting logic accounts for late-joining clients.</para>
+    /// <para><b>Persistent RPCs - ⚠️ Limitation:</b> Late-joiners only receive if targeted by RpcTarget.All or if your targeting property includes them.</para>
+    /// <para><b>See Also:</b> GONetRpcValidationTests.cs for runtime validation test suite (press Shift+V). See class code comments below for comprehensive examples.</para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method)]
     public class TargetRpcAttribute : GONetRpcAttribute
@@ -302,9 +343,10 @@ namespace GONet
         public bool IsMultipleTargets { get; }
         public string ValidationMethodName { get; }
 
-        public TargetRpcAttribute(RpcTarget target = RpcTarget.All)
+        public TargetRpcAttribute(RpcTarget target = RpcTarget.All, string validationMethod = null)
         {
             Target = target;
+            ValidationMethodName = validationMethod;
         }
 
         // Single constructor for property-based targeting
@@ -315,9 +357,392 @@ namespace GONet
             IsMultipleTargets = isMultipleTargets;
             ValidationMethodName = validationMethod;
         }
+
+        /* ========================================
+         * TARGETRPC COMPREHENSIVE USAGE GUIDE
+         * ========================================
+         *
+         * TargetRpc is the ONLY GONet RPC type that supports:
+         * - Server-side validation
+         * - Parameter modification (profanity filtering, clamping, sanitization)
+         * - Selective targeting (control exactly who receives messages)
+         * - Delivery confirmation reports
+         *
+         * ---------------------------------------
+         * WHEN TO USE TARGETRPC
+         * ---------------------------------------
+         *
+         * Use TargetRpc when you need:
+         * - Profanity filtering (modify chat messages before delivery)
+         * - Anti-cheat validation (clamp damage values, validate positions)
+         * - Access control (verify sender/receiver permissions)
+         * - Team/proximity-based messaging (send only to nearby players)
+         * - Delivery confirmation (know if message was received)
+         *
+         * Use ServerRpc for: Client → Server requests (no validation needed)
+         * Use ClientRpc for: Server → All clients broadcasts (no validation needed)
+         *
+         * ---------------------------------------
+         * BASIC TARGETING PATTERNS
+         * ---------------------------------------
+         *
+         * 1. BROADCAST TO ALL:
+         *
+         *    [TargetRpc(RpcTarget.All)]
+         *    void BroadcastEvent(string eventName)
+         *    {
+         *        HandleEvent(eventName);
+         *    }
+         *
+         * 2. SEND TO OWNER ONLY:
+         *
+         *    [TargetRpc(RpcTarget.Owner)]
+         *    void NotifyOwner(string message)
+         *    {
+         *        ShowNotification(message);
+         *    }
+         *
+         * 3. PROPERTY-BASED TARGETING (SINGLE):
+         *
+         *    public ushort TargetPlayerId { get; set; }
+         *
+         *    [TargetRpc(nameof(TargetPlayerId))]
+         *    void SendToPlayer(string message)
+         *    {
+         *        DisplayMessage(message);
+         *    }
+         *
+         *    // Usage:
+         *    TargetPlayerId = 5; // Set before calling
+         *    CallRpc(nameof(SendToPlayer), "Private message");
+         *
+         * 4. PROPERTY-BASED TARGETING (MULTIPLE):
+         *
+         *    public List<ushort> TeamMembers { get; set; }
+         *
+         *    [TargetRpc(nameof(TeamMembers), isMultipleTargets: true)]
+         *    void SendToTeam(string message)
+         *    {
+         *        DisplayTeamMessage(message);
+         *    }
+         *
+         *    // Usage:
+         *    TeamMembers = new List<ushort> { 1, 3, 5 };
+         *    CallRpc(nameof(SendToTeam), "Team objective complete!");
+         *
+         * 5. PARAMETER-BASED TARGETING:
+         *
+         *    [TargetRpc(RpcTarget.SpecificAuthority)]
+         *    void SendToPlayer(ushort targetId, string message)
+         *    {
+         *        // First parameter specifies target
+         *        DisplayMessage(message);
+         *    }
+         *
+         *    // Usage:
+         *    CallRpc(nameof(SendToPlayer), (ushort)3, "You won!");
+         *
+         * ---------------------------------------
+         * VALIDATION: SYNC VS ASYNC
+         * ---------------------------------------
+         *
+         * SYNC VALIDATOR (use ref for parameter modification):
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateChat))]
+         *    void Chat(string message)
+         *    {
+         *        DisplayChatMessage(message);
+         *    }
+         *
+         *    RpcValidationResult ValidateChat(ref string message)
+         *    {
+         *        var ctx = GONetMain.EventBus.GetValidationContext();
+         *        var result = ctx.HasValue ?
+         *            ctx.Value.GetValidationResult() :
+         *            RpcValidationResult.CreatePreAllocated(1);
+         *
+         *        // Modify parameter directly with ref
+         *        message = FilterProfanity(message);
+         *
+         *        result.AllowAll(); // Or filter targets
+         *        return result;
+         *    }
+         *
+         * ASYNC VALIDATOR (NO ref - use SetValidatedOverride):
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateChatAsync))]
+         *    void Chat(string message)
+         *    {
+         *        DisplayChatMessage(message);
+         *    }
+         *
+         *    async Task<RpcValidationResult> ValidateChatAsync(string message)
+         *    {
+         *        var ctx = GONetMain.EventBus.GetValidationContext();
+         *        var result = ctx.Value.GetValidationResult();
+         *
+         *        // Async operations allowed
+         *        string filtered = await WebAPI.FilterProfanity(message);
+         *
+         *        // Can't use ref with async - use SetValidatedOverride instead
+         *        if (filtered != message)
+         *            result.SetValidatedOverride(0, filtered); // Param index 0
+         *
+         *        result.AllowAll();
+         *        return result;
+         *    }
+         *
+         * VALIDATION PARAMETERS MUST MATCH RPC PARAMETERS:
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(Validate))]
+         *    void SendData(string msg, int value, Vector3 pos) { }
+         *
+         *    // CORRECT - parameters match RPC signature
+         *    RpcValidationResult Validate(ref string msg, ref int value, ref Vector3 pos)
+         *    {
+         *        // Same types, same order
+         *    }
+         *
+         * ---------------------------------------
+         * ADVANCED VALIDATION PATTERNS
+         * ---------------------------------------
+         *
+         * PROFANITY FILTERING:
+         *
+         *    RpcValidationResult ValidateChat(ref string message)
+         *    {
+         *        var result = GetValidationResult();
+         *        message = message.Replace("badword", "***");
+         *        result.AllowAll();
+         *        return result;
+         *    }
+         *
+         * ANTI-CHEAT (CLAMP VALUES):
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateDamage))]
+         *    void ReportDamage(int damage) { }
+         *
+         *    RpcValidationResult ValidateDamage(ref int damage)
+         *    {
+         *        var result = GetValidationResult();
+         *
+         *        // Clamp to prevent cheating
+         *        int original = damage;
+         *        damage = Mathf.Clamp(damage, 0, 100);
+         *
+         *        if (damage != original)
+         *            GONetLog.Warning($"Clamped damage from {original} to {damage}");
+         *
+         *        result.AllowAll();
+         *        return result;
+         *    }
+         *
+         * DENY ALL (BLOCK EVERYONE):
+         *
+         *    RpcValidationResult ValidateRestricted(ref string action)
+         *    {
+         *        var ctx = GONetMain.EventBus.GetValidationContext();
+         *        var result = ctx.Value.GetValidationResult();
+         *
+         *        // Check permissions
+         *        if (!HasPermission(ctx.Value.SourceAuthorityId, action))
+         *        {
+         *            result.DenyAll(); // Block message entirely
+         *            return result;
+         *        }
+         *
+         *        result.AllowAll();
+         *        return result;
+         *    }
+         *
+         * SELECTIVE TARGETING (TEAM-ONLY):
+         *
+         *    public List<ushort> TeamMembers { get; set; }
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateTeam))]
+         *    void SendTeamMessage(string msg) { }
+         *
+         *    RpcValidationResult ValidateTeam(ref string msg)
+         *    {
+         *        var ctx = GONetMain.EventBus.GetValidationContext();
+         *        var result = ctx.Value.GetValidationResult();
+         *
+         *        // Filter targets to team members only
+         *        for (int i = 0; i < ctx.Value.TargetCount; i++)
+         *        {
+         *            ushort targetId = ctx.Value.TargetAuthorityIds[i];
+         *            result.AllowedTargets[i] = TeamMembers.Contains(targetId);
+         *        }
+         *
+         *        return result;
+         *    }
+         *
+         * PROXIMITY-BASED TARGETING:
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(ValidateProximity))]
+         *    void BroadcastLocalEvent(string eventName, Vector3 pos) { }
+         *
+         *    RpcValidationResult ValidateProximity(ref string eventName, ref Vector3 pos)
+         *    {
+         *        var ctx = GONetMain.EventBus.GetValidationContext();
+         *        var result = ctx.Value.GetValidationResult();
+         *
+         *        const float maxDistance = 50f;
+         *
+         *        // Only send to clients within 50 units
+         *        for (int i = 0; i < ctx.Value.TargetCount; i++)
+         *        {
+         *            ushort targetId = ctx.Value.TargetAuthorityIds[i];
+         *            Vector3 targetPos = GetPlayerPosition(targetId);
+         *            float distance = Vector3.Distance(pos, targetPos);
+         *            result.AllowedTargets[i] = (distance <= maxDistance);
+         *        }
+         *
+         *        return result;
+         *    }
+         *
+         * ---------------------------------------
+         * DELIVERY CONFIRMATION
+         * ---------------------------------------
+         *
+         * BASIC DELIVERY REPORT:
+         *
+         *    [TargetRpc(RpcTarget.All)]
+         *    async Task<RpcDeliveryReport> SendConfirmed(string msg)
+         *    {
+         *        DisplayMessage(msg);
+         *        return await Task.CompletedTask; // Framework populates report
+         *    }
+         *
+         *    // Usage:
+         *    var report = await SendConfirmed("Important message");
+         *    if (report.FailedDelivery?.Length > 0)
+         *    {
+         *        Debug.LogError($"Failed to deliver to: {string.Join(", ", report.FailedDelivery)}");
+         *        Debug.LogError($"Reason: {report.FailureReason}");
+         *    }
+         *
+         * ---------------------------------------
+         * PERSISTENT RPCs - IMPORTANT LIMITATIONS
+         * ---------------------------------------
+         *
+         * Persistent TargetRPCs store ORIGINAL target authority IDs.
+         * Late-joiners may NOT receive them if their ID wasn't in the original list!
+         *
+         * ✅ SAFE - RpcTarget.All:
+         *
+         *    [TargetRpc(RpcTarget.All, IsPersistent = true)]
+         *    void AnnounceGamePhase(GamePhase phase)
+         *    {
+         *        // Late-joiners WILL receive this
+         *        currentPhase = phase;
+         *    }
+         *
+         * ❌ PROBLEMATIC - Dynamic target list:
+         *
+         *    public List<ushort> ActivePlayers { get; set; }
+         *
+         *    [TargetRpc(nameof(ActivePlayers), isMultipleTargets: true, IsPersistent = true)]
+         *    void SendRoundResults(ScoreData scores)
+         *    {
+         *        // Late-joiners WON'T receive this (not in original ActivePlayers list)
+         *        DisplayResults(scores);
+         *    }
+         *
+         * RECOMMENDATION: Use RpcTarget.All for persistent state that all clients need.
+         *
+         * ---------------------------------------
+         * VALIDATION CONTEXT API
+         * ---------------------------------------
+         *
+         * RpcValidationContext properties:
+         *
+         *    var ctx = GONetMain.EventBus.GetValidationContext();
+         *    if (ctx.HasValue)
+         *    {
+         *        ushort senderId = ctx.Value.SourceAuthorityId; // Who sent RPC
+         *        int targetCount = ctx.Value.TargetCount;       // How many targets
+         *        ushort[] targets = ctx.Value.TargetAuthorityIds; // Target IDs
+         *
+         *        // Get pre-allocated validation result (preferred - no GC)
+         *        RpcValidationResult result = ctx.Value.GetValidationResult();
+         *    }
+         *
+         * RpcValidationResult API:
+         *
+         *    result.AllowAll();              // Allow all targets
+         *    result.DenyAll();               // Block all targets
+         *    result.AllowTarget(authorityId); // Allow specific target
+         *    result.AllowedTargets[i] = true; // Manually set allowed targets
+         *    result.SetValidatedOverride(0, newValue); // Modify param (async only)
+         *
+         * ---------------------------------------
+         * COMMON PITFALLS
+         * ---------------------------------------
+         *
+         * ❌ WRONG - Missing ref keyword (sync validators):
+         *
+         *    RpcValidationResult Validate(string msg)
+         *    {
+         *        msg = "modified"; // This change is LOCAL only!
+         *        return result;
+         *    }
+         *
+         * ✅ CORRECT - Use ref keyword:
+         *
+         *    RpcValidationResult Validate(ref string msg)
+         *    {
+         *        msg = "modified"; // This propagates to RPC
+         *        return result;
+         *    }
+         *
+         * ❌ WRONG - Using ref with async:
+         *
+         *    async Task<RpcValidationResult> Validate(ref string msg) // COMPILE ERROR!
+         *
+         * ✅ CORRECT - Use SetValidatedOverride:
+         *
+         *    async Task<RpcValidationResult> Validate(string msg)
+         *    {
+         *        string modified = await FilterAsync(msg);
+         *        result.SetValidatedOverride(0, modified);
+         *        return result;
+         *    }
+         *
+         * ❌ WRONG - Parameter mismatch:
+         *
+         *    [TargetRpc(RpcTarget.All, validationMethod: nameof(Validate))]
+         *    void Send(string msg, int value) { }
+         *
+         *    RpcValidationResult Validate(ref string msg) // Missing ref int value!
+         *
+         * ✅ CORRECT - Parameters MUST match:
+         *
+         *    RpcValidationResult Validate(ref string msg, ref int value)
+         *
+         * ---------------------------------------
+         * TESTING & EXAMPLES
+         * ---------------------------------------
+         *
+         * Test File: Assets/GONet/Sample/RpcTests/GONetRpcValidationTests.cs
+         *
+         * How to run:
+         * 1. Start server + 2 clients
+         * 2. Press Shift+V from any client to run ALL validation tests
+         * 3. Press Shift+K to dump execution summary
+         *
+         * Tests included:
+         * - Sync Validator - AllowAll
+         * - Sync Validator - DenyAll
+         * - Sync Validator - Allow Specific Targets (Client:1 only)
+         * - Async Validator - AllowAll
+         * - Async Validator - DenyAll
+         * - Validator with Parameter Modification
+         * - Validator with Selective Targeting
+         *
+         * ======================================== */
     }
 
-    public enum RelayMode { None, Others, All, Owner }
     public enum RpcType
     {
         ServerRpc,
@@ -849,6 +1274,8 @@ namespace GONet
         public byte[] Data { get; set; }
         public long CorrelationId { get; set; } // For request-response
         public bool IsSingularRecipientOnly { get; set; }
+        public ushort OriginatorAuthorityId { get; set; } // Authority that initiated the RPC call
+        public bool HasValidation { get; set; } // Whether this RPC has a validation method
 
         internal static RpcEvent Borrow()
         {
@@ -930,6 +1357,9 @@ namespace GONet
         public int TargetCount { get; set; }
         public byte[] Data { get; set; }
         public long CorrelationId { get; set; }
+        public ushort OriginatorAuthorityId { get; set; } // Authority that initiated the RPC call
+        public bool HasValidation { get; set; } // Whether this RPC has a validation method
+        public bool ShouldExpandToAllClients { get; set; } // Server should expand target list to include all connected clients
 
         internal static RoutedRpcEvent Borrow()
         {
@@ -1177,6 +1607,18 @@ namespace GONet
             SourceAuthorityId = sourceAuthorityId;
             IsSourceRemote = false;
             IsFromMe = true;
+            IsReliable = isReliable;
+            GONetParticipantId = gonetParticipantId;
+            ValidationContext = default;
+        }
+
+        // Constructor for synthetic execution context (e.g., server-side ServerRpc with RunLocally=true)
+        internal GONetRpcContext(ushort sourceAuthorityId, bool isReliable, uint gonetParticipantId, bool isSourceRemote)
+        {
+            Envelope = null;
+            SourceAuthorityId = sourceAuthorityId;
+            IsSourceRemote = isSourceRemote;
+            IsFromMe = !isSourceRemote; // If remote, not from me; if local, from me
             IsReliable = isReliable;
             GONetParticipantId = gonetParticipantId;
             ValidationContext = default;

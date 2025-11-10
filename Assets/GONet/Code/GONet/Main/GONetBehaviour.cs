@@ -803,7 +803,8 @@ namespace GONet
         ///     <term><see cref="ServerRpcAttribute"/></term>
         ///     <description>
         ///       Sent from client to server. Set <see cref="GONetRpcAttribute.IsMineRequired"/>=<c>false</c> to allow any client to call.
-        ///       Can relay to other clients using <see cref="ServerRpcAttribute.Relay"/> property (<see cref="RelayMode.None"/>/<see cref="RelayMode.Others"/>/<see cref="RelayMode.All"/>/<see cref="RelayMode.Owner"/>).
+        ///       Server executes locally by default (set <see cref="ServerRpcAttribute.RunLocally"/>=<c>false</c> for strict client-to-server only).
+        ///       To broadcast results to clients, manually call <see cref="ClientRpcAttribute"/> or <see cref="TargetRpcAttribute"/> from within ServerRpc method.
         ///     </description>
         ///   </item>
         ///   <item>

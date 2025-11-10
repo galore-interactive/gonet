@@ -73,7 +73,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     private bool showNewChannelDialog = false;
 
     // Chat State
-    private List<ChatParticipant> participants = new List<ChatParticipant>();
+    private HashSet<ChatParticipant> participants = new HashSet<ChatParticipant>();
     private List<ChatChannel> channels = new List<ChatChannel>();
     private List<ChatMessage> allMessages = new List<ChatMessage>(); // Store ALL messages
     private HashSet<ushort> selectedParticipants = new HashSet<ushort>();
@@ -274,7 +274,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
 
             if (participant.AuthorityId != 0) // Found (checking struct default)
             {
-                participants.RemoveAll(p => p.AuthorityId == authorityId);
+                participants.Remove(participant);
                 selectedParticipants.Remove(authorityId);
 
                 var sysMsg = new ChatMessage
@@ -699,7 +699,7 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
     {
         // Server is broadcasting the authoritative participant list
         var ourself = participants.FirstOrDefault(p => p.AuthorityId == localAuthorityId);
-        participants = allParticipants.ToList();
+        participants = new HashSet<ChatParticipant>(allParticipants);
 
         // Ensure we're still in the list
         if (!participants.Any(p => p.AuthorityId == localAuthorityId) && ourself.AuthorityId != 0)
@@ -811,36 +811,6 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
         OnReceiveMessage(message);
 
         return default;
-    }
-
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY))]
-    internal async Task<RpcDeliveryReport> SendMessage_TEST()
-    {
-        await Task.CompletedTask; // Suppress CS1998 warning - method returns synchronously
-        return default;
-    }
-
-    internal RpcValidationResult ValidateMessage_TEST_EMPTY()
-    {
-        // Get the pre-allocated validation result and allow all targets
-        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
-        var result = validationContext.GetValidationResult();
-        result.AllowAll();
-        return result;
-    }
-
-    [TargetRpc(nameof(CurrentMessageTargets), isMultipleTargets: true, validationMethod: nameof(ValidateMessage_TEST_EMPTY_VOID))]
-    internal void SendMessage_TEST_VOID()
-    {
-    }
-
-    internal RpcValidationResult ValidateMessage_TEST_EMPTY_VOID()
-    {
-        // Get the pre-allocated validation result and allow all targets
-        var validationContext = GONetEventBus.GetCurrentRpcContext().ValidationContext;
-        var result = validationContext.GetValidationResult();
-        result.AllowAll();
-        return result;
     }
 
     void OnReceiveMessage(ChatMessage message)
@@ -1247,6 +1217,10 @@ public class GONetSampleChatSystem : GONetParticipantCompanionBehaviour
                     uniqueTargets.Add(p.AuthorityId);
                     GONetLog.Info($"[CHAT-DEBUG] Adding participant {p.AuthorityId} to targets (Status: {p.Status})");
                 }
+                // CRITICAL: Always include sender in channel messages (prevents race condition where sender's
+                // participant entry hasn't been synced yet)
+                uniqueTargets.Add(localAuthorityId);
+                GONetLog.Info($"[CHAT-DEBUG] Added sender {localAuthorityId} to channel targets (ensures sender receives own message)");
                 break;
 
             case ChatType.DirectMessage:
@@ -1567,12 +1541,28 @@ public static class UnityWebRequestExtensions
 }
 
 [MemoryPackable]
-public partial struct ChatParticipant
+public partial struct ChatParticipant : IEquatable<ChatParticipant>
 {
     public ushort AuthorityId { get; set; }
     public string DisplayName { get; set; }
     public bool IsServer { get; set; }
     public GONetSampleChatSystem.ConnectionStatus Status { get; set; }
+
+    // HashSet/Dictionary support - compare by AuthorityId only
+    public bool Equals(ChatParticipant other)
+    {
+        return AuthorityId == other.AuthorityId;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is ChatParticipant other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return AuthorityId.GetHashCode();
+    }
 }
 
 [MemoryPackable]
