@@ -822,6 +822,9 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
             DumpRpcExecutionSummary();
         }
 
+        // NOTE: Shift+A disabled - conflicts with GONetRpcAllTypesIntegrationTest
+        // Use Shift+L (TargetRpc), Shift+S (ServerRpc), Shift+C (ClientRpc) instead
+        /*
         // Shift+A: Run ALL tests applicable to this machine (auto-detect)
         if (Input.GetKeyDown(KeyCode.A))
         {
@@ -842,6 +845,7 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
             GONetLog.Info("[GONetRpcComprehensiveTests] Completed ALL applicable tests. Press Shift+K to dump summary.", myRpcLogTelemetryProfile);
             return; // Early exit to prevent duplicate execution if L/C/S also pressed
         }
+        */
 
         // Shift+L: TargetRpc comprehensive test (broadcasts to all machines)
         if (Input.GetKeyDown(KeyCode.L))

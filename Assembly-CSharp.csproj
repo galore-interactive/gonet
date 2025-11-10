@@ -80,6 +80,7 @@
     <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcMemoryPackTypesTest.cs" />
     <Compile Include="Assets\GONet\Code\Netcode.IO.NET\Utils\LockFreeQueue.cs" />
     <Compile Include="Assets\GONet\Sample\TestInstructionUI.cs" />
+    <Compile Include="Assets\GONet\Sample\RpcTests\GONetRpcAllTypesIntegrationTest.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetServer.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Main\GONetBehaviour.cs" />
     <Compile Include="Assets\GONet\Code\GONet\Generation\DesignTimeMetadata.cs" />
