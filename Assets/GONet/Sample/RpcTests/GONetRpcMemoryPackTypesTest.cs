@@ -99,31 +99,31 @@ namespace GONet.Sample.RpcTests
         #region Built-in Types (Expected: ✅ All should work)
 
         [ServerRpc]
-        void Test_Primitives(int intVal, float floatVal, bool boolVal, double doubleVal, long longVal, byte byteVal)
+        internal void Test_Primitives(int intVal, float floatVal, bool boolVal, double doubleVal, long longVal, byte byteVal)
         {
             LogTestResult("Primitives", true, $"int={intVal}, float={floatVal}, bool={boolVal}, double={doubleVal}, long={longVal}, byte={byteVal}");
         }
 
         [ServerRpc]
-        void Test_String(string message)
+        internal void Test_String(string message)
         {
             LogTestResult("String", true, $"message='{message}'");
         }
 
         [ServerRpc]
-        void Test_Vector3(Vector3 position)
+        internal void Test_Vector3(Vector3 position)
         {
             LogTestResult("Vector3", true, $"position={position}");
         }
 
         [ServerRpc]
-        void Test_Quaternion(Quaternion rotation)
+        internal void Test_Quaternion(Quaternion rotation)
         {
             LogTestResult("Quaternion", true, $"rotation={rotation}");
         }
 
         [ServerRpc]
-        void Test_Vector2(Vector2 uv)
+        internal void Test_Vector2(Vector2 uv)
         {
             LogTestResult("Vector2", true, $"uv={uv}");
         }
@@ -140,13 +140,13 @@ namespace GONet.Sample.RpcTests
         #region Enums (Expected: ✅ Should work)
 
         [ServerRpc]
-        void Test_Enum(TestEnum enumValue)
+        internal void Test_Enum(TestEnum enumValue)
         {
             LogTestResult("Enum", true, $"enumValue={enumValue}");
         }
 
         [ServerRpc]
-        void Test_EnumAsInt(int enumAsInt)
+        internal void Test_EnumAsInt(int enumAsInt)
         {
             TestEnum enumValue = (TestEnum)enumAsInt;
             LogTestResult("EnumAsInt workaround", true, $"enumValue={enumValue}");
@@ -176,7 +176,7 @@ namespace GONet.Sample.RpcTests
 
         // Workaround: Send Color as separate RGBA components
         [ServerRpc]
-        void Test_ColorAsFloats(float r, float g, float b, float a)
+        internal void Test_ColorAsFloats(float r, float g, float b, float a)
         {
             Color reconstructed = new Color(r, g, b, a);
             LogTestResult("Color as RGBA floats (workaround)", true, $"color={reconstructed}");
@@ -187,13 +187,13 @@ namespace GONet.Sample.RpcTests
         #region Custom MemoryPackable Structs (Expected: ✅ Should work)
 
         [ServerRpc]
-        void Test_CustomStruct(TestStruct data)
+        internal void Test_CustomStruct(TestStruct data)
         {
             LogTestResult("Custom [MemoryPackable] struct", true, $"id={data.id}, value={data.value}, name='{data.name}'");
         }
 
         [ServerRpc]
-        void Test_NestedStruct(NestedStruct nested)
+        internal void Test_NestedStruct(NestedStruct nested)
         {
             LogTestResult("Nested [MemoryPackable] struct", true, $"inner.id={nested.inner.id}, position={nested.position}, enumValue={nested.enumValue}");
         }
@@ -203,25 +203,25 @@ namespace GONet.Sample.RpcTests
         #region Arrays (Expected: ✅ Should work)
 
         [ServerRpc]
-        void Test_IntArray(int[] numbers)
+        internal void Test_IntArray(int[] numbers)
         {
             LogTestResult("int[]", true, $"length={numbers?.Length ?? 0}, first={(numbers != null && numbers.Length > 0 ? numbers[0].ToString() : "null")}");
         }
 
         [ServerRpc]
-        void Test_Vector3Array(Vector3[] positions)
+        internal void Test_Vector3Array(Vector3[] positions)
         {
             LogTestResult("Vector3[]", true, $"length={positions?.Length ?? 0}");
         }
 
         [ServerRpc]
-        void Test_StringArray(string[] messages)
+        internal void Test_StringArray(string[] messages)
         {
             LogTestResult("string[]", true, $"length={messages?.Length ?? 0}");
         }
 
         [ServerRpc]
-        void Test_CustomStructArray(TestStruct[] data)
+        internal void Test_CustomStructArray(TestStruct[] data)
         {
             LogTestResult("TestStruct[]", true, $"length={data?.Length ?? 0}");
         }
@@ -231,25 +231,25 @@ namespace GONet.Sample.RpcTests
         #region Collections (Expected: ✅ Should work)
 
         [ServerRpc]
-        void Test_ListInt(List<int> numbers)
+        internal void Test_ListInt(List<int> numbers)
         {
             LogTestResult("List<int>", true, $"count={numbers?.Count ?? 0}");
         }
 
         [ServerRpc]
-        void Test_ListString(List<string> messages)
+        internal void Test_ListString(List<string> messages)
         {
             LogTestResult("List<string>", true, $"count={messages?.Count ?? 0}");
         }
 
         [ServerRpc]
-        void Test_ListVector3(List<Vector3> positions)
+        internal void Test_ListVector3(List<Vector3> positions)
         {
             LogTestResult("List<Vector3>", true, $"count={positions?.Count ?? 0}");
         }
 
         [ServerRpc]
-        void Test_Dictionary(Dictionary<int, string> data)
+        internal void Test_Dictionary(Dictionary<int, string> data)
         {
             LogTestResult("Dictionary<int, string>", true, $"count={data?.Count ?? 0}");
         }
@@ -261,7 +261,7 @@ namespace GONet.Sample.RpcTests
         // UNCOMMENT TO TEST FAILURE CASE:
         /*
         [ServerRpc]
-        void Test_NonMemoryPackableStruct(NonMemoryPackableStruct data)
+        internal void Test_NonMemoryPackableStruct(NonMemoryPackableStruct data)
         {
             // This should FAIL code generation with error message about missing [MemoryPackable]
             LogTestResult("Non-MemoryPackable struct", false, "Should not compile!");
