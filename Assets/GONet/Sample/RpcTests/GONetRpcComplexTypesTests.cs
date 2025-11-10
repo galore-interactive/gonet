@@ -4,9 +4,48 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using MemoryPack;
 
 namespace GONet.Sample.RpcTests
 {
+    #region Custom Types for RPC Testing (must be at namespace level for MemoryPack)
+
+    public enum TestEnum
+    {
+        None = 0,
+        Alpha = 1,
+        Beta = 2,
+        Gamma = 3
+    }
+
+    [Serializable]
+    [MemoryPackable]
+    public partial struct TestStruct
+    {
+        public int id;
+        public float value;
+        public string name;
+
+        public override string ToString()
+        {
+            return $"TestStruct(id={id}, value={value}, name={name})";
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is TestStruct)) return false;
+            TestStruct other = (TestStruct)obj;
+            return id == other.id && Mathf.Approximately(value, other.value) && name == other.name;
+        }
+
+        public override int GetHashCode()
+        {
+            return id.GetHashCode() ^ value.GetHashCode() ^ (name != null ? name.GetHashCode() : 0);
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// Tests for RPC complex parameter types.
     /// Covers: Vector3, Quaternion, Color, structs, enums, arrays, lists, dictionaries
@@ -22,42 +61,6 @@ namespace GONet.Sample.RpcTests
     [RequireComponent(typeof(GONetParticipant))]
     public class GONetRpcComplexTypesTests : GONetParticipantCompanionBehaviour
     {
-        #region Custom Types for Testing
-
-        public enum TestEnum
-        {
-            None = 0,
-            Alpha = 1,
-            Beta = 2,
-            Gamma = 3
-        }
-
-        [Serializable]
-        public struct TestStruct
-        {
-            public int id;
-            public float value;
-            public string name;
-
-            public override string ToString()
-            {
-                return $"TestStruct(id={id}, value={value}, name={name})";
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (!(obj is TestStruct)) return false;
-                TestStruct other = (TestStruct)obj;
-                return id == other.id && Mathf.Approximately(value, other.value) && name == other.name;
-            }
-
-            public override int GetHashCode()
-            {
-                return id.GetHashCode() ^ value.GetHashCode() ^ (name != null ? name.GetHashCode() : 0);
-            }
-        }
-
-        #endregion
 
         #region RPC Execution Tracker
 
@@ -120,8 +123,10 @@ namespace GONet.Sample.RpcTests
 
         #region Unity Lifecycle
 
-        private void Start()
+        protected override void Start()
         {
+            base.Start();
+         
             InitTelemetryLogging();
         }
 
