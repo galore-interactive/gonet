@@ -85,9 +85,11 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
     {
         if (rpcExecutionLog.Count == 0)
         {
-            GONetLog.Info("No RPC executions recorded");
+            // No executions recorded - don't create log file
             return;
         }
+
+        EnsureLoggingProfileRegistered();
 
         var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
                                       .OrderBy(g => g.Key);
@@ -111,11 +113,21 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
     }
 
     string myRpcLogTelemetryProfile;
-    private void InitTelemetryLogging()
+    private bool isLoggingProfileRegistered = false;
+
+    /// <summary>
+    /// Lazy initialization: only register logging profile when we actually need to log something.
+    /// This prevents empty log files from being created when tests are not run.
+    /// </summary>
+    private void EnsureLoggingProfileRegistered()
     {
-        // Register a separate log file per machine to avoid log interleaving
-        myRpcLogTelemetryProfile = string.Concat("RpcTelemetry-", GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}");
-        GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+        if (!isLoggingProfileRegistered)
+        {
+            // Register a separate log file per machine to avoid log interleaving
+            myRpcLogTelemetryProfile = string.Concat("RpcTelemetry-", GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}");
+            GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+            isLoggingProfileRegistered = true;
+        }
     }
 
     private void OnApplicationQuit()
@@ -129,7 +141,7 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
 
     private void Start()
     {
-        InitTelemetryLogging();
+        // Logging profile registration deferred until first actual log write
         RegisterTestsWithUI();
     }
 
@@ -850,6 +862,8 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
         // Shift+L: TargetRpc comprehensive test (broadcasts to all machines)
         if (Input.GetKeyDown(KeyCode.L))
         {
+            EnsureLoggingProfileRegistered();
+
             // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
             if (currentTestId == -1)
             {
@@ -967,6 +981,8 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
         // Shift+C: ServerRpc comprehensive test (RunLocally=true allows server and clients to invoke)
         if (Input.GetKeyDown(KeyCode.C))
         {
+            EnsureLoggingProfileRegistered();
+
             // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
             if (currentTestId == -1)
             {
@@ -1056,6 +1072,8 @@ public class GONetRpcComprehensiveTests : GONetParticipantCompanionBehaviour
         // Shift+S: ClientRpc comprehensive test (server broadcasts to all clients)
         if (IsServer && Input.GetKeyDown(KeyCode.S))
         {
+            EnsureLoggingProfileRegistered();
+
             // Start tracking - use FIRST test ID encountered (stays set for all subsequent tests)
             if (currentTestId == -1)
             {

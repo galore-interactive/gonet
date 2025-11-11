@@ -62,9 +62,11 @@ namespace GONet.Sample.RpcTests
         {
             if (rpcExecutionLog.Count == 0)
             {
-                GONetLog.Info("No RPC executions recorded", myRpcLogTelemetryProfile);
+                // No executions recorded - don't create log file
                 return;
             }
+
+            EnsureLoggingProfileRegistered();
 
             var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
                                           .OrderBy(g => g.Key);
@@ -87,10 +89,20 @@ namespace GONet.Sample.RpcTests
         }
 
         string myRpcLogTelemetryProfile;
-        private void InitTelemetryLogging()
+        private bool isLoggingProfileRegistered = false;
+
+        /// <summary>
+        /// Lazy initialization: only register logging profile when we actually need to log something.
+        /// This prevents empty log files from being created when tests are not run.
+        /// </summary>
+        private void EnsureLoggingProfileRegistered()
         {
-            myRpcLogTelemetryProfile = $"RpcTargeting-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
-            GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+            if (!isLoggingProfileRegistered)
+            {
+                myRpcLogTelemetryProfile = $"RpcTargeting-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
+                GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+                isLoggingProfileRegistered = true;
+            }
         }
 
         #endregion
@@ -99,7 +111,7 @@ namespace GONet.Sample.RpcTests
 
         private void Start()
         {
-            InitTelemetryLogging();
+            // Logging profile registration deferred until first actual log write
             RegisterTestsWithUI();
         }
 
@@ -123,6 +135,7 @@ namespace GONet.Sample.RpcTests
             // Shift+T: Run ALL targeting mode tests (applicable to all machines)
             if (shiftPressed && Input.GetKeyDown(KeyCode.T))
             {
+                EnsureLoggingProfileRegistered();
                 GONetLog.Info("[GONetRpcTargetingTests] Running ALL targeting mode tests (Shift+T)...", myRpcLogTelemetryProfile);
                 InvokeTest_TargetRpc_Owner();
                 InvokeTest_TargetRpc_Others();
@@ -315,6 +328,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_Owner()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 
@@ -333,6 +348,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_Others()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 
@@ -351,6 +368,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_SpecificAuthority()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 
@@ -371,6 +390,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_MultipleAuthorities()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 
@@ -391,6 +412,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_PropertySingle()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 
@@ -411,6 +434,8 @@ namespace GONet.Sample.RpcTests
         /// </summary>
         public void InvokeTest_TargetRpc_PropertyMultiple()
         {
+            EnsureLoggingProfileRegistered();
+
             int correlationId = UnityEngine.Random.Range(100, 999);
             currentTestId = correlationId;
 

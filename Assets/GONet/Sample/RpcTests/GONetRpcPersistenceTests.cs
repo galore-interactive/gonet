@@ -66,9 +66,11 @@ namespace GONet.Sample.RpcTests
         {
             if (rpcExecutionLog.Count == 0)
             {
-                GONetLog.Info("No RPC executions recorded", myRpcLogTelemetryProfile);
+                // No executions recorded - don't create log file
                 return;
             }
+
+            EnsureLoggingProfileRegistered();
 
             var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
                                           .OrderBy(g => g.Key);
@@ -91,10 +93,20 @@ namespace GONet.Sample.RpcTests
         }
 
         string myRpcLogTelemetryProfile;
-        private void InitTelemetryLogging()
+        private bool isLoggingProfileRegistered = false;
+
+        /// <summary>
+        /// Lazy initialization: only register logging profile when we actually need to log something.
+        /// This prevents empty log files from being created when tests are not run.
+        /// </summary>
+        private void EnsureLoggingProfileRegistered()
         {
-            myRpcLogTelemetryProfile = $"RpcPersistence-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
-            GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+            if (!isLoggingProfileRegistered)
+            {
+                myRpcLogTelemetryProfile = $"RpcPersistence-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
+                GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+                isLoggingProfileRegistered = true;
+            }
         }
 
         #endregion
@@ -103,7 +115,7 @@ namespace GONet.Sample.RpcTests
 
         private void Start()
         {
-            InitTelemetryLogging();
+            // Logging profile registration deferred until first actual log write
         }
 
         private void OnApplicationQuit()
@@ -126,6 +138,7 @@ namespace GONet.Sample.RpcTests
             // Shift+P: Run ALL persistence tests
             if (shiftPressed && Input.GetKeyDown(KeyCode.P))
             {
+                EnsureLoggingProfileRegistered();
                 GONetLog.Info("[GONetRpcPersistenceTests] Running ALL persistence tests (Shift+P)...", myRpcLogTelemetryProfile);
                 InvokeTest_TargetRpc_Persistent();
                 InvokeTest_ClientRpc_Persistent();

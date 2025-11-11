@@ -61,9 +61,11 @@ namespace GONet.Sample.RpcTests
         {
             if (rpcExecutionLog.Count == 0)
             {
-                GONetLog.Info("No RPC executions recorded", myRpcLogTelemetryProfile);
+                // No executions recorded - don't create log file
                 return;
             }
+
+            EnsureLoggingProfileRegistered();
 
             var grouped = rpcExecutionLog.GroupBy(entry => entry.Split('|')[0])
                                           .OrderBy(g => g.Key);
@@ -86,10 +88,20 @@ namespace GONet.Sample.RpcTests
         }
 
         string myRpcLogTelemetryProfile;
-        private void InitTelemetryLogging()
+        private bool isLoggingProfileRegistered = false;
+
+        /// <summary>
+        /// Lazy initialization: only register logging profile when we actually need to log something.
+        /// This prevents empty log files from being created when tests are not run.
+        /// </summary>
+        private void EnsureLoggingProfileRegistered()
         {
-            myRpcLogTelemetryProfile = $"RpcAllTypes-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
-            GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+            if (!isLoggingProfileRegistered)
+            {
+                myRpcLogTelemetryProfile = $"RpcAllTypes-{(GONetMain.IsServer ? "Server" : $"Client{GONetMain.MyAuthorityId}")}";
+                GONetLog.RegisterLoggingProfile(new GONetLog.LoggingProfile(myRpcLogTelemetryProfile, outputToSeparateFile: true));
+                isLoggingProfileRegistered = true;
+            }
         }
 
         #endregion
@@ -99,8 +111,7 @@ namespace GONet.Sample.RpcTests
         protected override void Start()
         {
             base.Start();
-         
-            InitTelemetryLogging();
+            // Logging profile registration deferred until first actual log write
         }
 
         private void OnApplicationQuit()
@@ -123,6 +134,7 @@ namespace GONet.Sample.RpcTests
             // Shift+A: Run ALL RPC integration tests
             if (shiftPressed && Input.GetKeyDown(KeyCode.A))
             {
+                EnsureLoggingProfileRegistered();
                 GONetLog.Info("[GONetRpcAllTypesIntegrationTest] Running ALL RPC integration tests (Shift+A)...", myRpcLogTelemetryProfile);
                 RunAllTests();
                 GONetLog.Info("[GONetRpcAllTypesIntegrationTest] Completed ALL tests. Press Shift+K to dump summary.", myRpcLogTelemetryProfile);
@@ -135,6 +147,8 @@ namespace GONet.Sample.RpcTests
 
         private void RunAllTests()
         {
+            EnsureLoggingProfileRegistered();
+
             if (GONetMain.IsClient && !GONetMain.IsServer)
             {
                 // Client initiates tests
