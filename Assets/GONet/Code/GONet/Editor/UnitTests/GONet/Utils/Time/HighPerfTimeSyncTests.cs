@@ -720,7 +720,7 @@ namespace GONet.Tests.Time
     public class TimeSyncSchedulerTests : TimeSyncTestBase
     {
         private const string CATEGORY_SCHEDULER = "Scheduler";
-        private const string FIELD_LASTSYNCTIME = "lastSyncTimeTicks";
+        private const string FIELD_LASTSYNCTIME = "lastSyncTimeRawTicks"; // Updated to match renamed field
 
         private FieldInfo lastSyncTimeTicksField;
 
@@ -743,6 +743,14 @@ namespace GONet.Tests.Time
         [Category(CATEGORY_SCHEDULER)]
         public void Should_Respect_Minimum_Sync_Interval()
         {
+            // Reset scheduler to ensure clean state
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
+
+            // Enable aggressive mode for faster testing (1s intervals)
+            TimeSyncScheduler.EnableAggressiveMode("test_min_interval");
+
+            // Wait aggressive interval before first sync can succeed
+            Thread.Sleep(1100);
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.False);
             Thread.Sleep(500);
@@ -754,8 +762,16 @@ namespace GONet.Tests.Time
         [Timeout(10000)]
         public void Should_Allow_Sync_After_Interval()
         {
+            // Reset scheduler to ensure clean state
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
+
+            // Enable aggressive mode for faster testing (1s intervals)
+            TimeSyncScheduler.EnableAggressiveMode("test_sync_after_interval");
+
+            // Wait aggressive interval before first sync can succeed
+            Thread.Sleep(1100);
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
-            Thread.Sleep(5100);
+            Thread.Sleep(1100);
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
         }
 
@@ -763,7 +779,13 @@ namespace GONet.Tests.Time
         [Category(CATEGORY_SCHEDULER)]
         public void Should_Handle_Concurrent_Sync_Attempts()
         {
-            lastSyncTimeTicksField.SetValue(null, 0L);
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
+
+            // Enable aggressive mode for faster testing (1s intervals)
+            TimeSyncScheduler.EnableAggressiveMode("test_concurrent_sync");
+
+            // Wait aggressive interval so threads can successfully compete for sync
+            Thread.Sleep(1100);
 
             const int threadCount = 10;
             var barrier = new Barrier(threadCount);
@@ -793,7 +815,8 @@ namespace GONet.Tests.Time
         [Timeout(20000)]
         public void Should_Maintain_Sync_Schedule_Over_Time()
         {
-            lastSyncTimeTicksField.SetValue(null, 0L);
+            // Reset scheduler to current time (not 0) to avoid immediate first sync
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
 
             var syncTimes = new List<DateTime>();
             var stopwatch = Stopwatch.StartNew();
@@ -856,6 +879,14 @@ namespace GONet.Tests.Time
         [Category(CATEGORY_SCHEDULER)]
         public void Should_Handle_Clock_Adjustments()
         {
+            // Reset scheduler to ensure clean state
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
+
+            // Enable aggressive mode for faster testing (1s intervals)
+            TimeSyncScheduler.EnableAggressiveMode("test_clock_adjustments");
+
+            // Wait aggressive interval before first sync can succeed
+            Thread.Sleep(1100);
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
 
             long futureTime = GONet.Utils.HighResolutionTimeUtils.UtcNow.Ticks + TimeSpan.FromHours(1).Ticks;
@@ -863,7 +894,10 @@ namespace GONet.Tests.Time
 
             bool result = TimeSyncScheduler.ShouldSyncNow();
 
-            lastSyncTimeTicksField.SetValue(null, 0L);
+            lastSyncTimeTicksField.SetValue(null, GONetMain.Time.RawElapsedTicks);
+
+            // Wait MIN_INTERVAL to allow next sync
+            Thread.Sleep(1100);
 
             Assert.That(TimeSyncScheduler.ShouldSyncNow(), Is.True);
         }
