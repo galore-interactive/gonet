@@ -210,6 +210,7 @@ namespace GONet.Tests.Time
 
         [Test]
         [Category("NTPSync")]
+        [Explicit("Requires external network access to NTP servers - may fail due to firewall/network issues")]
         [Timeout(15000)]
         public async Task Should_Sync_With_NTP_Server()
         {

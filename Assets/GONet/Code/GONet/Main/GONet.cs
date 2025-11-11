@@ -4091,13 +4091,17 @@ namespace GONet
         {
             using (BitByBitByteArrayBuilder bitStream = BitByBitByteArrayBuilder.GetBuilder())
             {
-                { // header...just message type/id...well, and now time 
+                { // header...just message type/id...well, and now time
                     uint messageID = messageTypeToMessageIDMap[typeof(ResponseMessage)];
                     bitStream.WriteUInt(messageID);
 
-                    bitStream.WriteLong(Time.ElapsedTicks);
+                    // CRITICAL: Send RawElapsedTicks (monotonic) instead of ElapsedTicks (adjusted)
+                    // Client sends t0=RawElapsedTicks, server must respond with t1=RawElapsedTicks
+                    // Using ElapsedTicks breaks RTT math because adjusted time can differ from raw time
+                    // This was causing late-joiners to sync to far-future time and get stuck
+                    bitStream.WriteLong(Time.RawElapsedTicks);
 
-                    //GONetLog.Debug($"Server responding to time sync request from client.  My time (seconds): {TimeSpan.FromTicks(Time.ElapsedTicks).TotalSeconds}, ticks: {Time.ElapsedTicks}");
+                    //GONetLog.Debug($"Server responding to time sync request from client.  My time (seconds): {TimeSpan.FromTicks(Time.RawElapsedTicks).TotalSeconds}, ticks: {Time.RawElapsedTicks}");
                 }
 
                 // body
@@ -5608,21 +5612,26 @@ namespace GONet
 
         /// <summary>
         /// High-performance time sync scheduler
+        /// CRITICAL: Uses RAW time (RawElapsedTicks) for all scheduling decisions.
+        /// This is essential because adjusted time (ElapsedTicks) can jump backward during
+        /// network synchronization, breaking interval timing logic.
         /// </summary>
         public static class TimeSyncScheduler
         {
-            private static long lastSyncTimeTicks = 0;
+            // IMPORTANT: Use RAW time for scheduling - adjusted time can jump backward during sync!
+            // See: .claude/TIMESYNC_SCENE_CHANGE_BUG_ANALYSIS.md for full explanation
+            private static long lastSyncTimeRawTicks = 0;
             private static readonly long SYNC_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 5;
             private static readonly long AGGRESSIVE_INTERVAL_TICKS = TimeSpan.TicksPerSecond * 1; // 1 second for aggressive mode
             private static readonly long MIN_INTERVAL_TICKS = TimeSpan.TicksPerSecond;
 
-            // Aggressive mode state
-            private static long aggressiveModeEndTicks = 0;
+            // Aggressive mode state (also uses RAW time)
+            private static long aggressiveModeEndRawTicks = 0;
             private static readonly long AGGRESSIVE_MODE_DURATION_TICKS = TimeSpan.TicksPerSecond * 10; // 10 seconds
 
             public static void ResetOnConnection()
             {
-                lastSyncTimeTicks = Time.ElapsedTicks;
+                lastSyncTimeRawTicks = Time.RawElapsedTicks;
             }
 
             /// <summary>
@@ -5631,25 +5640,25 @@ namespace GONet
             /// </summary>
             public static void EnableAggressiveMode(string reason)
             {
-                long now = Time.ElapsedTicks;
-                aggressiveModeEndTicks = now + AGGRESSIVE_MODE_DURATION_TICKS;
+                long nowRaw = Time.RawElapsedTicks;
+                aggressiveModeEndRawTicks = nowRaw + AGGRESSIVE_MODE_DURATION_TICKS;
                 GONetLog.Info($"[TimeSync] Aggressive mode enabled for {TimeSpan.FromTicks(AGGRESSIVE_MODE_DURATION_TICKS).TotalSeconds}s - Reason: {reason}");
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool ShouldSyncNow()
             {
-                long now = Time.ElapsedTicks;
-                long lastSync = Volatile.Read(ref lastSyncTimeTicks);
-                long elapsed = now - lastSync;
+                long nowRaw = Time.RawElapsedTicks;
+                long lastSync = Volatile.Read(ref lastSyncTimeRawTicks);
+                long elapsed = nowRaw - lastSync;
                 if (elapsed < MIN_INTERVAL_TICKS) return false;
 
-                // Check if we're in aggressive mode
-                bool isAggressiveMode = now < Volatile.Read(ref aggressiveModeEndTicks);
+                // Check if we're in aggressive mode (using RAW time)
+                bool isAggressiveMode = nowRaw < Volatile.Read(ref aggressiveModeEndRawTicks);
                 long targetInterval = isAggressiveMode ? AGGRESSIVE_INTERVAL_TICKS : SYNC_INTERVAL_TICKS;
 
                 if (elapsed < targetInterval) return false;
-                return Interlocked.CompareExchange(ref lastSyncTimeTicks, now, lastSync) == lastSync;
+                return Interlocked.CompareExchange(ref lastSyncTimeRawTicks, nowRaw, lastSync) == lastSync;
             }
         }
 

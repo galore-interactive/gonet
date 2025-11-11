@@ -320,6 +320,9 @@ namespace GONet.Tests.Time
         [Category("Chaos")]
         public void Should_Recover_From_Memory_Pressure()
         {
+            // Enable aggressive mode for faster testing (1s intervals instead of 5s)
+            TimeSyncScheduler.EnableAggressiveMode("test_memory_pressure");
+
             // Simulate memory pressure by creating many temporary objects
             var memoryPressureTask = Task.Run(() =>
             {
@@ -448,7 +451,9 @@ namespace GONet.Tests.Time
 
         private RequestMessage CreateTimeSyncRequest()
         {
-            long clientTicks = RunOnThread<long>(() => clientTime.ElapsedTicks, clientActions);
+            // CRITICAL: Use RawElapsedTicks to match production behavior (GONet.cs:4047)
+            // RawElapsedTicks is monotonic and immune to backward adjustments
+            long clientTicks = RunOnThread<long>(() => clientTime.RawElapsedTicks, clientActions);
             return new RequestMessage(clientTicks);
         }
     }
