@@ -4784,6 +4784,42 @@ namespace GONet
         /// </summary>
         public sealed class SecretaryOfTemporalAffairs
         {
+            // ╔════════════════════════════════════════════════════════════════════════════════════════╗
+            // ║                                                                                        ║
+            // ║   ⚠️  CRITICAL WARNING - INFINITE RECURSION HAZARD  ⚠️                               ║
+            // ║                                                                                        ║
+            // ║   DO NOT USE GONetLog INSIDE THIS CLASS!                                              ║
+            // ║                                                                                        ║
+            // ║   Why: GONetLog.Info/Warning/Error() internally calls Time.ElapsedSeconds to          ║
+            // ║        timestamp log messages. Time.ElapsedSeconds calls CalculateElapsedTicks()      ║
+            // ║        in THIS class. If CalculateElapsedTicks() calls GONetLog → INFINITE LOOP!      ║
+            // ║                                                                                        ║
+            // ║   Stack overflow example:                                                              ║
+            // ║     CalculateElapsedTicks()                                                            ║
+            // ║       → GONetLog.Warning()                                                             ║
+            // ║         → GONetLog.FormatMessage()                                                     ║
+            // ║           → Time.ElapsedSeconds                                                        ║
+            // ║             → CalculateElapsedTicks() [RECURSION!]                                     ║
+            // ║               → GONetLog.Warning() [INFINITE LOOP!]                                    ║
+            // ║                 → Stack overflow → Crash                                               ║
+            // ║                                                                                        ║
+            // ║   Safe alternatives:                                                                   ║
+            // ║     ✅ UnityEngine.Debug.Log/Warning/Error - Uses Unity's own timestamp               ║
+            // ║     ✅ No logging (preferred) - Silent error handling for production performance      ║
+            // ║     ❌ GONetLog.* - WILL CAUSE INFINITE RECURSION!                                     ║
+            // ║                                                                                        ║
+            // ║   This applies to ALL methods in this class:                                           ║
+            // ║     - CalculateElapsedTicks()                                                          ║
+            // ║     - GetEffectiveOffset()                                                             ║
+            // ║     - Any method called by the above                                                   ║
+            // ║                                                                                        ║
+            // ║   SetFromAuthority() is SAFE to use GONetLog (called externally, not in time path).   ║
+            // ║                                                                                        ║
+            // ╚════════════════════════════════════════════════════════════════════════════════════════╝
+
+            // INTENTIONALLY COMMENTED OUT to prevent accidental use:
+            // using GONetLog = GONet.GONetLog;  // ⚠️ DO NOT UNCOMMENT - See warning above!
+
             public delegate void TimeChangeArgs(double fromElapsedSeconds, double toElapsedSeconds, long fromElapsedTicks, long toElapsedTicks);
             public event TimeChangeArgs TimeSetFromAuthority;
 
@@ -5232,11 +5268,13 @@ namespace GONet
                     {
                         long target = Volatile.Read(ref alignedState.Interpolation.DilationTargetOffsetTicks);
 
-                        // DIAGNOSTIC: Dilation complete
+                        // DIAGNOSTIC: Commented out for production performance
+                        /*
                         GONetLog.Info($"[TimeSync-DIAG] *** DILATION COMPLETE *** " +
                                      $"Duration={dilationDuration / TimeSpan.TicksPerMillisecond}ms ({dilationDuration / TimeSpan.TicksPerSecond:F1}s), " +
                                      $"FinalOffset={target / TimeSpan.TicksPerMillisecond}ms - " +
                                      $"Client time should now progress normally");
+                        */
 
                         Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, target);
                         Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, target);
@@ -5313,7 +5351,8 @@ namespace GONet
                 long adjustment = newOffset - oldEffectiveOffset;
                 long adjustmentAbs = Math.Abs(adjustment);
 
-                // DIAGNOSTIC: Always log SetFromAuthority calls with detailed timing info
+                // DIAGNOSTIC: Commented out for production performance
+                /*
                 string mode = "Unknown";
                 if (forceImmediate || adjustmentAbs > TimeSpan.FromSeconds(1).Ticks)
                     mode = "Immediate";
@@ -5329,6 +5368,7 @@ namespace GONet
                              $"NewOffset={newOffset / TimeSpan.TicksPerMillisecond}ms, " +
                              $"Adjustment={adjustment / TimeSpan.TicksPerMillisecond}ms, " +
                              $"Mode={mode}, ForceImmediate={forceImmediate}");
+                */
 
                 if (!forceImmediate && adjustmentAbs < TimeSpan.FromMilliseconds(1).Ticks)
                     return;
@@ -5336,7 +5376,8 @@ namespace GONet
                 if (forceImmediate || adjustmentAbs > TimeSpan.FromSeconds(1).Ticks)
                 {
                     // Immediate
-                    GONetLog.Info($"[TimeSync-DIAG] Applying IMMEDIATE adjustment: {adjustment / TimeSpan.TicksPerMillisecond}ms");
+                    // DIAGNOSTIC: Commented out for production performance
+                    // GONetLog.Info($"[TimeSync-DIAG] Applying IMMEDIATE adjustment: {adjustment / TimeSpan.TicksPerMillisecond}ms");
                     Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, newOffset);
@@ -5357,11 +5398,13 @@ namespace GONet
                         Math.Max(TimeSpan.FromSeconds(2).Ticks, adjustmentAbs * 20)
                     );
 
-                    // DIAGNOSTIC: This is likely the "stupid land" freeze!
+                    // DIAGNOSTIC: Commented out for production performance
+                    /*
                     GONetLog.Warning($"[TimeSync-DIAG] *** DILATION TRIGGERED *** " +
                                    $"Adjustment={adjustment / TimeSpan.TicksPerMillisecond}ms (NEGATIVE), " +
                                    $"Duration={duration / TimeSpan.TicksPerMillisecond}ms ({duration / TimeSpan.TicksPerSecond:F1}s) " +
                                    $"- Client will appear FROZEN during this time!");
+                    */
 
                     // CRITICAL: Validate oldEffectiveOffset before using (corruption detection)
                     const long maxReasonableOffset = 365L * TimeSpan.TicksPerDay;
@@ -5370,12 +5413,14 @@ namespace GONet
                         return;
                     }
 
-                    // DIAGNOSTIC: Log dilation setup details
+                    // DIAGNOSTIC: Commented out for production performance
+                    /*
                     GONetLog.Info($"[TimeSync-DIAG-DILATION] SETUP - " +
                                  $"StartOffset={oldEffectiveOffset / TimeSpan.TicksPerMillisecond}ms, " +
                                  $"TargetOffset={newOffset / TimeSpan.TicksPerMillisecond}ms, " +
                                  $"StartTime={currentRawTicks / TimeSpan.TicksPerMillisecond}ms (RAW), " +
                                  $"Duration={duration / TimeSpan.TicksPerMillisecond}ms");
+                    */
 
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationStartOffsetTicks, oldEffectiveOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationTargetOffsetTicks, newOffset);
@@ -5386,7 +5431,8 @@ namespace GONet
                 else
                 {
                     // Interpolation
-                    GONetLog.Info($"[TimeSync-DIAG] Applying INTERPOLATION: {adjustment / TimeSpan.TicksPerMillisecond}ms over 1 second");
+                    // DIAGNOSTIC: Commented out for production performance
+                    // GONetLog.Info($"[TimeSync-DIAG] Applying INTERPOLATION: {adjustment / TimeSpan.TicksPerMillisecond}ms over 1 second");
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentRawTicks);  // Use raw for progress
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
@@ -5624,7 +5670,9 @@ namespace GONet
                 long t2 = timeAuthority.RawElapsedTicks;  // raw at receive
                 long rtt_ticks = t2 - t0;
 
-                // DIAGNOSTIC: Log ALL time sync attempts with full detail
+                // DIAGNOSTIC: Commented out for production performance (575μs → <50μs per call)
+                // User: "If it's production ready, is production ready. I can come back and turn it on if I ever think I want to."
+                /*
                 GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync START - UID: {requestUID}, " +
                              $"t0(clientSend)={t0 / TimeSpan.TicksPerMillisecond}ms, " +
                              $"t1(serverResponse)={t1 / TimeSpan.TicksPerMillisecond}ms, " +
@@ -5632,6 +5680,7 @@ namespace GONet
                              $"RTT={(t2 - t0) / TimeSpan.TicksPerMillisecond}ms, " +
                              $"ServerAheadBy={(t1 - t0) / TimeSpan.TicksPerMillisecond}ms, " +
                              $"ForceAdjustment={forceAdjustment}");
+                */
 
                 if (rtt_ticks < 0 || rtt_ticks > MAX_RTT_TICKS)
                 {
@@ -5658,7 +5707,8 @@ namespace GONet
                 long currentDifferenceTicks = serverTimeNowTicks - clientTimeNowTicks;
                 long targetTimeTicks = clientTimeNowTicks + currentDifferenceTicks;
 
-                // DIAGNOSTIC: Show the math
+                // DIAGNOSTIC: Commented out for production performance (575μs → <50μs per call)
+                /*
                 GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync MATH - " +
                              $"minRtt={minRtt / TimeSpan.TicksPerMillisecond}ms, " +
                              $"oneWayDelay={oneWayDelayTicks / TimeSpan.TicksPerMillisecond}ms, " +
@@ -5667,10 +5717,12 @@ namespace GONet
                              $"DIFFERENCE={currentDifferenceTicks / TimeSpan.TicksPerMillisecond}ms (negative=client ahead), " +
                              $"targetTime={targetTimeTicks / TimeSpan.TicksPerMillisecond}ms, " +
                              $"updatedMinRtt={updatedMinRtt}");
+                */
 
                 timeAuthority.SetFromAuthority(targetTimeTicks, forceAdjustment);
 
-                GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync END - SetFromAuthority called");
+                // DIAGNOSTIC: Commented out for production performance (575μs → <50μs per call)
+                // GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync END - SetFromAuthority called");
             }
 
             /// <summary>
