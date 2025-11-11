@@ -5189,15 +5189,11 @@ namespace GONet
                 long effectiveOffset = GetEffectiveOffset(rawElapsedTicks);
                 long result = rawElapsedTicks + effectiveOffset;
                 lastCached = Volatile.Read(ref alignedState.State.CachedElapsedTicks);
+
+                // CRITICAL: Prevent backwards time (monotonic guarantee)
                 if (result < lastCached && lastCached > 0)
                 {
                     return lastCached;
-                }
-
-                const long maxReasonableElapsed = 365L * TimeSpan.TicksPerDay;
-                if (result > maxReasonableElapsed)
-                {
-                    return lastCached > 0 ? lastCached : 0;
                 }
 
                 return Math.Max(0, result);
@@ -5231,9 +5227,17 @@ namespace GONet
                 {
                     long dilationStart = Volatile.Read(ref alignedState.Interpolation.DilationStartTimeTicks);
                     long elapsed = currentElapsedTicks - dilationStart;
+
                     if (elapsed >= dilationDuration)
                     {
                         long target = Volatile.Read(ref alignedState.Interpolation.DilationTargetOffsetTicks);
+
+                        // DIAGNOSTIC: Dilation complete
+                        GONetLog.Info($"[TimeSync-DIAG] *** DILATION COMPLETE *** " +
+                                     $"Duration={dilationDuration / TimeSpan.TicksPerMillisecond}ms ({dilationDuration / TimeSpan.TicksPerSecond:F1}s), " +
+                                     $"FinalOffset={target / TimeSpan.TicksPerMillisecond}ms - " +
+                                     $"Client time should now progress normally");
+
                         Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, target);
                         Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, target);
                         Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
@@ -5244,6 +5248,7 @@ namespace GONet
                     long targetDilationOffset = Volatile.Read(ref alignedState.Interpolation.DilationTargetOffsetTicks);
                     long offsetDelta = targetDilationOffset - startOffset;
                     progress65536 = (elapsed << 16) / dilationDuration;
+
                     long easedProgress65536;
                     if (progress65536 < 32768)
                     {
@@ -5259,6 +5264,18 @@ namespace GONet
                     }
 
                     long newEffectiveOffset = startOffset + ((offsetDelta * easedProgress65536) >> 16);
+
+                    // CRITICAL: Detect corruption and recover gracefully
+                    const long maxReasonableOffset = 365L * TimeSpan.TicksPerDay; // 1 year
+                    if (Math.Abs(newEffectiveOffset) > maxReasonableOffset)
+                    {
+                        // Clear dilation immediately to stop corruption loop
+                        Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
+
+                        // Return target offset (safe value) instead of corrupt calculated value
+                        return targetDilationOffset;
+                    }
+
                     Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, newEffectiveOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.LastCalculationTicks, currentElapsedTicks);
 
@@ -5295,14 +5312,31 @@ namespace GONet
                 long newOffset = elapsedTicksFromAuthority - currentRawTicks;  // target (server raw now) - raw = true offset
                 long adjustment = newOffset - oldEffectiveOffset;
                 long adjustmentAbs = Math.Abs(adjustment);
-                //GONetLog.Debug($"Authority Set: RawTicks={currentRawTicks}, EffectiveTicks={currentEffectiveTicks}, OldOffset={oldEffectiveOffset}, NewOffset={newOffset}, Adjustment_Sec={TimeSpan.FromTicks(adjustment).TotalSeconds:F3}, Mode={(adjustmentAbs > TimeSpan.FromSeconds(1).Ticks ? "Immediate" : (adjustment < -TimeSpan.FromMilliseconds(50).Ticks ? "Dilation" : "Interpolation"))}");
-                
+
+                // DIAGNOSTIC: Always log SetFromAuthority calls with detailed timing info
+                string mode = "Unknown";
+                if (forceImmediate || adjustmentAbs > TimeSpan.FromSeconds(1).Ticks)
+                    mode = "Immediate";
+                else if (adjustment < -TimeSpan.FromMilliseconds(50).Ticks)
+                    mode = "Dilation";
+                else
+                    mode = "Interpolation";
+
+                GONetLog.Info($"[TimeSync-DIAG] SetFromAuthority: RawTicks={currentRawTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"EffectiveTicks={currentEffectiveTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"FromAuthority={elapsedTicksFromAuthority / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"OldOffset={oldEffectiveOffset / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"NewOffset={newOffset / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"Adjustment={adjustment / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"Mode={mode}, ForceImmediate={forceImmediate}");
+
                 if (!forceImmediate && adjustmentAbs < TimeSpan.FromMilliseconds(1).Ticks)
                     return;
-                
+
                 if (forceImmediate || adjustmentAbs > TimeSpan.FromSeconds(1).Ticks)
                 {
                     // Immediate
+                    GONetLog.Info($"[TimeSync-DIAG] Applying IMMEDIATE adjustment: {adjustment / TimeSpan.TicksPerMillisecond}ms");
                     Interlocked.Exchange(ref alignedState.State.AuthorityOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.EffectiveOffsetTicks, newOffset);
@@ -5310,11 +5344,39 @@ namespace GONet
                 }
                 else if (adjustment < -TimeSpan.FromMilliseconds(50).Ticks)
                 {
+                    // CRITICAL: Prevent double dilation setup (race condition fix)
+                    long existingDilation = Volatile.Read(ref alignedState.Interpolation.DilationDurationTicks);
+                    if (existingDilation > 0)
+                    {
+                        return;
+                    }
+
                     // Dilation (slow down for negative)
                     long duration = Math.Min(
                         TimeSpan.FromSeconds(5).Ticks,
                         Math.Max(TimeSpan.FromSeconds(2).Ticks, adjustmentAbs * 20)
                     );
+
+                    // DIAGNOSTIC: This is likely the "stupid land" freeze!
+                    GONetLog.Warning($"[TimeSync-DIAG] *** DILATION TRIGGERED *** " +
+                                   $"Adjustment={adjustment / TimeSpan.TicksPerMillisecond}ms (NEGATIVE), " +
+                                   $"Duration={duration / TimeSpan.TicksPerMillisecond}ms ({duration / TimeSpan.TicksPerSecond:F1}s) " +
+                                   $"- Client will appear FROZEN during this time!");
+
+                    // CRITICAL: Validate oldEffectiveOffset before using (corruption detection)
+                    const long maxReasonableOffset = 365L * TimeSpan.TicksPerDay;
+                    if (Math.Abs(oldEffectiveOffset) > maxReasonableOffset)
+                    {
+                        return;
+                    }
+
+                    // DIAGNOSTIC: Log dilation setup details
+                    GONetLog.Info($"[TimeSync-DIAG-DILATION] SETUP - " +
+                                 $"StartOffset={oldEffectiveOffset / TimeSpan.TicksPerMillisecond}ms, " +
+                                 $"TargetOffset={newOffset / TimeSpan.TicksPerMillisecond}ms, " +
+                                 $"StartTime={currentRawTicks / TimeSpan.TicksPerMillisecond}ms (RAW), " +
+                                 $"Duration={duration / TimeSpan.TicksPerMillisecond}ms");
+
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationStartOffsetTicks, oldEffectiveOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationTargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationStartTimeTicks, currentRawTicks);  // Use raw for progress
@@ -5324,6 +5386,7 @@ namespace GONet
                 else
                 {
                     // Interpolation
+                    GONetLog.Info($"[TimeSync-DIAG] Applying INTERPOLATION: {adjustment / TimeSpan.TicksPerMillisecond}ms over 1 second");
                     Interlocked.Exchange(ref alignedState.State.TargetOffsetTicks, newOffset);
                     Interlocked.Exchange(ref alignedState.State.AdjustmentStartTicks, currentRawTicks);  // Use raw for progress
                     Interlocked.Exchange(ref alignedState.Interpolation.DilationDurationTicks, 0);
@@ -5561,7 +5624,14 @@ namespace GONet
                 long t2 = timeAuthority.RawElapsedTicks;  // raw at receive
                 long rtt_ticks = t2 - t0;
 
-                //GONetLog.Info($"[TimeSync] ProcessTimeSync - UID: {requestUID}, t0: {t0}, t1: {t1}, t2: {t2}, RTT_ticks: {rtt_ticks}, RTT_ms: {rtt_ticks / 10_000}ms, forceAdjustment: {forceAdjustment}");
+                // DIAGNOSTIC: Log ALL time sync attempts with full detail
+                GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync START - UID: {requestUID}, " +
+                             $"t0(clientSend)={t0 / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"t1(serverResponse)={t1 / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"t2(clientReceive)={t2 / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"RTT={(t2 - t0) / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"ServerAheadBy={(t1 - t0) / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"ForceAdjustment={forceAdjustment}");
 
                 if (rtt_ticks < 0 || rtt_ticks > MAX_RTT_TICKS)
                 {
@@ -5588,11 +5658,19 @@ namespace GONet
                 long currentDifferenceTicks = serverTimeNowTicks - clientTimeNowTicks;
                 long targetTimeTicks = clientTimeNowTicks + currentDifferenceTicks;
 
-                //GONetLog.Info($"[TimeSync] Calculations - minRtt: {minRtt} ticks ({minRtt / 10_000}ms), oneWayDelay: {oneWayDelayTicks / 10_000}ms, currentDifference: {currentDifferenceTicks / 10_000}ms, updatedMinRtt: {updatedMinRtt}");
+                // DIAGNOSTIC: Show the math
+                GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync MATH - " +
+                             $"minRtt={minRtt / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"oneWayDelay={oneWayDelayTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"adjustedServerTime={adjustedServerTimeTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"clientTimeNow={clientTimeNowTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"DIFFERENCE={currentDifferenceTicks / TimeSpan.TicksPerMillisecond}ms (negative=client ahead), " +
+                             $"targetTime={targetTimeTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                             $"updatedMinRtt={updatedMinRtt}");
 
                 timeAuthority.SetFromAuthority(targetTimeTicks, forceAdjustment);
 
-                //GONetLog.Info($"[TimeSync] SetFromAuthority called - targetTimeTicks: {targetTimeTicks}, forceAdjustment: {forceAdjustment}");
+                GONetLog.Info($"[TimeSync-DIAG] ProcessTimeSync END - SetFromAuthority called");
             }
 
             /// <summary>
@@ -5642,7 +5720,11 @@ namespace GONet
             {
                 long nowRaw = Time.RawElapsedTicks;
                 aggressiveModeEndRawTicks = nowRaw + AGGRESSIVE_MODE_DURATION_TICKS;
-                GONetLog.Info($"[TimeSync] Aggressive mode enabled for {TimeSpan.FromTicks(AGGRESSIVE_MODE_DURATION_TICKS).TotalSeconds}s - Reason: {reason}");
+                GONetLog.Warning($"[TimeSync-DIAG] *** AGGRESSIVE MODE ENABLED *** " +
+                               $"Duration={AGGRESSIVE_MODE_DURATION_TICKS / TimeSpan.TicksPerSecond}s, " +
+                               $"NowRaw={nowRaw / TimeSpan.TicksPerMillisecond}ms, " +
+                               $"ExpiresAt={(nowRaw + AGGRESSIVE_MODE_DURATION_TICKS) / TimeSpan.TicksPerMillisecond}ms, " +
+                               $"Reason: {reason}");
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

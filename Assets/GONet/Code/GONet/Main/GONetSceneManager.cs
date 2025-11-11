@@ -18,6 +18,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GONet.Utils;
+using System;
+
 
 
 #if ADDRESSABLES_AVAILABLE
@@ -588,6 +590,11 @@ namespace GONet
             // Notify subscribers
             OnSceneLoadStarted?.Invoke(evt.SceneName, evt.Mode);
 
+            // DIAGNOSTIC: Track scene load start for time sync analysis
+            GONetLog.Warning($"[TimeSync-DIAG] *** SCENE LOAD START *** Scene='{evt.SceneName}', Mode={evt.Mode}, " +
+                          $"RawTime={GONetMain.Time.RawElapsedTicks / TimeSpan.TicksPerMillisecond}ms, " +
+                          $"ClientInitialized={isClientInitialized}");
+
             // Load scene locally on client
             LoadSceneLocally(evt);
 
@@ -691,7 +698,9 @@ namespace GONet
                 GONetLog.Warning($"[GONetSceneManager] Scene load operation completed callback fired but isDone is false for '{sceneName}'");
             }
 
-            GONetLog.Debug($"[GONetSceneManager] Scene load operation completed: '{sceneName}' (Mode: {mode})");
+            // DIAGNOSTIC: Track scene load completion for time sync analysis
+            GONetLog.Warning($"[TimeSync-DIAG] *** SCENE LOAD COMPLETE *** Scene='{sceneName}', Mode={mode}, " +
+                          $"RawTime={GONetMain.Time.RawElapsedTicks / TimeSpan.TicksPerMillisecond}ms");
         }
 
         private void UnloadSceneLocally(SceneUnloadEvent evt)
