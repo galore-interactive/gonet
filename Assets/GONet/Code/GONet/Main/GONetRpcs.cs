@@ -1177,21 +1177,23 @@ namespace GONet
         /// Borrows a bool array from the pool for use in RpcValidationResult.
         /// The array is automatically cleared and ready for use.
         /// IMPORTANT: Always return the array via ReturnAllowedTargets when done.
+        /// Thread-safe for concurrent async validator execution.
         /// </summary>
         /// <returns>A clean bool array sized for maximum RPC targets</returns>
         internal static bool[] BorrowAllowedTargets()
         {
-            return boolArrayPool.Borrow();
+            return boolArrayPool.BorrowSynchronized();
         }
 
         /// <summary>
         /// Returns a bool array to the pool for reuse.
         /// Called automatically by RpcValidationResult.Dispose().
+        /// Thread-safe for concurrent async validator execution.
         /// </summary>
         /// <param name="array">The array to return to the pool</param>
         internal static void ReturnAllowedTargets(bool[] array)
         {
-            boolArrayPool.Return(array);
+            boolArrayPool.ReturnSynchronized(array);
         }
     }
 
