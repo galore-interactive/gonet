@@ -5772,11 +5772,14 @@ namespace GONet
             {
                 long nowRaw = Time.RawElapsedTicks;
                 aggressiveModeEndRawTicks = nowRaw + AGGRESSIVE_MODE_DURATION_TICKS;
+                // DIAGNOSTIC: Commented out for production (development logging only)
+                /*
                 GONetLog.Warning($"[TimeSync-DIAG] *** AGGRESSIVE MODE ENABLED *** " +
                                $"Duration={AGGRESSIVE_MODE_DURATION_TICKS / TimeSpan.TicksPerSecond}s, " +
                                $"NowRaw={nowRaw / TimeSpan.TicksPerMillisecond}ms, " +
                                $"ExpiresAt={(nowRaw + AGGRESSIVE_MODE_DURATION_TICKS) / TimeSpan.TicksPerMillisecond}ms, " +
                                $"Reason: {reason}");
+                */
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
