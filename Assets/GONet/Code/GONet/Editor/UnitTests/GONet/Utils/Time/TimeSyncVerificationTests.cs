@@ -140,8 +140,9 @@ namespace GONet.Tests.Time
                 "After second sync, should maintain tight synchronization");
 
             // Verify that the second sync wasn't rejected (it should improve or maintain sync)
-            Assert.That(finalDiff, Is.LessThanOrEqualTo(diffAfterFirst),
-                "Second sync should not be rejected - difference should improve or stay same");
+            // Add small tolerance for Thread.Sleep imprecision (1ms)
+            Assert.That(finalDiff, Is.LessThanOrEqualTo(diffAfterFirst + 0.001),
+                "Second sync should not be rejected - difference should improve or stay same (within 1ms tolerance)");
 
             // The key test: verify we processed both syncs (no rejection of valid responses)
             bool secondSyncImprovedThings = finalDiff < diffAfterFirst + 0.1; // Allow small tolerance

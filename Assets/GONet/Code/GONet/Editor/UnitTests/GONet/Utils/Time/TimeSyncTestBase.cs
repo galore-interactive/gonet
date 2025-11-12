@@ -116,9 +116,16 @@ namespace GONet.Tests.Time
 
             // Reset TimeSyncScheduler static fields
             var schedulerType = typeof(TimeSyncScheduler);
-            var lastSyncTimeField = schedulerType.GetField("lastSyncTimeTicks",
+
+            // Reset lastSyncTimeRawTicks (field renamed from lastSyncTimeTicks)
+            var lastSyncTimeField = schedulerType.GetField("lastSyncTimeRawTicks",
                 BindingFlags.NonPublic | BindingFlags.Static);
             lastSyncTimeField?.SetValue(null, 0L);
+
+            // CRITICAL: Reset aggressiveModeEndRawTicks to disable aggressive mode between tests
+            var aggressiveModeEndField = schedulerType.GetField("aggressiveModeEndRawTicks",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            aggressiveModeEndField?.SetValue(null, 0L);
 
             HighPerfTimeSync.ResetForTesting();
 

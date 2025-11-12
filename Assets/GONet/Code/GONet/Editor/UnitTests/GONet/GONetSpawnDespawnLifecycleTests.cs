@@ -72,10 +72,16 @@ namespace GONet.Tests
             Assert.IsTrue(typeof(IPersistentEvent).IsAssignableFrom(eventType),
                 "InstantiateGONetParticipantEvent must be IPersistentEvent for late-joiner delivery");
 
-            // Verify required fields exist (these are public fields, not properties)
+            // Verify required fields/properties exist
             Assert.IsNotNull(eventType.GetField("GONetId"));
             Assert.IsNotNull(eventType.GetField("OwnerAuthorityId"));
-            Assert.IsNotNull(eventType.GetField("DesignTimeLocation"));
+
+            // DesignTimeLocation is now a property with backing field DesignTimeLocationIndex
+            var designTimeLocationProp = eventType.GetProperty("DesignTimeLocation");
+            var designTimeLocationField = eventType.GetField("DesignTimeLocationIndex");
+            Assert.IsTrue(designTimeLocationProp != null || designTimeLocationField != null,
+                "InstantiateGONetParticipantEvent must have DesignTimeLocation property or DesignTimeLocationIndex field");
+
             Assert.IsNotNull(eventType.GetField("Position"));
             Assert.IsNotNull(eventType.GetField("Rotation"));
         }

@@ -60,7 +60,7 @@ namespace GONet
             Assert.IsTrue(instance.IsMineRequired, "ServerRpc should have IsMineRequired=true by default (security)");
             Assert.IsTrue(instance.IsReliable, "ServerRpc should be reliable by default");
             Assert.IsFalse(instance.IsPersistent, "ServerRpc should not be persistent by default");
-            Assert.AreEqual(RelayMode.None, instance.Relay, "ServerRpc should have Relay=None by default");
+            Assert.IsTrue(instance.RunLocally, "ServerRpc should have RunLocally=true by default (matches Unity Netcode)");
         }
 
         [Test]
@@ -113,16 +113,19 @@ namespace GONet
         }
 
         [Test]
-        public void RelayMode_EnumValuesExist()
+        public void ServerRpcAttribute_RunLocallyProperty()
         {
-            var enumType = typeof(RelayMode);
-            Assert.IsTrue(enumType.IsEnum, "RelayMode should be an enum");
+            // Test default value
+            var defaultInstance = new ServerRpcAttribute();
+            Assert.IsTrue(defaultInstance.RunLocally, "RunLocally should default to true");
 
-            var names = Enum.GetNames(enumType);
-            CollectionAssert.Contains(names, "None", "Should have None relay mode");
-            CollectionAssert.Contains(names, "Others", "Should have Others relay mode");
-            CollectionAssert.Contains(names, "All", "Should have All relay mode");
-            CollectionAssert.Contains(names, "Owner", "Should have Owner relay mode");
+            // Test explicit false value
+            var noRunLocallyInstance = new ServerRpcAttribute { RunLocally = false };
+            Assert.IsFalse(noRunLocallyInstance.RunLocally, "Should be able to set RunLocally to false");
+
+            // Test explicit true value
+            var runLocallyInstance = new ServerRpcAttribute { RunLocally = true };
+            Assert.IsTrue(runLocallyInstance.RunLocally, "Should be able to explicitly set RunLocally to true");
         }
 
         #endregion
@@ -580,59 +583,76 @@ namespace GONet
 
         [Test]
         [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
-        public void Integration_ServerRpc_RelayModeAll_RebroadcastsToClients()
+        public void Integration_ServerRpc_WithManualClientRpcBroadcast()
         {
-            // SCENARIO: ServerRpc with Relay=All rebroadcasts to all clients after server processing (P1)
+            // SCENARIO: ServerRpc processes on server, manually broadcasts to all clients via ClientRpc (P1)
             //
             // SETUP:
             // 1. Start GONet server + 3 clients (A, B, C)
             // 2. Test component on client-owned object (IsMine=True on client A):
-            //    [ServerRpc(Relay = RelayMode.All)]
+            //    [ServerRpc]
             //    void BroadcastAction(string action)
             //    {
-            //        // Runs on server, then relayed to ALL clients
             //        serverReceivedActions.Add(action);
+            //        // Manually broadcast to all clients (industry-standard pattern)
+            //        CallRpc(nameof(NotifyAllClients), action);
+            //    }
+            //
+            //    [ClientRpc]
+            //    void NotifyAllClients(string action)
+            //    {
+            //        clientReceivedActions.Add(action);
             //    }
             //
             // TEST FLOW:
             // 1. Client A calls BroadcastAction("Jump")
             // 2. Wait for server to receive
             // 3. Verify server recorded "Jump"
-            // 4. Wait for relay to clients
-            // 5. Verify ALL clients (A, B, C) received "Jump" (including original sender A)
+            // 4. Wait for ClientRpc broadcast
+            // 5. Verify ALL clients (A, B, C) received "Jump" via ClientRpc
             //
             // ASSERTIONS:
-            // - Server processes RPC first
-            // - Server relays to all clients (including sender)
+            // - Server processes ServerRpc first
+            // - Server manually broadcasts via ClientRpc
             // - All clients synchronized
         }
 
         [Test]
         [Ignore("Requires Unity PlayMode test infrastructure and full GONet runtime")]
-        public void Integration_ServerRpc_RelayModeOthers_ExcludesOriginalSender()
+        public void Integration_ServerRpc_WithTargetRpcToOthers()
         {
-            // SCENARIO: ServerRpc with Relay=Others excludes original sender from relay (P1)
+            // SCENARIO: ServerRpc processes on server, manually notifies other clients via TargetRpc (P1)
             //
             // SETUP:
             // 1. Start GONet server + 3 clients (A, B, C)
             // 2. Test component:
-            //    [ServerRpc(Relay = RelayMode.Others)]
+            //    [ServerRpc]
             //    void NotifyOthers(string action)
             //    {
             //        serverReceivedActions.Add(action);
+            //        var context = GONetEventBus.GetCurrentRpcContext();
+            //        // Manually broadcast to others (excluding sender)
+            //        CallRpc(nameof(NotifyOthersImpl), action, context.SourceAuthorityId);
+            //    }
+            //
+            //    [TargetRpc(RpcTarget.Others)]
+            //    void NotifyOthersImpl(string action, ushort excludeAuthority)
+            //    {
+            //        if (GONetMain.MyAuthorityId != excludeAuthority)
+            //            clientReceivedActions.Add(action);
             //    }
             //
             // TEST FLOW:
             // 1. Client A calls NotifyOthers("Action")
-            // 2. Wait for server + relay
+            // 2. Wait for server + TargetRpc delivery
             // 3. Verify server recorded "Action"
             // 4. Verify clients B and C received "Action"
-            // 5. Verify client A did NOT receive relay (original sender excluded)
+            // 5. Verify client A did NOT receive notification (original sender excluded)
             //
             // ASSERTIONS:
-            // - Server processes RPC
-            // - Relay sent to other clients only
-            // - Original sender excluded from relay
+            // - Server processes ServerRpc
+            // - TargetRpc sent to other clients only
+            // - Original sender excluded from notification
         }
 
         [Test]

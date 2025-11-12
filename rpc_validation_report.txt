@@ -1,0 +1,102 @@
+================================================================================
+GONet Comprehensive RPC Validation Analysis
+================================================================================
+Log file: C:\Users\shash\AppData\LocalLow\Galore Interactive\GONetSandbox\logs\gonet-2025-11-10.log
+Total log lines: 125850
+
+================================================================================
+PHASE 1: ServerRpc RunLocally Validation
+================================================================================
+
+[OK] Server ServerRpc (RunLocally, Remote: False): 0 executions
+
+[OK] Server ServerRpc (from clients, Remote: True): 0 executions
+
+[OK] Client ServerRpc initiated: 0 executions
+
+[WARN]  WARNING: No server-side ServerRpc with Remote: False found!
+   Expected: Server pressing Shift+C should show Remote: False
+
+[WARN]  WARNING: No server-side ServerRpc with Remote: True found!
+   Expected: Clients pressing Shift+C should show Remote: True on server
+
+[FAIL] FAIL: RunLocally behavior validation failed
+
+================================================================================
+PHASE 2: ClientRpc Broadcast Validation
+================================================================================
+
+[OK] Server ClientRpc executed: 0 (should be 0 in dedicated mode)
+[OK] Client 1 ClientRpc received: 0
+[OK] Client 2 ClientRpc received: 0
+[OK] Client 3 ClientRpc received: 0
+
+[WARN]  SKIP: No ClientRpc broadcasts detected (Shift+S not pressed?)
+
+================================================================================
+PHASE 3: TargetRpc Targeting Validation
+================================================================================
+
+[OK] Server TargetRpc executed: 7
+[OK] Client 1 TargetRpc executed: 0
+[OK] Client 2 TargetRpc executed: 0
+[OK] Client 3 TargetRpc executed: 0
+
+[PASS] PASS: TargetRpc targeting validated (7 total executions)
+
+================================================================================
+PHASE 4: RPC Persistence & Late-Joiner Validation
+================================================================================
+
+[OK] Persistence log entries: 13
+  [Server] Log:Debug [TestExecutor] Making scene-based EventSystem 'EventSystem' persistent...
+  [Client:0] Log:Debug [ExitButtonUI] Making scene-based EventSystem 'EventSystem' persistent...
+  [Client:1] Log:Info No RPC executions recorded...
+  [Server] Log:Debug [TARGETRPC-SERVER] Received RoutedRpc: Method=TargetRpc_NonPersistent, OriginalTargetCount...
+  [Server] Log:Debug [TARGETRPC-SERVER] Routing RpcEvent to target: TargetId=1023, IsServer=True, Method=Target...
+
+[OK] Claim events by machine:
+  [Client:1]: 17 claims
+  [Server]: 10 claims
+  [Client:2]: 12 claims
+  [Client:3]: 10 claims
+  [Client:4]: 9 claims
+  [Client:3[DEBUG]: 1 claims
+
+[OK] Late-joiner deliveries: 2
+  [Server] Log:Debug [REACTIVE-SEND] Client 3 finished loading scene 'RpcPlayground' - sending scene-defined ob...
+  [Server] Log:Debug [REACTIVE-SEND] Client 4 finished loading scene 'RpcPlayground' - sending scene-defined ob...
+
+[PASS] PASS: Late-joiner (Client 3) received 10 persistent RPCs
+
+================================================================================
+PHASE 5: Async RPC & Return Values Validation
+================================================================================
+
+[OK] Async completions ('ASYNC DONE'): 0
+
+[OK] Async return values ('Claim successful'): 6
+  Sample: Log:Debug Claim successful! You are claim #1...
+
+[PASS] PASS: Async RPC completions validated
+
+================================================================================
+ERROR & WARNING ANALYSIS
+================================================================================
+
+[OK] Total Errors: 19
+  [Client:1] Log:Error RELIABLE sync bundle - GONetParticipant NOT FOUND. Current GONetId: 0, InstantiationId: 413695. Maps contain -...
+  [Client:2] Log:Error Reliable changes bundle being processed and GONetParticipant NOT FOUND by GONetId: 0 gonetId@instantiation: 41...
+  [Client:1] Log:Error Reliable changes bundle being processed and GONetParticipant NOT FOUND by GONetId: 0 gonetId@instantiation: 41...
+Traceback (most recent call last):
+  File "D:\projects\unity\gonet-git\Assets\GONet\Sample\Utilities\LogAnalysis\analyze_rpc_validation.py", line 428, in <module>
+    main()
+  File "D:\projects\unity\gonet-git\Assets\GONet\Sample\Utilities\LogAnalysis\analyze_rpc_validation.py", line 421, in main
+    validations['Error-Free Execution'] = analyze_errors_warnings(lines)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\unity\gonet-git\Assets\GONet\Sample\Utilities\LogAnalysis\analyze_rpc_validation.py", line 298, in analyze_errors_warnings
+    print(f"  [{machine}] {msg[:120]}...")
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 38-39: character maps to <undefined>
