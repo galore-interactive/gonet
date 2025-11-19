@@ -42,6 +42,13 @@ public class GONetSampleClientOrServer : MonoBehaviour
     {
         DontDestroyOnLoad(gameObject);
 
+        // Only set framerate cap if not already configured by the game
+        // Default is -1 (uncapped), which causes high CPU usage
+        if (Application.targetFrameRate == -1)
+        {
+            Application.targetFrameRate = 128;
+        }
+
         if (isServer)
         {
             InitServer();
@@ -85,8 +92,6 @@ public class GONetSampleClientOrServer : MonoBehaviour
 
     private void InitServer()
     {
-        Application.targetFrameRate = 128;
-
         if (isUsingAWSGameLift)
         {
             InitServer_AWSGameLift();

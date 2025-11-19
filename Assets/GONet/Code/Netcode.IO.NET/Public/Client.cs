@@ -424,6 +424,11 @@ namespace NetcodeIO.NET
 					{
 						Thread.Sleep(TimeSpan.FromTicks(ticksToSleep));
 					}
+					else
+					{
+						// Tick took longer than expected - yield CPU briefly to prevent busy-spin
+						Thread.Sleep(0); // Yields to other threads without blocking
+					}
 				}
 			}
 		}

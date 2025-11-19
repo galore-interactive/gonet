@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace NetcodeIO.NET.Utils
 {
-	internal struct Datagram
+	public struct Datagram
 	{
 		public byte[] payload;
 		public int payloadSize;

@@ -3068,6 +3068,8 @@ namespace GONet
 
             while (isRunning_endOfTheLineSendAndSave_Thread)
             {
+                bool didWork = false;
+
                 try
                 {
                     { // Do send stuffs
@@ -3131,6 +3133,7 @@ namespace GONet
                                 }
 
                                 ++processedCount;
+                                didWork = true;
                             }
 
                             if (processedCount < readyCount)
@@ -3153,6 +3156,7 @@ namespace GONet
                                     AppendToDatabaseFile_SaveThread(saveSupport.queue_needsSaving); // this is the act of saving...after this, they no longer need saving
                                 }
                                 saveSupport.OnAfterAllSaved_SaveThread();
+                                didWork = true;
                             }
                         }
                     }
@@ -3165,6 +3169,12 @@ namespace GONet
                 finally
                 {
                     ++tickCount_endOfTheLineSendAndSave_Thread;
+
+                    // Sleep if idle to prevent busy-spin CPU burn (same fix as socket read thread)
+                    if (!didWork)
+                    {
+                        Thread.Sleep(1); // Yields CPU when no work available (~0.5-2ms latency, minimal overhead)
+                    }
                 }
             }
         }

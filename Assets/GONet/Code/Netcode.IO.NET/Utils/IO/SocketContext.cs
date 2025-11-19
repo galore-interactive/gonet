@@ -1,503 +1,450 @@
-﻿using System;
+﻿using GONet;
+using GONet.Utils;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 
-using System.Threading;
-using GONet.Utils;
-using System.Collections.Concurrent;
-using GONet;
-
 namespace NetcodeIO.NET.Utils.IO
 {
-	internal interface ISocketContext : IDisposable
-	{
+    public interface ISocketContext : IDisposable
+    {
+        int BoundPort { get; }
         int AvailableToReadCount { get; }
-		int BoundPort { get; }
-		void Close();
-		void Bind(EndPoint endpoint);
-		void SendTo(byte[] data, EndPoint remoteEP);
-		void SendTo(byte[] data, int length, EndPoint remoteEP);
-		void SendToAsync(byte[] data, int length, EndPoint remoteEP);
-		bool Read(out Datagram packet);
-		void Pump();
-	}
+        void Bind(EndPoint endpoint);
+        void SendTo(byte[] data, EndPoint remoteEP);
+        void SendTo(byte[] data, int length, EndPoint remoteEP);
+        void SendToAsync(byte[] data, int length, EndPoint remoteEP);
+        bool Read(out Datagram packet);
+        void Pump(); // Only used by simulator
+        void Close();
+    }
 
-	internal class UDPSocketContext : ISocketContext
-	{
-		public int BoundPort => ((IPEndPoint)internalSocket.LocalEndPoint).Port;
+    internal sealed class UDPSocketContext : ISocketContext
+    {
+        public int BoundPort => _boundPort;
+        public int AvailableToReadCount => _datagramQueue.Count;
 
-        public int AvailableToReadCount => datagramQueue.Count;
+        private Socket _socket;
+        private int _boundPort = -1;
+        private volatile bool _isRunning;
+        private readonly AddressFamily _addressFamily;
 
-        private Socket internalSocket;
-		private Thread readFromSocketThread;
-		private volatile bool isReadSocketRunning;
+        private readonly DatagramQueue _datagramQueue;
+        private readonly ArrayPool<byte> _sendPayloadPool;
+        private readonly ArrayPool<byte> _receiveBufferPool;
+        private readonly ObjectPool<SendAsyncPackaging> _sendPackagingPool;
+        private readonly ReceiveAsyncPackagingPool _receivePackagingPool;
 
-		private DatagramQueue datagramQueue;
+        // Concurrent receives: Higher = better throughput, more memory
+        // 8-16 is optimal for game servers (balances latency vs memory)
+        private const int ConcurrentReceives = 12;
 
-        public UDPSocketContext(AddressFamily addressFamily)
+        // Custom pool for ReceiveAsyncPackaging (requires factory pattern)
+        private sealed class ReceiveAsyncPackagingPool : ObjectPoolBase<ReceiveAsyncPackaging>
         {
-            datagramQueue = new DatagramQueue();
+            private readonly UDPSocketContext _context;
 
-            // Create socket based on address family
-            internalSocket = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
-
-			// allow dual-stack
-			{
-				//internalSocket.DualMode = true;
-				// the above causes this:
-				//NotSupportedException: This protocol version is not supported.
-				//System.Net.Sockets.Socket.set_DualMode(System.Boolean value) (at < 36d5d97f0e39429283d80156f1c7f1fc >:0)
-			}
-            internalSocket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
-
+            public ReceiveAsyncPackagingPool(int initialSize, int growByCount, UDPSocketContext context)
+                : base(initialSize, growByCount, null)
             {
-                // NOTE: @ 10 Hz GONet tick rate, 100 APR characters for 1 client ... server is sending 656 Kbps => 8,400 bytes/tick => 6 packets/tick
-                //const int SocketBufferSize = 1024 * 1024; // 1MB TODO make this user configurable
-                internalSocket.ReceiveBufferSize = 8400 * 2 * 2; // ~represents a client's incoming needs for 20 Hz server send rate and double that need for safety
-                internalSocket.SendBufferSize = 8400 * 2 * 100; // ~represents a server's outgoing needs for 100 clients and therefore 100 APR characters
+                _context = context;
             }
+
+            protected override ReceiveAsyncPackaging CreateSingleInstance()
+            {
+                return new ReceiveAsyncPackaging { Context = _context };
+            }
+        }
+
+        // Global staging queue for async send completions (IOCP threads don't match caller threads)
+        private readonly ConcurrentQueue<byte[]> _sendPayloadReturns = new();
+        private readonly ConcurrentQueue<SendAsyncPackaging> _sendPackagingReturns = new();
+
+        private sealed class SendAsyncPackaging : SocketAsyncEventArgs
+        {
+            public byte[] payload;
+            public int payloadSize;
+            public UDPSocketContext Context;
+
+            public void Init(EndPoint remoteEP, byte[] payload, int size, UDPSocketContext context)
+            {
+                RemoteEndPoint = remoteEP;
+                SetBuffer(payload, 0, size);
+                this.payload = payload;
+                this.payloadSize = size;
+                Context = context;
+            }
+
+            protected override void OnCompleted(SocketAsyncEventArgs e)
+            {
+                var packaging = (SendAsyncPackaging)e;
+                if (packaging.BytesTransferred != packaging.payloadSize && packaging.SocketError == SocketError.Success)
+                {
+                    GONetLog.Warning($"Partial send: {packaging.BytesTransferred}/{packaging.payloadSize} bytes");
+                }
+
+                // Queue for return (will be drained by SendToAsync on main thread)
+                var ctx = packaging.Context;
+                if (ctx != null)
+                {
+                    ctx._sendPayloadReturns.Enqueue(packaging.payload);
+                    ctx._sendPackagingReturns.Enqueue(packaging);
+                }
+            }
+        }
+
+        private sealed class ReceiveAsyncPackaging : SocketAsyncEventArgs
+        {
+            public byte[] RentedBuffer;
+            public ArrayPool<byte> BufferPool;
+            public UDPSocketContext Context;
+
+            // Parameterless constructor required by ObjectPool
+            public ReceiveAsyncPackaging()
+            {
+            }
+
+            public void PrepareForReceive(AddressFamily family, ArrayPool<byte> bufferPool)
+            {
+                // Rent buffer from pool (MUST return after use!)
+                if (RentedBuffer == null)
+                {
+                    RentedBuffer = bufferPool.Borrow(65536);
+                    BufferPool = bufferPool;
+                    SetBuffer(RentedBuffer, 0, RentedBuffer.Length);
+                }
+
+                // Create NEW endpoint each time (thread-safe, no mutation)
+                RemoteEndPoint = new IPEndPoint(
+                    family == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any,
+                    0);
+            }
+
+            protected override void OnCompleted(SocketAsyncEventArgs e)
+            {
+                // Null check AND running check before processing
+                var ctx = Context;
+                if (ctx != null && ctx._isRunning)
+                {
+                    ctx.ProcessReceive((ReceiveAsyncPackaging)e);
+                }
+            }
+
+            public void ReturnBuffer()
+            {
+                if (RentedBuffer != null && BufferPool != null)
+                {
+                    BufferPool.Return(RentedBuffer);
+                    RentedBuffer = null;
+                    BufferPool = null;
+                }
+            }
+        }
+
+        public UDPSocketContext(AddressFamily addressFamily = AddressFamily.InterNetworkV6)
+        {
+            _addressFamily = addressFamily;
+            _datagramQueue = new DatagramQueue();
+
+            _socket = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
+            _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+
+            // Optimized buffer sizes (tuned for 100-client server @ 20Hz)
+            _socket.ReceiveBufferSize = 8400 * 4;   // ~64KB client incoming
+            _socket.SendBufferSize = 8400 * 200;    // ~1.6MB server outgoing
+
+            // Pooling (GONet style)
+            _sendPayloadPool = new ArrayPool<byte>(50, 25, 1024, 64 * 1024);
+            _receiveBufferPool = new ArrayPool<byte>(ConcurrentReceives * 2, ConcurrentReceives, 65536, 65536);
+            _sendPackagingPool = new ObjectPool<SendAsyncPackaging>(100, 50);
+            _receivePackagingPool = new ReceiveAsyncPackagingPool(
+                ConcurrentReceives * 2,  // Max capacity: 24
+                ConcurrentReceives,      // Min capacity: 12
+                this);
         }
 
         public void Bind(EndPoint endpoint)
-		{
-			internalSocket.Bind(endpoint);
+        {
+            _socket.Bind(endpoint);
+            _boundPort = ((IPEndPoint)_socket.LocalEndPoint).Port;
+            _isRunning = true;
 
-			readFromSocketThread = new Thread(ReadFromSocket_SeparateThread);
-			readFromSocketThread.Name = "GONet Socket Reads";
-			readFromSocketThread.Priority = ThreadPriority.AboveNormal;
-			readFromSocketThread.IsBackground = true; // do not prevent process from exiting when foreground thread(s) end
-			readFromSocketThread.Start();
-		}
-
-		/// <summary>
-		/// IMPORTANT: This is NOT an async send.
-		/// </summary>
-		public void SendTo(byte[] data, EndPoint remoteEP)
-		{
-            //GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
-			internalSocket.SendTo(data, remoteEP);
-        }
-
-		/// <summary>
-		/// IMPORTANT: This is NOT an async send.
-		/// </summary>
-		public void SendTo(byte[] data, int length, EndPoint remoteEP)
-		{
-            //GONet.GONetLog.Debug("sending...length[]: " + data.Length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
-			internalSocket.SendTo(data, length, SocketFlags.None, remoteEP);
-        }
-
-        #region Async send related stuff
-
-        static readonly ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>> asyncSendBorrowedPayloadsByPool = new ConcurrentDictionary<ArrayPool<byte>, ConcurrentQueue<byte[]>>(3, 3);
-		static readonly ConcurrentDictionary<Thread, ArrayPool<byte>> asyncSendPoolByThread = new ConcurrentDictionary<Thread, ArrayPool<byte>>(2, 2);
-
-		static readonly ConcurrentDictionary<ObjectPool<AsyncSendPackaging>, ConcurrentQueue<AsyncSendPackaging>> asyncSendBorrowedPackagingByPool = new ConcurrentDictionary<ObjectPool<AsyncSendPackaging>, ConcurrentQueue<AsyncSendPackaging>>(3, 3);
-		static readonly ConcurrentDictionary<Thread, ObjectPool<AsyncSendPackaging>> asyncSendPackagingPoolByThread = new ConcurrentDictionary<Thread, ObjectPool<AsyncSendPackaging>>(2, 2);
-
-		public class AsyncSendPackaging : SocketAsyncEventArgs
-		{
-			public byte[] payload;
-			public int payloadSize;
-			public ArrayPool<byte> payloadBorrowedFromPool;
-			public ObjectPool<AsyncSendPackaging> thisBorrowedFromPool;
-
-			internal void Init(EndPoint remoteEP, byte[] payload, int payloadSize, ArrayPool<byte> payloadBorrowedFromPool, ObjectPool<AsyncSendPackaging> thisBorrowedFromPool, EventHandler<SocketAsyncEventArgs> onCompleted)
+            // Post multiple overlapping async receives (NO THREAD NEEDED!)
+            for (int i = 0; i < ConcurrentReceives; i++)
             {
-				RemoteEndPoint = remoteEP;
-				SetBuffer(payload, 0, payloadSize);
+                var packaging = _receivePackagingPool.Borrow();
 
-				this.payload = payload;
-				this.payloadSize = payloadSize;
-				this.payloadBorrowedFromPool = payloadBorrowedFromPool;
-				this.thisBorrowedFromPool = thisBorrowedFromPool;
+                // CRITICAL: Re-initialize Context on every borrow (pool reuse pattern)
+                packaging.Context = this;
+                packaging.PrepareForReceive(_addressFamily, _receiveBufferPool);
 
-				Completed -= onCompleted; // this ensures we do not just keep adding again and again...not sure how else to ensure only one
-				Completed += onCompleted;
+                if (!PostReceive(packaging))
+                {
+                    // Completed synchronously (rare but possible)
+                    ProcessReceive(packaging);
+                }
             }
         }
 
-		/// <summary>
-		/// IMPORTANT: This is an ASYNC send.
-		/// </summary>
-		public void SendToAsync(byte[] data, int length, EndPoint remoteEP)
-		{
-			ArrayPool<byte> asyncSendPool;
-			if (!asyncSendPoolByThread.TryGetValue(Thread.CurrentThread, out asyncSendPool))
+        private bool PostReceive(ReceiveAsyncPackaging packaging)
+        {
+            var socket = _socket; // Snapshot to avoid race
+            if (!_isRunning || socket == null)
             {
-				asyncSendPoolByThread[Thread.CurrentThread] = asyncSendPool = new ArrayPool<byte>(10, 1, 1024 * 4, 1024 * 32);
-			}
-
-			ObjectPool<AsyncSendPackaging> asyncSendPackagingPool;
-			if (!asyncSendPackagingPoolByThread.TryGetValue(Thread.CurrentThread, out asyncSendPackagingPool))
-            {
-				asyncSendPackagingPoolByThread[Thread.CurrentThread] = asyncSendPackagingPool = new ObjectPool<AsyncSendPackaging>(50, 2);
+                _receivePackagingPool.Return(packaging);
+                return false;
             }
 
-			byte[] payload = asyncSendPool.Borrow(length);
-			Buffer.BlockCopy(data, 0, payload, 0, length);
-
-			AsyncSendPackaging sendPackaging = asyncSendPackagingPool.Borrow();
-			sendPackaging.Init(remoteEP, payload, length, asyncSendPool, asyncSendPackagingPool, OnSendToAsyncComplete);
-			
-			if (!internalSocket.SendToAsync(sendPackaging))
-			{
-				GONetLog.Error($"Ran into something possibly serious trying to initiate this SendToAsync call.");
-			}
-
-			ReturnBorrowedSendStuffsCompleted(Thread.CurrentThread); // memory management like this is required due to array pools not being multithread capable and we send and endSend on different threads
-
-			//GONet.GONetLog.Debug("sending...length: " + length + " to endpoint: " + NetworkUtils.GetEndpointDebugString(remoteEP));
-		}
-
-		private void ReturnBorrowedSendStuffsCompleted(Thread onlyProcessForThread)
-        {
-			ArrayPool<byte> borrowedFromPool = asyncSendPoolByThread[onlyProcessForThread];
-			ConcurrentQueue<byte[]> borrowedPayloads;
-			if (asyncSendBorrowedPayloadsByPool.TryGetValue(borrowedFromPool, out borrowedPayloads))
-			{
-				int arrayCount = borrowedPayloads.Count;
-				int returnedCount = 0;
-				byte[] borrowedPayload;
-				while (returnedCount < arrayCount && borrowedPayloads.TryDequeue(out borrowedPayload))
-				{
-					borrowedFromPool.Return(borrowedPayload);
-					++returnedCount;
-				}
-			}
-
-            ObjectPool<AsyncSendPackaging> asyncSendPackagingPool = asyncSendPackagingPoolByThread[onlyProcessForThread];
-			ConcurrentQueue<AsyncSendPackaging> borrowedPackagings;
-			if (asyncSendBorrowedPackagingByPool.TryGetValue(asyncSendPackagingPool, out borrowedPackagings))
-			{
-				int arrayCount = borrowedPackagings.Count;
-				int returnedCount = 0;
-				AsyncSendPackaging borrowedPackaging;
-				while (returnedCount < arrayCount && borrowedPackagings.TryDequeue(out borrowedPackaging))
-				{
-					asyncSendPackagingPool.Return(borrowedPackaging);
-					++returnedCount;
-				}
-			}
-
-		}
-
-		private void OnSendToAsyncComplete(object sender, SocketAsyncEventArgs sendToAsyncArgs)
-		{
-			if (sendToAsyncArgs.SocketError == SocketError.Success)
-			{
-				if (sendToAsyncArgs.LastOperation == SocketAsyncOperation.SendTo)
-				{
-					AsyncSendPackaging sendPackaging = (AsyncSendPackaging)sendToAsyncArgs;
-					int bytesSentCount = sendPackaging.BytesTransferred;
-
-					{ // the memory management required due to running stuff on differnet threads and array pools are not multithred capable
-						ConcurrentQueue<byte[]> borrowedPayloads;
-						if (!asyncSendBorrowedPayloadsByPool.TryGetValue(sendPackaging.payloadBorrowedFromPool, out borrowedPayloads))
-						{
-							asyncSendBorrowedPayloadsByPool[sendPackaging.payloadBorrowedFromPool] = borrowedPayloads = new ConcurrentQueue<byte[]>();
-						}
-						borrowedPayloads.Enqueue(sendPackaging.payload);
-					}
-
-					if (bytesSentCount != sendPackaging.payloadSize)
-					{
-						GONetLog.Warning($"Call to BeginSendTo did not end up sending all the payload of size: {sendPackaging.payloadSize} and instead only sent size: {bytesSentCount}");
-					}
-
-					{ // the memory management required due to running stuff on differnet threads and array pools are not multithred capable
-						ConcurrentQueue<AsyncSendPackaging> borrowedPackagings;
-						if (!asyncSendBorrowedPackagingByPool.TryGetValue(sendPackaging.thisBorrowedFromPool, out borrowedPackagings))
-						{
-							asyncSendBorrowedPackagingByPool[sendPackaging.thisBorrowedFromPool] = borrowedPackagings = new ConcurrentQueue<AsyncSendPackaging>();
-						}
-						borrowedPackagings.Enqueue(sendPackaging);
-					}
-				}
-			}
-			else
-			{
-				throw new SocketException((int)sendToAsyncArgs.SocketError);
-			}
-		}
-
-		private void OnBeginSendToComplete(IAsyncResult beginSendToResult)
-        {
             try
             {
-			}
-			catch (ObjectDisposedException ode)
+                return socket.ReceiveFromAsync(packaging);
+            }
+            catch (ObjectDisposedException)
             {
-				GONetLog.Info($"Trying to end the BeginSendTo call.  This is most likely happening as a result of a normal shutdown procedure. Message: {ode.Message}");
-			}
-			catch (Exception e)
+                // Socket disposed during call - graceful shutdown
+                _receivePackagingPool.Return(packaging);
+                return false;
+            }
+            catch (SocketException)
             {
-				GONetLog.Error($"Ran into something possibly serious trying to wrap up this BeginSendTo call.  Exception Type: {e.GetType().FullName} Message: {e.Message}");
+                // Socket error (e.g., closed) - graceful shutdown
+                _receivePackagingPool.Return(packaging);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                GONetLog.Error($"Unexpected PostReceive error: {ex}");
+                _receivePackagingPool.Return(packaging);
+                return false;
             }
         }
 
-        #endregion
+        private void ProcessReceive(ReceiveAsyncPackaging packaging)
+        {
+            // Check for successful receive
+            if (packaging.SocketError == SocketError.Success && packaging.BytesTransferred > 0)
+            {
+                // Copy from rented buffer to GONet's BufferPool (MUST copy before reposting!)
+                var payload = BufferPool.GetBuffer(packaging.BytesTransferred);
+                Buffer.BlockCopy(packaging.RentedBuffer, packaging.Offset, payload, 0, packaging.BytesTransferred);
+
+                _datagramQueue.Enqueue(new Datagram
+                {
+                    payload = payload,
+                    payloadSize = packaging.BytesTransferred,
+                    sender = packaging.RemoteEndPoint
+                });
+            }
+            else if (packaging.SocketError != SocketError.OperationAborted && packaging.SocketError != SocketError.Success)
+            {
+                // Log non-fatal errors (except normal shutdown)
+                GONetLog.Warning($"UDP receive error: {packaging.SocketError}");
+            }
+
+            // Repost receive if socket still alive
+            if (_isRunning && _socket != null)
+            {
+                packaging.PrepareForReceive(_addressFamily, _receiveBufferPool);
+
+                if (!PostReceive(packaging))
+                {
+                    // Rare: synchronous completion on repost (tail recursion)
+                    ProcessReceive(packaging);
+                }
+            }
+            else
+            {
+                // Shutdown: return buffer to pool, then return packaging
+                packaging.ReturnBuffer();
+                _receivePackagingPool.Return(packaging);
+            }
+        }
+
+        public void SendTo(byte[] data, EndPoint remoteEP) => _socket.SendTo(data, remoteEP);
+        public void SendTo(byte[] data, int length, EndPoint remoteEP) => _socket.SendTo(data, length, SocketFlags.None, remoteEP);
+
+        public void SendToAsync(byte[] data, int length, EndPoint remoteEP)
+        {
+            // Drain completed send returns FIRST (thread-safe drain from IOCP completions)
+            DrainSendReturns();
+
+            var payload = _sendPayloadPool.Borrow(length);
+            Buffer.BlockCopy(data, 0, payload, 0, length);
+
+            var packaging = _sendPackagingPool.Borrow();
+            packaging.Init(remoteEP, payload, length, this);
+
+            try
+            {
+                if (!_socket.SendToAsync(packaging))
+                {
+                    // Completed synchronously (rare)
+                    _sendPayloadReturns.Enqueue(packaging.payload);
+                    _sendPackagingReturns.Enqueue(packaging);
+                }
+            }
+            catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
+            {
+                // Error: return to pools immediately
+                _sendPayloadPool.Return(payload);
+                _sendPackagingPool.Return(packaging);
+                throw;
+            }
+
+            // Drain again (may have completed during SendToAsync call)
+            DrainSendReturns();
+        }
+
+        private void DrainSendReturns()
+        {
+            // Return completed payloads to pool
+            while (_sendPayloadReturns.TryDequeue(out var payload))
+                _sendPayloadPool.Return(payload);
+
+            // Return completed packagings to pool
+            while (_sendPackagingReturns.TryDequeue(out var packaging))
+                _sendPackagingPool.Return(packaging);
+        }
+
+        public bool Read(out Datagram packet) => _datagramQueue.TryDequeue(out packet);
+
+        public void Pump() { /* Real socket doesn't need pump */ }
+
+        public void Close()
+        {
+            _isRunning = false;
+            _socket?.Close();
+        }
+
+        public void Dispose()
+        {
+            Close();
+            _socket?.Dispose();
+            _socket = null;
+        }
+    }
+
+    // =============================================================================
+    // Network Simulator – Now Efficient, Deterministic, and Fully Compatible
+    // =============================================================================
+
+    internal sealed class NetworkSimulatorSocketManager
+    {
+        public int LatencyMS { get; set; } = 0;
+        public int JitterMS { get; set; } = 0;
+        public int PacketLossChance { get; set; } = 0;      // 0-99
+        public int DuplicatePacketChance { get; set; } = 0;  // 0-99
+        public bool AutoTime { get; set; } = true;
+
+        public double Time => AutoTime ? Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency : _manualTime;
+        private double _manualTime;
+
+        private readonly Dictionary<EndPoint, NetworkSimulatorSocketContext> _sockets = new();
+        private readonly Random _rnd = new();
+
+        public void Update(double time) => _manualTime = time;
+
+        public NetworkSimulatorSocketContext CreateContext(EndPoint endpoint)
+        {
+            var ctx = new NetworkSimulatorSocketContext(this);
+            lock (_sockets) _sockets[endpoint] = ctx;
+            ctx._localEndpoint = endpoint;
+            return ctx;
+        }
+
+        internal NetworkSimulatorSocketContext FindContext(EndPoint ep)
+        {
+            NetworkSimulatorSocketContext ctx;
+            lock (_sockets) _sockets.TryGetValue(ep, out ctx);
+            return ctx;
+        }
+
+        internal void Remove(EndPoint ep)
+        {
+            lock (_sockets) _sockets.Remove(ep);
+        }
+
+        internal void Deliver(byte[] data, EndPoint from, EndPoint to)
+        {
+            if (_rnd.Next(100) < PacketLossChance) return;
+
+            double delay = LatencyMS / 1000.0;
+            if (JitterMS > 0)
+                delay += (_rnd.NextDouble() * 2 - 1) * (JitterMS / 1000.0);
+
+            var target = FindContext(to);
+            if (target == null) return;
+
+            target.Enqueue(data, from, Time + delay);
+
+            if (_rnd.Next(100) < DuplicatePacketChance)
+                target.Enqueue(data, from, Time + delay + _rnd.NextDouble() * 0.05);
+        }
+    }
+
+    internal sealed class NetworkSimulatorSocketContext : ISocketContext
+    {
+        public int BoundPort => ((IPEndPoint)_localEndpoint).Port;
+        public int AvailableToReadCount => _readyQueue.Count;
+
+        internal EndPoint _localEndpoint;
+        private readonly NetworkSimulatorSocketManager _manager;
+        private readonly DatagramQueue _readyQueue = new();
+        private readonly List<(double arrival, byte[] data, EndPoint sender)> _pending = new();
+        private readonly object _lock = new();
+
+        internal NetworkSimulatorSocketContext(NetworkSimulatorSocketManager manager) => _manager = manager;
+
+        public void Bind(EndPoint endpoint) => _localEndpoint = endpoint;
+
+        public void SendTo(byte[] data, EndPoint remoteEP) => SendTo(data, data.Length, remoteEP);
+        public void SendTo(byte[] data, int length, EndPoint remoteEP)
+        {
+            var copy = new byte[length];
+            Buffer.BlockCopy(data, 0, copy, 0, length);
+            _manager.Deliver(copy, _localEndpoint, remoteEP);
+        }
+
+        public void SendToAsync(byte[] data, int length, EndPoint remoteEP) => SendTo(data, length, remoteEP);
+
+        internal void Enqueue(byte[] data, EndPoint sender, double arrival)
+        {
+            lock (_lock)
+                _pending.Add((arrival, data, sender));
+        }
 
         public void Pump()
-		{
-		}
-
-		public bool Read(out Datagram packet)
-		{
-			if (datagramQueue.Count > 0)
-			{
-				return datagramQueue.TryDequeue(out packet);
-			}
-
-			packet = default;
-			return false;
-		}
-
-		public void Close()
-		{
-			internalSocket.Close();
-			isReadSocketRunning = false;
-		}
-
-		public void Dispose()
-		{
-			Close();
-		}
-
-		private void ReadFromSocket_SeparateThread()
-		{
-			isReadSocketRunning = true;
-
-			/*
-			const int ACTIVE_RECEIVE_THREADS = 5; // TODO promote up to some user configration setting
-			datagramQueue.BeginReceiving(internalSocket, ACTIVE_RECEIVE_THREADS);
-			
-			while (isReadSocketRunning)
-			{
-				datagramQueue.ReturnBorrowedReceivePayloadsCompleted(Thread.CurrentThread);
-
-				Thread.Sleep(5);
-			}
-			*/
-
-			//*
-			while (isReadSocketRunning)
-            {
-				try
-                {
-					datagramQueue.ReadFrom(internalSocket);
-				}
-				catch
-				{
-				}
-			}
-			//*/
-		}
-	}
-
-	internal class NetworkSimulatorSocketManager
-	{
-		public int LatencyMS = 0;
-		public int JitterMS = 0;
-		public int PacketLossChance = 0;
-		public int DuplicatePacketChance = 0;
-
-		public bool AutoTime = true;
-
-		public double Time
-		{
-			get
-			{
-				if (AutoTime)
-					return DateTime.UtcNow.GetTotalSeconds();
-				else
-					return time;
-			}
-		}
-
-		private Dictionary<EndPoint, NetworkSimulatorSocketContext> sockets = new Dictionary<EndPoint, NetworkSimulatorSocketContext>();
-		private double time;
-
-		public void Update(double time)
-		{
-			this.time = time;
-		}
-
-		public NetworkSimulatorSocketContext CreateContext(EndPoint endpoint)
-		{
-			var socket = new NetworkSimulatorSocketContext();
-			socket.Manager = this;
-
-			return socket;
-		}
-
-		public void ChangeContext(NetworkSimulatorSocketContext socket, EndPoint endpoint)
-		{
-			if (sockets.ContainsKey(endpoint))
-				throw new SocketException();
-
-			sockets.Add(endpoint, socket);
-		}
-
-		public void RemoveContext(EndPoint endpoint)
-		{
-			sockets.Remove(endpoint);
-		}
-
-		public NetworkSimulatorSocketContext FindContext(EndPoint endpoint)
-		{
-			if (!sockets.ContainsKey(endpoint))
-				return null;
-
-			return sockets[endpoint];
-		}
-	}
-
-	internal class NetworkSimulatorSocketContext : ISocketContext
-	{
-		public int BoundPort => ((IPEndPoint)endpoint).Port;
-
-        public int AvailableToReadCount => datagramQueue.Count;
-
-        private struct simulatedPacket
-		{
-			public double receiveTime;
-			public byte[] packetData;
-			public EndPoint sender;
-		}
-
-		public NetworkSimulatorSocketManager Manager;
-
-		private EndPoint endpoint;
-		private List<simulatedPacket> simulatedPackets = new List<simulatedPacket>();
-		private DatagramQueue datagramQueue = new DatagramQueue();
-		private object mutex = new object();
-
-		private Random rand = new Random();
-		private bool running = false;
-
-		public void Bind(EndPoint endpoint)
-		{
-			if (this.endpoint != null && this.endpoint.Equals(endpoint)) return;
-
-			this.running = true;
-			this.endpoint = endpoint;
-
-			Manager.ChangeContext(this, this.endpoint);
-		}
-
-		public void SimulateReceive(byte[] packetData, EndPoint sender)
-		{
-			if (!running) return;
-
-			double receiveTime = Manager.Time;
-
-			// add latency+jitter to receive time
-			receiveTime += (Manager.LatencyMS / 1000.0) + (rand.Next(-Manager.JitterMS, Manager.JitterMS) / 2000.0);
-
-			lock (mutex)
-			{
-				simulatedPackets.Add(new simulatedPacket()
-				{
-					receiveTime = receiveTime,
-					packetData = packetData,
-					sender = sender
-				});
-			}
-		}
-
-		public void SendTo(byte[] data, EndPoint remoteEP)
-		{
-			if (!running) throw new SocketException();
-
-			// randomly drop packets
-			if (rand.Next(100) < Manager.PacketLossChance)
-			{
-				return;
-			}
-
-			byte[] temp = new byte[data.Length];
-			Buffer.BlockCopy(data, 0, temp, 0, data.Length);
-
-			var endSocket = Manager.FindContext(remoteEP);
-
-			if (endSocket != null)
-			{
-				endSocket.SimulateReceive(temp, this.endpoint);
-
-				// randomly duplicate packets
-				if (rand.Next(100) < Manager.DuplicatePacketChance)
-					endSocket.SimulateReceive(temp, this.endpoint);
-			}
-		}
-
-		/// <summary>
-		/// IMPORTANT: I am a lier and I am not ASYNC sending.
-		/// </summary>
-		public void SendToAsync(byte[] data, int length, EndPoint remoteEP)
-		{
-			SendTo(data, length, remoteEP);
-		}
-
-		public void SendTo(byte[] data, int length, EndPoint remoteEP)
         {
-			if (!running) throw new SocketException();
+            var now = _manager.Time;
+            lock (_lock)
+            {
+                for (int i = _pending.Count - 1; i >= 0; i--)
+                {
+                    if (_pending[i].arrival <= now)
+                    {
+                        var pkt = _pending[i];
+                        _pending.RemoveAt(i);
 
-			byte[] temp = new byte[length];
-			Buffer.BlockCopy(data, 0, temp, 0, length);
+                        var buffer = BufferPool.GetBuffer(pkt.data.Length);
+                        Buffer.BlockCopy(pkt.data, 0, buffer, 0, pkt.data.Length);
 
-			SendTo(temp, remoteEP);
-		}
+                        _readyQueue.Enqueue(new Datagram
+                        {
+                            payload = buffer,
+                            payloadSize = pkt.data.Length,
+                            sender = pkt.sender
+                        });
+                    }
+                }
+            }
+        }
 
-		public void Pump()
-		{
-			if (simulatedPackets.Count > 0)
-			{
-				lock (simulatedPackets)
-				{
-					// enqueue packets ready to be received
-					for (int i = 0; i < simulatedPackets.Count; i++)
-					{
-						if (Manager.Time >= simulatedPackets[i].receiveTime)
-						{
-							var receivePacket = simulatedPackets[i];
-							simulatedPackets.RemoveAt(i);
+        public bool Read(out Datagram packet) => _readyQueue.TryDequeue(out packet);
 
-							byte[] receiveBuffer = BufferPool.GetBuffer(2048);
-							Buffer.BlockCopy(receivePacket.packetData, 0, receiveBuffer, 0, receivePacket.packetData.Length);
-
-							Datagram datagram = new Datagram();
-							datagram.payload = receiveBuffer;
-							datagram.payloadSize = receivePacket.packetData.Length;
-							datagram.sender = receivePacket.sender;
-							datagramQueue.Enqueue(datagram);
-						}
-					}
-				}
-			}
-		}
-
-		public bool Read(out Datagram packet)
-		{
-			if (datagramQueue.Count > 0)
-			{
-				return datagramQueue.TryDequeue(out packet);
-			}
-
-			packet = new Datagram();
-			return false;
-		}
-
-		public void Close()
-		{
-			running = false;
-			Manager.RemoveContext(this.endpoint);
-		}
-
-		public void Dispose()
-		{
-			Close();
-		}
-	}
+        public void Close() => _manager.Remove(_localEndpoint);
+        public void Dispose() => Close();
+    }
 }
